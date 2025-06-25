@@ -1,0 +1,181 @@
+# 智能切竹机系统配置文件
+# 配置文件版本: v1.0
+
+# 硬件配置
+hardware:
+  # 视觉系统
+  vision:
+    camera:
+      resolution: [2048, 1536]  # 摄像头分辨率
+      fps: 30                   # 帧率
+      exposure: auto            # 曝光模式
+      gain: auto               # 增益模式
+    
+    lighting:
+      brightness: 80           # 照明亮度 (0-100)
+      color_temp: 6500         # 色温 (K)
+      strobe_mode: false       # 频闪模式
+    
+    calibration:
+      pixel_to_mm: 0.5         # 像素到毫米转换比例
+      focal_length: 16         # 镜头焦距 (mm)
+      working_distance: 400    # 工作距离 (mm)
+  
+  # 机械系统
+  mechanical:
+    rails:
+      length: 1000             # 导轨长度 (mm)
+      max_speed: 100           # 最大速度 (mm/s)
+      acceleration: 2000       # 加速度 (mm/s²)
+      precision: 0.01          # 定位精度 (mm)
+    
+    cutting:
+      blade_diameter: 200      # 刀片直径 (mm)
+      max_rpm: 6000           # 最大转速 (rpm)
+      cutting_force_limit: 500 # 切割力限制 (N)
+    
+    clamping:
+      min_diameter: 20         # 最小夹持直径 (mm)
+      max_diameter: 80         # 最大夹持直径 (mm)
+      clamping_force: 300      # 夹持力 (N)
+
+# 通信配置
+communication:
+  modbus_tcp:
+    plc_host: "192.168.1.20"   # PLC IP地址
+    port: 502                  # Modbus TCP端口
+    timeout: 5.0               # 超时时间 (秒)
+    retry_count: 3             # 重试次数
+    
+  jetson:
+    host: "192.168.1.10"       # Jetson Nano IP地址
+    subnet_mask: "255.255.255.0"
+    gateway: "192.168.1.1"
+  
+  security:
+    enable_encryption: true     # 启用加密
+    enable_signature: true      # 启用数字签名
+    max_time_deviation: 5000   # 最大时间偏差 (ms)
+
+# AI视觉配置
+vision_ai:
+  model:
+    type: "CNN"                # 模型类型
+    input_size: [640, 480]     # 输入尺寸
+    num_classes: 3             # 分类数量
+    confidence_threshold: 0.8  # 置信度阈值
+    
+  detection:
+    nms_threshold: 0.5         # 非最大抑制阈值
+    max_detections: 50         # 最大检测数量
+    min_node_distance: 20      # 最小竹节间距 (mm)
+    
+  preprocessing:
+    normalize: true            # 归一化
+    augmentation: false        # 数据增强
+    resize_method: "bilinear"  # 缩放方法
+
+# 加工参数
+cutting_parameters:
+  default:
+    target_length: 150.0       # 默认目标长度 (mm)
+    cutting_speed: 50.0        # 默认切割速度 (mm/s)
+    positioning_speed: 80.0    # 定位速度 (mm/s)
+    
+  bamboo_specs:
+    min_diameter: 20           # 最小直径 (mm)
+    max_diameter: 80           # 最大直径 (mm)
+    min_length: 100            # 最小长度 (mm)
+    max_length: 6000           # 最大长度 (mm)
+    
+  quality_control:
+    length_tolerance: 2.0      # 长度公差 (mm)
+    straightness_tolerance: 1.0 # 直线度公差 (mm)
+    surface_quality: "A"       # 表面质量等级
+
+# 安全配置
+safety:
+  emergency_stop:
+    enabled: true              # 启用急停
+    response_time: 100         # 响应时间 (ms)
+    
+  protective_measures:
+    light_curtain: true        # 光栅保护
+    safety_fence: true         # 安全围栏
+    two_hand_control: false    # 双手控制
+    
+  monitoring:
+    motor_temp_limit: 80       # 电机温度限制 (℃)
+    cutting_force_limit: 600   # 切割力限制 (N)
+    vibration_limit: 0.5       # 振动限制 (m/s²)
+
+# 数据管理
+data_management:
+  logging:
+    level: "INFO"              # 日志级别
+    file_path: "./logs/"       # 日志文件路径
+    max_file_size: "10MB"      # 最大文件大小
+    backup_count: 5            # 备份文件数量
+    
+  database:
+    type: "sqlite"             # 数据库类型
+    path: "./data/bamboo_cutting.db"
+    backup_interval: 3600      # 备份间隔 (秒)
+    
+  statistics:
+    enable_collection: true    # 启用统计收集
+    report_interval: 86400     # 报告间隔 (秒)
+
+# 性能参数
+performance:
+  processing:
+    max_threads: 4             # 最大线程数
+    batch_size: 1              # 批处理大小
+    queue_size: 10             # 队列大小
+    
+  monitoring:
+    status_update_interval: 1.0 # 状态更新间隔 (秒)
+    heartbeat_interval: 30     # 心跳间隔 (秒)
+    
+  optimization:
+    enable_gpu: true           # 启用GPU
+    memory_pool: true          # 启用内存池
+    cache_size: "1GB"          # 缓存大小
+
+# 用户界面
+user_interface:
+  display:
+    theme: "dark"              # 主题 (dark/light)
+    language: "zh_CN"          # 语言
+    font_size: 12              # 字体大小
+    
+  controls:
+    enable_manual_mode: true   # 启用手动模式
+    confirm_operations: true   # 操作确认
+    show_debug_info: false     # 显示调试信息
+
+# 维护配置
+maintenance:
+  schedule:
+    daily_check: true          # 日常检查
+    weekly_maintenance: true   # 周维护
+    monthly_calibration: true  # 月校准
+    
+  alerts:
+    blade_wear_limit: 500      # 刀片磨损限制 (小时)
+    lubrication_interval: 200  # 润滑间隔 (小时)
+    filter_replacement: 1000   # 滤芯更换 (小时)
+
+# 版本信息
+version_info:
+  config_version: "1.0"
+  software_version: "1.0.0"
+  hardware_version: "A1.0"
+  last_updated: "2025-01-11"
+  
+# 开发配置
+development:
+  debug_mode: false           # 调试模式
+  simulation_mode: false      # 仿真模式
+  test_data_path: "./test_data/"
+  mock_hardware: false        # 模拟硬件 

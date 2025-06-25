@@ -1,0 +1,188 @@
+# 智能切竹机项目依赖包
+
+# AI视觉处理
+torch>=1.9.0
+torchvision>=0.10.0
+opencv-python>=4.5.0
+numpy>=1.19.0
+Pillow>=8.0.0
+
+# 深度学习相关
+scikit-learn>=0.24.0
+matplotlib>=3.3.0
+seaborn>=0.11.0
+
+# 通信协议
+pymodbus>=2.5.3
+crc32c>=2.3
+cryptography>=3.4.0
+
+# 数据处理
+pandas>=1.3.0
+scipy>=1.7.0
+h5py>=3.1.0
+
+# 系统工具
+psutil>=5.8.0
+pyyaml>=5.4.0
+configparser>=5.0.0
+pathlib2>=2.3.0
+
+# 日志记录
+colorlog>=6.6.0
+
+# 测试工具
+pytest>=6.2.0
+pytest-cov>=2.11.0
+
+# 开发工具
+black>=21.0.0
+flake8>=3.8.0
+mypy>=0.812
+
+# Jetson Nano特定依赖
+# jetson-stats>=3.1.0  # 仅在Jetson设备上安装
+
+# 可选：GPU加速
+# cupy-cuda110>=9.0.0  # 根据CUDA版本选择
+
+# 图像处理增强
+albumentations>=1.1.0
+imgaug>=0.4.0
+
+# 配置管理
+hydra-core>=1.1.0
+omegaconf>=2.1.0
+
+# 实时监控
+rich>=10.0.0
+tqdm>=4.60.0
+
+# 网络工具
+requests>=2.25.0
+websockets>=9.1
+
+# 数据存储
+sqlite3  # Python内置，无需安装
+redis>=3.5.0  # 可选，用于缓存
+
+# 时间处理
+arrow>=1.2.0
+
+# 多线程/多进程
+threading  # Python内置
+multiprocessing  # Python内置
+concurrent.futures  # Python内置
+
+# 序列化
+pickle  # Python内置
+json  # Python内置
+protobuf>=3.17.0  # 用于通信协议
+
+# 数学计算
+sympy>=1.8.0  # 可选，用于复杂数学计算
+
+# 基础依赖
+numpy>=1.21.0
+opencv-python>=4.5.0
+pillow>=8.0.0
+scipy>=1.7.0
+
+# 图像处理和计算机视觉
+scikit-image>=0.18.0
+matplotlib>=3.3.0
+
+# 硬件控制相关
+pyserial>=3.5
+RPi.GPIO>=0.7.0; sys_platform == "linux"
+
+# GPIO模拟库（用于非树莓派环境测试）
+fake-rpi>=0.7.0
+
+# 配置文件处理
+pyyaml>=5.4.0
+configparser>=5.0.0
+
+# 日志和调试
+colorlog>=6.0.0
+
+# 数据处理
+pandas>=1.3.0
+
+# 网络通信
+requests>=2.25.0
+flask>=2.0.0
+
+# 单元测试
+pytest>=6.2.0
+pytest-cov>=2.12.0
+
+# 类型检查
+mypy>=0.910
+
+# 代码格式化
+black>=21.0.0
+flake8>=3.9.0
+
+# 文档生成
+sphinx>=4.0.0
+
+# 多媒体处理
+imageio>=2.9.0
+
+# 数值计算优化
+numba>=0.53.0
+
+# 机器学习和深度学习依赖
+# YOLOv8和相关依赖
+ultralytics>=8.3.145
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# ONNX支持（用于模型部署优化）
+onnx>=1.12.0
+onnxruntime>=1.12.0
+
+# 数据标注和处理
+labelimg>=1.8.6
+albumentations>=1.3.0
+
+# 模型训练相关
+tensorboard>=2.10.0
+wandb>=0.13.0
+
+# GPU加速支持（可选）
+# 注意：根据实际硬件选择对应版本
+# torch>=2.0.0+cu118  # CUDA 11.8版本
+# torchvision>=0.15.0+cu118
+
+# Jetson Nano特定依赖（如果在Jetson上部署）
+# jetson-stats>=4.2.0; sys_platform == "linux"
+
+# 其他机器学习工具
+scikit-learn>=1.0.0
+seaborn>=0.11.0
+
+# 性能监控
+psutil>=5.8.0
+memory-profiler>=0.60.0
+
+# 数据序列化
+joblib>=1.0.0
+pickle5>=0.0.11
+
+# 图像增强和预处理
+imgaug>=0.4.0
+
+# 模型压缩和优化
+openvino>=2023.0.0  # Intel OpenVINO（可选）
+
+# 开发环境依赖
+ipython>=7.25.0
+jupyter>=1.0.0
+notebook>=6.4.0
+
+# API和Web服务
+fastapi>=0.68.0
+uvicorn>=0.15.0 
