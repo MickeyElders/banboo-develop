@@ -1,0 +1,35 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=智能切竹机控制系统
+Name[en]=Bamboo Cut Intelligent System
+Comment=基于AI视觉识别的智能切竹机控制系统
+Comment[en]=AI Vision-based Intelligent Bamboo Cutting Machine Control System
+Icon=bamboo-cut
+Exec=/usr/bin/bamboo-cut-test
+Terminal=false
+Categories=Science;Engineering;Graphics;
+Keywords=bamboo;cutting;machine;AI;vision;industrial;automation;
+StartupNotify=true
+StartupWMClass=BambooCutSystem
+MimeType=application/x-bamboo-cut-project;
+
+[Desktop Action Settings]
+Name=系统设置
+Name[en]=System Settings
+Icon=preferences-system
+Exec=/usr/bin/bamboo-cut --settings
+
+[Desktop Action Demo]
+Name=演示模式
+Name[en]=Demo Mode
+Icon=media-playback-start
+Exec=/usr/bin/bamboo-cut-demo
+
+[Desktop Action Logs]
+Name=查看日志
+Name[en]=View Logs
+Icon=utilities-system-monitor
+Exec=gnome-terminal -- tail -f /opt/bamboo-cut/logs/system.log
+
+Actions=Settings;Demo;Logs; 

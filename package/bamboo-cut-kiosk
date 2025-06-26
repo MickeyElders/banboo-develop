@@ -1,0 +1,110 @@
+#!/bin/bash
+# 智能切竹机 Kiosk 模式启动脚本
+
+# 设置环境变量
+export PYTHONPATH="/opt/bamboo-cut:$PYTHONPATH"
+export BAMBOO_CUT_CONFIG_DIR="/etc/bamboo-cut"
+export BAMBOO_CUT_LOG_DIR="/opt/bamboo-cut/logs"
+export BAMBOO_CUT_DATA_DIR="/opt/bamboo-cut/data"
+
+# Kiosk 模式特定设置
+export BAMBOO_CUT_KIOSK_MODE=1
+export GDK_BACKEND=x11,wayland
+export MOZ_ENABLE_WAYLAND=1
+
+# 创建日志目录
+mkdir -p "$BAMBOO_CUT_LOG_DIR"
+
+# 函数：检查 X11 显示
+check_display() {
+    if [ -z "$DISPLAY" ]; then
+        export DISPLAY=:0
+    fi
+    
+    # 等待 X11 服务器就绪
+    local max_wait=30
+    local count=0
+    while ! xdpyinfo &>/dev/null && [ $count -lt $max_wait ]; do
+        echo "等待图形界面启动... ($count/$max_wait)"
+        sleep 1
+        ((count++))
+    done
+    
+    if ! xdpyinfo &>/dev/null; then
+        echo "错误: 无法连接到 X11 显示服务器"
+        return 1
+    fi
+}
+
+# 函数：设置 Kiosk 环境
+setup_kiosk_environment() {
+    echo "配置 Kiosk 模式环境..."
+    
+    # 隐藏鼠标光标（5秒无活动后）
+    if command -v unclutter &>/dev/null; then
+        unclutter -idle 5 &
+    fi
+    
+    # 禁用屏幕保护程序
+    if command -v xset &>/dev/null; then
+        xset s off
+        xset -dpms
+        xset s noblank
+    fi
+    
+    # 禁用 Alt+Tab 和其他快捷键
+    if command -v gsettings &>/dev/null; then
+        gsettings set org.gnome.desktop.wm.keybindings switch-applications "[]" 2>/dev/null || true
+        gsettings set org.gnome.desktop.wm.keybindings switch-windows "[]" 2>/dev/null || true
+        gsettings set org.gnome.shell.keybindings toggle-overview "[]" 2>/dev/null || true
+    fi
+}
+
+# 函数：启动应用程序
+start_application() {
+    echo "启动智能切竹机 Kiosk 界面..."
+    
+    # 切换到程序目录
+    cd /opt/bamboo-cut 2>/dev/null || {
+        echo "错误: 无法切换到程序目录"
+        exit 1
+    }
+    
+    # 启动触摸界面（全屏模式）
+    python3 /usr/bin/test_touch_interface.py --kiosk --fullscreen
+}
+
+# 主流程
+main() {
+    echo "正在启动智能切竹机 Kiosk 模式..."
+    
+    # 检查是否以 root 权限运行
+    if [ "$EUID" -ne 0 ]; then
+        echo "警告: Kiosk 模式建议以 root 权限运行以获得完整功能"
+    fi
+    
+    # 检查显示环境
+    if ! check_display; then
+        echo "错误: 无法初始化图形环境"
+        exit 1
+    fi
+    
+    # 设置 Kiosk 环境
+    setup_kiosk_environment
+    
+    # 启动应用程序
+    start_application
+}
+
+# 信号处理
+cleanup() {
+    echo "正在退出 Kiosk 模式..."
+    # 杀死子进程
+    pkill -P $$ || true
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# 执行主流程
+main "$@" 

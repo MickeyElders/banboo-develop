@@ -1,0 +1,145 @@
+#!/bin/bash
+# 智能切竹机系统安装后配置脚本
+
+set -e
+
+# 配置变量
+APP_NAME="bamboo-cut"
+APP_DIR="/opt/bamboo-cut"
+CONFIG_DIR="/etc/bamboo-cut"
+SERVICE_USER="bamboo-cut"
+
+echo "正在配置智能切竹机系统..."
+
+# 创建系统用户（如果不存在）
+if ! id "$SERVICE_USER" &>/dev/null; then
+    echo "创建系统用户: $SERVICE_USER"
+    useradd --system --home-dir "$APP_DIR" --shell /bin/false \
+            --comment "智能切竹机系统服务用户" "$SERVICE_USER"
+fi
+
+# 创建必要的目录
+mkdir -p "$APP_DIR"/{logs,temp,data}
+mkdir -p "$CONFIG_DIR"
+
+# 设置目录权限
+echo "设置文件权限..."
+chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR"
+chmod 755 "$APP_DIR"
+chmod 750 "$CONFIG_DIR"
+chmod 644 "$CONFIG_DIR"/*.yaml 2>/dev/null || true
+
+# 设置可执行文件权限
+chmod +x /usr/bin/bamboo-cut 2>/dev/null || true
+chmod +x /usr/bin/bamboo-cut-kiosk 2>/dev/null || true
+
+# 安装 Python 依赖
+echo "安装 Python 依赖包..."
+if command -v pip3 &>/dev/null; then
+    # 安装核心依赖
+    pip3 install --quiet --upgrade pip setuptools wheel
+    
+    # 安装项目依赖（如果 requirements.txt 存在）
+    if [ -f /usr/share/doc/bamboo-cut/requirements.txt ]; then
+        pip3 install --quiet -r /usr/share/doc/bamboo-cut/requirements.txt || {
+            echo "警告: 某些 Python 依赖包安装失败，可能需要手动安装"
+        }
+    fi
+    
+    # 确保关键依赖已安装
+    pip3 install --quiet opencv-python ultralytics pymodbus PyYAML numpy || {
+        echo "警告: 关键依赖包安装失败"
+    }
+else
+    echo "警告: pip3 未找到，请手动安装 Python 依赖"
+fi
+
+# 重新加载 systemd 配置
+echo "配置系统服务..."
+systemctl daemon-reload
+
+# 启用服务（但不立即启动）
+if [ -f /etc/systemd/system/bamboo-cut.service ]; then
+    systemctl enable bamboo-cut.service || {
+        echo "警告: 无法启用 bamboo-cut 服务"
+    }
+fi
+
+if [ -f /etc/systemd/system/bamboo-cut-kiosk.service ]; then
+    systemctl enable bamboo-cut-kiosk.service || {
+        echo "警告: 无法启用 bamboo-cut-kiosk 服务"
+    }
+fi
+
+# 更新桌面数据库
+if command -v update-desktop-database &>/dev/null; then
+    update-desktop-database /usr/share/applications/ || true
+fi
+
+# 更新图标缓存
+if command -v gtk-update-icon-cache &>/dev/null; then
+    gtk-update-icon-cache -f /usr/share/pixmaps/ || true
+fi
+
+# 添加用户到必要的组
+if getent group dialout &>/dev/null; then
+    usermod -a -G dialout "$SERVICE_USER" || true
+fi
+
+if getent group video &>/dev/null; then
+    usermod -a -G video "$SERVICE_USER" || true
+fi
+
+# 创建日志轮转配置
+cat > /etc/logrotate.d/bamboo-cut << 'EOF'
+/opt/bamboo-cut/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    copytruncate
+    notifempty
+    su bamboo-cut bamboo-cut
+}
+EOF
+
+# 设置 udev 规则（用于相机和串口设备）
+cat > /etc/udev/rules.d/99-bamboo-cut.rules << 'EOF'
+# 智能切竹机设备权限规则
+SUBSYSTEM=="video4linux", GROUP="video", MODE="0664"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", GROUP="video", MODE="0664"
+KERNEL=="ttyUSB*", GROUP="dialout", MODE="0664"
+KERNEL=="ttyACM*", GROUP="dialout", MODE="0664"
+EOF
+
+# 重新加载 udev 规则
+udevadm control --reload-rules || true
+
+echo ""
+echo "============================================="
+echo "智能切竹机系统安装完成！"
+echo "============================================="
+echo ""
+echo "可用命令："
+echo "  bamboo-cut           - 启动主程序"
+echo "  bamboo-cut-demo      - 运行演示程序"
+echo "  bamboo-cut-test      - 测试触摸界面"
+echo ""
+echo "系统服务："
+echo "  sudo systemctl start bamboo-cut        - 启动服务"
+echo "  sudo systemctl enable bamboo-cut       - 开机自启"
+echo "  sudo systemctl start bamboo-cut-kiosk  - 启动Kiosk模式"
+echo ""
+echo "配置文件位置："
+echo "  /etc/bamboo-cut/system_config.yaml"
+echo ""
+echo "日志文件位置："
+echo "  /opt/bamboo-cut/logs/"
+echo ""
+echo "如需设置Kiosk模式，请运行："
+echo "  sudo bamboo-cut-kiosk"
+echo ""
+
+exit 0 
