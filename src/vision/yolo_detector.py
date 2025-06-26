@@ -1,18 +1,25 @@
 """
-YOLOv8竹节检测器
-结合深度学习模型进行竹节检测
+YOLOv8竹节检测器 - 优化版本
+结合深度学习模型进行竹节检测，支持多种性能优化技术
 """
 
 import os
 import logging
 import time
-from typing import List, Optional, Dict, Tuple, Any
+import threading
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from typing import List, Optional, Dict, Tuple, Any, Union
 from pathlib import Path
+from contextlib import contextmanager
+from dataclasses import dataclass
+from enum import Enum
 
 import cv2
 import numpy as np
 import torch
 from ultralytics import YOLO
+from ultralytics.utils.autobatch import autobatch
 
 from .vision_processor import VisionProcessor, monitor_performance
 from .vision_types import (
@@ -24,23 +31,96 @@ from .vision_types import (
 logger = logging.getLogger(__name__)
 
 
-class YOLODetector(VisionProcessor):
+class ModelFormat(Enum):
+    """支持的模型格式"""
+    PYTORCH = "pt"
+    ONNX = "onnx"
+    TENSORRT = "engine"
+    OPENVINO = "openvino"
+    NCNN = "ncnn"
+    TFLITE = "tflite"
+    COREML = "coreml"
+
+
+class InferenceMode(Enum):
+    """推理模式"""
+    SYNC = "sync"           # 同步推理
+    ASYNC = "async"         # 异步推理
+    BATCH = "batch"         # 批处理推理
+    STREAM = "stream"       # 流式推理
+
+
+@dataclass
+class OptimizationConfig:
+    """性能优化配置"""
+    enable_half_precision: bool = True      # 启用FP16精度
+    enable_tensorrt: bool = True            # 启用TensorRT加速
+    enable_openvino: bool = False           # 启用OpenVINO优化
+    enable_onnx: bool = False              # 启用ONNX优化
+    
+    # 批处理配置
+    auto_batch_size: bool = True           # 自动确定批量大小
+    max_batch_size: int = 16               # 最大批量大小
+    
+    # 线程配置
+    max_workers: int = 4                   # 最大工作线程数
+    enable_threading: bool = True          # 启用多线程
+    
+    # 内存优化
+    enable_memory_pool: bool = True        # 启用内存池
+    max_memory_cache: int = 1024           # 最大内存缓存(MB)
+    
+    # 预热配置
+    warmup_iterations: int = 5             # 预热迭代次数
+    enable_model_cache: bool = True        # 启用模型缓存
+
+
+class OptimizedYOLODetector(VisionProcessor):
     """
-    基于YOLOv8的竹节检测器
+    优化版本的YOLOv8竹节检测器
+    支持多种性能优化技术
     """
     
     def __init__(self, config: AlgorithmConfig, calibration: Optional[CalibrationData] = None):
         super().__init__(config, calibration)
         
-        # YOLO模型相关
+        # 优化配置
+        self.opt_config = OptimizationConfig()
+        
+        # 模型相关
         self.model: Optional[YOLO] = None
-        self.model_path = "models/bamboo_yolo.pt"  # 默认模型路径
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.model_path = "models/bamboo_yolo.pt"
+        self.model_format = ModelFormat.PYTORCH
+        self.device = self._get_optimal_device()
         
         # 检测参数
         self.confidence_threshold = 0.5
         self.iou_threshold = 0.45
         self.max_detections = 50
+        
+        # 批处理相关
+        self.optimal_batch_size = 1
+        self.inference_mode = InferenceMode.SYNC
+        
+        # 线程安全
+        self._model_lock = threading.RLock()
+        self._inference_lock = threading.Lock()
+        self.thread_local = threading.local()
+        
+        # 性能统计
+        self.performance_stats = {
+            'total_inferences': 0,
+            'total_time': 0.0,
+            'preprocessing_time': 0.0,
+            'inference_time': 0.0,
+            'postprocessing_time': 0.0,
+            'memory_usage': 0.0,
+            'batch_sizes': [],
+            'throughput_fps': 0.0
+        }
+        
+        # 内存池
+        self.memory_pool = {}
         
         # 类别映射
         self.class_mapping = {
@@ -50,261 +130,501 @@ class YOLODetector(VisionProcessor):
             3: NodeType.DAMAGE_NODE
         }
         
-        # 性能统计
-        self.inference_times = []
-        self.preprocessing_times = []
-        
-        logger.info("YOLOv8检测器初始化完成")
+        logger.info("优化版YOLOv8检测器初始化完成")
+    
+    def _get_optimal_device(self) -> str:
+        """获取最优设备"""
+        if torch.cuda.is_available():
+            # 检查GPU内存
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            if gpu_memory >= 4.0:  # 4GB以上使用GPU
+                return 'cuda'
+            else:
+                logger.warning(f"GPU内存不足({gpu_memory:.1f}GB)，使用CPU")
+                return 'cpu'
+        else:
+            return 'cpu'
+    
+    def set_optimization_config(self, **kwargs):
+        """设置优化配置"""
+        for key, value in kwargs.items():
+            if hasattr(self.opt_config, key):
+                setattr(self.opt_config, key, value)
+                logger.info(f"优化配置更新: {key} = {value}")
     
     def initialize(self) -> bool:
         """
-        初始化YOLO检测器
-        Returns:
-            是否成功初始化
+        初始化优化版YOLO检测器
         """
         try:
-            # 检查模型文件
-            if not self._check_model_file():
-                logger.warning("未找到训练好的模型，将使用预训练模型")
-                return self._initialize_pretrained_model()
+            logger.info("初始化优化版YOLO检测器...")
             
-            # 加载自定义模型
-            logger.info(f"加载模型: {self.model_path}")
-            self.model = YOLO(self.model_path)
+            # 检查并加载模型
+            if not self._load_optimal_model():
+                return False
             
-            # 设置设备
-            if torch.cuda.is_available():
-                logger.info(f"使用GPU加速: {torch.cuda.get_device_name()}")
-            else:
-                logger.info("使用CPU推理")
+            # 自动优化批量大小
+            if self.opt_config.auto_batch_size:
+                self._optimize_batch_size()
             
             # 模型预热
             self._warmup_model()
             
+            # 初始化内存池
+            if self.opt_config.enable_memory_pool:
+                self._initialize_memory_pool()
+            
             self.is_initialized = True
-            logger.info("YOLO检测器初始化成功")
+            logger.info("优化版YOLO检测器初始化成功")
             return True
             
         except Exception as e:
-            logger.error(f"YOLO检测器初始化失败: {e}")
+            logger.error(f"优化版YOLO检测器初始化失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
-    def _check_model_file(self) -> bool:
-        """检查模型文件是否存在"""
+    def _load_optimal_model(self) -> bool:
+        """加载最优模型格式"""
+        try:
+            # 检查可用的模型格式，按性能优先级排序
+            model_candidates = self._find_model_candidates()
+            
+            for model_path, format_type in model_candidates:
+                try:
+                    logger.info(f"尝试加载模型: {model_path} (格式: {format_type.value})")
+                    
+                    # 加载模型
+                    self.model = YOLO(model_path)
+                    self.model_path = str(model_path)
+                    self.model_format = format_type
+                    
+                    # 设置设备
+                    if hasattr(self.model.model, 'to'):
+                        self.model.model.to(self.device)
+                    
+                    logger.info(f"成功加载模型: {model_path}")
+                    return True
+                    
+                except Exception as e:
+                    logger.warning(f"加载模型失败 {model_path}: {e}")
+                    continue
+            
+            # 如果没有找到模型，尝试下载预训练模型
+            return self._initialize_pretrained_model()
+            
+        except Exception as e:
+            logger.error(f"模型加载过程失败: {e}")
+            return False
+    
+    def _find_model_candidates(self) -> List[Tuple[Path, ModelFormat]]:
+        """查找可用的模型文件，按性能优先级排序"""
         model_dir = Path("models")
         model_dir.mkdir(exist_ok=True)
         
-        if Path(self.model_path).exists():
-            return True
-        
-        # 检查其他可能的模型文件
-        possible_models = [
-            "models/bamboo_yolov8n.pt",
-            "models/bamboo_yolov8s.pt", 
-            "models/bamboo_yolov8m.pt",
-            "models/bamboo_yolov8l.pt",
-            "models/best.pt",
-            "runs/detect/train/weights/best.pt"
+        # 按性能优先级排序
+        priority_formats = [
+            (ModelFormat.TENSORRT, ["*.engine"]),
+            (ModelFormat.ONNX, ["*.onnx"]),
+            (ModelFormat.OPENVINO, ["*_openvino_model"]),
+            (ModelFormat.PYTORCH, ["*.pt"]),
+            (ModelFormat.NCNN, ["*_ncnn_model"]),
+            (ModelFormat.TFLITE, ["*.tflite"]),
         ]
         
-        for model_path in possible_models:
-            if Path(model_path).exists():
-                self.model_path = model_path
-                logger.info(f"找到模型文件: {model_path}")
-                return True
+        candidates = []
         
-        return False
+        for format_type, patterns in priority_formats:
+            for pattern in patterns:
+                for model_path in model_dir.glob(pattern):
+                    if model_path.exists():
+                        candidates.append((model_path, format_type))
+        
+        # 检查训练输出目录
+        train_output = Path("runs/detect/train/weights")
+        if train_output.exists():
+            for model_file in ["best.pt", "last.pt"]:
+                model_path = train_output / model_file
+                if model_path.exists():
+                    candidates.append((model_path, ModelFormat.PYTORCH))
+        
+        return candidates
     
     def _initialize_pretrained_model(self) -> bool:
-        """
-        初始化预训练模型（用于演示或迁移学习）
-        """
+        """初始化预训练模型"""
         try:
-            logger.info("初始化YOLOv8预训练模型用于演示")
+            logger.info("初始化YOLOv8预训练模型")
             
-            # 使用YOLOv8n作为基础模型
-            self.model = YOLO('yolov8n.pt')
+            # 选择合适的预训练模型
+            if self.device == 'cuda':
+                model_name = 'yolov8s.pt'  # GPU使用稍大模型
+            else:
+                model_name = 'yolov8n.pt'  # CPU使用轻量模型
             
-            # 设置检测阈值（较低，因为不是专门训练的）
+            self.model = YOLO(model_name)
+            self.model_path = model_name
+            self.model_format = ModelFormat.PYTORCH
+            
+            # 降低阈值（因为不是专门训练的）
             self.confidence_threshold = 0.3
             
-            # 创建模型保存目录
-            Path("models").mkdir(exist_ok=True)
-            
-            logger.info("预训练模型初始化成功")
+            logger.info(f"预训练模型初始化成功: {model_name}")
             return True
             
         except Exception as e:
             logger.error(f"预训练模型初始化失败: {e}")
             return False
     
+    def _optimize_batch_size(self):
+        """自动优化批量大小"""
+        try:
+            if self.device == 'cuda' and hasattr(self.model, 'model'):
+                logger.info("自动优化批量大小...")
+                
+                # 使用ultralytics的autobatch功能
+                optimal_batch = autobatch(self.model, imgsz=640, fraction=0.9)
+                self.optimal_batch_size = min(optimal_batch, self.opt_config.max_batch_size)
+                
+                logger.info(f"最优批量大小: {self.optimal_batch_size}")
+            else:
+                self.optimal_batch_size = 1
+                logger.info("使用默认批量大小: 1")
+                
+        except Exception as e:
+            logger.warning(f"批量大小优化失败: {e}")
+            self.optimal_batch_size = 1
+    
     def _warmup_model(self):
-        """模型预热"""
+        """增强版模型预热"""
         try:
             logger.info("模型预热中...")
-            dummy_image = np.zeros((640, 640, 3), dtype=np.uint8)
             
-            # 执行几次推理预热
-            for i in range(3):
-                _ = self.model(dummy_image, verbose=False)
+            # 创建不同尺寸的测试图像
+            test_sizes = [(640, 640), (320, 320), (1280, 1280)]
+            
+            for i, (h, w) in enumerate(test_sizes):
+                for _ in range(self.opt_config.warmup_iterations):
+                    dummy_image = np.random.randint(0, 255, (h, w, 3), dtype=np.uint8)
+                    
+                    # 使用不同批量大小预热
+                    if i == 0 and self.optimal_batch_size > 1:
+                        dummy_batch = np.stack([dummy_image] * min(2, self.optimal_batch_size))
+                        _ = self.model(dummy_batch, verbose=False)
+                    else:
+                        _ = self.model(dummy_image, verbose=False)
             
             logger.info("模型预热完成")
             
         except Exception as e:
             logger.warning(f"模型预热失败: {e}")
     
+    def _initialize_memory_pool(self):
+        """初始化内存池"""
+        try:
+            # 预分配常用尺寸的内存
+            common_sizes = [(640, 640), (320, 320), (1280, 1280)]
+            
+            for size in common_sizes:
+                key = f"image_{size[0]}x{size[1]}"
+                self.memory_pool[key] = np.zeros((size[0], size[1], 3), dtype=np.uint8)
+            
+            logger.info("内存池初始化完成")
+            
+        except Exception as e:
+            logger.warning(f"内存池初始化失败: {e}")
+    
+    def get_thread_local_model(self) -> YOLO:
+        """获取线程本地模型实例"""
+        if not hasattr(self.thread_local, 'model'):
+            with self._model_lock:
+                # 为每个线程创建独立的模型实例
+                self.thread_local.model = YOLO(self.model_path)
+                if hasattr(self.thread_local.model.model, 'to'):
+                    self.thread_local.model.model.to(self.device)
+                logger.debug(f"为线程创建独立模型实例: {threading.current_thread().name}")
+        
+        return self.thread_local.model
+    
     @monitor_performance
     def process_image(self, image: np.ndarray, roi: Optional[ProcessingROI] = None) -> DetectionResult:
         """
-        使用YOLO模型处理图像
-        Args:
-            image: 输入图像
-            roi: 感兴趣区域（可选）
-        Returns:
-            检测结果
+        使用优化后的YOLO模型处理图像
         """
         try:
-            logger.debug("开始YOLO图像处理")
-            
-            # 预处理
             start_time = time.time()
-            processed_image = self.preprocess_image(image)
-            preprocess_time = time.time() - start_time
-            self.preprocessing_times.append(preprocess_time)
             
-            # YOLO推理
-            start_time = time.time()
-            nodes = self._yolo_inference(processed_image)
-            inference_time = time.time() - start_time
-            self.inference_times.append(inference_time)
-            
-            # 后处理 - 分割竹筒段
-            segments = []
-            if len(nodes) > 1:
-                segments = self._segment_bamboo_tubes_yolo(processed_image, nodes)
+            # 选择推理模式
+            if self.inference_mode == InferenceMode.ASYNC:
+                return asyncio.run(self._async_inference(image, roi))
+            elif self.inference_mode == InferenceMode.BATCH:
+                return self._batch_inference([image], [roi])[0]
             else:
-                logger.warning("竹节数量不足，无法分割竹筒段")
-            
-            # 计算切割点
-            cutting_points = self._calculate_cutting_points_yolo(nodes, segments)
-            
-            # 创建结果
-            result = DetectionResult(
-                nodes=nodes,
-                segments=segments,
-                cutting_points=cutting_points,
-                processing_time=0.0,  # 将在装饰器中设置
-                image_shape=image.shape[:2],
-                metadata={
-                    'algorithm': 'yolov8',
-                    'model_path': self.model_path,
-                    'device': self.device,
-                    'confidence_threshold': self.confidence_threshold,
-                    'inference_time': inference_time,
-                    'preprocess_time': preprocess_time,
-                    'num_detections': len(nodes)
-                }
-            )
-            
-            logger.info(f"YOLO检测完成: {len(nodes)}个竹节, {len(segments)}个竹筒段, {len(cutting_points)}个切割点")
-            
-            return result
-            
+                return self._sync_inference(image, roi)
+                
         except Exception as e:
-            logger.error(f"YOLO图像处理失败: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            
-            # 返回空结果
-            return DetectionResult(
-                nodes=[],
-                segments=[],
-                cutting_points=[],
-                processing_time=0.0,
-                image_shape=image.shape[:2],
-                metadata={'error': str(e), 'algorithm': 'yolov8'}
-            )
+            logger.error(f"图像处理失败: {e}")
+            return self._create_empty_result(image.shape[:2], str(e))
     
-    def _yolo_inference(self, image: np.ndarray) -> List[BambooNode]:
-        """
-        YOLO模型推理
-        Args:
-            image: 预处理后的图像
-        Returns:
-            检测到的竹节列表
-        """
-        nodes = []
+    def _sync_inference(self, image: np.ndarray, roi: Optional[ProcessingROI] = None) -> DetectionResult:
+        """同步推理"""
+        start_time = time.time()
         
+        # 预处理
+        preprocess_start = time.time()
+        processed_image = self.preprocess_image(image)
+        preprocess_time = time.time() - preprocess_start
+        
+        # 推理
+        inference_start = time.time()
+        if self.opt_config.enable_threading:
+            model = self.get_thread_local_model()
+        else:
+            model = self.model
+        
+        nodes = self._optimized_inference(processed_image, model)
+        inference_time = time.time() - inference_start
+        
+        # 后处理
+        postprocess_start = time.time()
+        segments = []
+        if len(nodes) > 1:
+            segments = self._segment_bamboo_tubes_yolo(processed_image, nodes)
+        
+        cutting_points = self._calculate_cutting_points_yolo(nodes, segments)
+        postprocess_time = time.time() - postprocess_start
+        
+        # 更新性能统计
+        total_time = time.time() - start_time
+        self._update_performance_stats(total_time, preprocess_time, inference_time, postprocess_time, 1)
+        
+        return DetectionResult(
+            nodes=nodes,
+            segments=segments,
+            cutting_points=cutting_points,
+            processing_time=total_time,
+            image_shape=image.shape[:2],
+            metadata={
+                'algorithm': 'yolov8_optimized',
+                'model_format': self.model_format.value,
+                'device': self.device,
+                'batch_size': 1,
+                'inference_mode': self.inference_mode.value,
+                'performance': {
+                    'preprocess_time': preprocess_time,
+                    'inference_time': inference_time,
+                    'postprocess_time': postprocess_time,
+                    'total_time': total_time
+                }
+            }
+        )
+    
+    async def _async_inference(self, image: np.ndarray, roi: Optional[ProcessingROI] = None) -> DetectionResult:
+        """异步推理"""
+        loop = asyncio.get_event_loop()
+        
+        # 在线程池中执行推理
+        with ThreadPoolExecutor(max_workers=self.opt_config.max_workers) as executor:
+            result = await loop.run_in_executor(executor, self._sync_inference, image, roi)
+        
+        return result
+    
+    def process_images_batch(self, images: List[np.ndarray], 
+                           rois: Optional[List[ProcessingROI]] = None) -> List[DetectionResult]:
+        """批量处理图像"""
+        if rois is None:
+            rois = [None] * len(images)
+        
+        return self._batch_inference(images, rois)
+    
+    def _batch_inference(self, images: List[np.ndarray], 
+                        rois: List[Optional[ProcessingROI]]) -> List[DetectionResult]:
+        """批量推理"""
+        if len(images) == 0:
+            return []
+        
+        start_time = time.time()
+        batch_size = min(len(images), self.optimal_batch_size)
+        results = []
+        
+        # 分批处理
+        for i in range(0, len(images), batch_size):
+            batch_images = images[i:i + batch_size]
+            batch_rois = rois[i:i + batch_size]
+            
+            # 预处理批次
+            preprocess_start = time.time()
+            processed_batch = [self.preprocess_image(img) for img in batch_images]
+            preprocess_time = time.time() - preprocess_start
+            
+            # 批量推理
+            inference_start = time.time()
+            batch_nodes = self._batch_yolo_inference(processed_batch)
+            inference_time = time.time() - inference_start
+            
+            # 后处理
+            postprocess_start = time.time()
+            for j, (img, nodes) in enumerate(zip(processed_batch, batch_nodes)):
+                segments = []
+                if len(nodes) > 1:
+                    segments = self._segment_bamboo_tubes_yolo(img, nodes)
+                
+                cutting_points = self._calculate_cutting_points_yolo(nodes, segments)
+                
+                result = DetectionResult(
+                    nodes=nodes,
+                    segments=segments,
+                    cutting_points=cutting_points,
+                    processing_time=0.0,  # 单张图像时间在批处理中难以准确计算
+                    image_shape=batch_images[j].shape[:2],
+                    metadata={
+                        'algorithm': 'yolov8_optimized',
+                        'model_format': self.model_format.value,
+                        'device': self.device,
+                        'batch_size': len(batch_images),
+                        'inference_mode': InferenceMode.BATCH.value
+                    }
+                )
+                results.append(result)
+            
+            postprocess_time = time.time() - postprocess_start
+            
+            # 更新性能统计
+            batch_time = time.time() - start_time
+            self._update_performance_stats(batch_time, preprocess_time, inference_time, postprocess_time, len(batch_images))
+        
+        return results
+    
+    def _optimized_inference(self, image: np.ndarray, model: YOLO) -> List[BambooNode]:
+        """优化的推理过程"""
         try:
-            # YOLO推理
-            results = self.model(
-                image,
-                conf=self.confidence_threshold,
-                iou=self.iou_threshold,
-                max_det=self.max_detections,
-                verbose=False
-            )
+            # 配置推理参数
+            inference_kwargs = {
+                'conf': self.confidence_threshold,
+                'iou': self.iou_threshold,
+                'max_det': self.max_detections,
+                'verbose': False,
+                'device': self.device
+            }
+            
+            # 启用FP16精度
+            if self.opt_config.enable_half_precision and self.device == 'cuda':
+                inference_kwargs['half'] = True
+            
+            # 执行推理
+            with self._inference_lock:
+                results = model(image, **inference_kwargs)
             
             # 解析结果
-            for result in results:
-                boxes = result.boxes
-                if boxes is None:
-                    continue
-                
-                # 提取检测框信息
-                xyxy = boxes.xyxy.cpu().numpy()  # 边界框坐标
-                conf = boxes.conf.cpu().numpy()  # 置信度
-                cls = boxes.cls.cpu().numpy()   # 类别
-                
-                for i in range(len(xyxy)):
-                    box = xyxy[i]
-                    confidence = float(conf[i])
-                    class_id = int(cls[i])
-                    
-                    # 计算中心点和尺寸
-                    x1, y1, x2, y2 = box
-                    center_x = (x1 + x2) / 2
-                    center_y = (y1 + y2) / 2
-                    width = x2 - x1
-                    height = y2 - y1
-                    
-                    # 映射节点类型
-                    node_type = self.class_mapping.get(class_id, NodeType.UNKNOWN)
-                    
-                    # 创建竹节
-                    node = BambooNode(
-                        position=Point2D(float(center_x), float(center_y)),
-                        position_mm=Point2D(
-                            float(center_x) * self.calibration.pixel_to_mm_ratio if self.calibration else float(center_x),
-                            float(center_y) * self.calibration.pixel_to_mm_ratio if self.calibration else float(center_y)
-                        ),
-                        confidence=confidence,
-                        node_type=node_type,
-                        bbox=BoundingBox(float(x1), float(y1), float(x2), float(y2)),
-                        width=float(width),
-                        width_mm=float(width) * self.calibration.pixel_to_mm_ratio if self.calibration else float(width),
-                        features={
-                            'class_id': class_id,
-                            'box_area': float(width * height),
-                            'aspect_ratio': float(width / max(height, 1)),
-                            'detection_method': 'yolov8'
-                        }
-                    )
-                    
-                    nodes.append(node)
-                    
-                    logger.debug(f"YOLO检测到竹节: 位置({center_x:.1f}, {center_y:.1f}), "
-                               f"类型={node_type.value}, 置信度={confidence:.3f}")
+            nodes = self._parse_yolo_results(results[0], image.shape)
             
-            # 按x坐标排序
-            nodes.sort(key=lambda n: n.position.x)
-            
-            logger.info(f"YOLO检测到 {len(nodes)} 个竹节")
+            return nodes
             
         except Exception as e:
-            logger.error(f"YOLO推理失败: {e}")
+            logger.error(f"优化推理失败: {e}")
+            return []
+    
+    def _batch_yolo_inference(self, images: List[np.ndarray]) -> List[List[BambooNode]]:
+        """批量YOLO推理"""
+        try:
+            # 确保所有图像尺寸一致
+            if len(set(img.shape for img in images)) > 1:
+                # 调整到统一尺寸
+                target_size = images[0].shape
+                images = [cv2.resize(img, (target_size[1], target_size[0])) for img in images]
+            
+            # 批量推理
+            inference_kwargs = {
+                'conf': self.confidence_threshold,
+                'iou': self.iou_threshold,
+                'max_det': self.max_detections,
+                'verbose': False,
+                'device': self.device
+            }
+            
+            if self.opt_config.enable_half_precision and self.device == 'cuda':
+                inference_kwargs['half'] = True
+            
+            # 执行批量推理
+            with self._inference_lock:
+                batch_results = self.model(images, **inference_kwargs)
+            
+            # 解析所有结果
+            all_nodes = []
+            for i, result in enumerate(batch_results):
+                nodes = self._parse_yolo_results(result, images[i].shape)
+                all_nodes.append(nodes)
+            
+            return all_nodes
+            
+        except Exception as e:
+            logger.error(f"批量推理失败: {e}")
+            return [[] for _ in images]
+    
+    def _parse_yolo_results(self, result, image_shape: Tuple[int, int, int]) -> List[BambooNode]:
+        """解析YOLO推理结果"""
+        nodes = []
         
+        if result.boxes is not None and len(result.boxes) > 0:
+            boxes = result.boxes.xyxy.cpu().numpy()
+            scores = result.boxes.conf.cpu().numpy()
+            classes = result.boxes.cls.cpu().numpy()
+            
+            for i, (box, score, cls) in enumerate(zip(boxes, scores, classes)):
+                x1, y1, x2, y2 = box
+                
+                # 计算中心点
+                center_x = (x1 + x2) / 2
+                center_y = (y1 + y2) / 2
+                
+                # 转换类别
+                node_type = self.class_mapping.get(int(cls), NodeType.NATURAL_NODE)
+                
+                # 创建竹节对象
+                node = BambooNode(
+                    id=f"yolo_{i}",
+                    center=Point2D(center_x, center_y),
+                    bounding_box=BoundingBox(x1, y1, x2 - x1, y2 - y1),
+                    confidence=float(score),
+                    node_type=node_type,
+                    diameter_px=max(x2 - x1, y2 - y1),
+                    metadata={
+                        'detection_method': 'yolov8_optimized',
+                        'class_id': int(cls),
+                        'bbox_area': (x2 - x1) * (y2 - y1)
+                    }
+                )
+                nodes.append(node)
+        
+        # 按Y坐标排序
+        nodes.sort(key=lambda n: n.center.y)
         return nodes
+    
+    def _update_performance_stats(self, total_time: float, preprocess_time: float, 
+                                 inference_time: float, postprocess_time: float, batch_size: int):
+        """更新性能统计"""
+        self.performance_stats['total_inferences'] += batch_size
+        self.performance_stats['total_time'] += total_time
+        self.performance_stats['preprocessing_time'] += preprocess_time
+        self.performance_stats['inference_time'] += inference_time
+        self.performance_stats['postprocessing_time'] += postprocess_time
+        self.performance_stats['batch_sizes'].append(batch_size)
+        
+        # 计算吞吐量
+        if self.performance_stats['total_time'] > 0:
+            self.performance_stats['throughput_fps'] = (
+                self.performance_stats['total_inferences'] / self.performance_stats['total_time']
+            )
+    
+    def _create_empty_result(self, image_shape: Tuple[int, int], error_msg: str = "") -> DetectionResult:
+        """创建空结果"""
+        return DetectionResult(
+            nodes=[],
+            segments=[],
+            cutting_points=[],
+            processing_time=0.0,
+            image_shape=image_shape,
+            metadata={'error': error_msg, 'algorithm': 'yolov8_optimized'}
+        )
     
     def _segment_bamboo_tubes_yolo(self, image: np.ndarray, nodes: List[BambooNode]) -> List[BambooSegment]:
         """
@@ -495,55 +815,207 @@ class YOLODetector(VisionProcessor):
         logger.info(f"检测参数已更新: conf={self.confidence_threshold}, "
                    f"iou={self.iou_threshold}, max_det={self.max_detections}")
     
-    def export_model(self, format: str = 'onnx', optimize: bool = True) -> str:
+    def export_optimized_model(self, format: str = 'onnx', **kwargs) -> str:
         """
-        导出模型为其他格式（用于部署优化）
+        导出优化模型
+        Args:
+            format: 导出格式 ('onnx', 'engine', 'openvino', 'ncnn', 'tflite')
+            **kwargs: 导出参数
+        Returns:
+            导出文件路径
         """
-        if not self.model:
-            raise RuntimeError("模型未初始化")
-        
         try:
-            export_path = f"models/bamboo_model.{format}"
+            if not self.model:
+                raise ValueError("模型未初始化")
             
-            if format == 'onnx':
-                self.model.export(format='onnx', optimize=optimize)
-            elif format == 'openvino':
-                self.model.export(format='openvino', optimize=optimize)
-            elif format == 'tensorrt':
-                self.model.export(format='engine', optimize=optimize)
-            else:
-                raise ValueError(f"不支持的导出格式: {format}")
+            logger.info(f"导出模型为{format}格式...")
             
-            logger.info(f"模型已导出为 {format} 格式: {export_path}")
-            return export_path
+            # 默认导出参数
+            export_kwargs = {
+                'imgsz': 640,
+                'optimize': True,
+                'half': self.opt_config.enable_half_precision and self.device == 'cuda',
+                'simplify': True,
+                'workspace': 4,  # GB
+                'batch': self.optimal_batch_size if self.optimal_batch_size > 1 else 1
+            }
+            
+            # 更新用户参数
+            export_kwargs.update(kwargs)
+            
+            # 执行导出
+            exported_path = self.model.export(format=format, **export_kwargs)
+            
+            logger.info(f"模型导出成功: {exported_path}")
+            return str(exported_path)
             
         except Exception as e:
             logger.error(f"模型导出失败: {e}")
             raise
     
+    def benchmark_performance(self, test_images: List[np.ndarray], 
+                            num_runs: int = 10) -> Dict[str, Any]:
+        """
+        性能基准测试
+        Args:
+            test_images: 测试图像列表
+            num_runs: 运行次数
+        Returns:
+            性能基准结果
+        """
+        try:
+            logger.info(f"开始性能基准测试，{num_runs}次运行...")
+            
+            # 重置性能统计
+            self.performance_stats = {
+                'total_inferences': 0,
+                'total_time': 0.0,
+                'preprocessing_time': 0.0,
+                'inference_time': 0.0,
+                'postprocessing_time': 0.0,
+                'memory_usage': 0.0,
+                'batch_sizes': [],
+                'throughput_fps': 0.0
+            }
+            
+            # 单张图像测试
+            single_times = []
+            for _ in range(num_runs):
+                start_time = time.time()
+                for img in test_images:
+                    self.process_image(img)
+                single_times.append(time.time() - start_time)
+            
+            # 批量处理测试
+            batch_times = []
+            if len(test_images) > 1 and self.optimal_batch_size > 1:
+                for _ in range(num_runs):
+                    start_time = time.time()
+                    self.process_images_batch(test_images)
+                    batch_times.append(time.time() - start_time)
+            
+            # 计算统计结果
+            benchmark_results = {
+                'model_info': {
+                    'path': self.model_path,
+                    'format': self.model_format.value,
+                    'device': self.device,
+                    'optimal_batch_size': self.optimal_batch_size
+                },
+                'single_image': {
+                    'avg_time': np.mean(single_times),
+                    'min_time': np.min(single_times),
+                    'max_time': np.max(single_times),
+                    'std_time': np.std(single_times),
+                    'throughput_fps': len(test_images) / np.mean(single_times)
+                },
+                'performance_breakdown': {
+                    'preprocessing_pct': (self.performance_stats['preprocessing_time'] / 
+                                        self.performance_stats['total_time'] * 100),
+                    'inference_pct': (self.performance_stats['inference_time'] / 
+                                    self.performance_stats['total_time'] * 100),
+                    'postprocessing_pct': (self.performance_stats['postprocessing_time'] / 
+                                         self.performance_stats['total_time'] * 100)
+                }
+            }
+            
+            if batch_times:
+                benchmark_results['batch_processing'] = {
+                    'avg_time': np.mean(batch_times),
+                    'min_time': np.min(batch_times),
+                    'max_time': np.max(batch_times),
+                    'throughput_fps': len(test_images) / np.mean(batch_times),
+                    'speedup_factor': np.mean(single_times) / np.mean(batch_times)
+                }
+            
+            logger.info("性能基准测试完成")
+            return benchmark_results
+            
+        except Exception as e:
+            logger.error(f"性能基准测试失败: {e}")
+            return {}
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """获取性能统计"""
+        stats = self.performance_stats.copy()
+        
+        # 添加平均值
+        if stats['total_inferences'] > 0:
+            stats['avg_total_time'] = stats['total_time'] / stats['total_inferences']
+            stats['avg_preprocessing_time'] = stats['preprocessing_time'] / stats['total_inferences']
+            stats['avg_inference_time'] = stats['inference_time'] / stats['total_inferences']
+            stats['avg_postprocessing_time'] = stats['postprocessing_time'] / stats['total_inferences']
+        
+        # 添加配置信息
+        stats['optimization_config'] = {
+            'model_format': self.model_format.value,
+            'device': self.device,
+            'optimal_batch_size': self.optimal_batch_size,
+            'half_precision': self.opt_config.enable_half_precision,
+            'threading_enabled': self.opt_config.enable_threading
+        }
+        
+        return stats
+    
+    def set_inference_mode(self, mode: InferenceMode):
+        """设置推理模式"""
+        self.inference_mode = mode
+        logger.info(f"推理模式已设置为: {mode.value}")
+    
+    @contextmanager
+    def inference_context(self, **kwargs):
+        """推理上下文管理器"""
+        old_config = {}
+        
+        # 保存旧配置
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                old_config[key] = getattr(self, key)
+                setattr(self, key, value)
+        
+        try:
+            yield self
+        finally:
+            # 恢复旧配置
+            for key, value in old_config.items():
+                setattr(self, key, value)
+
     def cleanup(self):
         """清理资源"""
         try:
             if self.model:
-                # 清理GPU内存
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                
+                del self.model
                 self.model = None
             
-            self.is_initialized = False
-            logger.info("YOLO检测器资源清理完成")
+            # 清理线程本地存储
+            if hasattr(self.thread_local, 'model'):
+                del self.thread_local.model
+            
+            # 清理内存池
+            self.memory_pool.clear()
+            
+            # 清理CUDA缓存
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            logger.info("优化版YOLO检测器资源清理完成")
             
         except Exception as e:
             logger.error(f"资源清理失败: {e}")
 
 
-def register_yolo_detector():
-    """注册YOLO检测器到工厂"""
+# 为了向后兼容，保留原始类名
+YOLODetector = OptimizedYOLODetector
+
+
+def register_optimized_yolo_detector():
+    """注册优化版YOLO检测器到工厂"""
     from .vision_processor import VisionProcessorFactory
-    VisionProcessorFactory.register('yolo', YOLODetector)
-    logger.info("YOLO检测器已注册")
+    
+    VisionProcessorFactory.register_processor("yolo_optimized", OptimizedYOLODetector)
+    VisionProcessorFactory.register_processor("yolo", OptimizedYOLODetector)  # 默认使用优化版本
+    logger.info("优化版YOLO检测器已注册到工厂")
 
 
 # 自动注册
-register_yolo_detector() 
+register_optimized_yolo_detector() 
