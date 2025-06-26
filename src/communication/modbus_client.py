@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-智能切竹机 - Modbus TCP通信客户端
-实现与PLC控制器的实时通信
+智能切竹机 - Modbus TCP监控客户端
+实现与PLC控制器的数据监控通信
 
-主要功能：
+主要功能（纯监控模式）：
 1. Modbus TCP连接管理
-2. 切割指令发送
-3. 设备状态查询
-4. 安全校验与错误处理
+2. 设备状态数据读取
+3. 传感器数据监控
+4. 通信错误处理
+
+注意：本客户端仅用于数据监控，不发送控制指令
 """
 
 import socket
@@ -29,10 +31,11 @@ logger = logging.getLogger(__name__)
 
 class DeviceState(Enum):
     """设备状态枚举"""
-    IDLE = 0         # 空闲
-    POSITIONING = 1  # 定位中
-    CUTTING = 2      # 切割中
-    FAULT = 3        # 故障
+    STOPPED = 0      # 停止状态
+    HOMING = 1       # 回零中
+    IDLE = 2         # 空闲待命
+    RUNNING = 3      # 运行中
+    FAULT = 4        # 故障状态
 
 
 class FaultCode(Enum):
@@ -185,6 +188,31 @@ class ModbusTCPClient:
         signature = hash_obj.digest()
         # 填充到32字节
         return signature + b'\x00' * (32 - len(signature))
+    
+    def read_holding_registers(self, start_address: int, count: int) -> Optional[bytes]:
+        """
+        读取保持寄存器
+        Args:
+            start_address: 起始地址
+            count: 寄存器数量
+        Returns:
+            寄存器数据或None
+        """
+        try:
+            # 构建Modbus请求
+            request_data = struct.pack('>HH', start_address, count)
+            response = self._send_request(0x03, request_data)
+            
+            if response and len(response) >= 3:
+                byte_count = response[2]
+                if len(response) >= 3 + byte_count:
+                    return response[3:3+byte_count]
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"读取保持寄存器失败: {e}")
+            return None
     
     def _send_request(self, function_code: int, data: bytes) -> Optional[bytes]:
         """

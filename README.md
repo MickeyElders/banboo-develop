@@ -184,17 +184,86 @@ message DeviceStatus {
 
 ---
 
+## 快速开始
+
+### 测试模式（推荐开始）
+在没有PLC硬件的情况下，可以使用测试模式体验触摸界面：
+
+```bash
+# 1. 安装GUI依赖
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1
+
+# 2. 启动测试模式（使用模拟数据）
+python3 test_touch_interface.py
+```
+
+测试模式特点：
+- ✅ 完整的触摸界面体验
+- ✅ 模拟实时数据更新  
+- ✅ 所有按钮和功能可操作
+- ✅ 不需要PLC硬件连接
+- ✅ 适合演示和界面测试
+
+### 标准模式（需要硬件）
+1. 配置系统参数
+   ```bash
+   cp config/system_config.yaml.example config/system_config.yaml
+   # 编辑配置文件以匹配您的硬件设置
+   ```
+
+2. 运行主程序
+   ```bash
+   python main.py
+   ```
+
+### Kiosk模式（推荐生产环境）
+基于GNOME的触摸界面系统，支持开机自启动和自定义启动动画。
+
+1. 一键部署Kiosk模式
+   ```bash
+   sudo ./setup_kiosk_complete.sh
+   ```
+
+2. 手动配置触摸界面
+   ```bash
+   # 配置自启动
+   sudo ./scripts/create_kiosk_startup.sh
+   
+   # 配置自定义启动动画
+   sudo ./scripts/setup_custom_splash.sh
+   
+   # 启动触摸界面
+   python3 src/gui/touch_interface.py
+   ```
+
+3. 卸载Kiosk模式
+   ```bash
+   ./scripts/uninstall_kiosk.sh
+   ./scripts/uninstall_splash.sh
+   ```
+
+详细配置指南请参考: [Kiosk模式设置指南](docs/kiosk_setup_guide.md)
+
+---
+
 ## 项目状态
 
 ### 当前阶段
 🔄 **开发阶段** - 正在构建核心系统架构
 
+### 已完成功能
+- ✅ AI视觉识别系统
+- ✅ Modbus TCP通信模块
+- ✅ PLC状态监控系统
+- ✅ 工业级触摸界面
+- ✅ Kiosk模式自启动
+- ✅ 自定义启动动画
+
 ### 下一步计划
 1. 搭建硬件测试平台
-2. 开发AI视觉识别算法
-3. 实现Modbus TCP通信模块
-4. 集成PLC控制程序
-5. 系统联调与优化
+2. 系统联调与优化
+3. 性能测试与调优
+4. 生产环境部署
 
 ---
 

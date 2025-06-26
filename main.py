@@ -18,7 +18,7 @@ import threading
 import signal
 import yaml
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any
 from pathlib import Path
 
 # 添加项目路径
@@ -26,6 +26,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.vision.bamboo_detector import BambooDetector, BambooSegment, CuttingPoint
 from src.communication.modbus_client import CuttingController, DeviceState
+from src.communication.status_integration import PLCStatusIntegration, CoreStatusData, ExtendedStatusData
 
 # 配置日志
 logging.basicConfig(
@@ -55,6 +56,7 @@ class SmartBambooCuttingMachine:
         # 核心组件
         self.vision_detector: Optional[BambooDetector] = None
         self.cutting_controller: Optional[CuttingController] = None
+        self.status_integration: Optional[PLCStatusIntegration] = None
         
         # 工作状态
         self.current_bamboo: Optional[List[BambooSegment]] = None
@@ -117,10 +119,16 @@ class SmartBambooCuttingMachine:
             
             self.cutting_controller = CuttingController(plc_host)
             
+            # 初始化状态集成器
+            from src.communication.status_integration import create_status_integration
+            self.status_integration = create_status_integration(plc_host)
+            
+            # 添加状态变化回调
+            self.status_integration.add_status_callback(self._on_status_change)
+            self.status_integration.add_alert_callback(self._on_alert)
+            
             # 启动状态监控
-            self.cutting_controller.start_monitoring(
-                interval=self.config.get('performance', {}).get('monitoring', {}).get('status_update_interval', 1.0)
-            )
+            self.status_integration.start_monitoring()
             
             logger.info("系统组件初始化完成")
             return True
@@ -190,7 +198,7 @@ class SmartBambooCuttingMachine:
                           f"类型={cutting_point.cut_type}")
                 
                 # 检查设备状态
-                if not self.cutting_controller.is_ready():
+                if not self.status_integration.is_ready_for_cutting():
                     logger.error("设备未就绪，跳过此次切割")
                     continue
                 
@@ -368,6 +376,105 @@ class SmartBambooCuttingMachine:
             print(f"运行时间: {runtime_hours:.2f} 小时")
         
         print("="*50)
+    
+    def _on_status_change(self, status_type: str, data: Any):
+        """
+        处理状态变化回调
+        Args:
+            status_type: 状态类型 ('core' 或 'extended')
+            data: 状态数据
+        """
+        try:
+            if status_type == 'core':
+                # 核心状态变化处理
+                core_data: CoreStatusData = data
+                device_state_name = self.status_integration.get_device_state_name()
+                
+                logger.info(f"设备状态更新: {device_state_name} - 位置: {core_data.actual_position:.2f}mm, "
+                          f"切割力: {core_data.cutting_force:.1f}N, 温度: {core_data.motor_temp:.1f}°C")
+                
+                # 根据状态调整工作流程
+                if core_data.device_state == 0:  # 空闲状态
+                    # 可以开始新的切割任务
+                    pass
+                elif core_data.device_state == 2:  # 切割中
+                    # 监控切割过程
+                    if core_data.cutting_force > 400.0:
+                        logger.warning(f"切割力较高: {core_data.cutting_force:.1f}N")
+                
+            elif status_type == 'extended':
+                # 扩展状态变化处理
+                extended_data: ExtendedStatusData = data
+                logger.debug(f"扩展状态更新: 电流: {extended_data.motor_current:.1f}A, "
+                           f"转速: {extended_data.spindle_rpm:.0f}RPM, "
+                           f"刀片磨损: {extended_data.blade_wear_level:.1f}%")
+                
+        except Exception as e:
+            logger.error(f"状态变化处理错误: {e}")
+    
+    def _on_alert(self, alert_message: str, data: Any):
+        """
+        处理告警回调
+        Args:
+            alert_message: 告警消息
+            data: 相关数据
+        """
+        try:
+            logger.warning(f"系统告警: {alert_message}")
+            
+            # 根据告警类型采取相应措施
+            if "急停" in alert_message:
+                # 急停告警 - 立即停止所有操作
+                self.stop_event.set()
+                logger.error("收到急停告警，停止系统运行")
+                
+            elif "故障" in alert_message:
+                # 设备故障 - 暂停当前作业
+                logger.error("收到设备故障告警，暂停当前作业")
+                
+            elif "温度过高" in alert_message:
+                # 温度告警 - 降低工作强度
+                logger.warning("电机温度过高，建议降低工作强度")
+                
+            elif "切割力过载" in alert_message:
+                # 切割力过载 - 调整切割参数
+                logger.warning("切割力过载，建议检查刀具状态")
+                
+            # 更新统计信息
+            self.statistics['failed_cuts'] += 1
+            
+        except Exception as e:
+            logger.error(f"告警处理错误: {e}")
+    
+    def shutdown(self):
+        """优雅关闭系统"""
+        try:
+            logger.info("正在关闭智能切竹机系统...")
+            
+            # 停止主循环
+            self.running = False
+            self.stop_event.set()
+            
+            # 停止状态监控
+            if self.status_integration:
+                self.status_integration.stop_monitoring()
+            
+            # 断开通信连接
+            if self.cutting_controller:
+                self.cutting_controller.disconnect()
+            
+            # 等待主线程结束
+            if self.main_thread and self.main_thread.is_alive():
+                self.main_thread.join(timeout=5.0)
+            
+            # 更新运行时间统计
+            if self.statistics['start_time']:
+                self.statistics['total_runtime'] = time.time() - self.statistics['start_time']
+            
+            logger.info("系统已安全关闭")
+            
+        except Exception as e:
+            logger.error(f"系统关闭错误: {e}")
 
 
 def signal_handler(signum, frame):

@@ -89,7 +89,7 @@ class OptimizedYOLODetector(VisionProcessor):
         
         # 模型相关
         self.model: Optional[YOLO] = None
-        self.model_path = "models/bamboo_yolo.pt"
+        self.model_path = "models/yolov8n_bamboo_best.pt"
         self.model_format = ModelFormat.PYTORCH
         self.device = self._get_optimal_device()
         
@@ -222,22 +222,28 @@ class OptimizedYOLODetector(VisionProcessor):
         model_dir = Path("models")
         model_dir.mkdir(exist_ok=True)
         
-        # 按性能优先级排序
+        candidates = []
+        
+        # 优先检查训练好的模型
+        trained_model = model_dir / "yolov8n_bamboo_best.pt"
+        if trained_model.exists():
+            candidates.append((trained_model, ModelFormat.PYTORCH))
+            logger.info(f"找到训练好的模型: {trained_model}")
+        
+        # 检查其他格式的优化模型
         priority_formats = [
-            (ModelFormat.TENSORRT, ["*.engine"]),
-            (ModelFormat.ONNX, ["*.onnx"]),
+            (ModelFormat.TENSORRT, ["yolov8n_bamboo_best.engine"]),
+            (ModelFormat.ONNX, ["yolov8n_bamboo_best.onnx", "best_model.onnx"]),
             (ModelFormat.OPENVINO, ["*_openvino_model"]),
-            (ModelFormat.PYTORCH, ["*.pt"]),
+            (ModelFormat.PYTORCH, ["best_model.pt", "*.pt"]),
             (ModelFormat.NCNN, ["*_ncnn_model"]),
             (ModelFormat.TFLITE, ["*.tflite"]),
         ]
         
-        candidates = []
-        
         for format_type, patterns in priority_formats:
             for pattern in patterns:
                 for model_path in model_dir.glob(pattern):
-                    if model_path.exists():
+                    if model_path.exists() and model_path not in [c[0] for c in candidates]:
                         candidates.append((model_path, format_type))
         
         # 检查训练输出目录
