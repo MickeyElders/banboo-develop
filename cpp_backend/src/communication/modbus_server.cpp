@@ -1,5 +1,7 @@
 #include "bamboo_cut/communication/modbus_server.h"
+#ifdef ENABLE_MODBUS
 #include <modbus/modbus.h>
+#endif
 #include <iostream>
 #include <sstream>
 #include <cstring>

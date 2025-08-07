@@ -1,6 +1,7 @@
 #include "bamboo_cut/vision/stereo_vision.h"
 #include <iostream>
 #include <fstream>
+#include <thread>
 #include <chrono>
 #include <opencv2/ximgproc.hpp>
 
