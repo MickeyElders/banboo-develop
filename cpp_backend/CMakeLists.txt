@@ -109,25 +109,28 @@ endif()
 # Threads
 find_package(Threads REQUIRED)
 
-# JSON库 (nlohmann/json) - 使用 FetchContent 自动下载
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3  # 使用稳定版本
-    GIT_SHALLOW TRUE
-)
-
-FetchContent_MakeAvailable(nlohmann_json)
-
-if(nlohmann_json_POPULATED)
-    message(STATUS "nlohmann_json fetched and built successfully")
+# JSON库 (nlohmann/json) - 优先使用系统安装版本
+find_package(nlohmann_json QUIET)
+if(nlohmann_json_FOUND)
+    message(STATUS "Found system nlohmann_json: ${nlohmann_json_VERSION}")
     set(ENABLE_JSON ON)
 else()
-    message(WARNING "Failed to fetch nlohmann_json, trying system installation")
-    # 回退到系统安装的版本
-    find_package(nlohmann_json QUIET)
-    if(NOT nlohmann_json_FOUND)
-        message(STATUS "nlohmann_json not found, will use bundled version")
+    message(WARNING "System nlohmann_json not found, trying FetchContent")
+    # 回退到FetchContent下载
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3  # 使用稳定版本
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+    
+    if(nlohmann_json_POPULATED)
+        message(STATUS "nlohmann_json fetched and built successfully")
+        set(ENABLE_JSON ON)
+    else()
+        message(ERROR "Failed to find or fetch nlohmann_json")
+        set(ENABLE_JSON OFF)
     endif()
 endif()
 
