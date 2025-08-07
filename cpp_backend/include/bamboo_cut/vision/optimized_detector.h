@@ -13,6 +13,7 @@
 #include "bamboo_cut/vision/stereo_vision.h"
 #include "bamboo_cut/vision/sahi_slicing.h"
 #include "bamboo_cut/vision/hardware_accelerated_camera.h"
+#include "bamboo_cut/vision/bamboo_detector.h"
 
 namespace bamboo_cut {
 namespace vision {
@@ -61,6 +62,18 @@ struct OptimizedDetectorConfig {
     int batch_size{4};
     bool enable_async_processing{true};
     int num_worker_threads{4};
+    
+    // 模型参数
+    std::string model_path;
+    int input_width{640};
+    int input_height{640};
+    bool use_tensorrt{true};
+    bool use_fp16{true};
+    
+    // SAHI切片参数
+    int sahi_slice_height{512};
+    int sahi_slice_width{512};
+    float sahi_overlap_ratio{0.2f};
     
     OptimizedDetectorConfig() = default;
     bool validate() const;
@@ -211,6 +224,7 @@ private:
     bool initialized_{false};
 
     // 组件
+    std::unique_ptr<BambooDetector> base_detector_;
     std::unique_ptr<TensorRTEngine> tensorrt_engine_;
     std::unique_ptr<NAMAttention> nam_attention_;
     std::unique_ptr<WiseIoULoss> wise_iou_loss_;
