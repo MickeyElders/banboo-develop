@@ -339,7 +339,7 @@ Point3D StereoVision::pixel_to_3d(const cv::Point2f& pixel, const cv::Mat& dispa
     result.z = point_3d_h.at<float>(2, 0) / point_3d_h.at<float>(3, 0);
     
     // 计算置信度 (基于视差值的强度)
-    result.confidence = std::min(1.0, disp_value / matching_config_.num_disparities);
+    result.confidence = std::min(1.0, disp_value / static_cast<double>(matching_config_.num_disparities));
     
     return result;
 }
