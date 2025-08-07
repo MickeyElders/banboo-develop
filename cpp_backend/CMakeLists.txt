@@ -222,7 +222,7 @@ target_include_directories(bamboo_cut_lib PUBLIC
 )
 
 # 为库目标设置编译定义
-target_compile_definitions(bamboo_cut_lib PRIVATE
+target_compile_definitions(bamboo_cut_lib PUBLIC
     $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
     $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
     $<$<BOOL:${ENABLE_FP16}>:ENABLE_FP16>
@@ -276,17 +276,7 @@ add_executable(bamboo_cut_backend
     src/main.cpp
 )
 
-# 为可执行文件设置编译定义
-target_compile_definitions(bamboo_cut_backend PRIVATE
-    $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
-    $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
-    $<$<BOOL:${ENABLE_FP16}>:ENABLE_FP16>
-    $<$<BOOL:${ENABLE_DEEPSTREAM}>:ENABLE_DEEPSTREAM>
-    $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
-    $<$<BOOL:${ENABLE_JSON}>:ENABLE_JSON>
-)
-
-# 链接库到可执行文件
+# 链接库到可执行文件 (编译定义会从库自动继承，因为库使用了PUBLIC)
 target_link_libraries(bamboo_cut_backend bamboo_cut_lib)
 
 # ================================
