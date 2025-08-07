@@ -200,6 +200,12 @@ private:
     core::DetectionResult apply_result_filtering(const core::DetectionResult& result);
     core::DetectionResult apply_result_sorting(const core::DetectionResult& result);
 
+    // 初始化辅助函数
+    bool initialize_base_detector();
+    bool initialize_optimizations();
+    bool initialize_sahi_slicing();
+    bool initialize_advanced_optimizations();
+
     // 配置和状态
     OptimizedDetectorConfig config_;
     bool initialized_{false};

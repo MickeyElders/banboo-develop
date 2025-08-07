@@ -26,13 +26,13 @@ bool OptimizedDetector::initialize() {
         }
         
         // 初始化基础检测器
-        if (!initializeBaseDetector()) {
+        if (!initialize_base_detector()) {
             LOG_ERROR("基础检测器初始化失败");
             return false;
         }
         
         // 初始化优化组件
-        if (!initializeOptimizations()) {
+        if (!initialize_optimizations()) {
             LOG_ERROR("优化组件初始化失败");
             return false;
         }
@@ -119,7 +119,7 @@ void OptimizedDetector::reset_performance_stats() {
     stats_ = PerformanceStats{};
 }
 
-bool OptimizedDetector::initializeBaseDetector() {
+bool OptimizedDetector::initialize_base_detector() {
     try {
         // 创建基础检测器配置
         BambooDetector::Config base_config;
@@ -149,11 +149,11 @@ bool OptimizedDetector::initializeBaseDetector() {
     }
 }
 
-bool OptimizedDetector::initializeOptimizations() {
+bool OptimizedDetector::initialize_optimizations() {
     try {
         // 初始化SAHI切片
         if (config_.enable_sahi_slicing) {
-            if (!initializeSAHISlicing()) {
+            if (!initialize_sahi_slicing()) {
                 LOG_WARN("SAHI切片初始化失败，将禁用此功能");
                 config_.enable_sahi_slicing = false;
             }
@@ -161,7 +161,7 @@ bool OptimizedDetector::initializeOptimizations() {
         
         // 初始化其他优化组件
         if (config_.optimization_level > 0) {
-            if (!initializeAdvancedOptimizations()) {
+            if (!initialize_advanced_optimizations()) {
                 LOG_WARN("高级优化初始化失败，将使用基础优化");
                 config_.optimization_level = 0;
             }
@@ -176,7 +176,7 @@ bool OptimizedDetector::initializeOptimizations() {
     }
 }
 
-bool OptimizedDetector::initializeSAHISlicing() {
+bool OptimizedDetector::initialize_sahi_slicing() {
     try {
         // 创建SAHI切片配置
         SAHIConfig sahi_config;
@@ -197,7 +197,7 @@ bool OptimizedDetector::initializeSAHISlicing() {
     }
 }
 
-bool OptimizedDetector::initializeAdvancedOptimizations() {
+bool OptimizedDetector::initialize_advanced_optimizations() {
     try {
         // 这里可以初始化其他高级优化组件
         // 比如NAM注意力、Wise-IoU等
