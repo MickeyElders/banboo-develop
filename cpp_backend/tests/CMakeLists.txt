@@ -8,9 +8,16 @@ find_package(GTest QUIET)
 
 if(GTest_FOUND)
     message(STATUS "Found Google Test, building tests")
+    set(ENABLE_GTEST ON)
     
     # 创建测试可执行文件
     add_executable(test_modbus_server test_modbus_server.cpp)
+    
+    # 设置编译定义
+    target_compile_definitions(test_modbus_server PRIVATE
+        ENABLE_GTEST
+        $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
+    )
     
     # 链接依赖库 (使用库目标而不是可执行文件)
     target_link_libraries(test_modbus_server
@@ -29,10 +36,16 @@ if(GTest_FOUND)
     )
     
 else()
-    message(WARNING "Google Test not found, skipping tests")
+    message(WARNING "Google Test not found, building tests without framework")
+    set(ENABLE_GTEST OFF)
     
     # 如果没有Google Test，创建一个简单的测试可执行文件
     add_executable(test_modbus_server test_modbus_server.cpp)
+    
+    # 设置编译定义
+    target_compile_definitions(test_modbus_server PRIVATE
+        $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
+    )
     
     # 链接依赖库 (使用库目标而不是可执行文件)
     target_link_libraries(test_modbus_server
