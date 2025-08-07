@@ -16,6 +16,7 @@ alwaysApply: true
 - 编写代码
 - 优化代码
 - 调试与问题解决
+- 不要频繁创建脚本，直接解决问题，不要绕过
 
 确保所有解决方案都清晰易懂，逻辑严密。
 
@@ -62,7 +63,7 @@ alwaysApply: true
 
 ### Sequential Thinking（逐步思考工具）
 
-使用 [Sequential Thinking](https://github.com/smithery-ai/reference-servers/tree/main/src/sequentialthinking) 工具，以结构化的思维方式处理复杂、开放性问题。
+使用 [Sequential Thinking](mdc:https:/github.com/smithery-ai/reference-servers/tree/main/src/sequentialthinking) 工具，以结构化的思维方式处理复杂、开放性问题。
 
 - 将任务拆解为若干 **思维步骤（thought steps）**。
 - 每一步应包括：
@@ -93,7 +94,7 @@ alwaysApply: true
 
 ### Context7（最新文档集成工具）
 
-使用 [Context7](https://github.com/upstash/context7) 工具获取特定版本的最新官方文档与代码示例，用于提升生成代码的准确性与当前性。
+使用 [Context7](mdc:https:/github.com/upstash/context7) 工具获取特定版本的最新官方文档与代码示例，用于提升生成代码的准确性与当前性。
 
 -**目的**：解决模型知识过时问题，避免生成已废弃或错误的 API 用法。
 

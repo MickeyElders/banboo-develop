@@ -1,0 +1,7 @@
+{
+    "cmake.sourceDirectory": "D:/github/bamboo-cut-develop/SOEM",
+    "python.analysis.extraPaths": [
+        "./test",
+        "./test"
+    ]
+}

@@ -1,0 +1,85 @@
+name: bamboo_cut_frontend
+description: 智能切竹机嵌入式触屏界面
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 界面组件
+  cupertino_icons: ^1.0.6
+  material_design_icons_flutter: ^7.0.7296
+  
+  # 状态管理
+  provider: ^6.1.1
+  bloc: ^8.1.2
+  flutter_bloc: ^8.1.3
+  
+  # 网络通信
+  http: ^1.1.0
+  web_socket_channel: ^2.4.0
+  
+  # FFI通信 (与C++后端)
+  ffi: ^2.1.0
+  
+  # 数据序列化
+  json_annotation: ^4.8.1
+  
+  # 图表和可视化
+  fl_chart: ^0.64.0
+  charts_flutter: ^0.12.0
+  
+  # 工具库
+  intl: ^0.18.1
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.1
+  
+  # 系统集成
+  wakelock: ^0.6.2
+  screen_brightness: ^0.2.2+1
+  
+  # 文件操作
+  file_picker: ^6.1.1
+  
+  # 日志
+  logger: ^2.0.2+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # 代码生成
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+  
+  # 代码检查
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  # 资源文件
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/config/
+  
+  # 字体
+  fonts:
+    - family: RobotoMono
+      fonts:
+        - asset: assets/fonts/RobotoMono-Regular.ttf
+        - asset: assets/fonts/RobotoMono-Bold.ttf
+          weight: 700
+
+# 平台特定配置
+flutter_platforms:
+  linux:
+    desktop: true
+    embedded: true
+    wayland: true
+    x11: true 
