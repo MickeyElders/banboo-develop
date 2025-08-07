@@ -38,37 +38,27 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # OpenCV
 find_package(OpenCV REQUIRED)
 message(STATUS "Found OpenCV: ${OpenCV_VERSION}")
+set(ENABLE_OPENCV ON)
 
 # PkgConfig for GStreamer
 find_package(PkgConfig REQUIRED)
-
 # GStreamer
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
 pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
 pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
+message(STATUS "Found GStreamer: ${GSTREAMER_VERSION}")
+set(ENABLE_GSTREAMER ON)
 
-# CUDA (if available)
-find_package(CUDA QUIET)
-if(CUDA_FOUND AND CUDA_TOOLKIT_ROOT_DIR)
-    # 额外检查CUDA头文件是否真的存在
-    find_path(CUDA_RUNTIME_INCLUDE cuda_runtime.h
-        PATHS ${CUDA_TOOLKIT_ROOT_DIR}/include
-        NO_DEFAULT_PATH)
-    
-    if(CUDA_RUNTIME_INCLUDE)
-        enable_language(CUDA)
-        message(STATUS "Found CUDA: ${CUDA_VERSION}")
-        set(ENABLE_CUDA ON)
-        include_directories(${CUDA_INCLUDE_DIRS})
-    else()
-        message(WARNING "CUDA found but headers missing, GPU acceleration disabled")
-        set(ENABLE_CUDA OFF)
-        set(CUDA_FOUND OFF)
-    endif()
-else()
-    message(WARNING "CUDA not found, GPU acceleration disabled")
-    set(ENABLE_CUDA OFF)
-endif()
+# CUDA
+find_package(CUDA REQUIRED)
+# 额外检查CUDA头文件是否真的存在
+find_path(CUDA_RUNTIME_INCLUDE cuda_runtime.h
+    PATHS ${CUDA_TOOLKIT_ROOT_DIR}/include
+    REQUIRED)
+
+message(STATUS "Found CUDA: ${CUDA_VERSION}")
+set(ENABLE_CUDA ON)
+include_directories(${CUDA_INCLUDE_DIRS})
 
 # TensorRT (增强配置，支持 FP16 和完整功能)
 find_path(TENSORRT_INCLUDE_DIR NvInfer.h
@@ -197,15 +187,19 @@ configure_file(
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}/include
-    ${OpenCV_INCLUDE_DIRS}
-    ${GSTREAMER_INCLUDE_DIRS}
-    ${GSTREAMER_APP_INCLUDE_DIRS}
-    ${GSTREAMER_VIDEO_INCLUDE_DIRS}
     ${MODBUS_INCLUDE_DIRS}
 )
 
-if(TENSORRT_FOUND)
-    include_directories(${TENSORRT_INCLUDE_DIR})
+if(OpenCV_FOUND)
+    include_directories(${OpenCV_INCLUDE_DIRS})
+endif()
+
+if(GSTREAMER_FOUND)
+    include_directories(
+        ${GSTREAMER_INCLUDE_DIRS}
+        ${GSTREAMER_APP_INCLUDE_DIRS}
+        ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+    )
 endif()
 
 # ================================
@@ -231,11 +225,19 @@ add_library(bamboo_cut_lib STATIC
 # 设置include路径
 target_include_directories(bamboo_cut_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${OpenCV_INCLUDE_DIRS}
-    ${GSTREAMER_INCLUDE_DIRS}
-    ${GSTREAMER_APP_INCLUDE_DIRS}
-    ${GSTREAMER_VIDEO_INCLUDE_DIRS}
 )
+
+if(OpenCV_FOUND)
+    target_include_directories(bamboo_cut_lib PUBLIC ${OpenCV_INCLUDE_DIRS})
+endif()
+
+if(GSTREAMER_FOUND)
+    target_include_directories(bamboo_cut_lib PUBLIC
+        ${GSTREAMER_INCLUDE_DIRS}
+        ${GSTREAMER_APP_INCLUDE_DIRS}
+        ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+    )
+endif()
 
 # 为库目标设置编译定义
 target_compile_definitions(bamboo_cut_lib PUBLIC
@@ -245,16 +247,26 @@ target_compile_definitions(bamboo_cut_lib PUBLIC
     $<$<BOOL:${ENABLE_DEEPSTREAM}>:ENABLE_DEEPSTREAM>
     $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
     $<$<BOOL:${ENABLE_JSON}>:ENABLE_JSON>
+    $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
+    $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
 )
 
 # 为库目标链接依赖
 target_link_libraries(bamboo_cut_lib
-    ${OpenCV_LIBS}
-    ${GSTREAMER_LIBRARIES}
-    ${GSTREAMER_APP_LIBRARIES}
-    ${GSTREAMER_VIDEO_LIBRARIES}
     Threads::Threads
 )
+
+if(OpenCV_FOUND)
+    target_link_libraries(bamboo_cut_lib ${OpenCV_LIBS})
+endif()
+
+if(GSTREAMER_FOUND)
+    target_link_libraries(bamboo_cut_lib 
+        ${GSTREAMER_LIBRARIES}
+        ${GSTREAMER_APP_LIBRARIES}
+        ${GSTREAMER_VIDEO_LIBRARIES}
+    )
+endif()
 
 if(TENSORRT_FOUND)
     target_link_libraries(bamboo_cut_lib 
