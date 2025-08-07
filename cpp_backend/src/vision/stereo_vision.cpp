@@ -13,9 +13,22 @@ StereoVision::StereoVision(const CameraSyncConfig& sync_config)
     // 初始化统计信息
     statistics_.last_capture_time = std::chrono::steady_clock::now();
     
-    // 设置默认匹配配置
-    matching_config_ = stereo_utils::get_recommended_matching_config(
-        cv::Size(sync_config_.width, sync_config_.height));
+    // 设置默认匹配配置（不使用函数调用，直接设置默认值）
+    matching_config_.min_disparity = 0;
+    matching_config_.num_disparities = 16 * 6;  // 96
+    matching_config_.block_size = 5;
+    matching_config_.P1 = 8 * 3 * 5 * 5;  // 600
+    matching_config_.P2 = 32 * 3 * 5 * 5; // 2400
+    matching_config_.disp12_max_diff = 1;
+    matching_config_.pre_filter_cap = 63;
+    matching_config_.uniqueness_ratio = 10;
+    matching_config_.speckle_window_size = 100;
+    matching_config_.speckle_range = 32;
+    matching_config_.mode = cv::StereoSGBM::MODE_SGBM_3WAY;
+    matching_config_.use_wls_filter = true;
+    matching_config_.lambda = 8000.0;
+    matching_config_.sigma = 1.5;
+    matching_config_.min_confidence = 0.5;
 }
 
 StereoVision::~StereoVision() {
