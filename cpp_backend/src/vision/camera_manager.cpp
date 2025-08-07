@@ -106,19 +106,17 @@ CameraInfo CameraManager::getCameraInfo() const {
 
 bool CameraManager::initializeCamera(int camera_id) {
     try {
-        // 创建相机捕获对象
-        auto cap = std::make_unique<cv::VideoCapture>(camera_id);
+        // 构建 GStreamer 流水线
+        std::string pipeline = buildGStreamerPipeline(camera_id);
+        LOG_INFO("GStreamer pipeline: {}", pipeline);
+        
+        // 使用 GStreamer 后端创建相机捕获对象
+        auto cap = std::make_unique<cv::VideoCapture>(pipeline, cv::CAP_GSTREAMER);
         
         if (!cap->isOpened()) {
-            LOG_ERROR("无法打开相机 {}", camera_id);
+            LOG_ERROR("无法打开相机 {}, pipeline: {}", camera_id, pipeline);
             return false;
         }
-        
-        // 设置相机参数
-        cap->set(cv::CAP_PROP_FRAME_WIDTH, config_.resolution.width);
-        cap->set(cv::CAP_PROP_FRAME_HEIGHT, config_.resolution.height);
-        cap->set(cv::CAP_PROP_FPS, config_.fps);
-        cap->set(cv::CAP_PROP_BUFFERSIZE, 1);
         
         // 验证设置是否生效
         double actual_width = cap->get(cv::CAP_PROP_FRAME_WIDTH);
@@ -224,6 +222,40 @@ std::vector<cv::Mat> CameraManager::getLatestFrames() const {
     }
     
     return frames;
+}
+
+std::string CameraManager::buildGStreamerPipeline(int camera_id) {
+    std::stringstream pipeline;
+    
+    // 检查是否为 CSI 摄像头
+    bool is_csi = config_.device_id.find("csi") != std::string::npos;
+    
+    if (is_csi) {
+        // CSI 摄像头 → GPU 内存直采 → 推理 → 输出的低延迟链路
+        pipeline << "nvarguscamerasrc sensor-id=" << camera_id
+                << " ! video/x-raw(memory:NVMM),width=" << config_.resolution.width 
+                << ",height=" << config_.resolution.height
+                << ",framerate=" << config_.fps << "/1"
+                << ",format=NV12"
+                << " ! nvvidconv flip-method=0"  // 可选的图像翻转
+                << " ! video/x-raw(memory:NVMM),format=RGBA"  // 转换为 RGBA 格式
+                << " ! nvvidconv"  // 必要的格式转换
+                << " ! video/x-raw,format=RGBA"  // 确保输出格式正确
+                << " ! videoconvert"  // 确保颜色空间正确
+                << " ! video/x-raw,format=RGBA"
+                << " ! appsink name=appsink max-buffers=2 drop=true sync=false";
+    } else {
+        // 普通 USB 摄像头的流水线
+        pipeline << "v4l2src device=/dev/video" << camera_id
+                << " ! video/x-raw,width=" << config_.resolution.width
+                << ",height=" << config_.resolution.height
+                << ",framerate=" << config_.fps << "/1"
+                << " ! videoconvert"
+                << " ! video/x-raw,format=RGBA"
+                << " ! appsink name=appsink max-buffers=2 drop=true sync=false";
+    }
+    
+    return pipeline.str();
 }
 
 } // namespace vision
