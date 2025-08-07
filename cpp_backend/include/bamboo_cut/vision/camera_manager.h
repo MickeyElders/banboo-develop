@@ -67,6 +67,10 @@ public:
     // 状态查询
     bool isInitialized() const { return initialized_; }
     bool isCapturing() const { return capturing_; }
+    bool isRunning() const;
+    int getCameraCount() const;
+    cv::Mat getLatestFrame(int camera_id) const;
+    std::vector<cv::Mat> getLatestFrames() const;
     
     // 性能统计
     struct PerformanceStats {
