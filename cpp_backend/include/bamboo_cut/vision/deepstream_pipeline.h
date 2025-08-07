@@ -77,7 +77,8 @@ struct DeepStreamConfig {
  */
 class DeepStreamPipeline {
 public:
-    explicit DeepStreamPipeline(const DeepStreamConfig& config = DeepStreamConfig{});
+    DeepStreamPipeline();
+    explicit DeepStreamPipeline(const DeepStreamConfig& config);
     ~DeepStreamPipeline();
 
     // 禁用拷贝
@@ -208,7 +209,8 @@ public:
         bool validate() const;
     };
 
-    explicit DeepStreamMultiStream(const MultiStreamConfig& config = MultiStreamConfig{});
+    DeepStreamMultiStream();
+    explicit DeepStreamMultiStream(const MultiStreamConfig& config);
     ~DeepStreamMultiStream();
 
     // 禁用拷贝

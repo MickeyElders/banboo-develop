@@ -72,7 +72,8 @@ struct InferenceResult {
  */
 class TensorRTEngine {
 public:
-    explicit TensorRTEngine(const TensorRTConfig& config = TensorRTConfig{});
+    TensorRTEngine();
+    explicit TensorRTEngine(const TensorRTConfig& config);
     ~TensorRTEngine();
 
     // 禁用拷贝
