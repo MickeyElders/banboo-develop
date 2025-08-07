@@ -39,6 +39,7 @@ bool ModbusServer::start() {
         return false;
     }
 
+#ifdef ENABLE_MODBUS
     try {
         // 创建Modbus TCP上下文
         modbus_ctx_ = modbus_new_tcp(config_.ip_address.c_str(), config_.port);
@@ -78,6 +79,10 @@ bool ModbusServer::start() {
         log_error("启动服务器异常: " + std::string(e.what()));
         return false;
     }
+#else
+    log_error("Modbus功能未启用，请重新编译时启用ENABLE_MODBUS");
+    return false;
+#endif
 }
 
 void ModbusServer::stop() {
@@ -88,6 +93,7 @@ void ModbusServer::stop() {
     running_.store(false);
     client_connected_.store(false);
 
+#ifdef ENABLE_MODBUS
     // 关闭服务器套接字
     if (server_socket_ != -1) {
         close(server_socket_);
@@ -110,11 +116,13 @@ void ModbusServer::stop() {
         modbus_free(modbus_ctx_);
         modbus_ctx_ = nullptr;
     }
+#endif
 
     std::cout << "Modbus TCP服务器已停止" << std::endl;
 }
 
 void ModbusServer::server_thread() {
+#ifdef ENABLE_MODBUS
     while (running_.load()) {
         try {
             // 等待客户端连接
@@ -175,9 +183,14 @@ void ModbusServer::server_thread() {
             log_error("服务器线程异常: " + std::string(e.what()));
         }
     }
+#else
+    // 如果Modbus未启用，线程直接退出
+    return;
+#endif
 }
 
 bool ModbusServer::handle_client_connection(modbus_t* ctx) {
+#ifdef ENABLE_MODBUS
     uint8_t query[MODBUS_TCP_MAX_ADU_LENGTH];
     
     while (running_.load() && client_connected_.load()) {
@@ -233,6 +246,10 @@ bool ModbusServer::handle_client_connection(modbus_t* ctx) {
     }
     
     return true;
+#else
+    // 如果Modbus未启用，直接返回失败
+    return false;
+#endif
 }
 
 void ModbusServer::heartbeat_thread() {
@@ -609,8 +626,13 @@ void ModbusServer::log_error(const std::string& error) {
 }
 
 void ModbusServer::handle_modbus_error(modbus_t* ctx, const std::string& operation) {
+#ifdef ENABLE_MODBUS
     std::string error_msg = operation + ": " + modbus_strerror(errno);
     log_error(error_msg);
+#else
+    std::string error_msg = operation + ": Modbus功能未启用";
+    log_error(error_msg);
+#endif
 }
 
 } // namespace communication
