@@ -206,57 +206,14 @@ file(GLOB_RECURSE SOURCES
 )
 
 # ================================
-# 可执行文件
+# 库目标 (供测试使用)
 # ================================
-add_executable(bamboo_cut_backend
-    src/main.cpp
+add_library(bamboo_cut_lib STATIC
     ${SOURCES}
 )
 
-# ================================
-# 链接库
-# ================================
-target_link_libraries(bamboo_cut_backend
-    ${OpenCV_LIBS}
-    ${GSTREAMER_LIBRARIES}
-    ${GSTREAMER_APP_LIBRARIES}
-    ${GSTREAMER_VIDEO_LIBRARIES}
-    Threads::Threads
-)
-
-if(TENSORRT_FOUND)
-    target_link_libraries(bamboo_cut_backend 
-        ${TENSORRT_INFER_LIBRARY}
-        ${TENSORRT_ONNX_LIBRARY}
-        ${TENSORRT_PLUGIN_LIBRARY}
-    )
-endif()
-
-if(DEEPSTREAM_FOUND)
-    target_link_libraries(bamboo_cut_backend ${DEEPSTREAM_LIBRARY})
-endif()
-
-if(CUDA_FOUND)
-    target_link_libraries(bamboo_cut_backend ${CUDA_LIBRARIES})
-endif()
-
-# 链接 FetchContent 下载的库
-if(libmodbus_POPULATED)
-    target_link_libraries(bamboo_cut_backend modbus)
-elseif(MODBUS_LIBRARY)
-    target_link_libraries(bamboo_cut_backend ${MODBUS_LIBRARY})
-endif()
-
-if(nlohmann_json_POPULATED)
-    target_link_libraries(bamboo_cut_backend nlohmann_json::nlohmann_json)
-elseif(nlohmann_json_FOUND)
-    target_link_libraries(bamboo_cut_backend nlohmann_json::nlohmann_json)
-endif()
-
-# ================================
-# 编译定义
-# ================================
-target_compile_definitions(bamboo_cut_backend PRIVATE
+# 为库目标设置编译定义
+target_compile_definitions(bamboo_cut_lib PRIVATE
     $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
     $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
     $<$<BOOL:${ENABLE_FP16}>:ENABLE_FP16>
@@ -265,11 +222,61 @@ target_compile_definitions(bamboo_cut_backend PRIVATE
     $<$<BOOL:${ENABLE_JSON}>:ENABLE_JSON>
 )
 
+# 为库目标链接依赖
+target_link_libraries(bamboo_cut_lib
+    ${OpenCV_LIBS}
+    ${GSTREAMER_LIBRARIES}
+    ${GSTREAMER_APP_LIBRARIES}
+    ${GSTREAMER_VIDEO_LIBRARIES}
+    Threads::Threads
+)
+
+if(TENSORRT_FOUND)
+    target_link_libraries(bamboo_cut_lib 
+        ${TENSORRT_INFER_LIBRARY}
+        ${TENSORRT_ONNX_LIBRARY}
+        ${TENSORRT_PLUGIN_LIBRARY}
+    )
+endif()
+
+if(DEEPSTREAM_FOUND)
+    target_link_libraries(bamboo_cut_lib ${DEEPSTREAM_LIBRARY})
+endif()
+
+if(CUDA_FOUND)
+    target_link_libraries(bamboo_cut_lib ${CUDA_LIBRARIES})
+endif()
+
+# 链接 FetchContent 下载的库
+if(libmodbus_POPULATED)
+    target_link_libraries(bamboo_cut_lib modbus)
+elseif(MODBUS_LIBRARY)
+    target_link_libraries(bamboo_cut_lib ${MODBUS_LIBRARY})
+endif()
+
+if(nlohmann_json_POPULATED)
+    target_link_libraries(bamboo_cut_lib nlohmann_json::nlohmann_json)
+elseif(nlohmann_json_FOUND)
+    target_link_libraries(bamboo_cut_lib nlohmann_json::nlohmann_json)
+endif()
+
+# ================================
+# 可执行文件
+# ================================
+add_executable(bamboo_cut_backend
+    src/main.cpp
+)
+
+# 链接库到可执行文件
+target_link_libraries(bamboo_cut_backend bamboo_cut_lib)
+
 # ================================
 # 安装规则
 # ================================
-install(TARGETS bamboo_cut_backend
+install(TARGETS bamboo_cut_backend bamboo_cut_lib
     RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/

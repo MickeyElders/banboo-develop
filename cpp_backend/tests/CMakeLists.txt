@@ -12,9 +12,9 @@ if(GTest_FOUND)
     # 创建测试可执行文件
     add_executable(test_modbus_server test_modbus_server.cpp)
     
-    # 链接依赖库
+    # 链接依赖库 (使用库目标而不是可执行文件)
     target_link_libraries(test_modbus_server
-        bamboo_cut_backend
+        bamboo_cut_lib
         GTest::GTest
         GTest::Main
         ${OpenCV_LIBS}
@@ -23,22 +23,25 @@ if(GTest_FOUND)
     # 添加测试
     add_test(NAME ModbusServerTest COMMAND test_modbus_server)
     
+    # 设置测试输出目录 (只有在测试被创建时才设置)
+    set_tests_properties(ModbusServerTest PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    
 else()
     message(WARNING "Google Test not found, skipping tests")
     
     # 如果没有Google Test，创建一个简单的测试可执行文件
     add_executable(test_modbus_server test_modbus_server.cpp)
     
-    # 链接依赖库
+    # 链接依赖库 (使用库目标而不是可执行文件)
     target_link_libraries(test_modbus_server
-        bamboo_cut_backend
+        bamboo_cut_lib
         ${OpenCV_LIBS}
     )
     
     message(STATUS "Created test executable without Google Test framework")
-endif()
-
-# 设置测试输出目录
-set_tests_properties(ModbusServerTest PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-) 
+    
+    # 注意：不添加测试，因为Google Test不可用
+    # 不调用 set_tests_properties，因为没有测试被创建
+endif() 
