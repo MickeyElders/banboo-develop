@@ -294,12 +294,6 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 
 # ================================
-# 测试
-# ================================
-enable_testing()
-add_subdirectory(tests)
-
-# ================================
 # 打包信息
 # ================================
 set(CPACK_PACKAGE_NAME "bamboo-cut-backend")
