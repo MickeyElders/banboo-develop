@@ -36,7 +36,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # ================================
 
 # OpenCV
+set(OpenCV_DIR "C:/opencv/build")  # 设置OpenCV的安装路径
 find_package(OpenCV REQUIRED)
+if(NOT OpenCV_FOUND)
+    message(FATAL_ERROR "OpenCV not found. Please install OpenCV and set OpenCV_DIR to the correct path.")
+endif()
 message(STATUS "Found OpenCV: ${OpenCV_VERSION}")
 set(ENABLE_OPENCV ON)
 
