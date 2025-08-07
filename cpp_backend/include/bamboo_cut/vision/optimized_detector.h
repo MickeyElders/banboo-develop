@@ -83,7 +83,8 @@ struct OptimizedDetectionResult {
  */
 class OptimizedDetector {
 public:
-    explicit OptimizedDetector(const OptimizedDetectorConfig& config = OptimizedDetectorConfig{});
+    OptimizedDetector();
+    explicit OptimizedDetector(const OptimizedDetectorConfig& config);
     ~OptimizedDetector();
 
     // 禁用拷贝

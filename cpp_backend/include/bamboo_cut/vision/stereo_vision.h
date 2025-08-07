@@ -124,7 +124,8 @@ struct CalibrationDetection {
  */
 class StereoVision {
 public:
-    explicit StereoVision(const CameraSyncConfig& sync_config = CameraSyncConfig{});
+    StereoVision();
+    explicit StereoVision(const CameraSyncConfig& sync_config);
     ~StereoVision();
 
     // 禁用拷贝构造和赋值

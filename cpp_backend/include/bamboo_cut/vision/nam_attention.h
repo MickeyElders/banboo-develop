@@ -26,7 +26,8 @@ public:
         bool validate() const;
     };
 
-    explicit NAMAttention(const NAMConfig& config = NAMConfig{});
+    NAMAttention();
+    explicit NAMAttention(const NAMConfig& config);
     ~NAMAttention();
 
     // 禁用拷贝
@@ -108,7 +109,8 @@ public:
         bool validate() const;
     };
 
-    explicit NAMNetwork(const NetworkConfig& config = NetworkConfig{});
+    NAMNetwork();
+    explicit NAMNetwork(const NetworkConfig& config);
     ~NAMNetwork();
 
     // 禁用拷贝

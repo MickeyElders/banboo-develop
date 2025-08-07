@@ -35,7 +35,8 @@ struct WiseIoUConfig {
  */
 class WiseIoULoss {
 public:
-    explicit WiseIoULoss(const WiseIoUConfig& config = WiseIoUConfig{});
+    WiseIoULoss();
+    explicit WiseIoULoss(const WiseIoUConfig& config);
     ~WiseIoULoss();
 
     // 禁用拷贝
@@ -138,7 +139,8 @@ public:
         bool validate() const;
     };
 
-    explicit WiseIoUNetwork(const NetworkConfig& config = NetworkConfig{});
+    WiseIoUNetwork();
+    explicit WiseIoUNetwork(const NetworkConfig& config);
     ~WiseIoUNetwork();
 
     // 禁用拷贝

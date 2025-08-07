@@ -185,7 +185,8 @@ struct HardwareAcceleratedFrame {
  */
 class HardwareAcceleratedCamera {
 public:
-    explicit HardwareAcceleratedCamera(const HardwareAccelerationConfig& config = HardwareAccelerationConfig{});
+    HardwareAcceleratedCamera();
+    explicit HardwareAcceleratedCamera(const HardwareAccelerationConfig& config);
     ~HardwareAcceleratedCamera();
 
     // 禁用拷贝
@@ -332,7 +333,8 @@ public:
         bool validate() const;
     };
 
-    explicit MultiCameraHardwareManager(const MultiCameraConfig& config = MultiCameraConfig{});
+    MultiCameraHardwareManager();
+    explicit MultiCameraHardwareManager(const MultiCameraConfig& config);
     ~MultiCameraHardwareManager();
 
     // 禁用拷贝

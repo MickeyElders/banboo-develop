@@ -97,7 +97,8 @@ struct SliceDetectionResult {
  */
 class SAHISlicing {
 public:
-    explicit SAHISlicing(const SAHIConfig& config = SAHIConfig{});
+    SAHISlicing();
+    explicit SAHISlicing(const SAHIConfig& config);
     ~SAHISlicing();
 
     // 禁用拷贝
@@ -204,7 +205,8 @@ public:
         bool validate() const;
     };
 
-    explicit AdaptiveSlicer(const AdaptiveConfig& config = AdaptiveConfig{});
+    AdaptiveSlicer();
+    explicit AdaptiveSlicer(const AdaptiveConfig& config);
     ~AdaptiveSlicer();
 
     // 禁用拷贝

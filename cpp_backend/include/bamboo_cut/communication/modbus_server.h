@@ -137,7 +137,8 @@ using TimeoutCallback = std::function<void(const std::string& timeout_type)>;
  */
 class ModbusServer {
 public:
-    explicit ModbusServer(const ModbusConfig& config = ModbusConfig{});
+    ModbusServer();
+    explicit ModbusServer(const ModbusConfig& config);
     ~ModbusServer();
 
     // 禁用拷贝构造和赋值
