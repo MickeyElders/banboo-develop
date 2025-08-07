@@ -47,16 +47,17 @@ bool OptimizedDetector::initialize() {
     }
 }
 
-DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
-    DetectionResult result;
+core::DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
+    core::DetectionResult result;
+    result.confidence = 0.0f;
     
     if (!initialized_) {
-        result.error_message = "检测器未初始化";
+        LOG_ERROR("检测器未初始化");
         return result;
     }
     
     if (image.empty()) {
-        result.error_message = "输入图像为空";
+        LOG_ERROR("输入图像为空");
         return result;
     }
     
@@ -64,30 +65,35 @@ DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
         auto start_time = std::chrono::high_resolution_clock::now();
         
         // 应用优化预处理
-        cv::Mat optimized_image = applyOptimizations(image);
+        cv::Mat optimized_image = apply_optimizations(image);
         
         // 执行检测
         result = base_detector_->detect(optimized_image);
         
         // 应用后处理优化
-        result = applyPostProcessingOptimizations(result);
+        result = apply_post_processing_optimizations(result);
         
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-        result.processing_time_ms = duration.count() / 1000.0f;
         
-        result.success = true;
+        // 更新性能统计
+        stats_.total_frames++;
+        stats_.processed_frames++;
+        stats_.detection_count++;
+        stats_.avg_processing_time_ms = duration.count() / 1000.0;
+        stats_.fps = 1000.0 / stats_.avg_processing_time_ms;
+        stats_.last_update = std::chrono::steady_clock::now();
         
     } catch (const std::exception& e) {
-        result.error_message = std::string("检测异常: ") + e.what();
         LOG_ERROR("检测异常: {}", e.what());
+        result.confidence = 0.0f;
     }
     
     return result;
 }
 
-std::vector<DetectionResult> OptimizedDetector::detectBatch(const std::vector<cv::Mat>& images) {
-    std::vector<DetectionResult> results;
+std::vector<core::DetectionResult> OptimizedDetector::detect_batch(const std::vector<cv::Mat>& images) {
+    std::vector<core::DetectionResult> results;
     results.reserve(images.size());
     
     for (const auto& image : images) {
@@ -97,7 +103,7 @@ std::vector<DetectionResult> OptimizedDetector::detectBatch(const std::vector<cv
     return results;
 }
 
-std::string OptimizedDetector::getModelInfo() const {
+std::string OptimizedDetector::get_model_info() const {
     std::string info = "OptimizedDetector - ";
     info += "模型: " + config_.model_path + ", ";
     info += "优化级别: " + std::to_string(config_.optimization_level) + ", ";
@@ -105,11 +111,11 @@ std::string OptimizedDetector::getModelInfo() const {
     return info;
 }
 
-OptimizedDetector::PerformanceStats OptimizedDetector::getPerformanceStats() const {
+OptimizedDetector::PerformanceStats OptimizedDetector::get_performance_stats() const {
     return stats_;
 }
 
-void OptimizedDetector::resetPerformanceStats() {
+void OptimizedDetector::reset_performance_stats() {
     stats_ = PerformanceStats{};
 }
 
@@ -205,24 +211,24 @@ bool OptimizedDetector::initializeAdvancedOptimizations() {
     }
 }
 
-cv::Mat OptimizedDetector::applyOptimizations(const cv::Mat& image) {
+cv::Mat OptimizedDetector::apply_optimizations(const cv::Mat& image) {
     cv::Mat optimized_image = image.clone();
     
     // 应用图像预处理优化
     if (config_.optimization_level > 0) {
         // 图像增强
-        optimized_image = applyImageEnhancement(optimized_image);
+        optimized_image = apply_image_enhancement(optimized_image);
         
         // 噪声抑制
         if (config_.enable_noise_reduction) {
-            optimized_image = applyNoiseReduction(optimized_image);
+            optimized_image = apply_noise_reduction(optimized_image);
         }
     }
     
     return optimized_image;
 }
 
-cv::Mat OptimizedDetector::applyImageEnhancement(const cv::Mat& image) {
+cv::Mat OptimizedDetector::apply_image_enhancement(const cv::Mat& image) {
     cv::Mat enhanced = image.clone();
     
     // 直方图均衡化
@@ -240,52 +246,48 @@ cv::Mat OptimizedDetector::applyImageEnhancement(const cv::Mat& image) {
     return enhanced;
 }
 
-cv::Mat OptimizedDetector::applyNoiseReduction(const cv::Mat& image) {
+cv::Mat OptimizedDetector::apply_noise_reduction(const cv::Mat& image) {
     cv::Mat denoised;
     cv::bilateralFilter(image, denoised, 9, 75, 75);
     return denoised;
 }
 
-core::DetectionResult OptimizedDetector::applyPostProcessingOptimizations(const core::DetectionResult& result) {
+core::DetectionResult OptimizedDetector::apply_post_processing_optimizations(const core::DetectionResult& result) {
     core::DetectionResult optimized_result = result;
     
     // 应用后处理优化
     if (config_.optimization_level > 0) {
         // 结果过滤
-        optimized_result = applyResultFiltering(optimized_result);
+        optimized_result = apply_result_filtering(optimized_result);
         
         // 结果排序
-        optimized_result = applyResultSorting(optimized_result);
+        optimized_result = apply_result_sorting(optimized_result);
     }
     
     return optimized_result;
 }
 
-core::DetectionResult OptimizedDetector::applyResultFiltering(const core::DetectionResult& result) {
+core::DetectionResult OptimizedDetector::apply_result_filtering(const core::DetectionResult& result) {
     core::DetectionResult filtered_result = result;
     
     // 过滤低置信度的检测结果
-    std::vector<core::DetectionPoint> filtered_points;
-    for (const auto& point : result.points) {
-        if (point.confidence >= config_.confidence_threshold) {
-            filtered_points.push_back(point);
-        }
+    if (result.confidence >= config_.confidence_threshold) {
+        return filtered_result;
     }
     
-    filtered_result.points = filtered_points;
+    // 如果置信度低于阈值，返回一个空的检测结果
+    filtered_result.confidence = 0.0f;
+    filtered_result.center = core::Point2D();
+    filtered_result.bounding_box = core::Rectangle();
+    filtered_result.label = "";
+    filtered_result.class_id = 0;
+    
     return filtered_result;
 }
 
-core::DetectionResult OptimizedDetector::applyResultSorting(const core::DetectionResult& result) {
-    core::DetectionResult sorted_result = result;
-    
-    // 按置信度排序
-    std::sort(sorted_result.points.begin(), sorted_result.points.end(),
-              [](const core::DetectionPoint& a, const core::DetectionPoint& b) {
-                  return a.confidence > b.confidence;
-              });
-    
-    return sorted_result;
+core::DetectionResult OptimizedDetector::apply_result_sorting(const core::DetectionResult& result) {
+    // 由于单个DetectionResult已经包含了所有信息，不需要排序
+    return result;
 }
 
 } // namespace vision

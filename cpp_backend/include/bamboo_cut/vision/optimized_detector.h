@@ -101,14 +101,17 @@ public:
     bool is_initialized() const { return initialized_; }
 
     // 单帧检测
-    OptimizedDetectionResult detect(const cv::Mat& image);
+    core::DetectionResult detect(const cv::Mat& image);
     
     // 立体检测
-    OptimizedDetectionResult detect_stereo(const StereoFrame& stereo_frame);
+    core::DetectionResult detect_stereo(const StereoFrame& stereo_frame);
     
     // 批处理检测
-    std::vector<OptimizedDetectionResult> detect_batch(const std::vector<cv::Mat>& images);
-    std::vector<OptimizedDetectionResult> detect_stereo_batch(const std::vector<StereoFrame>& stereo_frames);
+    std::vector<core::DetectionResult> detect_batch(const std::vector<cv::Mat>& images);
+    std::vector<core::DetectionResult> detect_stereo_batch(const std::vector<StereoFrame>& stereo_frames);
+    
+    // 获取模型信息
+    std::string get_model_info() const;
 
     // 模型管理
     bool load_model(const std::string& model_path);
@@ -188,14 +191,14 @@ private:
                                const std::vector<core::DetectionResult>& ground_truth);
 
     // 图像优化处理
-    cv::Mat applyOptimizations(const cv::Mat& image);
-    cv::Mat applyImageEnhancement(const cv::Mat& image);
-    cv::Mat applyNoiseReduction(const cv::Mat& image);
+    cv::Mat apply_optimizations(const cv::Mat& image);
+    cv::Mat apply_image_enhancement(const cv::Mat& image);
+    cv::Mat apply_noise_reduction(const cv::Mat& image);
     
     // 后处理优化
-    core::DetectionResult applyPostProcessingOptimizations(const core::DetectionResult& result);
-    core::DetectionResult applyResultFiltering(const core::DetectionResult& result);
-    core::DetectionResult applyResultSorting(const core::DetectionResult& result);
+    core::DetectionResult apply_post_processing_optimizations(const core::DetectionResult& result);
+    core::DetectionResult apply_result_filtering(const core::DetectionResult& result);
+    core::DetectionResult apply_result_sorting(const core::DetectionResult& result);
 
     // 配置和状态
     OptimizedDetectorConfig config_;

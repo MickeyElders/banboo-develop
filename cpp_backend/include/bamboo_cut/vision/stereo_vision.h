@@ -234,7 +234,7 @@ private:
     
     // 统计信息
     mutable std::mutex stats_mutex_;
-    Statistics statistics_;
+    Statistics statistics_{};  // 使用默认构造函数初始化
     
     // 线程同步
     std::chrono::steady_clock::time_point last_left_timestamp_;
