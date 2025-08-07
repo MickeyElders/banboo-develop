@@ -49,10 +49,22 @@ pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
 
 # CUDA (if available)
 find_package(CUDA QUIET)
-if(CUDA_FOUND)
-    enable_language(CUDA)
-    message(STATUS "Found CUDA: ${CUDA_VERSION}")
-    set(ENABLE_CUDA ON)
+if(CUDA_FOUND AND CUDA_TOOLKIT_ROOT_DIR)
+    # 额外检查CUDA头文件是否真的存在
+    find_path(CUDA_RUNTIME_INCLUDE cuda_runtime.h
+        PATHS ${CUDA_TOOLKIT_ROOT_DIR}/include
+        NO_DEFAULT_PATH)
+    
+    if(CUDA_RUNTIME_INCLUDE)
+        enable_language(CUDA)
+        message(STATUS "Found CUDA: ${CUDA_VERSION}")
+        set(ENABLE_CUDA ON)
+        include_directories(${CUDA_INCLUDE_DIRS})
+    else()
+        message(WARNING "CUDA found but headers missing, GPU acceleration disabled")
+        set(ENABLE_CUDA OFF)
+        set(CUDA_FOUND OFF)
+    endif()
 else()
     message(WARNING "CUDA not found, GPU acceleration disabled")
     set(ENABLE_CUDA OFF)

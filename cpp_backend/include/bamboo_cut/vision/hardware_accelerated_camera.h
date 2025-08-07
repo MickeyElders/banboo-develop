@@ -22,9 +22,12 @@
 #include <unistd.h>
 
 // CUDA 头文件 (如果可用)
+// 注意：ENABLE_CUDA应该只在CMake检测到CUDA时定义
 #ifdef ENABLE_CUDA
-#include <cuda_runtime.h>
-#include <cuda.h>
+    // 只在真正有CUDA时才包含这些头文件
+    // 如果编译失败说明CMake配置有问题
+    #include <cuda_runtime.h>
+    #include <cuda.h>
 #endif
 
 namespace bamboo_cut {
