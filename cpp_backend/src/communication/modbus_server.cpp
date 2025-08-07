@@ -207,8 +207,7 @@ bool ModbusServer::handle_client_connection(modbus_t* ctx) {
             // 创建modbus映射结构
             modbus_mapping_t mb_mapping;
             mb_mapping.nb_registers = REG_COUNT;
-            mb_mapping.start_address = 40001;
-            mb_mapping.registers = registers_;
+            mb_mapping.tab_registers = registers_;
 
             // 处理Modbus请求并发送响应
             int reply_rc = modbus_reply(ctx, query, rc, &mb_mapping);
