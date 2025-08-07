@@ -215,6 +215,9 @@ endif()
 set(SOURCES
     src/core/logger.cpp
     src/vision/stereo_vision.cpp
+    src/vision/detector.cpp
+    src/vision/camera_manager.cpp
+    src/vision/optimized_detector.cpp
     src/communication/modbus_server.cpp
 )
 
