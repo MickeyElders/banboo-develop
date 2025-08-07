@@ -118,18 +118,28 @@ void ModbusServer::server_thread() {
     while (running_.load()) {
         try {
             // 等待客户端连接
-            modbus_t* client_ctx = modbus_tcp_accept(modbus_ctx_, &server_socket_);
-            if (client_ctx == nullptr) {
+            int client_socket = modbus_tcp_accept(modbus_ctx_, &server_socket_);
+            if (client_socket == -1) {
                 if (running_.load()) {
                     handle_modbus_error(modbus_ctx_, "接受连接失败");
                 }
                 continue;
             }
 
+            // 创建客户端上下文
+            modbus_t* client_ctx = modbus_new_tcp_pi("0.0.0.0", "502");
+            if (client_ctx == nullptr) {
+                close(client_socket);
+                continue;
+            }
+
+            // 设置客户端套接字
+            modbus_set_socket(client_ctx, client_socket);
+
             // 获取客户端IP
             struct sockaddr_in client_addr;
             socklen_t addr_len = sizeof(client_addr);
-            getpeername(modbus_get_socket(client_ctx), 
+            getpeername(client_socket, 
                        (struct sockaddr*)&client_addr, &addr_len);
             std::string client_ip = inet_ntoa(client_addr.sin_addr);
 
@@ -194,8 +204,14 @@ bool ModbusServer::handle_client_connection(modbus_t* ctx) {
             // 更新寄存器数据
             update_registers();
 
+            // 创建modbus映射结构
+            modbus_mapping_t mb_mapping;
+            mb_mapping.nb_registers = REG_COUNT;
+            mb_mapping.start_address = 40001;
+            mb_mapping.registers = registers_;
+
             // 处理Modbus请求并发送响应
-            int reply_rc = modbus_reply(ctx, query, rc, registers_);
+            int reply_rc = modbus_reply(ctx, query, rc, &mb_mapping);
             if (reply_rc == -1) {
                 handle_modbus_error(ctx, "发送响应失败");
                 std::lock_guard<std::mutex> lock(stats_mutex_);
