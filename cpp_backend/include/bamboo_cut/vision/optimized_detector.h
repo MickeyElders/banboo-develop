@@ -52,6 +52,10 @@ struct OptimizedDetectorConfig {
     bool enable_sahi_slicing{true};  // 启用 SAHI 切片推理
     bool enable_hardware_acceleration{true}; // 启用硬件加速
     
+    // 图像优化参数
+    int optimization_level{1};  // 优化级别 (0-3)
+    bool enable_noise_reduction{true}; // 启用噪声抑制
+    
     // 性能优化
     bool enable_batch_processing{true};
     int batch_size{4};
@@ -182,6 +186,16 @@ private:
     // 损失计算
     float compute_wise_iou_loss(const std::vector<core::DetectionResult>& predictions,
                                const std::vector<core::DetectionResult>& ground_truth);
+
+    // 图像优化处理
+    cv::Mat applyOptimizations(const cv::Mat& image);
+    cv::Mat applyImageEnhancement(const cv::Mat& image);
+    cv::Mat applyNoiseReduction(const cv::Mat& image);
+    
+    // 后处理优化
+    core::DetectionResult applyPostProcessingOptimizations(const core::DetectionResult& result);
+    core::DetectionResult applyResultFiltering(const core::DetectionResult& result);
+    core::DetectionResult applyResultSorting(const core::DetectionResult& result);
 
     // 配置和状态
     OptimizedDetectorConfig config_;

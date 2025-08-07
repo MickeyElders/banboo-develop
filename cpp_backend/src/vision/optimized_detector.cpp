@@ -246,8 +246,8 @@ cv::Mat OptimizedDetector::applyNoiseReduction(const cv::Mat& image) {
     return denoised;
 }
 
-DetectionResult OptimizedDetector::applyPostProcessingOptimizations(const DetectionResult& result) {
-    DetectionResult optimized_result = result;
+core::DetectionResult OptimizedDetector::applyPostProcessingOptimizations(const core::DetectionResult& result) {
+    core::DetectionResult optimized_result = result;
     
     // 应用后处理优化
     if (config_.optimization_level > 0) {
@@ -261,11 +261,11 @@ DetectionResult OptimizedDetector::applyPostProcessingOptimizations(const Detect
     return optimized_result;
 }
 
-DetectionResult OptimizedDetector::applyResultFiltering(const DetectionResult& result) {
-    DetectionResult filtered_result = result;
+core::DetectionResult OptimizedDetector::applyResultFiltering(const core::DetectionResult& result) {
+    core::DetectionResult filtered_result = result;
     
     // 过滤低置信度的检测结果
-    std::vector<DetectionPoint> filtered_points;
+    std::vector<core::DetectionPoint> filtered_points;
     for (const auto& point : result.points) {
         if (point.confidence >= config_.confidence_threshold) {
             filtered_points.push_back(point);
@@ -276,12 +276,12 @@ DetectionResult OptimizedDetector::applyResultFiltering(const DetectionResult& r
     return filtered_result;
 }
 
-DetectionResult OptimizedDetector::applyResultSorting(const DetectionResult& result) {
-    DetectionResult sorted_result = result;
+core::DetectionResult OptimizedDetector::applyResultSorting(const core::DetectionResult& result) {
+    core::DetectionResult sorted_result = result;
     
     // 按置信度排序
     std::sort(sorted_result.points.begin(), sorted_result.points.end(),
-              [](const DetectionPoint& a, const DetectionPoint& b) {
+              [](const core::DetectionPoint& a, const core::DetectionPoint& b) {
                   return a.confidence > b.confidence;
               });
     
