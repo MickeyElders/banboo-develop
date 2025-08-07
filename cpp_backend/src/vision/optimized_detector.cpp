@@ -25,11 +25,18 @@ bool OptimizedDetector::initialize() {
             return false;
         }
         
-        // 初始化基础检测器
-        if (!initialize_base_detector()) {
-            LOG_ERROR("基础检测器初始化失败");
-            return false;
-        }
+            // 初始化基础检测器
+    if (!initialize_base_detector()) {
+        LOG_ERROR("基础检测器初始化失败");
+        return false;
+    }
+    
+    // 初始化NAM注意力模块
+    nam_attention_ = std::make_unique<NAMAttention>(config_.nam_config);
+    if (!nam_attention_->initialize()) {
+        LOG_ERROR("NAM注意力模块初始化失败");
+        return false;
+    }
         
         // 初始化优化组件
         if (!initialize_optimizations()) {
@@ -67,8 +74,11 @@ core::DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
         // 应用优化预处理
         cv::Mat optimized_image = apply_optimizations(image);
         
+        // 应用NAM注意力增强特征
+        cv::Mat enhanced_image = apply_nam_attention(optimized_image);
+        
         // 执行检测
-        result = base_detector_->detect(optimized_image);
+        result = base_detector_->detect(enhanced_image);
         
         // 应用后处理优化
         result = apply_post_processing_optimizations(result);
@@ -288,6 +298,66 @@ core::DetectionResult OptimizedDetector::apply_result_filtering(const core::Dete
 core::DetectionResult OptimizedDetector::apply_result_sorting(const core::DetectionResult& result) {
     // 由于单个DetectionResult已经包含了所有信息，不需要排序
     return result;
+}
+
+cv::Mat OptimizedDetector::apply_nam_attention(const cv::Mat& features) {
+    if (!nam_attention_ || !nam_attention_->is_initialized()) {
+        LOG_WARN("NAM注意力模块未初始化，返回原始特征");
+        return features;
+    }
+    
+    try {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // 应用NAM注意力
+        cv::Mat enhanced_features = nam_attention_->forward(features);
+        
+        // 更新性能统计
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            performance_stats_.nam_stats = nam_attention_->get_performance_stats();
+        }
+        
+        LOG_DEBUG("NAM注意力处理完成，耗时: {}ms", duration.count() / 1000.0);
+        return enhanced_features;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("NAM注意力处理异常: {}", e.what());
+        return features;
+    }
+}
+
+std::vector<cv::Mat> OptimizedDetector::apply_nam_attention_batch(const std::vector<cv::Mat>& features) {
+    if (!nam_attention_ || !nam_attention_->is_initialized()) {
+        LOG_WARN("NAM注意力模块未初始化，返回原始特征");
+        return features;
+    }
+    
+    try {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // 批量应用NAM注意力
+        std::vector<cv::Mat> enhanced_features = nam_attention_->forward_batch(features);
+        
+        // 更新性能统计
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            performance_stats_.nam_stats = nam_attention_->get_performance_stats();
+        }
+        
+        LOG_DEBUG("NAM注意力批量处理完成，耗时: {}ms", duration.count() / 1000.0);
+        return enhanced_features;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("NAM注意力批量处理异常: {}", e.what());
+        return features;
+    }
 }
 
 } // namespace vision
