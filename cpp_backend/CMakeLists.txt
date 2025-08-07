@@ -199,10 +199,10 @@ endif()
 # ================================
 # 源文件
 # ================================
-file(GLOB_RECURSE SOURCES
-    src/core/*.cpp
-    src/vision/*.cpp
-    src/communication/*.cpp
+# 只包含实际存在的源文件
+set(SOURCES
+    src/vision/stereo_vision.cpp
+    src/communication/modbus_server.cpp
 )
 
 # ================================
@@ -210,6 +210,15 @@ file(GLOB_RECURSE SOURCES
 # ================================
 add_library(bamboo_cut_lib STATIC
     ${SOURCES}
+)
+
+# 设置include路径
+target_include_directories(bamboo_cut_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+    ${GSTREAMER_INCLUDE_DIRS}
+    ${GSTREAMER_APP_INCLUDE_DIRS}
+    ${GSTREAMER_VIDEO_INCLUDE_DIRS}
 )
 
 # 为库目标设置编译定义
