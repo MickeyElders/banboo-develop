@@ -213,6 +213,7 @@ endif()
 # ================================
 # 只包含实际存在的源文件
 set(SOURCES
+    src/core/logger.cpp
     src/vision/stereo_vision.cpp
     src/communication/modbus_server.cpp
 )
