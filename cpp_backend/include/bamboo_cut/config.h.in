@@ -10,10 +10,8 @@
 // 目标架构
 #define TARGET_ARCH "@TARGET_ARCH@"
 
-// 功能开关
-#cmakedefine ENABLE_CUDA
-#cmakedefine ENABLE_TENSORRT
-#cmakedefine ENABLE_MODBUS
+// 注意：功能开关现在通过CMakeLists.txt中的target_compile_definitions设置
+// 这里不再使用#cmakedefine，避免重复定义
 
 // 路径配置
 #define MODELS_PATH "/opt/bamboo-cut/models"
