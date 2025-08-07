@@ -34,7 +34,7 @@ struct OptimizedDetectorConfig {
     DeepStreamConfig deepstream_config;
     
     // 立体视觉配置
-    StereoVision::StereoConfig stereo_config;
+    CameraSyncConfig stereo_config;
     
     // SAHI 切片配置
     SAHIConfig sahi_config;
@@ -144,7 +144,7 @@ public:
         NAMAttention::PerformanceStats nam_stats;
         WiseIoULoss::PerformanceStats wise_iou_stats;
         DeepStreamPipeline::PerformanceStats deepstream_stats;
-        StereoVision::PerformanceStats stereo_stats;
+        StereoVision::Statistics stereo_stats;
         
         core::Timestamp last_update;
     };

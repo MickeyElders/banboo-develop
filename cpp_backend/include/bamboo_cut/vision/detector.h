@@ -55,6 +55,9 @@ public:
     // 初始化检测器
     bool initialize();
     
+    // 检查是否已初始化
+    bool is_initialized() const { return initialized_; }
+    
     // 检测竹材切点
     DetectionResult detect(const cv::Mat& image);
     
