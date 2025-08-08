@@ -136,6 +136,7 @@ private:
     
     // 内部方法
     bool initializeGStreamer();
+    bool initializeCamera(int camera_id);
     std::string buildGStreamerPipeline(int camera_id);
     void captureLoop();
     

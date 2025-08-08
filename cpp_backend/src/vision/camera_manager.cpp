@@ -21,21 +21,25 @@ bool CameraManager::initialize() {
     LOG_INFO("初始化CameraManager");
     
     try {
-        // 检查相机配置
-        if (config_.camera_ids.empty()) {
-            LOG_ERROR("相机ID列表为空");
-            return false;
-        }
+        // 从device_id中提取相机ID
+        std::string device_id = config_.device_id;
+        int camera_id = 0; // 默认相机ID
         
-        // 初始化相机
-        for (int camera_id : config_.camera_ids) {
-            if (!initializeCamera(camera_id)) {
-                LOG_ERROR("相机 {} 初始化失败", camera_id);
-                return false;
+        // 如果device_id包含数字，提取相机ID
+        if (device_id.find("video") != std::string::npos) {
+            size_t pos = device_id.find_last_of("0123456789");
+            if (pos != std::string::npos) {
+                camera_id = std::stoi(device_id.substr(pos));
             }
         }
         
-        LOG_INFO("CameraManager初始化成功，共 {} 个相机", config_.camera_ids.size());
+        // 初始化相机
+        if (!initializeCamera(camera_id)) {
+            LOG_ERROR("相机 {} 初始化失败", camera_id);
+            return false;
+        }
+        
+        LOG_INFO("CameraManager初始化成功，相机ID: {}", camera_id);
         return true;
         
     } catch (const std::exception& e) {
@@ -92,14 +96,10 @@ void CameraManager::setFrameCallback(FrameCallback callback) {
 
 CameraInfo CameraManager::getCameraInfo() const {
     CameraInfo info;
-    info.camera_count = config_.camera_ids.size();
-    info.resolution = config_.resolution;
-    info.fps = config_.fps;
-    info.is_running = is_running_;
-    
-    for (int camera_id : config_.camera_ids) {
-        info.camera_ids.push_back(camera_id);
-    }
+    info.device_path = config_.device_id;
+    info.current_width = config_.width;
+    info.current_height = config_.height;
+    info.current_fps = static_cast<float>(config_.framerate);
     
     return info;
 }
