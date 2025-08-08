@@ -37,6 +37,20 @@ bool OptimizedDetector::initialize() {
         LOG_ERROR("NAM注意力模块初始化失败");
         return false;
     }
+    
+    // 初始化GhostConv模块
+    ghost_conv_ = std::make_unique<GhostConv>(config_.ghost_conv_config);
+    if (!ghost_conv_->initialize()) {
+        LOG_ERROR("GhostConv模块初始化失败");
+        return false;
+    }
+    
+    // 初始化VoV-GSCSP模块
+    vov_gscsp_ = std::make_unique<VoVGSCSP>(config_.vov_gscsp_config);
+    if (!vov_gscsp_->initialize()) {
+        LOG_ERROR("VoV-GSCSP模块初始化失败");
+        return false;
+    }
         
         // 初始化优化组件
         if (!initialize_optimizations()) {
@@ -77,8 +91,14 @@ core::DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
         // 应用NAM注意力增强特征
         cv::Mat enhanced_image = apply_nam_attention(optimized_image);
         
+        // 应用GhostConv减少计算量
+        cv::Mat ghost_enhanced = apply_ghost_conv(enhanced_image);
+        
+        // 应用VoV-GSCSP压缩颈部
+        cv::Mat compressed_features = apply_vov_gscsp(ghost_enhanced);
+        
         // 执行检测
-        result = base_detector_->detect(enhanced_image);
+        result = base_detector_->detect(compressed_features);
         
         // 应用后处理优化
         result = apply_post_processing_optimizations(result);
@@ -356,6 +376,66 @@ std::vector<cv::Mat> OptimizedDetector::apply_nam_attention_batch(const std::vec
         
     } catch (const std::exception& e) {
         LOG_ERROR("NAM注意力批量处理异常: {}", e.what());
+        return features;
+    }
+}
+
+cv::Mat OptimizedDetector::apply_ghost_conv(const cv::Mat& features) {
+    if (!ghost_conv_ || !ghost_conv_->is_initialized()) {
+        LOG_WARN("GhostConv模块未初始化，返回原始特征");
+        return features;
+    }
+    
+    try {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // 应用GhostConv
+        cv::Mat ghost_features = ghost_conv_->forward(features);
+        
+        // 更新性能统计
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            performance_stats_.ghost_conv_stats = ghost_conv_->get_performance_stats();
+        }
+        
+        LOG_DEBUG("GhostConv处理完成，耗时: {}ms", duration.count() / 1000.0);
+        return ghost_features;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("GhostConv处理异常: {}", e.what());
+        return features;
+    }
+}
+
+cv::Mat OptimizedDetector::apply_vov_gscsp(const cv::Mat& features) {
+    if (!vov_gscsp_ || !vov_gscsp_->is_initialized()) {
+        LOG_WARN("VoV-GSCSP模块未初始化，返回原始特征");
+        return features;
+    }
+    
+    try {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // 应用VoV-GSCSP
+        cv::Mat compressed_features = vov_gscsp_->forward(features);
+        
+        // 更新性能统计
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            performance_stats_.vov_gscsp_stats = vov_gscsp_->get_performance_stats();
+        }
+        
+        LOG_DEBUG("VoV-GSCSP处理完成，耗时: {}ms", duration.count() / 1000.0);
+        return compressed_features;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("VoV-GSCSP处理异常: {}", e.what());
         return features;
     }
 }

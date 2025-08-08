@@ -8,6 +8,8 @@
 #include "bamboo_cut/core/types.h"
 #include "bamboo_cut/vision/tensorrt_engine.h"
 #include "bamboo_cut/vision/nam_attention.h"
+#include "bamboo_cut/vision/ghost_conv.h"
+#include "bamboo_cut/vision/vov_gscsp.h"
 #include "bamboo_cut/vision/wise_iou.h"
 #include "bamboo_cut/vision/deepstream_pipeline.h"
 #include "bamboo_cut/vision/stereo_vision.h"
@@ -27,6 +29,12 @@ struct OptimizedDetectorConfig {
     
     // NAM 注意力配置
     NAMAttention::NAMConfig nam_config;
+    
+    // GhostConv 配置
+    GhostConvConfig ghost_conv_config;
+    
+    // VoV-GSCSP 配置
+    VoVGSCSPConfig vov_gscsp_config;
     
     // Wise-IoU 配置
     WiseIoUConfig wise_iou_config;
@@ -163,6 +171,8 @@ public:
         // 组件性能
         TensorRTEngine::PerformanceStats tensorrt_stats;
         NAMAttention::PerformanceStats nam_stats;
+        GhostConv::PerformanceStats ghost_conv_stats;
+        VoVGSCSP::PerformanceStats vov_gscsp_stats;
         WiseIoULoss::PerformanceStats wise_iou_stats;
         DeepStreamPipeline::PerformanceStats deepstream_stats;
         StereoVision::Statistics stereo_stats;
@@ -198,6 +208,8 @@ private:
     // 特征增强
     cv::Mat apply_nam_attention(const cv::Mat& features);
     std::vector<cv::Mat> apply_nam_attention_batch(const std::vector<cv::Mat>& features);
+    cv::Mat apply_ghost_conv(const cv::Mat& features);
+    cv::Mat apply_vov_gscsp(const cv::Mat& features);
     
     // 损失计算
     float compute_wise_iou_loss(const std::vector<core::DetectionResult>& predictions,
@@ -227,6 +239,8 @@ private:
     std::unique_ptr<BambooDetector> base_detector_;
     std::unique_ptr<TensorRTEngine> tensorrt_engine_;
     std::unique_ptr<NAMAttention> nam_attention_;
+    std::unique_ptr<GhostConv> ghost_conv_;
+    std::unique_ptr<VoVGSCSP> vov_gscsp_;
     std::unique_ptr<WiseIoULoss> wise_iou_loss_;
     std::unique_ptr<DeepStreamPipeline> deepstream_pipeline_;
     std::unique_ptr<StereoVision> stereo_vision_;
