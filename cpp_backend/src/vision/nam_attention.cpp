@@ -1,5 +1,6 @@
 #include "bamboo_cut/vision/nam_attention.h"
 #include "bamboo_cut/core/logger.h"
+#include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 #include <chrono>
 #include <algorithm>
