@@ -2,17 +2,17 @@
 
 hardware:
   camera_id: 0
-  resolution: [1280, 720]
+  resolution: [1920, 1080]
   fps: 30
 
 communication:
-  server_ip: "192.168.1.10"
+  server_ip: "192.168.1.100"
   server_port: 502
   timeout: 5.0
 
 ai:
   model_path: "vision/models/yolov8n.pt"
-  confidence_threshold: 0.8
+  confidence_threshold: 0.5
 
 user_interface:
   theme: "dark"

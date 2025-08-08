@@ -74,13 +74,29 @@
 
 ## 🚀 快速开始
 
-### 1. 自动化构建部署
+### 方法一：使用统一编译系统（推荐）
 
 ```bash
 # 克隆项目
 git clone <repository-url> bamboo-cut-develop
 cd bamboo-cut-develop
 
+# Makefile编译（跨平台推荐）
+make                    # 编译所有组件（发布模式）
+make debug             # 调试模式编译
+make embedded          # 嵌入式版本编译
+make clean             # 清理编译文件
+
+# 或使用脚本编译
+chmod +x build_all.sh
+./build_all.sh         # Linux/macOS
+# 或
+./build_all.ps1        # Windows PowerShell
+```
+
+### 方法二：自动化部署脚本
+
+```bash
 # 一键构建 (x86_64)
 ./deploy/scripts/build_and_deploy.sh --install-deps --arch x86_64
 
@@ -91,7 +107,7 @@ cd bamboo-cut-develop
 ./deploy/scripts/build_and_deploy.sh --cross-compile --arch aarch64
 ```
 
-### 2. 部署安装
+### 部署安装
 
 ```bash
 # 本地安装
@@ -104,7 +120,7 @@ cd bamboo-cut-develop
 ./deploy/scripts/build_and_deploy.sh --deploy remote:192.168.1.100
 ```
 
-### 3. 启动系统
+### 启动系统
 
 ```bash
 # systemd服务
@@ -115,6 +131,8 @@ sudo systemctl status bamboo-cut
 cd /opt/bamboo-cut
 ./start_bamboo_cut.sh
 ```
+
+> 📖 **详细构建指南**: 查看 [构建系统使用指南](docs/BUILD_GUIDE.md) 了解更多编译选项和高级配置
 
 ## ⚙️ 配置说明
 
@@ -233,11 +251,36 @@ sudo apt install nvidia-jetpack  # TensorRT + DeepStream
 ### 项目结构
 
 ```
-├── cpp_backend/           # C++后端源码
-├── flutter_frontend/      # Flutter前端源码
-├── deploy/               # 部署脚本和配置
-├── docs/                 # 技术文档
-└── config/               # 系统配置
+bamboo-cut-develop/
+├── README.md                 # 项目主文档
+├── VERSION                   # 版本标识文件 (2.0.0)
+├── Makefile                  # 跨平台统一编译配置
+├── build_all.sh              # Linux/macOS 编译脚本
+├── build_all.ps1             # Windows PowerShell 编译脚本
+├── .vscode/                  # VS Code 配置
+├── config/                   # 系统配置文件
+│   ├── system_config.yaml    # 硬件和系统配置
+│   ├── ai_optimization.yaml  # AI模型优化配置
+│   └── performance_config.yaml # 性能调优配置
+├── models/                   # AI模型文件目录 ⭐
+│   ├── README.md             # 模型使用说明
+│   ├── bamboo_detection.onnx # 竹节检测ONNX模型
+│   └── bamboo_detection.trt  # TensorRT优化引擎
+├── cpp_backend/              # C++ 后端源码
+│   ├── CMakeLists.txt        # CMake 构建配置
+│   ├── include/              # 头文件目录
+│   ├── src/                  # 源文件目录
+│   ├── tools/                # 开发工具
+│   └── examples/             # 示例代码
+├── flutter_frontend/         # Flutter 前端源码
+│   ├── pubspec.yaml          # Flutter 项目配置
+│   └── lib/                  # Dart 源文件
+├── deploy/                   # 部署相关
+│   └── scripts/              # 部署脚本
+└── docs/                     # 技术文档
+    ├── BUILD_GUIDE.md        # 详细编译指南
+    ├── cpp_plc_communication_protocol.md  # PLC通信协议
+    └── ... (其他技术文档)
 ```
 
 ## 📈 版本历史

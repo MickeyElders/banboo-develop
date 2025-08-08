@@ -1,0 +1,20 @@
+# 推理配置
+inference:
+  batch_size: 1
+  max_threads: 4
+  use_fp16: true
+  enable_tensorrt: true
+
+# 摄像头配置
+camera:
+  buffer_size: 10
+  use_hardware_acceleration: true
+  enable_gpu_memory_mapping: true
+  enable_zero_copy: true
+
+# 模型优化
+optimization:
+  enable_ghostconv: true
+  enable_gsconv: true
+  enable_vov_gscsp: true
+  enable_nam: true

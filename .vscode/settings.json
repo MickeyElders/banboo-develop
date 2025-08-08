@@ -3,5 +3,6 @@
     "python.analysis.extraPaths": [
         "./test",
         "./test"
-    ]
+    ],
+    "cmake.ignoreCMakeListsMissing": true
 }

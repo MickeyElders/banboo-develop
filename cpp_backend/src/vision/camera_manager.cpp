@@ -1,5 +1,6 @@
 #include "bamboo_cut/vision/camera_manager.h"
 #include "bamboo_cut/core/logger.h"
+#include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
 #include <thread>
 #include <chrono>
