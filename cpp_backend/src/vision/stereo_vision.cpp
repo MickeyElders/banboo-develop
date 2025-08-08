@@ -3,6 +3,7 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include <opencv2/opencv.hpp>
 #include <opencv2/ximgproc.hpp>
 
 namespace bamboo_cut {

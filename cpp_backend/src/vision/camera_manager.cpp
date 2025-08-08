@@ -60,7 +60,7 @@ bool CameraManager::startCapture() {
         is_running_ = true;
         
         // 启动捕获线程
-        capture_thread_ = std::thread(&CameraManager::captureLoop, this);
+        capture_thread_ = std::make_unique<std::thread>(&CameraManager::captureLoop, this);
         
         LOG_INFO("相机捕获启动成功");
         return true;
@@ -72,20 +72,21 @@ bool CameraManager::startCapture() {
     }
 }
 
-void CameraManager::stopCapture() {
+bool CameraManager::stopCapture() {
     if (!is_running_) {
-        return;
+        return true;
     }
     
     LOG_INFO("停止相机捕获");
     
     is_running_ = false;
     
-    if (capture_thread_.joinable()) {
-        capture_thread_.join();
+    if (capture_thread_ && capture_thread_->joinable()) {
+        capture_thread_->join();
     }
     
     LOG_INFO("相机捕获已停止");
+    return true;
 }
 
 void CameraManager::setFrameCallback(FrameCallback callback) {
@@ -159,7 +160,8 @@ void CameraManager::captureLoop() {
         // 如果有帧数据，创建FrameInfo并调用回调
         if (!frames.empty()) {
             FrameInfo frame_info;
-            frame_info.timestamp = std::chrono::steady_clock::now();
+            frame_info.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
             frame_info.frames = frames;
             frame_info.camera_ids = camera_ids;
             frame_info.frame_count = frames.size();
