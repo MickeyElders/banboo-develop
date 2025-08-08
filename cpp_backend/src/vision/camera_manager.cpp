@@ -138,7 +138,7 @@ bool CameraManager::initializeCamera(int camera_id) {
 void CameraManager::captureLoop() {
     LOG_INFO("相机捕获循环开始");
     
-    const auto frame_interval = std::chrono::microseconds(1000000 / config_.fps);
+    const auto frame_interval = std::chrono::microseconds(1000000 / config_.framerate);
     auto last_frame_time = std::chrono::steady_clock::now();
     
     while (is_running_) {
@@ -233,9 +233,9 @@ std::string CameraManager::buildGStreamerPipeline(int camera_id) {
     if (is_csi) {
         // CSI 摄像头 → GPU 内存直采 → 推理 → 输出的低延迟链路
         pipeline << "nvarguscamerasrc sensor-id=" << camera_id
-                << " ! video/x-raw(memory:NVMM),width=" << config_.resolution.width 
-                << ",height=" << config_.resolution.height
-                << ",framerate=" << config_.fps << "/1"
+                << " ! video/x-raw(memory:NVMM),width=" << config_.width 
+                << ",height=" << config_.height
+                << ",framerate=" << config_.framerate << "/1"
                 << ",format=NV12"
                 << " ! nvvidconv flip-method=0"  // 可选的图像翻转
                 << " ! video/x-raw(memory:NVMM),format=RGBA"  // 转换为 RGBA 格式
@@ -247,9 +247,9 @@ std::string CameraManager::buildGStreamerPipeline(int camera_id) {
     } else {
         // 普通 USB 摄像头的流水线
         pipeline << "v4l2src device=/dev/video" << camera_id
-                << " ! video/x-raw,width=" << config_.resolution.width
-                << ",height=" << config_.resolution.height
-                << ",framerate=" << config_.fps << "/1"
+                << " ! video/x-raw,width=" << config_.width
+                << ",height=" << config_.height
+                << ",framerate=" << config_.framerate << "/1"
                 << " ! videoconvert"
                 << " ! video/x-raw,format=RGBA"
                 << " ! appsink name=appsink max-buffers=2 drop=true sync=false";

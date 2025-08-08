@@ -32,11 +32,14 @@ struct CameraConfig {
 
 struct FrameInfo {
     cv::Mat image;
+    std::vector<cv::Mat> frames;  // 多相机帧
+    std::vector<int> camera_ids;  // 相机ID列表
+    int frame_count;              // 帧数量
     uint64_t timestamp;
     int frame_id;
     bool valid;
     
-    FrameInfo() : timestamp(0), frame_id(0), valid(false) {}
+    FrameInfo() : timestamp(0), frame_id(0), valid(false), frame_count(0) {}
 };
 
 class CameraManager {
@@ -103,6 +106,7 @@ private:
     CameraConfig config_;
     bool initialized_;
     std::atomic<bool> capturing_;
+    std::atomic<bool> is_running_;
     
     // GStreamer相关
     GstElement* pipeline_;
@@ -116,6 +120,9 @@ private:
     std::queue<FrameInfo> frame_buffer_;
     mutable std::mutex buffer_mutex_;
     std::condition_variable buffer_condition_;
+    
+    // 相机映射
+    std::map<int, std::unique_ptr<cv::VideoCapture>> cameras_;
     
     // 回调函数
     FrameCallback frame_callback_;
