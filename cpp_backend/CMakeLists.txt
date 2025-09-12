@@ -35,14 +35,28 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # 查找依赖库
 # ================================
 
-# OpenCV
-set(OpenCV_DIR "C:/opencv/build")  # 设置OpenCV的安装路径
-find_package(OpenCV REQUIRED)
-if(NOT OpenCV_FOUND)
-    message(FATAL_ERROR "OpenCV not found. Please install OpenCV and set OpenCV_DIR to the correct path.")
+# OpenCV - 使用pkg-config方式以兼容不同系统
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(OPENCV REQUIRED opencv4)
+if(NOT OPENCV_FOUND)
+    pkg_check_modules(OPENCV REQUIRED opencv)
 endif()
-message(STATUS "Found OpenCV: ${OpenCV_VERSION}")
-set(ENABLE_OPENCV ON)
+
+if(OPENCV_FOUND)
+    # 设置变量以兼容原代码
+    set(OpenCV_LIBS ${OPENCV_LIBRARIES})
+    set(OpenCV_INCLUDE_DIRS ${OPENCV_INCLUDE_DIRS})
+    set(OpenCV_FOUND TRUE)
+    set(ENABLE_OPENCV ON)
+    message(STATUS "Found OpenCV via pkg-config: ${OPENCV_VERSION}")
+    
+    # 添加包含目录和链接库
+    include_directories(${OPENCV_INCLUDE_DIRS})
+    link_directories(${OPENCV_LIBRARY_DIRS})
+    add_definitions(${OPENCV_CFLAGS_OTHER})
+else()
+    message(FATAL_ERROR "OpenCV not found via pkg-config. Please install libopencv-dev")
+endif()
 
 # PkgConfig for GStreamer
 find_package(PkgConfig REQUIRED)
