@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 智能切竹机统一编译脚本
-# 支持同时编译C++后端和Flutter前端
+# 支持同时编译C++后端和Qt前端
 
 set -e  # 遇到错误立即退出
 
@@ -38,7 +38,7 @@ show_help() {
     echo "选项:"
     echo "  -h, --help              显示此帮助信息"
     echo "  -c, --cpp-only          仅编译C++后端"
-    echo "  -f, --flutter-only      仅编译Flutter前端"
+    echo "  -q, --qt-only           仅编译Qt前端"
     echo "  -a, --all              编译所有组件 (默认)"
     echo "  -d, --debug            调试模式编译"
     echo "  -r, --release          发布模式编译 (默认)"
@@ -50,7 +50,7 @@ show_help() {
     echo "  $0                     # 编译所有组件 (发布模式)"
     echo "  $0 -d                  # 调试模式编译所有组件"
     echo "  $0 -c -d               # 仅编译C++后端 (调试模式)"
-    echo "  $0 -f -p linux         # 仅编译Flutter前端 (Linux平台)"
+    echo "  $0 -q                  # 仅编译Qt前端"
     echo "  $0 -a -j 8 -t embedded # 编译所有组件 (8线程, 嵌入式目标)"
 }
 
@@ -77,10 +77,15 @@ check_dependencies() {
         missing_deps+=("git")
     fi
     
-    # 检查Flutter (如果需要编译前端)
-    if [[ "$COMPILE_FLUTTER" == "true" ]]; then
-        if ! command -v flutter &> /dev/null; then
-            missing_deps+=("flutter")
+    # 检查Qt (如果需要编译前端)
+    if [[ "$COMPILE_QT" == "true" ]]; then
+        if ! command -v qmake &> /dev/null && ! command -v qmake6 &> /dev/null; then
+            missing_deps+=("qt6-base-dev")
+        fi
+        
+        # 检查Qt6依赖
+        if ! pkg-config --exists Qt6Core &> /dev/null; then
+            log_warning "Qt6开发包未找到，请安装qt6-base-dev"
         fi
     fi
     
@@ -155,46 +160,44 @@ compile_cpp_backend() {
     cd ../..
 }
 
-# 编译Flutter前端
-compile_flutter_frontend() {
-    log_info "开始编译Flutter前端..."
+# 编译Qt前端
+compile_qt_frontend() {
+    log_info "开始编译Qt前端..."
     
-    cd flutter_frontend
+    cd qt_frontend
     
-    # 获取Flutter依赖
-    log_info "获取Flutter依赖..."
-    flutter pub get
+    # 创建构建目录
+    if [[ "$BUILD_TYPE" == "debug" ]]; then
+        mkdir -p build_debug
+        cd build_debug
+        CMAKE_BUILD_TYPE="Debug"
+    else
+        mkdir -p build
+        cd build
+        CMAKE_BUILD_TYPE="Release"
+    fi
     
-    # 检查Flutter环境
-    log_info "检查Flutter环境..."
-    flutter doctor
+    # 配置CMake
+    log_info "配置Qt CMake (${CMAKE_BUILD_TYPE}模式)..."
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -DCMAKE_PREFIX_PATH="/usr/lib/qt6"
     
-    # 根据目标平台编译
-    case "$TARGET_PLATFORM" in
-        "linux")
-            log_info "编译Linux桌面版本..."
-            flutter build linux --${BUILD_TYPE}
-            ;;
-        "windows")
-            log_info "编译Windows桌面版本..."
-            flutter build windows --${BUILD_TYPE}
-            ;;
-        "android")
-            log_info "编译Android版本..."
-            flutter build apk --${BUILD_TYPE}
-            ;;
-        "web")
-            log_info "编译Web版本..."
-            flutter build web --${BUILD_TYPE}
-            ;;
-        *)
-            log_info "编译当前平台版本..."
-            flutter build --${BUILD_TYPE}
-            ;;
-    esac
+    # 编译Qt前端
+    log_info "编译Qt前端 (使用${JOBS}个线程)..."
+    make -j${JOBS}
     
-    log_success "Flutter前端编译成功"
-    cd ..
+    # 检查编译结果
+    if [[ -f "bamboo_controller_qt" ]]; then
+        log_success "Qt前端编译成功"
+        ls -lh bamboo_controller_qt
+    else
+        log_error "Qt前端编译失败"
+        exit 1
+    fi
+    
+    cd ../..
 }
 
 # 编译嵌入式版本
@@ -218,15 +221,21 @@ compile_embedded() {
     
     cd ../..
     
-    # 编译Flutter嵌入式版本
-    cd flutter_frontend
+    # 编译Qt嵌入式版本
+    cd qt_frontend
     
-    flutter build linux \
-        --${BUILD_TYPE} \
-        --dart-define=EMBEDDED=true \
-        --dart-define=PLATFORM=linux
+    mkdir -p build_embedded
+    cd build_embedded
     
-    cd ..
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+        -DTARGET_ARCH=aarch64 \
+        -DENABLE_EMBEDDED=ON \
+        -DCMAKE_PREFIX_PATH="/usr/lib/qt6"
+    
+    make -j${JOBS}
+    
+    cd ../..
 }
 
 # 创建部署包
@@ -247,20 +256,17 @@ create_deployment_package() {
         cp cpp_backend/config/*.yaml ${package_name}/backend/ 2>/dev/null || true
     fi
     
-    # 复制Flutter前端
-    if [[ "$COMPILE_FLUTTER" == "true" ]]; then
+    # 复制Qt前端
+    if [[ "$COMPILE_QT" == "true" ]]; then
         mkdir -p ${package_name}/frontend
-        case "$TARGET_PLATFORM" in
-            "linux")
-                cp -r flutter_frontend/build/linux/x64/release/bundle/* ${package_name}/frontend/ 2>/dev/null || true
-                ;;
-            "windows")
-                cp -r flutter_frontend/build/windows/runner/Release/* ${package_name}/frontend/ 2>/dev/null || true
-                ;;
-            "android")
-                cp flutter_frontend/build/app/outputs/flutter-apk/app-release.apk ${package_name}/frontend/ 2>/dev/null || true
-                ;;
-        esac
+        if [[ "$BUILD_TYPE" == "debug" ]]; then
+            cp qt_frontend/build_debug/bamboo_controller_qt ${package_name}/frontend/ 2>/dev/null || true
+        else
+            cp qt_frontend/build/bamboo_controller_qt ${package_name}/frontend/ 2>/dev/null || true
+        fi
+        # 复制QML文件和资源
+        cp -r qt_frontend/qml ${package_name}/frontend/ 2>/dev/null || true
+        cp -r qt_frontend/resources ${package_name}/frontend/ 2>/dev/null || true
     fi
     
     # 复制文档和脚本
@@ -285,9 +291,9 @@ fi
 
 # 启动前端界面
 if [[ -d "./frontend" ]]; then
-    echo "启动Flutter前端..."
+    echo "启动Qt前端..."
     cd frontend
-    ./bamboo_cut_frontend &
+    ./bamboo_controller_qt &
     FRONTEND_PID=$!
     echo "前端服务PID: $FRONTEND_PID"
     cd ..
@@ -314,7 +320,7 @@ EOF
 main() {
     # 默认参数
     COMPILE_CPP="true"
-    COMPILE_FLUTTER="true"
+    COMPILE_QT="true"
     BUILD_TYPE="release"
     JOBS=4
     TARGET_PLATFORM="linux"
@@ -332,14 +338,14 @@ main() {
                 COMPILE_FLUTTER="false"
                 shift
                 ;;
-            -f|--flutter-only)
+            -q|--qt-only)
                 COMPILE_CPP="false"
-                COMPILE_FLUTTER="true"
+                COMPILE_QT="true"
                 shift
                 ;;
             -a|--all)
                 COMPILE_CPP="true"
-                COMPILE_FLUTTER="true"
+                COMPILE_QT="true"
                 shift
                 ;;
             -d|--debug)
@@ -373,7 +379,7 @@ main() {
     # 显示编译配置
     log_info "编译配置:"
     echo "  C++后端: $COMPILE_CPP"
-    echo "  Flutter前端: $COMPILE_FLUTTER"
+    echo "  Qt前端: $COMPILE_QT"
     echo "  编译模式: $BUILD_TYPE"
     echo "  并行任务: $JOBS"
     echo "  目标平台: $TARGET_PLATFORM"
@@ -395,9 +401,9 @@ main() {
             compile_cpp_backend
         fi
         
-        # 编译Flutter前端
-        if [[ "$COMPILE_FLUTTER" == "true" ]]; then
-            compile_flutter_frontend
+        # 编译Qt前端
+        if [[ "$COMPILE_QT" == "true" ]]; then
+            compile_qt_frontend
         fi
     fi
     
@@ -421,18 +427,12 @@ main() {
         fi
     fi
     
-    if [[ "$COMPILE_FLUTTER" == "true" ]]; then
-        case "$TARGET_PLATFORM" in
-            "linux")
-                ls -lh flutter_frontend/build/linux/x64/release/bundle/ 2>/dev/null || echo "Flutter前端文件未找到"
-                ;;
-            "windows")
-                ls -lh flutter_frontend/build/windows/runner/Release/ 2>/dev/null || echo "Flutter前端文件未找到"
-                ;;
-            "android")
-                ls -lh flutter_frontend/build/app/outputs/flutter-apk/ 2>/dev/null || echo "Flutter前端文件未找到"
-                ;;
-        esac
+    if [[ "$COMPILE_QT" == "true" ]]; then
+        if [[ "$BUILD_TYPE" == "debug" ]]; then
+            ls -lh qt_frontend/build_debug/bamboo_controller_qt 2>/dev/null || echo "Qt前端文件未找到"
+        else
+            ls -lh qt_frontend/build/bamboo_controller_qt 2>/dev/null || echo "Qt前端文件未找到"
+        fi
     fi
 }
 

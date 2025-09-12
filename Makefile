@@ -2,7 +2,7 @@
 # 支持同时编译C++后端和Flutter前端
 
 # 默认目标
-.PHONY: all help clean cpp flutter embedded debug release
+.PHONY: all help clean cpp qt embedded debug release check-qt-deps
 
 # 默认配置
 BUILD_TYPE ?= release
@@ -35,7 +35,7 @@ define log_error
 endef
 
 # 默认目标
-all: cpp flutter
+all: cpp qt
 	$(call log_success,编译完成！)
 
 # 显示帮助
@@ -45,6 +45,7 @@ help:
 	@echo "目标:"
 	@echo "  all         编译所有组件 (默认)"
 	@echo "  cpp         仅编译C++后端"
+	@echo "  qt          仅编译Qt前端"
 	@echo "  flutter     仅编译Flutter前端"
 	@echo "  embedded    编译嵌入式版本"
 	@echo "  debug       调试模式编译"
@@ -62,6 +63,7 @@ help:
 	@echo "  make                       # 编译所有组件 (发布模式)"
 	@echo "  make BUILD_TYPE=debug      # 调试模式编译所有组件"
 	@echo "  make cpp BUILD_TYPE=debug  # 仅编译C++后端 (调试模式)"
+	@echo "  make qt BUILD_TYPE=debug       # 仅编译Qt前端 (调试模式)"
 	@echo "  make flutter PLATFORM=windows  # 仅编译Flutter前端 (Windows)"
 	@echo "  make embedded JOBS=8       # 编译嵌入式版本 (8线程)"
 
@@ -112,6 +114,21 @@ flutter:
 	esac
 	$(call log_success,Flutter前端编译成功)
 
+# 编译Qt前端
+qt: check-qt-deps
+	$(call log_info,开始编译Qt前端...)
+	@cd qt_frontend && \
+	if [ "$(BUILD_TYPE)" = "debug" ]; then \
+		mkdir -p build_debug && cd build_debug && \
+		cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && \
+		make -j$(JOBS); \
+	else \
+		mkdir -p build && cd build && \
+		cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && \
+		make -j$(JOBS); \
+	fi
+	$(call log_success,Qt前端编译成功)
+
 # 编译嵌入式版本
 embedded: TARGET = embedded
 embedded:
@@ -128,6 +145,7 @@ embedded:
 clean:
 	$(call log_info,清理编译文件...)
 	@rm -rf cpp_backend/build cpp_backend/build_debug cpp_backend/build_embedded
+	@rm -rf qt_frontend/build qt_frontend/build_debug
 	@rm -rf flutter_frontend/build
 	@rm -rf bamboo_cut_*.tar.gz bamboo_cut_*.zip
 	$(call log_success,清理完成)
@@ -142,6 +160,16 @@ check-deps:
 	@command -v flutter >/dev/null 2>&1 || { $(call log_warning,flutter未找到，前端编译将跳过); }
 	@pkg-config --exists opencv4 >/dev/null 2>&1 || pkg-config --exists opencv >/dev/null 2>&1 || { $(call log_warning,OpenCV未找到，C++后端编译可能失败); }
 	$(call log_success,依赖检查完成)
+
+# 检查Qt依赖
+check-qt-deps:
+	$(call log_info,检查Qt编译依赖...)
+	@command -v qmake >/dev/null 2>&1 || command -v qmake6 >/dev/null 2>&1 || { $(call log_error,Qt未找到，请安装Qt6开发环境); exit 1; }
+	@pkg-config --exists Qt6Core >/dev/null 2>&1 || { $(call log_error,Qt6开发包未找到，请运行: sudo apt install qt6-base-dev); exit 1; }
+	@pkg-config --exists Qt6Quick >/dev/null 2>&1 || { $(call log_warning,Qt6 Quick未找到，某些功能可能不可用); }
+	@pkg-config --exists Qt6Multimedia >/dev/null 2>&1 || { $(call log_warning,Qt6 Multimedia未找到，视频功能可能不可用); }
+	@pkg-config --exists glesv2 >/dev/null 2>&1 || { $(call log_warning,OpenGL ES未找到，硬件加速可能不可用); }
+	$(call log_success,Qt依赖检查完成)
 
 # 创建部署包
 package: all
@@ -187,6 +215,9 @@ install-deps-ubuntu:
 	sudo apt install -y cmake build-essential git pkg-config && \
 	sudo apt install -y libopencv-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev && \
 	sudo apt install -y libmodbus-dev nlohmann-json3-dev && \
+	sudo apt install -y qt6-base-dev qt6-multimedia-dev qt6-quick-dev qt6-serialport-dev && \
+	sudo apt install -y qml6-module-qtquick-controls qml6-module-qtquick-layouts && \
+	sudo apt install -y libegl1-mesa-dev libgles2-mesa-dev && \
 	sudo apt install -y curl unzip && \
 	curl -fsSL https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.16.5-stable.tar.xz | sudo tar -xJ -C /opt && \
 	echo 'export PATH="/opt/flutter/bin:$PATH"' >> ~/.bashrc

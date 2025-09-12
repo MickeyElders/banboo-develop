@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "system": {
+    "language": "zh_CN",
+    "theme": "light",
+    "autoStart": false,
+    "enableLogging": true,
+    "logLevel": "info",
+    "maxLogFiles": 10,
+    "enableDebug": false
+  },
+  "camera": {
+    "deviceId": 0,
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "pipeline": "",
+    "useHardwareAcceleration": true,
+    "enableAutoExposure": true,
+    "enableAutoWhiteBalance": true,
+    "exposure": -1,
+    "gain": -1,
+    "brightness": 0,
+    "contrast": 0
+  },
+  "detection": {
+    "modelPath": "../models/best.pt",
+    "configPath": "",
+    "classNamesPath": "",
+    "confidenceThreshold": 0.7,
+    "nmsThreshold": 0.4,
+    "useGPU": true,
+    "useTensorRT": true,
+    "useINT8": true,
+    "batchSize": 1,
+    "maxDetections": 100
+  },
+  "ui": {
+    "windowWidth": 1024,
+    "windowHeight": 768,
+    "fullscreen": false,
+    "showStatusBar": true,
+    "showToolbar": true,
+    "styleSheet": "",
+    "fontSize": 12,
+    "enableTouchMode": true,
+    "touchSensitivity": 10
+  },
+  "network": {
+    "serverAddress": "127.0.0.1",
+    "serverPort": 8080,
+    "serialPort": "/dev/ttyUSB0",
+    "baudRate": 115200,
+    "connectionTimeout": 5000,
+    "enableSSL": false,
+    "certificatePath": ""
+  },
+  "hardware": {
+    "cutSpeed": 50,
+    "cutDepth": 30,
+    "bladePosition": 0,
+    "autoRetract": true,
+    "retractDelay": 1000,
+    "forceThreshold": 80.0,
+    "controllerType": "modbus_rtu",
+    "customSettings": {}
+  }
+}
