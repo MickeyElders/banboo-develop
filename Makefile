@@ -74,7 +74,7 @@ release: BUILD_TYPE = release
 release: all
 
 # 编译C++后端
-cpp:
+cpp: check-deps
 	$(call log_info,开始编译C++后端...)
 	@cd cpp_backend && \
 	if [ "$(BUILD_TYPE)" = "debug" ]; then \
@@ -135,9 +135,9 @@ clean:
 # 检查依赖
 check-deps:
 	$(call log_info,检查编译依赖...)
-	@command -v cmake >/dev/null 2>&1 || { $(call log_error,cmake未找到); exit 1; }
+	@command -v cmake >/dev/null 2>&1 || { $(call log_error,cmake未找到，请运行: make install-deps-ubuntu); exit 1; }
 	@command -v make >/dev/null 2>&1 || { $(call log_error,make未找到); exit 1; }
-	@command -v g++ >/dev/null 2>&1 || { $(call log_error,g++未找到); exit 1; }
+	@command -v g++ >/dev/null 2>&1 || { $(call log_error,g++未找到，请运行: make install-deps-ubuntu); exit 1; }
 	@command -v git >/dev/null 2>&1 || { $(call log_error,git未找到); exit 1; }
 	@command -v flutter >/dev/null 2>&1 || { $(call log_warning,flutter未找到，前端编译将跳过); }
 	@pkg-config --exists opencv4 >/dev/null 2>&1 || pkg-config --exists opencv >/dev/null 2>&1 || { $(call log_warning,OpenCV未找到，C++后端编译可能失败); }
