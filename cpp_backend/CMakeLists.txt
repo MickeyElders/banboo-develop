@@ -124,6 +124,24 @@ if(NOT ENABLE_OPENCV)
     Or build from source: https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html")
 endif()
 
+# 检查OpenCV扩展模块 (contrib)
+set(ENABLE_OPENCV_CONTRIB OFF)
+if(ENABLE_OPENCV)
+    # 尝试查找OpenCV扩展模块
+    find_path(OPENCV_CONTRIB_INCLUDE opencv2/ximgproc.hpp
+        PATHS ${OpenCV_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS}
+        PATH_SUFFIXES opencv4/opencv2 opencv2
+        NO_DEFAULT_PATH)
+    
+    if(OPENCV_CONTRIB_INCLUDE)
+        message(STATUS "Found OpenCV contrib modules")
+        set(ENABLE_OPENCV_CONTRIB ON)
+    else()
+        message(WARNING "OpenCV contrib modules not found - some advanced features will be disabled")
+        message(WARNING "To enable full functionality, install: sudo apt-get install libopencv-contrib-dev")
+    endif()
+endif()
+
 # PkgConfig for GStreamer
 find_package(PkgConfig REQUIRED)
 # GStreamer
@@ -333,6 +351,7 @@ target_compile_definitions(bamboo_cut_lib PUBLIC
     $<$<BOOL:${ENABLE_JSON}>:ENABLE_JSON>
     $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
     $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
+    $<$<BOOL:${ENABLE_OPENCV_CONTRIB}>:ENABLE_OPENCV_CONTRIB>
 )
 
 # 为库目标链接依赖

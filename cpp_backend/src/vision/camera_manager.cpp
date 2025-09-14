@@ -4,6 +4,8 @@
 #include <opencv2/videoio.hpp>
 #include <thread>
 #include <chrono>
+#include <sstream>
+#include <map>
 
 namespace bamboo_cut {
 namespace vision {

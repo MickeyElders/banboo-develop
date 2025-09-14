@@ -49,6 +49,16 @@ public:
         float pixel_to_mm_ratio = 1.0f; // 像素到毫米的转换比例
     };
 
+    // 模型优化配置
+    struct OptimizationConfig {
+        bool enable_ghostconv = true;      // GhostConv优化
+        bool enable_gsconv = true;         // GSConv优化
+        bool enable_vov_gscsp = true;      // VoV-GSCSP优化
+        bool enable_nam = true;            // NAM注意力机制
+        float pruning_ratio = 0.1f;        // 剪枝比例
+        bool quantize_int8 = false;        // INT8量化
+    };
+
     explicit BambooDetector(const Config& config);
     virtual ~BambooDetector();
 
@@ -78,6 +88,14 @@ public:
     
     PerformanceStats getPerformanceStats() const;
     void resetPerformanceStats();
+
+    // 模型优化方法
+    bool optimizeModel(const std::string& input_model_path,
+                      const std::string& output_model_path,
+                      const OptimizationConfig& config);
+    
+    float benchmarkModel(const std::string& model_path,
+                        int num_iterations = 100);
 
 private:
     Config config_;

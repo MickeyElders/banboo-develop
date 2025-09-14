@@ -206,7 +206,7 @@ void BambooDetector::updatePerformanceStats(float inference_time) const {
 
 bool BambooDetector::optimizeModel(const std::string& input_model_path,
                                   const std::string& output_model_path,
-                                  const OptimizationConfig& config) {
+                                  const BambooDetector::OptimizationConfig& config) {
     LOG_INFO("模型优化功能暂未实现");
     return false;
 }

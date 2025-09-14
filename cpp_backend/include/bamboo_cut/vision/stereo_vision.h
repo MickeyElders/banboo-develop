@@ -3,7 +3,14 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/ximgproc.hpp>  // 添加WLS滤波器支持
+
+// 可选的OpenCV扩展模块支持
+#ifdef ENABLE_OPENCV_CONTRIB
+    #include <opencv2/ximgproc.hpp>  // WLS滤波器支持 (需要opencv-contrib)
+    #define HAS_WLS_FILTER 1
+#else
+    #define HAS_WLS_FILTER 0
+#endif
 #include <memory>
 #include <string>
 #include <vector>
@@ -224,7 +231,9 @@ private:
     
     // 立体匹配器
     cv::Ptr<cv::StereoSGBM> stereo_matcher_;
+#if HAS_WLS_FILTER
     cv::Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter_;
+#endif
     
     // 状态管理
     std::atomic<bool> initialized_{false};

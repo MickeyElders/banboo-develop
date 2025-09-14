@@ -99,10 +99,14 @@ if [ "$OPENCV_FOUND" = false ]; then
             libopencv-contrib-dev \
             libopencv-imgproc-dev \
             libopencv-imgcodecs-dev \
-            libopencv-videoio-dev
+            libopencv-videoio-dev \
+            libopencv-calib3d-dev \
+            libopencv-features2d-dev \
+            libopencv-objdetect-dev \
+            libopencv-dnn-dev
     else
-        log_info "安装标准OpenCV开发包"
-        sudo apt install -y libopencv-dev
+        log_info "安装标准OpenCV开发包（包含扩展模块）"
+        sudo apt install -y libopencv-dev libopencv-contrib-dev
     fi
     
     # 验证安装
