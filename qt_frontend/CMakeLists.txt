@@ -21,20 +21,16 @@ set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
     src/videorenderer.cpp
-    src/touchcontroller.cpp
     src/cameramanager.cpp
     src/bamboodetector.cpp
-    src/systemcontroller.cpp
     src/configmanager.cpp
 )
 
 set(HEADERS
     include/mainwindow.h
     include/videorenderer.h
-    include/touchcontroller.h
     include/cameramanager.h
     include/bamboodetector.h
-    include/systemcontroller.h
     include/configmanager.h
 )
 
@@ -53,7 +49,7 @@ qt6_add_resources(RESOURCES resources/resources.qrc)
 qt6_add_executable(bamboo_controller_qt ${SOURCES} ${HEADERS} ${RESOURCES})
 
 # Qt模块链接
-target_link_libraries(bamboo_controller_qt
+target_link_libraries(bamboo_controller_qt PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Quick
