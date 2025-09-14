@@ -1,12 +1,12 @@
 #ifndef VIDEORENDERER_H
 #define VIDEORENDERER_H
 
-#include <QtOpenGL/QOpenGLWidget>
-#include <QtOpenGL/QOpenGLFunctions>
-#include <QtOpenGL/QOpenGLShaderProgram>
-#include <QtOpenGL/QOpenGLBuffer>
-#include <QtOpenGL/QOpenGLVertexArrayObject>
-#include <QtOpenGL/QOpenGLTexture>
+#include <QOpenGLWidget>
+#include <QOpenGLFunctions>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLBuffer>
+#include <QOpenGLVertexArrayObject>
+#include <QOpenGLTexture>
 #include <QtGui/QMatrix4x4>
 #include <QtCore/QTimer>
 #include <opencv2/opencv.hpp>

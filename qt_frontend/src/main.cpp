@@ -5,7 +5,7 @@
 #include <QtCore/QCommandLineParser>
 #include <QtCore/QTranslator>
 #include <QtCore/QLibraryInfo>
-#include <QtQml/qmlregistertype.h>
+#include <QtQml/qqml.h>
 #include <QtQuick/QQuickStyle>
 #include <QFont>
 #include <QStyleFactory>
@@ -13,7 +13,6 @@
 #include "mainwindow.h"
 #include "configmanager.h"
 #include "bamboodetector.h"
-#include "systemcontroller.h"
 
 // 日志分类
 Q_LOGGING_CATEGORY(appMain, "app.main")
@@ -66,7 +65,6 @@ void setupApplication(QApplication &app)
     
     // 注册元对象类型
     qmlRegisterType<BambooDetector>("BambooDetector", 1, 0, "BambooDetector");
-    qmlRegisterType<SystemController>("SystemController", 1, 0, "SystemController");
 }
 
 void setupTranslations(QApplication &app)
