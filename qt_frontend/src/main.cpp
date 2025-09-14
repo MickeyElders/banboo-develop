@@ -51,9 +51,9 @@ void setupApplication(QApplication &app)
     app.setAttribute(Qt::AA_SynthesizeTouchForUnhandledMouseEvents, true);
     app.setAttribute(Qt::AA_SynthesizeMouseForUnhandledTouchEvents, true);
     
-    // 启用高DPI支持
-    app.setAttribute(Qt::AA_EnableHighDpiScaling, true);
-    app.setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+    // Qt6中这些属性已弃用，高DPI默认启用
+    // app.setAttribute(Qt::AA_EnableHighDpiScaling, true);  // Qt6中已弃用
+    // app.setAttribute(Qt::AA_UseHighDpiPixmaps, true);     // Qt6中已弃用
 
     // 设置字体
     QFont font = app.font();

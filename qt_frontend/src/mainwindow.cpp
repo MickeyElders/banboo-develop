@@ -20,6 +20,7 @@
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QDateTime>
 #include <QtQml/QQmlContext>
+#include <QtQuick/QQuickItem>
 #include <QtGui/QResizeEvent>
 #include <QtGui/QCloseEvent>
 
