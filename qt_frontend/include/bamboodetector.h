@@ -137,7 +137,8 @@ private:
     void* m_tensorRTContext;
     bool m_useTensorRT;
     
-    // 性能统计
+public:
+    // 性能统计（供BambooDetector访问）
     qint64 m_lastProcessTime;
 };
 

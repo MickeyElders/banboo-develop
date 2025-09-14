@@ -6,6 +6,7 @@
 #include <QtCore/QStandardPaths>
 #include <QtCore/QFileInfo>
 #include <QtCore/QDir>
+#include <QtCore/QDateTime>
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 #include <algorithm>

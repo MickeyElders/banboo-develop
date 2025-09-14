@@ -15,7 +15,7 @@
 class VideoRenderer;
 class TouchController;
 class CameraManager;
-class BambooDetector;
+#include "bamboodetector.h"
 class SystemController;
 class ConfigManager;
 

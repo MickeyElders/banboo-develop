@@ -372,7 +372,8 @@ void MainWindow::onSettingsButtonClicked()
     
     // 通过QML显示设置对话框
     if (m_videoWidget && m_videoWidget->rootObject()) {
-        QMetaObject::invokeMethod(m_videoWidget->rootObject(), "showSettingsDialog", Qt::QueuedConnection);
+        QObject* rootObj = m_videoWidget->rootObject();
+        QMetaObject::invokeMethod(rootObj, "showSettingsDialog", Qt::QueuedConnection);
     }
 }
 
