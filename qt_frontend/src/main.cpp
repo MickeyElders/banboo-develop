@@ -6,7 +6,7 @@
 #include <QtCore/QTranslator>
 #include <QtCore/QLibraryInfo>
 #include <QtQml/qqml.h>
-#include <QtQuick/QQuickStyle>
+#include <QQuickStyle>
 #include <QFont>
 #include <QStyleFactory>
 

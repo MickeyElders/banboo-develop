@@ -14,7 +14,11 @@ pkg_check_modules(GLES2 REQUIRED glesv2)
 pkg_check_modules(EGL REQUIRED egl)
 
 # OpenCV配置
+find_package(PkgConfig REQUIRED)
 pkg_check_modules(OpenCV REQUIRED opencv4)
+if(NOT OpenCV_FOUND)
+    find_package(OpenCV REQUIRED)
+endif()
 
 # 源文件
 set(SOURCES
@@ -73,9 +77,13 @@ target_include_directories(bamboo_controller_qt PRIVATE
     ${EGL_INCLUDE_DIRS}
 )
 
+# 编译选项
+target_compile_options(bamboo_controller_qt PRIVATE
+    ${OpenCV_CFLAGS_OTHER}
+)
+
 # 编译定义
 target_compile_definitions(bamboo_controller_qt PRIVATE
-    ${OpenCV_CFLAGS_OTHER}
     USE_OPENGL_ES
     JETSON_PLATFORM
 )
