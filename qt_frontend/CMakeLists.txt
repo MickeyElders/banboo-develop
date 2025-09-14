@@ -67,7 +67,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # 可执行文件
-qt6_add_executable(bamboo_controller_qt ${SOURCES} ${RESOURCES})
+qt6_add_executable(bamboo_controller_qt ${SOURCES} ${HEADERS} ${RESOURCES})
 
 # Qt模块链接
 target_link_libraries(bamboo_controller_qt PRIVATE
