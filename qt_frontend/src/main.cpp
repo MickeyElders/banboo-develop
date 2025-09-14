@@ -5,6 +5,7 @@
 #include <QtCore/QCommandLineParser>
 #include <QtCore/QTranslator>
 #include <QtCore/QLibraryInfo>
+#include <QtCore/QLibrary>
 #include <QtQml/qqml.h>
 #include <QtQuickControls2/QQuickStyle>
 #include <QFont>
@@ -70,7 +71,7 @@ void setupApplication(QApplication &app)
 void setupTranslations(QApplication &app)
 {
     QTranslator *qtTranslator = new QTranslator(&app);
-    if (qtTranslator->load("qt_zh_CN", QLibraryInfo::location(QLibraryInfo::TranslationsPath))) {
+    if (qtTranslator->load("qt_zh_CN", QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
         app.installTranslator(qtTranslator);
     }
 

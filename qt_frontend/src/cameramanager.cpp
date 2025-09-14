@@ -7,6 +7,8 @@
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QProcess>
+#include <QtCore/QVariant>
+#include <QtCore/QDateTime>
 #include <opencv2/opencv.hpp>
 
 Q_LOGGING_CATEGORY(cameraManager, "app.cameramanager")
@@ -432,7 +434,7 @@ void CameraManager::setExposure(int exposure)
 {
     if (m_worker) {
         QMetaObject::invokeMethod(m_worker, "setParameter", Qt::QueuedConnection,
-                                Q_ARG(QString, "exposure"), Q_ARG(QVariant, exposure));
+                                Q_ARG(QString, "exposure"), Q_ARG(QVariant, QVariant(exposure)));
     }
 }
 
@@ -440,7 +442,7 @@ void CameraManager::setGain(int gain)
 {
     if (m_worker) {
         QMetaObject::invokeMethod(m_worker, "setParameter", Qt::QueuedConnection,
-                                Q_ARG(QString, "gain"), Q_ARG(QVariant, gain));
+                                Q_ARG(QString, "gain"), Q_ARG(QVariant, QVariant(gain)));
     }
 }
 
@@ -448,7 +450,7 @@ void CameraManager::setBrightness(int brightness)
 {
     if (m_worker) {
         QMetaObject::invokeMethod(m_worker, "setParameter", Qt::QueuedConnection,
-                                Q_ARG(QString, "brightness"), Q_ARG(QVariant, brightness));
+                                Q_ARG(QString, "brightness"), Q_ARG(QVariant, QVariant(brightness)));
     }
 }
 
@@ -456,7 +458,7 @@ void CameraManager::setContrast(int contrast)
 {
     if (m_worker) {
         QMetaObject::invokeMethod(m_worker, "setParameter", Qt::QueuedConnection,
-                                Q_ARG(QString, "contrast"), Q_ARG(QVariant, contrast));
+                                Q_ARG(QString, "contrast"), Q_ARG(QVariant, QVariant(contrast)));
     }
 }
 

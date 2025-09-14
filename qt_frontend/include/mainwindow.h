@@ -36,12 +36,17 @@ private slots:
     void onStopButtonClicked();
     void onSettingsButtonClicked();
     void onSystemStatusUpdate();
-    void onDetectionResult(const QRect& bambooRect, float confidence);
+    void onDetectionResult(const BambooDetector::DetectionResult& result);
     void onCameraFrameReady();
 
 private:
+    void initializeComponents();
+    void configureComponents();
     void setupUI();
     void setupConnections();
+    void createControlPanel();
+    void createStatusBar();
+    void stopOperation();
     void updateStatusBar();
     void switchToOperationMode();
     void switchToStandbyMode();

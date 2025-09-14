@@ -18,6 +18,8 @@
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QDateTime>
+#include <QtQml/QQmlContext>
 #include <QtGui/QResizeEvent>
 #include <QtGui/QCloseEvent>
 
@@ -169,7 +171,7 @@ void MainWindow::setupUI()
     // 创建QML视频显示组件
     m_videoWidget = new QQuickWidget(this);
     m_videoWidget->setSource(QUrl("qrc:/qml/main.qml"));
-    m_videoWidget->setResizeMode(QQuickWidget::SizeRootRootToWidget);
+    m_videoWidget->setResizeMode(QQuickWidget::SizeRootObjectToView);
     m_videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     // 设置视频渲染器到QML
@@ -369,7 +371,9 @@ void MainWindow::onSettingsButtonClicked()
     qCInfo(mainWindow) << "Settings button clicked";
     
     // 通过QML显示设置对话框
-    QMetaObject::invokeMethod(m_videoWidget->rootObject(), "showSettingsDialog");
+    if (m_videoWidget && m_videoWidget->rootObject()) {
+        QMetaObject::invokeMethod(m_videoWidget->rootObject(), "showSettingsDialog", Qt::QueuedConnection);
+    }
 }
 
 void MainWindow::onSystemStatusUpdate()

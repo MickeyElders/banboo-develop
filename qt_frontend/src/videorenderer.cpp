@@ -7,8 +7,11 @@
 #include <QtGui/QMatrix4x4>
 #include <QtCore/QTimer>
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QDateTime>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QWheelEvent>
+#include <QtGui/QPainter>
+#include <QtGui/QPen>
 #include <opencv2/opencv.hpp>
 
 Q_LOGGING_CATEGORY(videoRenderer, "app.videorenderer")
