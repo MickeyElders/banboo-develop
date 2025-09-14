@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Qt配置
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Quick QuickWidgets OpenGL OpenGLWidgets Qml QuickControls2 Multimedia MultimediaWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Quick QuickWidgets OpenGL OpenGLWidgets Qml QuickControls2 Multimedia MultimediaWidgets SerialPort Network)
 
 # OpenGL ES配置（适配Jetson设备）
 find_package(OpenGL REQUIRED)
@@ -61,8 +61,13 @@ set(QML_FILES
 # 资源文件
 qt6_add_resources(RESOURCES resources/resources.qrc)
 
+# 设置Qt自动处理MOC、UIC、RCC
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
 # 可执行文件
-qt6_add_executable(bamboo_controller_qt ${SOURCES} ${HEADERS} ${RESOURCES})
+qt6_add_executable(bamboo_controller_qt ${SOURCES} ${RESOURCES})
 
 # Qt模块链接
 target_link_libraries(bamboo_controller_qt PRIVATE
@@ -76,6 +81,8 @@ target_link_libraries(bamboo_controller_qt PRIVATE
     Qt6::QuickControls2
     Qt6::Multimedia
     Qt6::MultimediaWidgets
+    Qt6::SerialPort
+    Qt6::Network
     ${OpenCV_LIBS}
     ${GLES2_LIBRARIES}
     ${EGL_LIBRARIES}
