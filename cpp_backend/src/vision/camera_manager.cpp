@@ -263,5 +263,15 @@ std::string CameraManager::buildGStreamerPipeline(int camera_id) {
     return pipeline.str();
 }
 
+CameraManager::PerformanceStats CameraManager::getPerformanceStats() const {
+    PerformanceStats stats;
+    stats.total_frames = 0;
+    stats.dropped_frames = 0;
+    stats.avg_fps = static_cast<double>(config_.framerate);
+    stats.avg_processing_time_ms = 0.0;
+    stats.memory_usage_mb = 0.0;
+    return stats;
+}
+
 } // namespace vision
-} // namespace bamboo_cut 
+} // namespace bamboo_cut

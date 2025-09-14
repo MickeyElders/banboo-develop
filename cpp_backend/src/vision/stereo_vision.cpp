@@ -619,6 +619,57 @@ StereoVision::Statistics StereoVision::get_statistics() const {
     return statistics_;
 }
 
+bool StereoVision::load_calibration(const std::string& calibration_file) {
+    try {
+        cv::FileStorage fs(calibration_file, cv::FileStorage::READ);
+        if (!fs.isOpened()) {
+            std::cerr << "无法打开标定文件: " << calibration_file << std::endl;
+            return false;
+        }
+        
+        // 读取标定参数
+        fs["left_camera_matrix"] >> calibration_params_.left_camera_matrix;
+        fs["right_camera_matrix"] >> calibration_params_.right_camera_matrix;
+        fs["left_dist_coeffs"] >> calibration_params_.left_dist_coeffs;
+        fs["right_dist_coeffs"] >> calibration_params_.right_dist_coeffs;
+        fs["R"] >> calibration_params_.R;
+        fs["T"] >> calibration_params_.T;
+        fs["E"] >> calibration_params_.E;
+        fs["F"] >> calibration_params_.F;
+        fs["Q"] >> calibration_params_.Q;
+        fs["R1"] >> calibration_params_.R1;
+        fs["R2"] >> calibration_params_.R2;
+        fs["P1"] >> calibration_params_.P1;
+        fs["P2"] >> calibration_params_.P2;
+        fs["map1_left"] >> calibration_params_.map1_left;
+        fs["map2_left"] >> calibration_params_.map2_left;
+        fs["map1_right"] >> calibration_params_.map1_right;
+        fs["map2_right"] >> calibration_params_.map2_right;
+        
+        cv::Size temp_size;
+        fs["image_size"] >> temp_size;
+        calibration_params_.image_size = temp_size;
+        
+        double baseline;
+        fs["baseline"] >> baseline;
+        calibration_params_.baseline = baseline;
+        
+        fs.release();
+        
+        calibration_params_.is_calibrated = true;
+        std::cout << "标定文件加载成功: " << calibration_file << std::endl;
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "加载标定文件异常: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+StereoCalibrationParams StereoVision::get_calibration_params() const {
+    return calibration_params_;
+}
+
 // 工具函数实现
 namespace stereo_utils {
 

@@ -314,6 +314,9 @@ set(SOURCES
     src/vision/detector.cpp
     src/vision/camera_manager.cpp
     src/vision/optimized_detector.cpp
+    src/vision/nam_attention.cpp
+    src/vision/ghost_conv.cpp
+    src/vision/vov_gscsp.cpp
     src/communication/modbus_server.cpp
 )
 
