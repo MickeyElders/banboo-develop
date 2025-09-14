@@ -267,9 +267,8 @@ CameraManager::PerformanceStats CameraManager::getPerformanceStats() const {
     PerformanceStats stats;
     stats.total_frames = 0;
     stats.dropped_frames = 0;
-    stats.avg_fps = static_cast<double>(config_.framerate);
+    stats.fps = static_cast<double>(config_.framerate);
     stats.avg_processing_time_ms = 0.0;
-    stats.memory_usage_mb = 0.0;
     return stats;
 }
 
