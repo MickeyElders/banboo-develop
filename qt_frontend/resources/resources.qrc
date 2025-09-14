@@ -1,31 +1,11 @@
 <RCC>
-    <qresource prefix="/icons">
-        <file>icons/app_icon.png</file>
-        <file>icons/start.png</file>
-        <file>icons/stop.png</file>
-        <file>icons/emergency.png</file>
-        <file>icons/settings.png</file>
-        <file>icons/camera.png</file>
-        <file>icons/detection.png</file>
-        <file>icons/system.png</file>
-    </qresource>
-    
     <qresource prefix="/shaders">
         <file>shaders/vertex.glsl</file>
         <file>shaders/fragment.glsl</file>
         <file>shaders/yuv_fragment.glsl</file>
     </qresource>
     
-    <qresource prefix="/translations">
-        <file>translations/bamboo_controller_zh_CN.qm</file>
-        <file>translations/bamboo_controller_en_US.qm</file>
-    </qresource>
-    
     <qresource prefix="/config">
         <file>config/default_config.json</file>
-    </qresource>
-    
-    <qresource prefix="/fonts">
-        <file>fonts/NotoSansCJK-Regular.otf</file>
     </qresource>
 </RCC>
