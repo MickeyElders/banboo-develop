@@ -64,7 +64,7 @@ private slots:
     void onDoubleTapTimer();
 
 private:
-    void processTouch(const QList<QTouchEvent::TouchPoint>& touchPoints);
+    void processTouch(const QList<QEventPoint>& touchPoints);
     void detectGesture();
     void resetState();
     bool isValidTouchPoint(const QPointF& point) const;
