@@ -13,39 +13,19 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLES2 REQUIRED glesv2)
 pkg_check_modules(EGL REQUIRED egl)
 
-# OpenCV配置 - 多种查找方式
-find_package(PkgConfig REQUIRED)
+# OpenCV配置 - 适配Jetson OpenCV 4.8.0
+set(OpenCV_DIR /usr/lib/aarch64-linux-gnu/cmake/opencv4)
+find_package(OpenCV 4.8 REQUIRED)
 
-# 方式1: pkg-config查找opencv4
-pkg_check_modules(OpenCV4 opencv4)
-if(OpenCV4_FOUND)
-    set(OpenCV_INCLUDE_DIRS ${OpenCV4_INCLUDE_DIRS})
-    set(OpenCV_LIBRARIES ${OpenCV4_LIBRARIES})
-    set(OpenCV_CFLAGS_OTHER ${OpenCV4_CFLAGS_OTHER})
+if(OpenCV_FOUND)
+    message(STATUS "Found OpenCV: ${OpenCV_VERSION}")
+    message(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
+    message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
 else()
-    # 方式2: 标准find_package
-    find_package(OpenCV)
-    if(OpenCV_FOUND)
-        set(OpenCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIRS})
-        set(OpenCV_LIBRARIES ${OpenCV_LIBS})
-    else()
-        # 方式3: 手动查找常见路径
-        find_path(OpenCV_INCLUDE_DIRS opencv2/opencv.hpp
-            PATHS /usr/include /usr/local/include /opt/opencv/include
-            PATH_SUFFIXES opencv4 opencv)
-        find_library(OpenCV_LIBRARIES
-            NAMES opencv_core libopencv_core
-            PATHS /usr/lib /usr/local/lib /opt/opencv/lib
-            PATH_SUFFIXES aarch64-linux-gnu x86_64-linux-gnu)
-    endif()
-endif()
-
-# 检查OpenCV是否找到
-if(NOT OpenCV_INCLUDE_DIRS)
-    message(WARNING "OpenCV headers not found, some features may be disabled")
-    set(OpenCV_INCLUDE_DIRS "")
-    set(OpenCV_LIBRARIES "")
-    set(OpenCV_CFLAGS_OTHER "")
+    # 备用方案：直接设置路径
+    set(OpenCV_INCLUDE_DIRS "/usr/include/opencv4")
+    set(OpenCV_LIBS "opencv_core;opencv_imgproc;opencv_highgui;opencv_imgcodecs")
+    message(STATUS "Using fallback OpenCV paths")
 endif()
 
 # 源文件
@@ -101,6 +81,7 @@ target_link_libraries(bamboo_controller_qt PRIVATE
 target_include_directories(bamboo_controller_qt PRIVATE
     include
     ${OpenCV_INCLUDE_DIRS}
+    /usr/include/opencv4
     ${GLES2_INCLUDE_DIRS}
     ${EGL_INCLUDE_DIRS}
 )
