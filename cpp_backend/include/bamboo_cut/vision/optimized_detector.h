@@ -183,6 +183,7 @@ public:
         core::Timestamp last_update;
     };
     PerformanceStats get_performance_stats() const;
+    void reset_performance_stats();
 
     // 回调函数类型
     using DetectionCallback = std::function<void(const OptimizedDetectionResult&)>;

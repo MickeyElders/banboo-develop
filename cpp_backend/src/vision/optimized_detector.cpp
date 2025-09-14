@@ -101,7 +101,15 @@ core::DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
         cv::Mat compressed_features = apply_vov_gscsp(ghost_enhanced);
         
         // 执行检测
-        result = base_detector_->detect(compressed_features);
+        vision::DetectionResult vision_result = base_detector_->detect(compressed_features);
+        // 转换为core::DetectionResult
+        if (vision_result.success && !vision_result.points.empty()) {
+            result.confidence = vision_result.points[0].confidence;
+            result.center.x = vision_result.points[0].x;
+            result.center.y = vision_result.points[0].y;
+            result.class_id = vision_result.points[0].class_id;
+            result.label = (vision_result.points[0].class_id == 0) ? "切点" : "节点";
+        }
         
         // 应用后处理优化
         result = apply_post_processing_optimizations(result);
@@ -110,12 +118,12 @@ core::DetectionResult OptimizedDetector::detect(const cv::Mat& image) {
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
         
         // 更新性能统计
-        stats_.total_frames++;
-        stats_.processed_frames++;
-        stats_.detection_count++;
-        stats_.avg_processing_time_ms = duration.count() / 1000.0;
-        stats_.fps = 1000.0 / stats_.avg_processing_time_ms;
-        stats_.last_update = std::chrono::steady_clock::now();
+        performance_stats_.total_frames++;
+        performance_stats_.processed_frames++;
+        performance_stats_.detection_count++;
+        performance_stats_.avg_processing_time_ms = duration.count() / 1000.0;
+        performance_stats_.fps = 1000.0 / performance_stats_.avg_processing_time_ms;
+        performance_stats_.last_update = std::chrono::steady_clock::now();
         
     } catch (const std::exception& e) {
         LOG_ERROR("检测异常: {}", e.what());
@@ -140,16 +148,16 @@ std::string OptimizedDetector::get_model_info() const {
     std::string info = "OptimizedDetector - ";
     info += "模型: " + config_.model_path + ", ";
     info += "优化级别: " + std::to_string(config_.optimization_level) + ", ";
-    info += "SAHI切片: " + (config_.enable_sahi_slicing ? "启用" : "禁用");
+    info += std::string("SAHI切片: ") + (config_.enable_sahi_slicing ? "启用" : "禁用");
     return info;
 }
 
 OptimizedDetector::PerformanceStats OptimizedDetector::get_performance_stats() const {
-    return stats_;
+    return performance_stats_;
 }
 
 void OptimizedDetector::reset_performance_stats() {
-    stats_ = PerformanceStats{};
+    performance_stats_ = PerformanceStats{};
 }
 
 bool OptimizedDetector::initialize_base_detector() {
@@ -219,7 +227,7 @@ bool OptimizedDetector::initialize_sahi_slicing() {
         sahi_config.confidence_threshold = config_.confidence_threshold;
         
         // 创建SAHI切片器
-        sahi_slicer_ = std::make_unique<SAHISlicing>(sahi_config);
+        sahi_slicing_ = std::make_unique<SAHISlicing>(sahi_config);
         
         LOG_INFO("SAHI切片初始化成功");
         return true;

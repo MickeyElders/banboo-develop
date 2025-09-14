@@ -299,9 +299,13 @@ bool StereoVision::compute_disparity(const cv::Mat& left_rect, const cv::Mat& ri
     stereo_matcher_->compute(left_gray, right_gray, raw_disparity);
     
     // 应用WLS滤波
-    if (matching_config_.use_wls_filter && wls_filter_) {
+    if (matching_config_.use_wls_filter) {
 #if HAS_WLS_FILTER
-        wls_filter_->filter(raw_disparity, left_gray, disparity);
+        if (wls_filter_) {
+            wls_filter_->filter(raw_disparity, left_gray, disparity);
+        } else {
+            disparity = raw_disparity;
+        }
 #else
         disparity = raw_disparity;
 #endif
