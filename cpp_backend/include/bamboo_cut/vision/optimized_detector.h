@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include <functional>
+#include <mutex>
+#include <chrono>
 
 #include "bamboo_cut/core/types.h"
 #include "bamboo_cut/vision/tensorrt_engine.h"
@@ -28,7 +31,7 @@ struct OptimizedDetectorConfig {
     TensorRTConfig tensorrt_config;
     
     // NAM 注意力配置
-    NAMAttention::NAMConfig nam_config;
+    NAMConfig nam_config;
     
     // GhostConv 配置
     GhostConvConfig ghost_conv_config;

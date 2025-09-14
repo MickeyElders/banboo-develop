@@ -98,7 +98,7 @@ void CameraManager::setFrameCallback(FrameCallback callback) {
     LOG_INFO("设置帧回调函数");
 }
 
-CameraInfo CameraManager::getCameraInfo() const {
+CameraManager::CameraInfo CameraManager::getCameraInfo() const {
     CameraInfo info;
     info.device_path = config_.device_id;
     info.current_width = config_.width;

@@ -3,6 +3,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 #include <chrono>
+#include <mutex>
+#include <functional>
 
 namespace bamboo_cut {
 namespace vision {

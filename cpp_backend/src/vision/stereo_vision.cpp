@@ -100,9 +100,11 @@ void StereoVision::shutdown() {
     if (stereo_matcher_) {
         stereo_matcher_.release();
     }
+#if HAS_WLS_FILTER
     if (wls_filter_) {
         wls_filter_.release();
     }
+#endif
     
     std::cout << "立体视觉系统已关闭" << std::endl;
 }
