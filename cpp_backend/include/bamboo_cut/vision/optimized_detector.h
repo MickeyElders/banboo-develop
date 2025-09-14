@@ -15,7 +15,7 @@
 #include "bamboo_cut/vision/stereo_vision.h"
 #include "bamboo_cut/vision/sahi_slicing.h"
 #include "bamboo_cut/vision/hardware_accelerated_camera.h"
-#include "bamboo_cut/vision/bamboo_detector.h"
+#include "bamboo_cut/vision/detector.h"
 
 namespace bamboo_cut {
 namespace vision {

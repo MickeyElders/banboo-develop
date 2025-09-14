@@ -4,7 +4,10 @@
 #include <thread>
 #include <chrono>
 #include <opencv2/opencv.hpp>
-#include <opencv2/ximgproc.hpp>
+
+#ifdef ENABLE_OPENCV_CONTRIB
+    #include <opencv2/ximgproc.hpp>
+#endif
 
 namespace bamboo_cut {
 namespace vision {
@@ -68,9 +71,14 @@ bool StereoVision::initialize() {
     
     // 创建WLS滤波器
     if (matching_config_.use_wls_filter) {
+#if HAS_WLS_FILTER
         wls_filter_ = cv::ximgproc::createDisparityWLSFilter(stereo_matcher_);
         wls_filter_->setLambda(matching_config_.lambda);
         wls_filter_->setSigmaColor(matching_config_.sigma);
+#else
+        std::cerr << "警告: OpenCV扩展模块未安装，WLS滤波器不可用" << std::endl;
+        matching_config_.use_wls_filter = false;
+#endif
     }
     
     initialized_.store(true);
@@ -290,7 +298,11 @@ bool StereoVision::compute_disparity(const cv::Mat& left_rect, const cv::Mat& ri
     
     // 应用WLS滤波
     if (matching_config_.use_wls_filter && wls_filter_) {
+#if HAS_WLS_FILTER
         wls_filter_->filter(raw_disparity, left_gray, disparity);
+#else
+        disparity = raw_disparity;
+#endif
     } else {
         disparity = raw_disparity;
     }
