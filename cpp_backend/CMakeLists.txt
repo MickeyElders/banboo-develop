@@ -317,6 +317,11 @@ set(SOURCES
     src/vision/nam_attention.cpp
     src/vision/ghost_conv.cpp
     src/vision/vov_gscsp.cpp
+    src/vision/sahi_slicing.cpp
+    src/vision/wise_iou.cpp
+    src/vision/hardware_accelerated_camera.cpp
+    src/vision/tensorrt_engine.cpp
+    src/vision/deepstream_pipeline.cpp
     src/communication/modbus_server.cpp
 )
 
