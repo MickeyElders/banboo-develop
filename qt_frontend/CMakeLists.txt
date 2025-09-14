@@ -63,7 +63,7 @@ target_link_libraries(bamboo_controller_qt PRIVATE
     Qt6::Qml
     Qt6::Multimedia
     Qt6::MultimediaWidgets
-    ${OpenCV_LIBRARIES}
+    ${OpenCV_LIBS}
     ${GLES2_LIBRARIES}
     ${EGL_LIBRARIES}
     ${OPENGL_LIBRARIES}
