@@ -163,7 +163,11 @@ public:
     struct PerformanceStats {
         uint64_t total_detections{0};
         uint64_t total_frames_processed{0};
+        uint64_t total_frames{0};
+        uint64_t processed_frames{0};
+        uint64_t detection_count{0};
         double avg_detection_time_ms{0.0};
+        double avg_processing_time_ms{0.0};
         double min_detection_time_ms{0.0};
         double max_detection_time_ms{0.0};
         double fps{0.0};
