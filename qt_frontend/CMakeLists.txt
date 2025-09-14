@@ -13,11 +13,39 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLES2 REQUIRED glesv2)
 pkg_check_modules(EGL REQUIRED egl)
 
-# OpenCV配置
+# OpenCV配置 - 多种查找方式
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(OpenCV REQUIRED opencv4)
-if(NOT OpenCV_FOUND)
-    find_package(OpenCV REQUIRED)
+
+# 方式1: pkg-config查找opencv4
+pkg_check_modules(OpenCV4 opencv4)
+if(OpenCV4_FOUND)
+    set(OpenCV_INCLUDE_DIRS ${OpenCV4_INCLUDE_DIRS})
+    set(OpenCV_LIBRARIES ${OpenCV4_LIBRARIES})
+    set(OpenCV_CFLAGS_OTHER ${OpenCV4_CFLAGS_OTHER})
+else()
+    # 方式2: 标准find_package
+    find_package(OpenCV)
+    if(OpenCV_FOUND)
+        set(OpenCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIRS})
+        set(OpenCV_LIBRARIES ${OpenCV_LIBS})
+    else()
+        # 方式3: 手动查找常见路径
+        find_path(OpenCV_INCLUDE_DIRS opencv2/opencv.hpp
+            PATHS /usr/include /usr/local/include /opt/opencv/include
+            PATH_SUFFIXES opencv4 opencv)
+        find_library(OpenCV_LIBRARIES
+            NAMES opencv_core libopencv_core
+            PATHS /usr/lib /usr/local/lib /opt/opencv/lib
+            PATH_SUFFIXES aarch64-linux-gnu x86_64-linux-gnu)
+    endif()
+endif()
+
+# 检查OpenCV是否找到
+if(NOT OpenCV_INCLUDE_DIRS)
+    message(WARNING "OpenCV headers not found, some features may be disabled")
+    set(OpenCV_INCLUDE_DIRS "")
+    set(OpenCV_LIBRARIES "")
+    set(OpenCV_CFLAGS_OTHER "")
 endif()
 
 # 源文件
