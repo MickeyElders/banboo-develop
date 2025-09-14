@@ -157,8 +157,36 @@ check-deps:
 	@command -v make >/dev/null 2>&1 || { $(call log_error,make未找到); exit 1; }
 	@command -v g++ >/dev/null 2>&1 || { $(call log_error,g++未找到，请运行: make install-deps-ubuntu); exit 1; }
 	@command -v git >/dev/null 2>&1 || { $(call log_error,git未找到); exit 1; }
-	@command -v flutter >/dev/null 2>&1 || { $(call log_warning,flutter未找到，前端编译将跳过); }
-	@pkg-config --exists opencv4 >/dev/null 2>&1 || pkg-config --exists opencv >/dev/null 2>&1 || { $(call log_warning,OpenCV未找到，C++后端编译可能失败); }
+	@command -v pkg-config >/dev/null 2>&1 || { $(call log_error,pkg-config未找到，请运行: make install-deps-ubuntu); exit 1; }
+	@echo "检查OpenCV..."
+	@opencv_found=false; \
+	if pkg-config --exists opencv4 >/dev/null 2>&1; then \
+		$(call log_info,找到OpenCV4: $$(pkg-config --modversion opencv4)); \
+		opencv_found=true; \
+	elif pkg-config --exists opencv >/dev/null 2>&1; then \
+		$(call log_info,找到OpenCV: $$(pkg-config --modversion opencv)); \
+		opencv_found=true; \
+	elif [ -f /usr/include/opencv4/opencv2/opencv.hpp ]; then \
+		$(call log_info,找到OpenCV4头文件: /usr/include/opencv4/); \
+		opencv_found=true; \
+	elif [ -f /usr/include/opencv2/opencv.hpp ]; then \
+		$(call log_info,找到OpenCV头文件: /usr/include/); \
+		opencv_found=true; \
+	elif [ -f /usr/local/include/opencv4/opencv2/opencv.hpp ]; then \
+		$(call log_info,找到OpenCV4头文件: /usr/local/include/opencv4/); \
+		opencv_found=true; \
+	elif [ -f /usr/local/include/opencv2/opencv.hpp ]; then \
+		$(call log_info,找到OpenCV头文件: /usr/local/include/); \
+		opencv_found=true; \
+	fi; \
+	if [ "$$opencv_found" = "false" ]; then \
+		$(call log_error,OpenCV未找到，请安装OpenCV开发包); \
+		echo "   Ubuntu/Debian: sudo apt-get install libopencv-dev"; \
+		echo "   Jetson: sudo apt-get install libopencv-dev libopencv-contrib-dev"; \
+		echo "   或从源码编译: https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html"; \
+		exit 1; \
+	fi
+	@pkg-config --exists gstreamer-1.0 >/dev/null 2>&1 || { $(call log_warning,GStreamer未找到，视频功能可能受限); }
 	$(call log_success,依赖检查完成)
 
 # 检查Qt依赖

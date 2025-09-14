@@ -35,27 +35,93 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # 查找依赖库
 # ================================
 
-# OpenCV - 使用pkg-config方式以兼容不同系统
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(OPENCV REQUIRED opencv4)
-if(NOT OPENCV_FOUND)
-    pkg_check_modules(OPENCV REQUIRED opencv)
+# OpenCV - 多种方式查找以提高兼容性
+set(ENABLE_OPENCV OFF)
+set(OpenCV_FOUND FALSE)
+
+# 方法1: 尝试使用find_package查找OpenCV
+find_package(OpenCV QUIET)
+if(OpenCV_FOUND)
+    message(STATUS "Found OpenCV via find_package: ${OpenCV_VERSION}")
+    set(ENABLE_OPENCV ON)
+    # OpenCV变量已经由find_package设置
+    set(OpenCV_LIBS ${OpenCV_LIBS})
+    set(OpenCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIRS})
+else()
+    # 方法2: 尝试使用pkg-config查找OpenCV
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(OPENCV QUIET opencv4)
+        if(NOT OPENCV_FOUND)
+            pkg_check_modules(OPENCV QUIET opencv)
+        endif()
+        
+        if(OPENCV_FOUND)
+            message(STATUS "Found OpenCV via pkg-config: ${OPENCV_VERSION}")
+            set(ENABLE_OPENCV ON)
+            set(OpenCV_FOUND TRUE)
+            # 设置变量以兼容原代码
+            set(OpenCV_LIBS ${OPENCV_LIBRARIES})
+            set(OpenCV_INCLUDE_DIRS ${OPENCV_INCLUDE_DIRS})
+            # 添加包含目录和链接库
+            include_directories(${OPENCV_INCLUDE_DIRS})
+            link_directories(${OPENCV_LIBRARY_DIRS})
+            add_definitions(${OPENCV_CFLAGS_OTHER})
+        endif()
+    endif()
 endif()
 
-if(OPENCV_FOUND)
-    # 设置变量以兼容原代码
-    set(OpenCV_LIBS ${OPENCV_LIBRARIES})
-    set(OpenCV_INCLUDE_DIRS ${OPENCV_INCLUDE_DIRS})
-    set(OpenCV_FOUND TRUE)
-    set(ENABLE_OPENCV ON)
-    message(STATUS "Found OpenCV via pkg-config: ${OPENCV_VERSION}")
+# 方法3: 手动查找OpenCV (Jetson特定路径)
+if(NOT ENABLE_OPENCV)
+    # Jetson常用的OpenCV安装路径
+    set(OPENCV_SEARCH_PATHS
+        /usr/include/opencv4
+        /usr/local/include/opencv4
+        /opt/opencv/include/opencv4
+        /usr/include/opencv2
+        /usr/local/include/opencv2
+        /opt/opencv/include/opencv2
+        /usr/include
+        /usr/local/include
+    )
     
-    # 添加包含目录和链接库
-    include_directories(${OPENCV_INCLUDE_DIRS})
-    link_directories(${OPENCV_LIBRARY_DIRS})
-    add_definitions(${OPENCV_CFLAGS_OTHER})
-else()
-    message(FATAL_ERROR "OpenCV not found via pkg-config. Please install libopencv-dev")
+    find_path(OpenCV_INCLUDE_DIR opencv2/opencv.hpp
+        PATHS ${OPENCV_SEARCH_PATHS}
+        NO_DEFAULT_PATH)
+    
+    if(OpenCV_INCLUDE_DIR)
+        # 查找OpenCV库
+        find_library(OpenCV_CORE_LIB opencv_core
+            PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu
+            NO_DEFAULT_PATH)
+        
+        if(OpenCV_CORE_LIB)
+            message(STATUS "Found OpenCV manually: ${OpenCV_INCLUDE_DIR}")
+            set(ENABLE_OPENCV ON)
+            set(OpenCV_FOUND TRUE)
+            set(OpenCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIR})
+            
+            # 查找常用的OpenCV库
+            set(OpenCV_LIBS "")
+            foreach(lib IN ITEMS opencv_core opencv_imgproc opencv_imgcodecs opencv_videoio opencv_video opencv_calib3d opencv_features2d opencv_objdetect opencv_dnn opencv_highgui)
+                find_library(${lib}_LIB ${lib}
+                    PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu
+                    NO_DEFAULT_PATH)
+                if(${lib}_LIB)
+                    list(APPEND OpenCV_LIBS ${${lib}_LIB})
+                endif()
+            endforeach()
+            
+            include_directories(${OpenCV_INCLUDE_DIRS})
+            message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
+        endif()
+    endif()
+endif()
+
+if(NOT ENABLE_OPENCV)
+    message(FATAL_ERROR "OpenCV not found! Please install OpenCV:
+    Ubuntu/Debian: sudo apt-get install libopencv-dev
+    Or build from source: https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html")
 endif()
 
 # PkgConfig for GStreamer
