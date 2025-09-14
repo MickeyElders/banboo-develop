@@ -126,17 +126,17 @@ void TensorRTEngine::shutdown() {
     
 #ifdef ENABLE_TENSORRT
     if (context_) {
-        context_->destroy();
+        delete context_;
         context_ = nullptr;
     }
     
     if (engine_) {
-        engine_->destroy();
+        delete engine_;
         engine_ = nullptr;
     }
     
     if (runtime_) {
-        runtime_->destroy();
+        delete runtime_;
         runtime_ = nullptr;
     }
     
@@ -180,7 +180,7 @@ InferenceResult TensorRTEngine::infer(const cv::Mat& input_image) {
         
         // 执行推理
         void* bindings[] = {input_buffer_, output_buffer_};
-        if (!context_->execute(config_.max_batch_size, bindings)) {
+        if (!context_->executeV2(bindings)) {
             result.error_message = "TensorRT推理执行失败";
             return result;
         }

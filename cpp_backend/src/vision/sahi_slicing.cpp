@@ -213,12 +213,12 @@ core::DetectionResult SAHISlicing::transform_detection_to_original(
     transformed.bounding_box.y += slice_roi.y;
     
     // 确保坐标在原图范围内
-    transformed.bounding_box.x = std::max(0, std::min(transformed.bounding_box.x, original_size.width));
-    transformed.bounding_box.y = std::max(0, std::min(transformed.bounding_box.y, original_size.height));
-    transformed.bounding_box.width = std::min(transformed.bounding_box.width, 
-                                            original_size.width - transformed.bounding_box.x);
-    transformed.bounding_box.height = std::min(transformed.bounding_box.height, 
-                                             original_size.height - transformed.bounding_box.y);
+    transformed.bounding_box.x = std::max(0.0f, std::min(transformed.bounding_box.x, static_cast<float>(original_size.width)));
+    transformed.bounding_box.y = std::max(0.0f, std::min(transformed.bounding_box.y, static_cast<float>(original_size.height)));
+    transformed.bounding_box.width = std::min(transformed.bounding_box.width,
+                                            static_cast<float>(original_size.width) - transformed.bounding_box.x);
+    transformed.bounding_box.height = std::min(transformed.bounding_box.height,
+                                             static_cast<float>(original_size.height) - transformed.bounding_box.y);
     
     return transformed;
 }
@@ -351,9 +351,6 @@ void AdaptiveSlicer::set_config(const AdaptiveConfig& config) {
     config_ = config;
 }
 
-AdaptiveSlicer::AdaptiveConfig AdaptiveSlicer::get_config() const {
-    return config_;
-}
 
 float AdaptiveSlicer::calculate_region_density(const cv::Mat& density_map, const cv::Rect& region) {
     if (region.x >= 0 && region.y >= 0 && 
