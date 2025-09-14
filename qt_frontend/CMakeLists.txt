@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Qt配置
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Quick QuickWidgets OpenGL OpenGLWidgets Qml Multimedia MultimediaWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Quick QuickWidgets OpenGL OpenGLWidgets Qml QuickControls2 Multimedia MultimediaWidgets)
 
 # OpenGL ES配置（适配Jetson设备）
 find_package(OpenGL REQUIRED)
@@ -36,6 +36,8 @@ set(SOURCES
     src/cameramanager.cpp
     src/bamboodetector.cpp
     src/configmanager.cpp
+    src/systemcontroller.cpp
+    src/touchcontroller.cpp
 )
 
 set(HEADERS
@@ -44,6 +46,8 @@ set(HEADERS
     include/cameramanager.h
     include/bamboodetector.h
     include/configmanager.h
+    include/systemcontroller.h
+    include/touchcontroller.h
 )
 
 set(QML_FILES
@@ -69,6 +73,7 @@ target_link_libraries(bamboo_controller_qt PRIVATE
     Qt6::OpenGL
     Qt6::OpenGLWidgets
     Qt6::Qml
+    Qt6::QuickControls2
     Qt6::Multimedia
     Qt6::MultimediaWidgets
     ${OpenCV_LIBS}
