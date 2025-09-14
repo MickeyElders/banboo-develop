@@ -9,6 +9,7 @@
 #include <QtSerialPort/QSerialPortInfo>
 #include <QtNetwork/QHostAddress>
 #include <QSysInfo>
+#include <random>
 
 Q_LOGGING_CATEGORY(systemController, "app.systemcontroller")
 
@@ -383,13 +384,20 @@ void SystemController::updateSystemInfo()
 {
     // 模拟系统信息更新
     static int uptimeCounter = 0;
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> cpu_dis(0, 99);
+    static std::uniform_int_distribution<> mem_dis(20, 99);
+    static std::uniform_int_distribution<> disk_dis(30, 79);
+    static std::uniform_int_distribution<> temp_dis(40, 59);
+    
     uptimeCounter++;
     
     m_systemInfo.uptime = uptimeCounter;
-    m_systemInfo.cpuUsage = qrand() % 100;
-    m_systemInfo.memoryUsage = qrand() % 80 + 20;
-    m_systemInfo.diskUsage = qrand() % 50 + 30;
-    m_systemInfo.temperature = qrand() % 20 + 40; // 40-60度
+    m_systemInfo.cpuUsage = cpu_dis(gen);
+    m_systemInfo.memoryUsage = mem_dis(gen);
+    m_systemInfo.diskUsage = disk_dis(gen);
+    m_systemInfo.temperature = temp_dis(gen); // 40-60度
     
     emit systemInfoUpdated(m_systemInfo);
 }

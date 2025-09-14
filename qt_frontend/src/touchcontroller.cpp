@@ -52,7 +52,7 @@ bool TouchController::handleTouchEvent(QTouchEvent *event)
     }
     
     qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
-    const QList<QTouchEvent::TouchPoint> touchPoints = event->touchPoints();
+    const QList<QTouchEvent::TouchPoint> touchPoints = event->points();
     
     // 过滤有效触摸点
     QList<QTouchEvent::TouchPoint> validPoints;
@@ -270,7 +270,9 @@ void TouchController::detectGesture()
         float velocity = distance / timeDiff;
         
         if (velocity > MIN_SWIPE_VELOCITY && distance > MIN_PAN_DISTANCE * 2) {
-            QPointF direction = (end - start).normalized();
+            QPointF delta = end - start;
+            float length = qSqrt(delta.x() * delta.x() + delta.y() * delta.y());
+            QPointF direction = length > 0 ? QPointF(delta.x() / length, delta.y() / length) : QPointF(0, 0);
             
             emit swipeGesture(direction, velocity);
             
