@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Qt配置
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Quick QuickWidgets OpenGL Multimedia MultimediaWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Quick QuickWidgets OpenGL OpenGLWidgets Qml Multimedia MultimediaWidgets)
 
 # OpenGL ES配置（适配Jetson设备）
 find_package(OpenGL REQUIRED)
@@ -55,6 +55,8 @@ target_link_libraries(bamboo_controller_qt PRIVATE
     Qt6::Quick
     Qt6::QuickWidgets
     Qt6::OpenGL
+    Qt6::OpenGLWidgets
+    Qt6::Qml
     Qt6::Multimedia
     Qt6::MultimediaWidgets
     ${OpenCV_LIBRARIES}
