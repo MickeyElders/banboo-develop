@@ -4,6 +4,10 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <functional>
+#include <mutex>
+#include <chrono>
+#include <map>
 
 namespace bamboo_cut {
 namespace vision {

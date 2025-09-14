@@ -4,6 +4,10 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <functional>
+#include <mutex>
+#include <chrono>
+#include <map>
 #include "bamboo_cut/vision/ghost_conv.h"
 
 namespace bamboo_cut {

@@ -1,9 +1,28 @@
 #include "bamboo_cut/vision/nam_attention.h"
 #include <iostream>
 #include <chrono>
+#include <mutex>
+#include <algorithm>
 
 namespace bamboo_cut {
 namespace vision {
+
+// NAMConfig validation implementation
+bool NAMConfig::validate() const {
+    if (channel_reduction_ratio <= 0 || channel_reduction_ratio > 64) {
+        return false;
+    }
+    if (spatial_kernel_size < 1 || spatial_kernel_size > 15) {
+        return false;
+    }
+    if (learning_rate <= 0 || learning_rate > 1.0) {
+        return false;
+    }
+    if (dropout_rate < 0 || dropout_rate > 1.0) {
+        return false;
+    }
+    return true;
+}
 
 NAMAttention::NAMAttention(const NAMConfig& config) : config_(config), initialized_(false) {
     std::cout << "创建NAMAttention实例" << std::endl;
@@ -61,8 +80,40 @@ cv::Mat NAMAttention::forward(const cv::Mat& input) {
     }
     
     try {
-        // 简化实现：直接返回输入
-        return input.clone();
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // 应用通道注意力
+        cv::Mat channel_attention = apply_channel_attention(input);
+        
+        // 应用空间注意力
+        cv::Mat spatial_attention = apply_spatial_attention(input);
+        
+        // 融合注意力
+        cv::Mat result = fuse_attention(channel_attention, spatial_attention);
+        
+        // 更新性能统计
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            performance_stats_.total_forward_passes++;
+            double processing_time_ms = duration.count() / 1000.0;
+            
+            if (performance_stats_.total_forward_passes == 1) {
+                performance_stats_.min_processing_time_ms = processing_time_ms;
+                performance_stats_.max_processing_time_ms = processing_time_ms;
+                performance_stats_.avg_processing_time_ms = processing_time_ms;
+            } else {
+                performance_stats_.min_processing_time_ms = std::min(performance_stats_.min_processing_time_ms, processing_time_ms);
+                performance_stats_.max_processing_time_ms = std::max(performance_stats_.max_processing_time_ms, processing_time_ms);
+                performance_stats_.avg_processing_time_ms = (performance_stats_.avg_processing_time_ms * (performance_stats_.total_forward_passes - 1) + processing_time_ms) / performance_stats_.total_forward_passes;
+            }
+            
+            performance_stats_.last_update = std::chrono::steady_clock::now();
+        }
+        
+        return result;
         
     } catch (const std::exception& e) {
         std::cerr << "NAMAttention前向传播异常: " << e.what() << std::endl;
@@ -82,17 +133,129 @@ std::vector<cv::Mat> NAMAttention::forward_batch(const std::vector<cv::Mat>& inp
 }
 
 cv::Mat NAMAttention::apply_channel_attention(const cv::Mat& input) {
-    return input.clone();
+    if (input.empty()) return cv::Mat();
+    
+    try {
+        // 计算通道级全局平均池化
+        cv::Mat pooled = channel_global_pooling(input);
+        
+        // 通过全连接层
+        cv::Mat fc_output = channel_fc_layers(pooled);
+        
+        // 应用Sigmoid激活
+        cv::Mat attention_weights = channel_sigmoid_activation(fc_output);
+        
+        // 将注意力权重应用到输入
+        cv::Mat result;
+        if (input.channels() == attention_weights.channels()) {
+            cv::multiply(input, attention_weights, result);
+        } else {
+            result = input.clone();
+        }
+        
+        return result;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "通道注意力计算异常: " << e.what() << std::endl;
+        return input.clone();
+    }
 }
 
 cv::Mat NAMAttention::apply_spatial_attention(const cv::Mat& input) {
-    return input.clone();
+    if (input.empty()) return cv::Mat();
+    
+    try {
+        // 应用空间卷积
+        cv::Mat conv_output = spatial_conv_layer(input);
+        
+        // 应用Sigmoid激活得到空间注意力图
+        cv::Mat attention_map = spatial_sigmoid_activation(conv_output);
+        
+        // 将注意力图应用到输入
+        cv::Mat result;
+        if (attention_map.size() == input.size()) {
+            cv::multiply(input, attention_map, result);
+        } else {
+            // 如果尺寸不匹配，调整注意力图尺寸
+            cv::Mat resized_attention;
+            cv::resize(attention_map, resized_attention, input.size());
+            cv::multiply(input, resized_attention, result);
+        }
+        
+        return result;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "空间注意力计算异常: " << e.what() << std::endl;
+        return input.clone();
+    }
 }
 
 cv::Mat NAMAttention::fuse_attention(const cv::Mat& channel_attn, const cv::Mat& spatial_attn) {
+    if (channel_attn.empty()) return spatial_attn.clone();
+    if (spatial_attn.empty()) return channel_attn.clone();
+    
+    try {
+        cv::Mat output;
+        // 根据配置权重融合
+        float channel_weight = 0.6f;  // 通道注意力权重稍高
+        float spatial_weight = 0.4f;  // 空间注意力权重
+        
+        cv::addWeighted(channel_attn, channel_weight, spatial_attn, spatial_weight, 0, output);
+        return output;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "注意力融合异常: " << e.what() << std::endl;
+        return channel_attn.clone();
+    }
+}
+
+// 私有辅助函数实现
+cv::Mat NAMAttention::channel_global_pooling(const cv::Mat& input) {
+    cv::Mat pooled;
+    cv::reduce(input.reshape(1, input.rows * input.cols), pooled, 0, cv::REDUCE_AVG);
+    return pooled;
+}
+
+cv::Mat NAMAttention::channel_fc_layers(const cv::Mat& pooled) {
+    // 简单的线性变换模拟全连接层
     cv::Mat output;
-    cv::addWeighted(channel_attn, 0.5, spatial_attn, 0.5, 0, output);
+    cv::multiply(pooled, cv::Scalar::all(config_.channel_gamma), output);
+    cv::add(output, cv::Scalar::all(config_.channel_beta), output);
     return output;
+}
+
+cv::Mat NAMAttention::channel_sigmoid_activation(const cv::Mat& fc_output) {
+    cv::Mat sigmoid_output;
+    cv::exp(-fc_output, sigmoid_output);
+    cv::add(sigmoid_output, cv::Scalar::all(1.0), sigmoid_output);
+    cv::divide(cv::Scalar::all(1.0), sigmoid_output, sigmoid_output);
+    return sigmoid_output;
+}
+
+cv::Mat NAMAttention::spatial_conv_layer(const cv::Mat& input) {
+    cv::Mat output;
+    int kernel_size = static_cast<int>(config_.spatial_kernel_size);
+    if (kernel_size % 2 == 0) kernel_size += 1; // 确保是奇数
+    
+    // 使用Gaussian滤波器模拟空间卷积
+    cv::GaussianBlur(input, output, cv::Size(kernel_size, kernel_size), 1.0);
+    return output;
+}
+
+cv::Mat NAMAttention::spatial_sigmoid_activation(const cv::Mat& conv_output) {
+    cv::Mat normalized, sigmoid_output;
+    
+    // 归一化到0-1范围
+    cv::normalize(conv_output, normalized, 0, 1, cv::NORM_MINMAX);
+    
+    // 应用sigmoid函数
+    cv::multiply(normalized, cv::Scalar::all(config_.spatial_gamma), sigmoid_output);
+    cv::subtract(sigmoid_output, cv::Scalar::all(config_.spatial_beta), sigmoid_output);
+    cv::exp(-sigmoid_output, sigmoid_output);
+    cv::add(sigmoid_output, cv::Scalar::all(1.0), sigmoid_output);
+    cv::divide(cv::Scalar::all(1.0), sigmoid_output, sigmoid_output);
+    
+    return sigmoid_output;
 }
 
 void NAMAttention::set_config(const NAMConfig& config) {
