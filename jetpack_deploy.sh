@@ -292,23 +292,53 @@ configure_jetpack_performance() {
         if [ "$ENABLE_POWER_OPTIMIZATION" = "ON" ]; then
             log_jetpack "配置功耗管理优化..."
             
-            # 创建功耗配置文件
+            # 创建功耗配置文件（移除sudo，因为systemd服务以root运行）
             cat > "${JETPACK_DEPLOY_DIR}/power_config.sh" << 'EOF'
 #!/bin/bash
 # JetPack SDK 功耗管理配置
 
+echo "🔧 应用JetPack性能优化设置..."
+
 # 设置 CPU 调度器为性能模式
-echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+if [ -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
+    echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor > /dev/null 2>&1
+    echo "✅ CPU调度器已设置为性能模式"
+else
+    echo "⚠️ 无法设置CPU调度器，跳过"
+fi
 
 # 优化内存管理
-echo 1 | sudo tee /proc/sys/vm/overcommit_memory
-echo 80 | sudo tee /proc/sys/vm/swappiness
+if [ -w /proc/sys/vm/overcommit_memory ]; then
+    echo 1 | tee /proc/sys/vm/overcommit_memory > /dev/null 2>&1
+    echo "✅ 内存过量分配已优化"
+else
+    echo "⚠️ 无法设置内存管理，跳过"
+fi
+
+if [ -w /proc/sys/vm/swappiness ]; then
+    echo 80 | tee /proc/sys/vm/swappiness > /dev/null 2>&1
+    echo "✅ 交换分区优化已设置"
+else
+    echo "⚠️ 无法设置交换分区，跳过"
+fi
 
 # GPU 功耗管理
-echo 1 | sudo tee /sys/devices/platform/host1x/57000000.gpu/power/autosuspend_delay_ms
+if [ -w /sys/devices/platform/host1x/57000000.gpu/power/autosuspend_delay_ms ]; then
+    echo 1 | tee /sys/devices/platform/host1x/57000000.gpu/power/autosuspend_delay_ms > /dev/null 2>&1
+    echo "✅ GPU功耗管理已优化"
+else
+    echo "⚠️ 无法设置GPU功耗管理，跳过"
+fi
 
 # 网络优化
-echo 1 | sudo tee /proc/sys/net/core/netdev_max_backlog
+if [ -w /proc/sys/net/core/netdev_max_backlog ]; then
+    echo 1 | tee /proc/sys/net/core/netdev_max_backlog > /dev/null 2>&1
+    echo "✅ 网络优化已设置"
+else
+    echo "⚠️ 无法设置网络优化，跳过"
+fi
+
+echo "🎉 JetPack性能优化设置完成"
 EOF
             chmod +x "${JETPACK_DEPLOY_DIR}/power_config.sh"
         fi
@@ -1011,11 +1041,11 @@ sudo mkdir -p /var/log/bamboo-cut
 sudo cp -r * /opt/bamboo-cut/
 
 # 设置权限
-sudo chown -R bamboo-cut:bamboo-cut /opt/bamboo-cut
+sudo chown -R root:root /opt/bamboo-cut
 sudo chown -R bamboo-cut:bamboo-cut /var/log/bamboo-cut
 sudo chmod +x /opt/bamboo-cut/*.sh
 
-# 创建 systemd 服务
+# 创建 systemd 服务（以root用户运行解决sudo权限问题）
 sudo tee /etc/systemd/system/bamboo-cut-jetpack.service > /dev/null << 'SERVICE_EOF'
 [Unit]
 Description=智能切竹机系统 (JetPack SDK)
@@ -1023,12 +1053,13 @@ After=network.target
 
 [Service]
 Type=simple
-User=bamboo-cut
+User=root
 WorkingDirectory=/opt/bamboo-cut
 ExecStart=/opt/bamboo-cut/start_bamboo_cut_jetpack.sh
 Restart=always
 RestartSec=10
 Environment=DISPLAY=:0
+Environment=QT_QPA_PLATFORM=eglfs
 
 [Install]
 WantedBy=multi-user.target
