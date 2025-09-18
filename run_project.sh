@@ -104,6 +104,113 @@ build_all() {
     log_success "整个项目编译完成！"
 }
 
+# 设置设备权限
+setup_device_permissions() {
+    log_info "配置设备权限..."
+    
+    # 摄像头权限
+    for device in /dev/video*; do
+        if [ -e "$device" ]; then
+            sudo chmod 666 "$device" 2>/dev/null || true
+            log_info "设置摄像头权限: $device"
+        fi
+    done
+    
+    # 串口权限
+    for device in /dev/ttyUSB* /dev/ttyACM* /dev/ttyS*; do
+        if [ -e "$device" ]; then
+            sudo chmod 666 "$device" 2>/dev/null || true
+        fi
+    done
+    
+    # 帧缓冲权限
+    for device in /dev/fb*; do
+        if [ -e "$device" ]; then
+            sudo chmod 666 "$device" 2>/dev/null || true
+        fi
+    done
+}
+
+# 智能平台插件检测和设置
+detect_and_set_qt_platform() {
+    log_info "检测可用的Qt平台插件..."
+    
+    # 优先尝试EGLFS（适合Jetson等嵌入式设备）
+    if [ -c "/dev/fb0" ] || [ -d "/sys/class/drm" ]; then
+        # 设置EGLFS环境
+        export QT_QPA_PLATFORM=eglfs
+        export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+        export QT_OPENGL=es2
+        export QT_QPA_FONTDIR=/usr/share/fonts
+        
+        log_info "使用EGLFS平台 (推荐用于Jetson设备)"
+        return 0
+    fi
+    
+    # 尝试Wayland
+    if [ -n "$WAYLAND_DISPLAY" ]; then
+        export QT_QPA_PLATFORM=wayland
+        log_info "使用Wayland平台"
+        return 0
+    fi
+    
+    # 尝试XCB (X11)
+    if [ -n "$DISPLAY" ]; then
+        export QT_QPA_PLATFORM=xcb
+        log_info "使用XCB平台"
+        return 0
+    fi
+    
+    # 最后尝试LinuxFB
+    if [ -c "/dev/fb0" ]; then
+        export QT_QPA_PLATFORM=linuxfb
+        export QT_QPA_FB_DISABLE_INPUT=1
+        log_info "使用LinuxFB平台"
+        return 0
+    fi
+    
+    # 如果都不可用，使用minimal平台
+    export QT_QPA_PLATFORM=minimal
+    log_warning "使用Minimal平台（无显示输出）"
+    return 0
+}
+
+# 设置Qt环境变量
+setup_qt_environment() {
+    # Qt模块路径
+    export QT_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/qt6/plugins:/usr/lib/qt6/plugins"
+    export QML_IMPORT_PATH="/usr/lib/aarch64-linux-gnu/qt6/qml:/usr/lib/qt6/qml"
+    
+    # OpenGL设置
+    export QT_OPENGL=es2
+    export QT_QUICK_BACKEND=software
+    
+    # 禁用Qt日志过滤
+    export QT_LOGGING_RULES="*=true"
+    
+    # 设置字体路径
+    export QT_QPA_FONTDIR="/usr/share/fonts"
+    
+    log_info "Qt环境变量已配置"
+}
+
+# 尝试不同平台启动
+try_different_platforms() {
+    local app_path="$1"
+    local platforms=("eglfs" "wayland" "xcb" "linuxfb" "minimal")
+    
+    for platform in "${platforms[@]}"; do
+        log_info "尝试 $platform 平台..."
+        if QT_QPA_PLATFORM=$platform "$app_path" 2>/dev/null; then
+            log_success "成功使用 $platform 平台启动"
+            return 0
+        fi
+    done
+    
+    log_error "所有平台都启动失败"
+    return 1
+}
+
 run_qt_frontend() {
     log_info "运行Qt前端..."
     cd "$SCRIPT_DIR/qt_frontend"
@@ -113,14 +220,29 @@ run_qt_frontend() {
         return 1
     fi
     
-    # 使用启动脚本
-    if [ -f "run_bamboo_qt.sh" ]; then
-        chmod +x run_bamboo_qt.sh
-        ./run_bamboo_qt.sh
+    log_info "配置Qt环境和平台插件..."
+    
+    # 执行配置
+    setup_device_permissions
+    setup_qt_environment
+    detect_and_set_qt_platform
+    
+    # 显示当前配置
+    log_info "当前Qt配置："
+    echo "  平台插件: ${QT_QPA_PLATFORM:-未设置}"
+    echo "  OpenGL: ${QT_OPENGL:-未设置}"
+    echo "  插件路径: ${QT_PLUGIN_PATH:-未设置}"
+    
+    # 运行应用程序
+    cd build
+    log_info "启动智能切竹机控制程序..."
+    
+    # 尝试运行，如果失败则尝试其他平台
+    if ! ./bamboo_controller_qt 2>/dev/null; then
+        log_warning "默认平台启动失败，尝试其他平台..."
+        try_different_platforms "./bamboo_controller_qt"
     else
-        # 直接运行
-        cd build
-        ./bamboo_controller_qt
+        log_success "Qt前端启动成功"
     fi
 }
 
@@ -172,6 +294,19 @@ show_system_info() {
     # GCC信息
     if command -v gcc >/dev/null 2>&1; then
         echo "🔨 GCC版本: $(gcc --version | head -n1)"
+    fi
+    
+    # 显示可用的Qt平台插件
+    echo ""
+    echo "🎯 Qt平台插件信息："
+    if [ -n "$DISPLAY" ]; then
+        echo "  DISPLAY: $DISPLAY"
+    fi
+    if [ -n "$WAYLAND_DISPLAY" ]; then
+        echo "  WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
+    fi
+    if [ -c "/dev/fb0" ]; then
+        echo "  帧缓冲: /dev/fb0 可用"
     fi
     
     echo ""
