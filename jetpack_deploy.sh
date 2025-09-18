@@ -1075,15 +1075,54 @@ if [ -f "./power_config.sh" ]; then
     echo "✅ 性能优化已应用"
 fi
 
-# 检查摄像头设备并设置模式
-if [ ! -e /dev/video0 ]; then
-    echo "⚠️ 未检测到摄像头设备，启用模拟模式"
-    export BAMBOO_CAMERA_MODE="simulation"
-    export BAMBOO_SKIP_CAMERA="true"
-else
-    echo "✅ 检测到摄像头设备"
+# 增强摄像头检测逻辑
+echo "🔍 检测摄像头设备..."
+CAMERA_FOUND=false
+
+# 检查多个可能的摄像头设备
+for device in /dev/video0 /dev/video1 /dev/video2; do
+    if [ -e "$device" ]; then
+        echo "📹 找到摄像头设备: $device"
+        
+        # 尝试获取设备信息
+        if command -v v4l2-ctl >/dev/null 2>&1; then
+            echo "📋 设备信息:"
+            v4l2-ctl --device="$device" --info 2>/dev/null || echo "   无法获取设备详细信息"
+        fi
+        
+        # 检查设备是否可读写
+        if [ -r "$device" ] && [ -w "$device" ]; then
+            echo "✅ 摄像头设备 $device 可访问"
+            CAMERA_FOUND=true
+            export BAMBOO_CAMERA_DEVICE="$device"
+            break
+        else
+            echo "⚠️ 摄像头设备 $device 存在但无访问权限"
+        fi
+    fi
+done
+
+# 列出所有video设备用于调试
+echo "📋 系统中的所有video设备:"
+ls -la /dev/video* 2>/dev/null || echo "   未找到video设备"
+
+# 检查USB摄像头
+echo "📋 USB设备信息:"
+lsusb 2>/dev/null | grep -i "camera\|video\|webcam" || echo "   未检测到USB摄像头"
+
+# 设置摄像头模式
+if [ "$CAMERA_FOUND" = true ]; then
+    echo "✅ 检测到可用摄像头设备，启用硬件模式"
     export BAMBOO_CAMERA_MODE="hardware"
     export BAMBOO_SKIP_CAMERA="false"
+else
+    echo "⚠️ 未检测到可用摄像头设备，启用模拟模式"
+    echo "💡 如果您已安装摄像头，请检查："
+    echo "   1. 摄像头是否正确连接"
+    echo "   2. 驱动程序是否已安装"
+    echo "   3. 设备权限是否正确"
+    export BAMBOO_CAMERA_MODE="simulation"
+    export BAMBOO_SKIP_CAMERA="true"
 fi
 
 # 优化模型 (如果存在且需要)
@@ -1218,6 +1257,7 @@ sudo tee /etc/systemd/system/bamboo-cut-jetpack.service > /dev/null << 'SERVICE_
 [Unit]
 Description=智能切竹机系统 (JetPack SDK) - 健壮版
 After=network.target
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
@@ -1227,7 +1267,6 @@ ExecStart=/opt/bamboo-cut/start_bamboo_cut_jetpack.sh
 Restart=on-failure
 RestartSec=30
 StartLimitBurst=3
-StartLimitIntervalSec=300
 Environment=DISPLAY=:0
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=BAMBOO_SKIP_CAMERA=true
