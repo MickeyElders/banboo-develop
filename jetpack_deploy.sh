@@ -833,10 +833,11 @@ POSSIBLE_PATHS=(
     "/usr/bin/trtexec"
     "/usr/local/bin/trtexec"
     "/usr/src/tensorrt/bin/trtexec"
+    "/usr/src/tensorrt/samples/trtexec"
     "/opt/tensorrt/bin/trtexec"
-    "$(find /usr -name trtexec -type f 2>/dev/null | head -1)"
 )
 
+# 首先检查预定义路径
 for path in "${POSSIBLE_PATHS[@]}"; do
     if [ -f "$path" ] && [ -x "$path" ]; then
         TRTEXEC_PATH="$path"
@@ -844,6 +845,16 @@ for path in "${POSSIBLE_PATHS[@]}"; do
         break
     fi
 done
+
+# 如果预定义路径都找不到，使用find命令搜索
+if [ -z "$TRTEXEC_PATH" ]; then
+    echo "🔍 在预定义路径中未找到trtexec，使用find命令搜索..."
+    FOUND_PATH=$(find /usr -name trtexec -type f -executable 2>/dev/null | head -1)
+    if [ -n "$FOUND_PATH" ] && [ -f "$FOUND_PATH" ] && [ -x "$FOUND_PATH" ]; then
+        TRTEXEC_PATH="$FOUND_PATH"
+        echo "✅ 通过搜索找到 trtexec: $TRTEXEC_PATH"
+    fi
+fi
 
 # 如果还是找不到trtexec，尝试从包管理器安装
 if [ -z "$TRTEXEC_PATH" ]; then
