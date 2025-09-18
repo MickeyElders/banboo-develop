@@ -816,28 +816,68 @@ EOF
         sed -i 's|model_path:.*|model_path: "/opt/bamboo-cut/models/bamboo_detection.onnx"|g' \
             "${PROJECT_ROOT}/config/ai_optimization.yaml" 2>/dev/null || true
         
-        # 创建增强版 TensorRT 模型优化脚本
+        # 创建增强版 TensorRT 模型优化脚本（可选，不阻止启动）
         cat > "${MODELS_DIR}/optimize_models.sh" << 'EOF'
 #!/bin/bash
-# TensorRT 模型优化脚本（增强版）
+# TensorRT 模型优化脚本（增强版，可选执行）
 
 MODELS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONNX_DIR="${MODELS_DIR}/onnx"
 TRT_DIR="${MODELS_DIR}/tensorrt"
 
-echo "开始 TensorRT 模型优化..."
+echo "🚀 开始 TensorRT 模型优化..."
 
-# 检查 trtexec 工具
-if ! command -v trtexec &> /dev/null; then
-    echo "错误: trtexec 未找到，请确保已安装 TensorRT"
-    exit 1
+# 查找 trtexec 工具
+TRTEXEC_PATH=""
+POSSIBLE_PATHS=(
+    "/usr/bin/trtexec"
+    "/usr/local/bin/trtexec"
+    "/usr/src/tensorrt/bin/trtexec"
+    "/opt/tensorrt/bin/trtexec"
+    "$(find /usr -name trtexec -type f 2>/dev/null | head -1)"
+)
+
+for path in "${POSSIBLE_PATHS[@]}"; do
+    if [ -f "$path" ] && [ -x "$path" ]; then
+        TRTEXEC_PATH="$path"
+        echo "✅ 找到 trtexec: $TRTEXEC_PATH"
+        break
+    fi
+done
+
+# 如果还是找不到trtexec，尝试从包管理器安装
+if [ -z "$TRTEXEC_PATH" ]; then
+    echo "🔍 尝试安装 trtexec 工具..."
+    
+    # 尝试安装tensorrt-dev包
+    if apt-get update && apt-get install -y tensorrt-dev 2>/dev/null; then
+        # 重新查找
+        for path in "${POSSIBLE_PATHS[@]}"; do
+            if [ -f "$path" ] && [ -x "$path" ]; then
+                TRTEXEC_PATH="$path"
+                echo "✅ 安装后找到 trtexec: $TRTEXEC_PATH"
+                break
+            fi
+        done
+    fi
+fi
+
+# 如果仍然找不到，跳过TensorRT优化
+if [ -z "$TRTEXEC_PATH" ]; then
+    echo "⚠️ trtexec 未找到，跳过 TensorRT 优化"
+    echo "💡 TensorRT已安装但缺少trtexec工具"
+    echo "🔧 可尝试安装: sudo apt install tensorrt-dev"
+    echo "✅ 系统将使用 ONNX 模型继续运行"
+    exit 0  # 正常退出，不阻止系统启动
 fi
 
 # 首先验证ONNX模型与OpenCV的兼容性
-echo "验证ONNX模型兼容性..."
+echo "🔍 验证ONNX模型兼容性..."
+onnx_found=false
 for onnx_file in "${MODELS_DIR}"/*.onnx; do
     if [ -f "$onnx_file" ]; then
-        echo "测试模型: $(basename "$onnx_file")"
+        onnx_found=true
+        echo "📋 测试模型: $(basename "$onnx_file")"
         python3 -c "
 import cv2
 try:
@@ -845,21 +885,28 @@ try:
     print('✅ 模型与OpenCV兼容')
 except Exception as e:
     print(f'❌ 模型不兼容: {e}')
-    exit(1)
-" || echo "跳过不兼容的模型: $(basename "$onnx_file")"
+" 2>/dev/null || echo "⚠️ 跳过不兼容的模型: $(basename "$onnx_file")"
     fi
 done
 
+if [ "$onnx_found" = false ]; then
+    echo "⚠️ 未找到ONNX模型文件，跳过优化"
+    exit 0
+fi
+
 # 优化 ONNX 模型为 TensorRT 引擎
+echo "⚡ 开始TensorRT引擎生成..."
 for onnx_file in "${MODELS_DIR}"/*.onnx; do
     if [ -f "$onnx_file" ]; then
         filename=$(basename "$onnx_file" .onnx)
-        echo "优化模型: $filename"
+        echo "🔧 优化模型: $filename"
         
         # 移动到onnx目录
+        mkdir -p "${ONNX_DIR}" "${TRT_DIR}"
         cp "$onnx_file" "${ONNX_DIR}/" 2>/dev/null || true
         
-        trtexec \
+        # 执行TensorRT优化
+        if "$TRTEXEC_PATH" \
             --onnx="$onnx_file" \
             --saveEngine="${TRT_DIR}/${filename}.trt" \
             --fp16 \
@@ -867,11 +914,15 @@ for onnx_file in "${MODELS_DIR}"/*.onnx; do
             --minShapes=input:1x3x640x640 \
             --optShapes=input:1x3x640x640 \
             --maxShapes=input:4x3x640x640 \
-            --verbose
+            --verbose 2>/dev/null; then
+            echo "✅ TensorRT引擎生成成功: ${filename}.trt"
+        else
+            echo "⚠️ TensorRT引擎生成失败: $filename，将使用ONNX模型"
+        fi
     fi
 done
 
-echo "TensorRT 模型优化完成"
+echo "🎉 TensorRT 模型优化完成（如有成功）"
 EOF
         chmod +x "${MODELS_DIR}/optimize_models.sh"
         
