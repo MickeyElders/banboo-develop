@@ -11,8 +11,11 @@ communication:
   timeout: 5.0
 
 ai:
-  model_path: "vision/models/yolov8n.pt"
+  model_path: "/opt/bamboo-cut/models/bamboo_detector.onnx"
+  tensorrt_engine_path: "/opt/bamboo-cut/models/tensorrt/bamboo_detector.trt"
   confidence_threshold: 0.5
+  enable_tensorrt: true
+  enable_jetpack_optimization: true
 
 user_interface:
   theme: "dark"
