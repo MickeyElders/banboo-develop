@@ -202,14 +202,14 @@ run_cpp_backend() {
     log_info "运行C++后端..."
     cd "$SCRIPT_DIR/cpp_backend"
     
-    if [ ! -f "build/bamboo_cut_system" ]; then
+    if [ ! -f "build/bamboo_cut_backend" ]; then
         log_error "C++后端未编译，请先编译"
         return 1
     fi
     
     cd build
     log_info "启动智能切竹机后端系统..."
-    ./bamboo_cut_system
+    ./bamboo_cut_backend
 }
 
 # 尝试不同平台启动
@@ -286,7 +286,7 @@ run_full_system() {
     log_info "运行完整系统（后端+前端）..."
     
     # 检查编译状态
-    if [ ! -f "$SCRIPT_DIR/cpp_backend/build/bamboo_cut_system" ]; then
+    if [ ! -f "$SCRIPT_DIR/cpp_backend/build/bamboo_cut_backend" ]; then
         log_error "C++后端未编译，请先编译"
         return 1
     fi
@@ -298,7 +298,7 @@ run_full_system() {
     
     log_info "启动后端系统..."
     cd "$SCRIPT_DIR/cpp_backend/build"
-    ./bamboo_cut_system &
+    ./bamboo_cut_backend &
     BACKEND_PID=$!
     
     sleep 2  # 等待后端启动
