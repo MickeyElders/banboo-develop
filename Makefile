@@ -193,9 +193,28 @@ check-deps:
 check-qt-deps:
 	$(call log_info,检查Qt编译依赖...)
 	@command -v qmake >/dev/null 2>&1 || command -v qmake6 >/dev/null 2>&1 || { echo "$(RED)[ERROR]$(NC) Qt未找到，请安装Qt6开发环境"; exit 1; }
-	@pkg-config --exists Qt6Core >/dev/null 2>&1 || { echo "$(RED)[ERROR]$(NC) Qt6开发包未找到，请运行: sudo apt install qt6-base-dev"; exit 1; }
-	@pkg-config --exists Qt6Quick >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) Qt6 Quick未找到，某些功能可能不可用"; }
-	@pkg-config --exists Qt6Multimedia >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) Qt6 Multimedia未找到，视频功能可能不可用"; }
+	@# 检查Qt6Core - 尝试多种可能的包名
+	@qt6_found=false; \
+	if pkg-config --exists Qt6Core >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 找到Qt6Core: $$(pkg-config --modversion Qt6Core)"; \
+		qt6_found=true; \
+	elif pkg-config --exists qt6-core >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 找到qt6-core: $$(pkg-config --modversion qt6-core)"; \
+		qt6_found=true; \
+	elif [ -f /usr/include/qt6/QtCore/QObject ] || [ -f /usr/include/x86_64-linux-gnu/qt6/QtCore/QObject ] || [ -f /usr/include/aarch64-linux-gnu/qt6/QtCore/QObject ]; then \
+		echo "$(GREEN)[INFO]$(NC) 找到Qt6头文件"; \
+		qt6_found=true; \
+	elif command -v qmake6 >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 找到qmake6: $$(qmake6 -v | grep Qt)"; \
+		qt6_found=true; \
+	fi; \
+	if [ "$$qt6_found" = "false" ]; then \
+		echo "$(RED)[ERROR]$(NC) Qt6开发包未找到，请运行: sudo apt install qt6-base-dev"; \
+		exit 1; \
+	fi
+	@# 检查其他Qt6模块（可选）
+	@pkg-config --exists Qt6Quick >/dev/null 2>&1 || pkg-config --exists qt6-quick >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) Qt6 Quick未找到，某些功能可能不可用"; }
+	@pkg-config --exists Qt6Multimedia >/dev/null 2>&1 || pkg-config --exists qt6-multimedia >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) Qt6 Multimedia未找到，视频功能可能不可用"; }
 	@pkg-config --exists glesv2 >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) OpenGL ES未找到，硬件加速可能不可用"; }
 	$(call log_success,Qt依赖检查完成)
 
