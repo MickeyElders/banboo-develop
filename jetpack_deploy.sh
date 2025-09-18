@@ -1075,14 +1075,50 @@ if [ -f "./power_config.sh" ]; then
     echo "✅ 性能优化已应用"
 fi
 
-# 增强摄像头检测逻辑
+# 增强摄像头检测逻辑（支持CSI和USB摄像头）
 echo "🔍 检测摄像头设备..."
 CAMERA_FOUND=false
 
-# 检查多个可能的摄像头设备
+# 检查CSI摄像头（IMX219等）
+echo "📋 检查CSI摄像头..."
+CSI_CAMERA_DETECTED=false
+
+# 检查IMX219模块
+if lsmod | grep -q imx219; then
+    echo "✅ IMX219内核模块已加载"
+    CSI_CAMERA_DETECTED=true
+elif modprobe imx219 2>/dev/null; then
+    echo "✅ IMX219内核模块加载成功"
+    CSI_CAMERA_DETECTED=true
+    sleep 2  # 等待模块初始化
+else
+    echo "⚠️ 无法加载IMX219内核模块"
+fi
+
+# 检查I2C设备上的IMX219
+if command -v i2cdetect >/dev/null 2>&1; then
+    echo "🔍 扫描I2C总线上的摄像头设备..."
+    for bus in 0 1 2 6 7 8 9 10; do
+        if i2cdetect -y -r $bus 2>/dev/null | grep -q "10"; then
+            echo "✅ 在I2C总线 $bus 上检测到IMX219设备"
+            CSI_CAMERA_DETECTED=true
+            break
+        fi
+    done
+fi
+
+# 检查media设备（CSI摄像头通常显示为media设备）
+MEDIA_DEVICES=$(find /dev -name "media*" 2>/dev/null)
+if [ -n "$MEDIA_DEVICES" ]; then
+    echo "📹 找到media设备: $MEDIA_DEVICES"
+    CSI_CAMERA_DETECTED=true
+fi
+
+# 检查传统video设备
+echo "📋 检查传统video设备..."
 for device in /dev/video0 /dev/video1 /dev/video2; do
     if [ -e "$device" ]; then
-        echo "📹 找到摄像头设备: $device"
+        echo "📹 找到video设备: $device"
         
         # 尝试获取设备信息
         if command -v v4l2-ctl >/dev/null 2>&1; then
@@ -1106,21 +1142,38 @@ done
 echo "📋 系统中的所有video设备:"
 ls -la /dev/video* 2>/dev/null || echo "   未找到video设备"
 
+# 列出所有media设备用于调试
+echo "📋 系统中的所有media设备:"
+ls -la /dev/media* 2>/dev/null || echo "   未找到media设备"
+
 # 检查USB摄像头
 echo "📋 USB设备信息:"
 lsusb 2>/dev/null | grep -i "camera\|video\|webcam" || echo "   未检测到USB摄像头"
 
+# 检查内核日志中的摄像头信息
+echo "📋 内核日志中的摄像头信息:"
+dmesg | grep -i "imx219\|camera\|csi" | tail -5 || echo "   未找到相关日志"
+
 # 设置摄像头模式
-if [ "$CAMERA_FOUND" = true ]; then
-    echo "✅ 检测到可用摄像头设备，启用硬件模式"
+if [ "$CAMERA_FOUND" = true ] || [ "$CSI_CAMERA_DETECTED" = true ]; then
+    if [ "$CSI_CAMERA_DETECTED" = true ]; then
+        echo "✅ 检测到CSI摄像头，启用硬件模式"
+        export BAMBOO_CAMERA_TYPE="csi"
+    else
+        echo "✅ 检测到USB摄像头，启用硬件模式"
+        export BAMBOO_CAMERA_TYPE="usb"
+    fi
     export BAMBOO_CAMERA_MODE="hardware"
     export BAMBOO_SKIP_CAMERA="false"
 else
     echo "⚠️ 未检测到可用摄像头设备，启用模拟模式"
-    echo "💡 如果您已安装摄像头，请检查："
+    echo "💡 对于IMX219 CSI摄像头，请运行CSI摄像头配置脚本："
+    echo "   sudo bash $(dirname $0)/csi_camera_setup.sh"
+    echo "💡 通用摄像头故障排除："
     echo "   1. 摄像头是否正确连接"
     echo "   2. 驱动程序是否已安装"
     echo "   3. 设备权限是否正确"
+    echo "   4. 对于CSI摄像头，检查排线连接和内核模块"
     export BAMBOO_CAMERA_MODE="simulation"
     export BAMBOO_SKIP_CAMERA="true"
 fi
