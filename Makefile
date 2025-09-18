@@ -192,11 +192,11 @@ check-deps:
 # 检查Qt依赖
 check-qt-deps:
 	$(call log_info,检查Qt编译依赖...)
-	@command -v qmake >/dev/null 2>&1 || command -v qmake6 >/dev/null 2>&1 || { $(call log_error,Qt未找到，请安装Qt6开发环境); exit 1; }
-	@pkg-config --exists Qt6Core >/dev/null 2>&1 || { $(call log_error,Qt6开发包未找到，请运行: sudo apt install qt6-base-dev); exit 1; }
-	@pkg-config --exists Qt6Quick >/dev/null 2>&1 || { $(call log_warning,Qt6 Quick未找到，某些功能可能不可用); }
-	@pkg-config --exists Qt6Multimedia >/dev/null 2>&1 || { $(call log_warning,Qt6 Multimedia未找到，视频功能可能不可用); }
-	@pkg-config --exists glesv2 >/dev/null 2>&1 || { $(call log_warning,OpenGL ES未找到，硬件加速可能不可用); }
+	@command -v qmake >/dev/null 2>&1 || command -v qmake6 >/dev/null 2>&1 || { echo "$(RED)[ERROR]$(NC) Qt未找到，请安装Qt6开发环境"; exit 1; }
+	@pkg-config --exists Qt6Core >/dev/null 2>&1 || { echo "$(RED)[ERROR]$(NC) Qt6开发包未找到，请运行: sudo apt install qt6-base-dev"; exit 1; }
+	@pkg-config --exists Qt6Quick >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) Qt6 Quick未找到，某些功能可能不可用"; }
+	@pkg-config --exists Qt6Multimedia >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) Qt6 Multimedia未找到，视频功能可能不可用"; }
+	@pkg-config --exists glesv2 >/dev/null 2>&1 || { echo "$(YELLOW)[WARNING]$(NC) OpenGL ES未找到，硬件加速可能不可用"; }
 	$(call log_success,Qt依赖检查完成)
 
 # 创建部署包
