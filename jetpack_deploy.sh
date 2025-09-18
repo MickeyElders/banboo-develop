@@ -1336,17 +1336,45 @@ main() {
     # 如果启用了Qt部署，确保Qt前端已编译
     if [ "$ENABLE_QT_DEPLOY" = "true" ]; then
         log_qt "检查Qt前端编译状态..."
-        if [ ! -f "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" ]; then
+        # 检查编译输出位置
+        QT_FRONTEND_RELEASE="${PROJECT_ROOT}/qt_frontend/build/bamboo_cut_frontend"
+        QT_FRONTEND_DEBUG="${PROJECT_ROOT}/qt_frontend/build_debug/bamboo_cut_frontend"
+        
+        if [ ! -f "$QT_FRONTEND_RELEASE" ] && [ ! -f "$QT_FRONTEND_DEBUG" ]; then
             log_qt "Qt前端未编译，开始编译..."
             cd "$PROJECT_ROOT"
-            make qt-frontend
+            
+            # 使用正确的make目标
+            if [ "$BUILD_TYPE" = "Debug" ]; then
+                make qt BUILD_TYPE=debug
+            else
+                make qt BUILD_TYPE=release
+            fi
+            
             if [ $? -ne 0 ]; then
                 log_error "Qt前端编译失败"
                 exit 1
             fi
             log_success "Qt前端编译完成"
+            
+            # 复制到BUILD_DIR以便后续使用
+            mkdir -p "${BUILD_DIR}/qt_frontend"
+            if [ -f "$QT_FRONTEND_RELEASE" ]; then
+                cp "$QT_FRONTEND_RELEASE" "${BUILD_DIR}/qt_frontend/"
+            elif [ -f "$QT_FRONTEND_DEBUG" ]; then
+                cp "$QT_FRONTEND_DEBUG" "${BUILD_DIR}/qt_frontend/"
+            fi
         else
             log_qt "Qt前端已编译"
+            
+            # 确保复制到BUILD_DIR
+            mkdir -p "${BUILD_DIR}/qt_frontend"
+            if [ -f "$QT_FRONTEND_RELEASE" ]; then
+                cp "$QT_FRONTEND_RELEASE" "${BUILD_DIR}/qt_frontend/" 2>/dev/null || true
+            fi
+            if [ -f "$QT_FRONTEND_DEBUG" ]; then
+                cp "$QT_FRONTEND_DEBUG" "${BUILD_DIR}/qt_frontend/" 2>/dev/null || true
+            fi
         fi
     fi
     
