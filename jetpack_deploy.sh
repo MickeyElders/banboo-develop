@@ -1329,7 +1329,27 @@ main() {
         deploy_ai_models
     fi
     
+    # 确保项目已编译
+    log_jetpack "确保项目已编译..."
     build_project
+    
+    # 如果启用了Qt部署，确保Qt前端已编译
+    if [ "$ENABLE_QT_DEPLOY" = "true" ]; then
+        log_qt "检查Qt前端编译状态..."
+        if [ ! -f "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" ]; then
+            log_qt "Qt前端未编译，开始编译..."
+            cd "$PROJECT_ROOT"
+            make qt-frontend
+            if [ $? -ne 0 ]; then
+                log_error "Qt前端编译失败"
+                exit 1
+            fi
+            log_success "Qt前端编译完成"
+        else
+            log_qt "Qt前端已编译"
+        fi
+    fi
+    
     create_jetpack_package
     deploy_to_target
     
