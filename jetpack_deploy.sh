@@ -386,7 +386,7 @@ EOF
     fi
 }
 
-# 配置和部署 AI 模型文件
+# 配置和部署 AI 模型文件（增强版，包含OpenCV兼容性修复）
 deploy_ai_models() {
     if [ "$DEPLOY_MODELS" = "true" ]; then
         log_jetpack "配置和部署 AI 模型文件..."
@@ -404,17 +404,237 @@ deploy_ai_models() {
             cp -r "${PROJECT_ROOT}/models"/* "$MODELS_DIR/" 2>/dev/null || true
         fi
         
+        # 检查是否需要转换ONNX模型或更新现有模型
+        local need_convert=false
+        local onnx_file="${MODELS_DIR}/bamboo_detection.onnx"
+        
+        if [ ! -f "${onnx_file}" ]; then
+            log_jetpack "ONNX模型不存在，需要转换"
+            need_convert=true
+        else
+            # 检查现有ONNX模型是否兼容OpenCV
+            log_jetpack "检查现有ONNX模型的OpenCV兼容性..."
+            cd "${MODELS_DIR}"
+            
+            python3 -c "
+import cv2
+import sys
+try:
+    net = cv2.dnn.readNetFromONNX('bamboo_detection.onnx')
+    import numpy as np
+    blob = cv2.dnn.blobFromImage(np.random.rand(640,640,3).astype('uint8'), 1.0/255.0, (640, 640), (0,0,0), True, False)
+    net.setInput(blob)
+    output = net.forward()
+    print('✅ 现有ONNX模型兼容OpenCV')
+    sys.exit(0)
+except Exception as e:
+    print(f'❌ 现有ONNX模型不兼容OpenCV: {e}')
+    sys.exit(1)
+" 2>/dev/null
+            
+            if [ $? -ne 0 ]; then
+                log_warning "现有ONNX模型不兼容OpenCV，需要重新转换"
+                need_convert=true
+            fi
+            
+            cd - > /dev/null
+        fi
+        
+        if [ "$need_convert" = true ]; then
+            log_jetpack "转换PyTorch模型为OpenCV兼容的ONNX..."
+            
+            # 安装必要的Python包
+            python3 -m pip install ultralytics onnx onnxsim torch
+            
+            # 创建OpenCV兼容的转换脚本
+            cat > "${MODELS_DIR}/convert_opencv_compatible.py" << 'EOF'
+#!/usr/bin/env python3
+import torch
+import onnx
+from ultralytics import YOLO
+import logging
+import sys
+import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def convert_pytorch_to_opencv_onnx(model_path="best.pt"):
+    """转换PyTorch模型为OpenCV DNN兼容的ONNX格式"""
+    
+    try:
+        # 加载YOLO模型
+        model = YOLO(model_path)
+        logger.info(f"已加载模型: {model_path}")
+        
+        # 导出为ONNX，使用OpenCV兼容参数
+        success = model.export(
+            format="onnx",
+            imgsz=640,           # 固定输入尺寸
+            dynamic=False,       # 禁用动态尺寸，避免Reshape问题
+            simplify=True,       # 简化模型
+            opset=11,           # 使用OpenCV支持良好的opset版本
+            half=False,         # 禁用半精度，避免精度问题
+            int8=False,         # 暂时禁用int8
+            optimize=False,     # 禁用额外优化，避免引入不兼容节点
+            verbose=True
+        )
+        
+        if success:
+            logger.info("✅ ONNX模型导出成功")
+            
+            # 验证模型
+            onnx_path = model_path.replace('.pt', '.onnx')
+            if os.path.exists(onnx_path):
+                model_onnx = onnx.load(onnx_path)
+                onnx.checker.check_model(model_onnx)
+                logger.info("✅ ONNX模型验证通过")
+                
+                # 重命名为标准名称
+                import shutil
+                shutil.move(onnx_path, "bamboo_detection.onnx")
+                logger.info("✅ 模型已保存为 bamboo_detection.onnx")
+            
+            return True
+        else:
+            logger.error("❌ ONNX模型导出失败")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ 转换过程出错: {e}")
+        return False
+
+def test_opencv_compatibility():
+    """测试模型与OpenCV DNN的兼容性"""
+    try:
+        import cv2
+        
+        # 尝试加载模型
+        net = cv2.dnn.readNetFromONNX("bamboo_detection.onnx")
+        logger.info("✅ OpenCV DNN成功加载模型")
+        
+        # 创建测试输入
+        import numpy as np
+        test_input = np.random.rand(640, 640, 3).astype('uint8')
+        blob = cv2.dnn.blobFromImage(test_input, 1.0/255.0, (640, 640), (0,0,0), True, False)
+        
+        # 设置输入并执行前向传播
+        net.setInput(blob)
+        output = net.forward()
+        logger.info(f"✅ 模型推理成功，输出形状: {output.shape}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ OpenCV兼容性测试失败: {e}")
+        return False
+
+if __name__ == "__main__":
+    # 执行转换
+    if convert_pytorch_to_opencv_onnx():
+        # 测试兼容性
+        if test_opencv_compatibility():
+            logger.info("🎉 模型转换和兼容性验证完成")
+            sys.exit(0)
+        else:
+            sys.exit(1)
+    else:
+        sys.exit(1)
+EOF
+            
+            # 执行转换
+            cd "${MODELS_DIR}"
+            python3 convert_opencv_compatible.py
+            conversion_result=$?
+            cd - > /dev/null
+            
+            if [ $conversion_result -eq 0 ] && [ -f "${onnx_file}" ]; then
+                log_success "✅ OpenCV兼容的ONNX模型转换成功"
+            else
+                log_error "❌ ONNX模型转换失败，尝试备用方案..."
+                
+                # 备用方案：手动PyTorch导出
+                cat > "${MODELS_DIR}/manual_export.py" << 'EOF'
+#!/usr/bin/env python3
+import torch
+import torch.onnx
+from ultralytics import YOLO
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def manual_export_onnx(model_path="best.pt"):
+    """手动导出ONNX，避免ultralytics的自动优化"""
+    
+    try:
+        # 加载模型并切换到评估模式
+        yolo_model = YOLO(model_path)
+        pytorch_model = yolo_model.model
+        pytorch_model.eval()
+        
+        # 创建示例输入
+        dummy_input = torch.randn(1, 3, 640, 640)
+        
+        # 手动导出ONNX
+        torch.onnx.export(
+            pytorch_model,
+            dummy_input,
+            "bamboo_detection.onnx",
+            export_params=True,
+            opset_version=11,
+            do_constant_folding=True,
+            input_names=['images'],
+            output_names=['output'],
+            dynamic_axes=None,  # 禁用动态轴
+            verbose=True,
+            keep_initializers_as_inputs=False
+        )
+        
+        logger.info("✅ 手动ONNX导出完成")
+        
+        # 验证导出的模型
+        import onnx
+        model_onnx = onnx.load("bamboo_detection.onnx")
+        onnx.checker.check_model(model_onnx)
+        logger.info("✅ ONNX模型验证通过")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ 手动导出失败: {e}")
+        return False
+
+if __name__ == "__main__":
+    manual_export_onnx()
+EOF
+                
+                cd "${MODELS_DIR}"
+                python3 manual_export.py
+                cd - > /dev/null
+                
+                if [ -f "${onnx_file}" ]; then
+                    log_success "✅ 备用方案：手动ONNX导出成功"
+                else
+                    log_error "❌ 所有ONNX转换方案都失败"
+                    return 1
+                fi
+            fi
+        else
+            log_success "✅ 现有ONNX模型兼容OpenCV，无需重新转换"
+        fi
+        
         # 更新模型配置文件以适配 JetPack SDK 路径
         log_jetpack "更新模型配置文件..."
         
         # 更新 AI 优化配置
-        sed -i 's|model_path:.*|model_path: "/opt/bamboo-cut/models/bamboo_detector.onnx"|g' \
+        sed -i 's|model_path:.*|model_path: "/opt/bamboo-cut/models/bamboo_detection.onnx"|g' \
             "${PROJECT_ROOT}/config/ai_optimization.yaml" 2>/dev/null || true
         
-        # 创建 TensorRT 模型优化脚本
+        # 创建增强版 TensorRT 模型优化脚本
         cat > "${MODELS_DIR}/optimize_models.sh" << 'EOF'
 #!/bin/bash
-# TensorRT 模型优化脚本
+# TensorRT 模型优化脚本（增强版）
 
 MODELS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONNX_DIR="${MODELS_DIR}/onnx"
@@ -428,11 +648,31 @@ if ! command -v trtexec &> /dev/null; then
     exit 1
 fi
 
+# 首先验证ONNX模型与OpenCV的兼容性
+echo "验证ONNX模型兼容性..."
+for onnx_file in "${MODELS_DIR}"/*.onnx; do
+    if [ -f "$onnx_file" ]; then
+        echo "测试模型: $(basename "$onnx_file")"
+        python3 -c "
+import cv2
+try:
+    net = cv2.dnn.readNetFromONNX('$(basename "$onnx_file")')
+    print('✅ 模型与OpenCV兼容')
+except Exception as e:
+    print(f'❌ 模型不兼容: {e}')
+    exit(1)
+" || echo "跳过不兼容的模型: $(basename "$onnx_file")"
+    fi
+done
+
 # 优化 ONNX 模型为 TensorRT 引擎
-for onnx_file in "${ONNX_DIR}"/*.onnx; do
+for onnx_file in "${MODELS_DIR}"/*.onnx; do
     if [ -f "$onnx_file" ]; then
         filename=$(basename "$onnx_file" .onnx)
         echo "优化模型: $filename"
+        
+        # 移动到onnx目录
+        cp "$onnx_file" "${ONNX_DIR}/" 2>/dev/null || true
         
         trtexec \
             --onnx="$onnx_file" \
@@ -441,7 +681,8 @@ for onnx_file in "${ONNX_DIR}"/*.onnx; do
             --workspace=1024 \
             --minShapes=input:1x3x640x640 \
             --optShapes=input:1x3x640x640 \
-            --maxShapes=input:4x3x640x640
+            --maxShapes=input:4x3x640x640 \
+            --verbose
     fi
 done
 
