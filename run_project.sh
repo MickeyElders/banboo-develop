@@ -197,7 +197,6 @@ setup_qt_environment() {
     log_info "Qt环境变量已配置"
 }
 
-<<<<<<< HEAD
 # 运行C++后端
 run_cpp_backend() {
     log_info "运行C++后端..."
@@ -216,17 +215,11 @@ run_cpp_backend() {
 # 尝试不同平台启动
 try_different_platforms() {
     local app_path="$1"
-    local debug="$2"
-=======
-# 尝试不同平台启动
-try_different_platforms() {
-    local app_path="$1"
->>>>>>> 708576450b153b7e54001f5d377eaf976605ee7c
+    local debug="${2:-normal}"
     local platforms=("eglfs" "wayland" "xcb" "linuxfb" "minimal")
     
     for platform in "${platforms[@]}"; do
         log_info "尝试 $platform 平台..."
-<<<<<<< HEAD
         if [ "$debug" == "debug" ]; then
             # 调试模式，显示详细信息
             if QT_QPA_PLATFORM=$platform "$app_path"; then
@@ -239,11 +232,6 @@ try_different_platforms() {
                 log_success "成功使用 $platform 平台启动"
                 return 0
             fi
-=======
-        if QT_QPA_PLATFORM=$platform "$app_path" 2>/dev/null; then
-            log_success "成功使用 $platform 平台启动"
-            return 0
->>>>>>> 708576450b153b7e54001f5d377eaf976605ee7c
         fi
     done
     
@@ -251,7 +239,6 @@ try_different_platforms() {
     return 1
 }
 
-<<<<<<< HEAD
 # 调试Qt前端
 debug_qt_frontend() {
     log_info "调试模式运行Qt前端..."
@@ -327,8 +314,6 @@ run_full_system() {
     fi
 }
 
-=======
->>>>>>> 708576450b153b7e54001f5d377eaf976605ee7c
 run_qt_frontend() {
     log_info "运行Qt前端..."
     cd "$SCRIPT_DIR/qt_frontend"
@@ -358,7 +343,7 @@ run_qt_frontend() {
     # 尝试运行，如果失败则尝试其他平台
     if ! ./bamboo_controller_qt 2>/dev/null; then
         log_warning "默认平台启动失败，尝试其他平台..."
-        try_different_platforms "./bamboo_controller_qt"
+        try_different_platforms "./bamboo_controller_qt" "normal"
     else
         log_success "Qt前端启动成功"
     fi
@@ -449,20 +434,29 @@ main() {
                 build_qt_frontend
                 ;;
             4)
-                run_qt_frontend
+                run_cpp_backend
                 ;;
             5)
-                clean_builds
+                run_qt_frontend
                 ;;
             6)
+                run_full_system
+                ;;
+            7)
+                clean_builds
+                ;;
+            8)
                 show_system_info
+                ;;
+            9)
+                debug_qt_frontend
                 ;;
             0)
                 log_info "退出程序"
                 exit 0
                 ;;
             *)
-                log_error "无效选择，请输入0-6之间的数字"
+                log_error "无效选择，请输入0-9之间的数字"
                 ;;
         esac
         
@@ -482,6 +476,15 @@ case "${1:-}" in
         ;;
     "run")
         run_qt_frontend
+        ;;
+    "run-backend")
+        run_cpp_backend
+        ;;
+    "run-full")
+        run_full_system
+        ;;
+    "debug")
+        debug_qt_frontend
         ;;
     "info")
         show_system_info
