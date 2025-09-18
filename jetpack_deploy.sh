@@ -1011,9 +1011,29 @@ create_jetpack_package() {
         PACKAGE_DIR="${DEPLOY_DIR}/packages/bamboo-cut-jetpack-${VERSION}"
         mkdir -p "$PACKAGE_DIR"
         
-        # 复制可执行文件
-        cp "${BUILD_DIR}/cpp_backend/bamboo_cut_backend" "$PACKAGE_DIR/" 2>/dev/null || true
-        cp "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" "$PACKAGE_DIR/" 2>/dev/null || true
+        # 复制可执行文件（添加验证）
+        echo "📋 检查可执行文件..."
+        if [ -f "${BUILD_DIR}/cpp_backend/bamboo_cut_backend" ]; then
+            cp "${BUILD_DIR}/cpp_backend/bamboo_cut_backend" "$PACKAGE_DIR/"
+            echo "✅ C++后端可执行文件已复制"
+        else
+            echo "⚠️ C++后端可执行文件不存在，创建占位符"
+            echo '#!/bin/bash
+echo "C++后端尚未编译，请先编译项目"
+exit 1' > "$PACKAGE_DIR/bamboo_cut_backend"
+            chmod +x "$PACKAGE_DIR/bamboo_cut_backend"
+        fi
+        
+        if [ -f "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" ]; then
+            cp "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" "$PACKAGE_DIR/"
+            echo "✅ Qt前端可执行文件已复制"
+        else
+            echo "⚠️ Qt前端可执行文件不存在，创建占位符"
+            echo '#!/bin/bash
+echo "Qt前端尚未编译，请先编译项目"
+exit 1' > "$PACKAGE_DIR/bamboo_cut_frontend"
+            chmod +x "$PACKAGE_DIR/bamboo_cut_frontend"
+        fi
         
         # 复制配置文件
         cp -r "${PROJECT_ROOT}/config" "$PACKAGE_DIR/"
@@ -1056,13 +1076,29 @@ fi
 # 优化模型 (如果存在且需要)
 if [ -f "./models/optimize_models.sh" ] && [ ! -f "./models/tensorrt/optimized.flag" ]; then
     echo "首次运行，正在优化 AI 模型..."
-    ./models/optimize_models.sh
+    cd ./models && ./optimize_models.sh && cd ..
+    mkdir -p "./models/tensorrt"
     touch "./models/tensorrt/optimized.flag"
 fi
 
 # 设置环境变量
 export LD_LIBRARY_PATH="./qt_libs:${LD_LIBRARY_PATH}"
 export CUDA_VISIBLE_DEVICES=0
+
+# 检查可执行文件
+if [ ! -f "./bamboo_cut_backend" ] || [ ! -x "./bamboo_cut_backend" ]; then
+    echo "❌ C++后端可执行文件不存在或无执行权限"
+    echo "请确认项目已正确编译和部署"
+    exit 1
+fi
+
+if [ ! -f "./bamboo_cut_frontend" ] || [ ! -x "./bamboo_cut_frontend" ]; then
+    echo "❌ Qt前端可执行文件不存在或无执行权限"
+    echo "将仅启动C++后端"
+    FRONTEND_AVAILABLE=false
+else
+    FRONTEND_AVAILABLE=true
+fi
 
 # 启动后端
 echo "启动 C++ 后端..."
@@ -1072,14 +1108,19 @@ BACKEND_PID=$!
 # 等待后端启动
 sleep 3
 
-# 启动前端
-echo "启动 Qt 前端..."
-./bamboo_cut_frontend &
-FRONTEND_PID=$!
-
-# 等待进程
-wait $FRONTEND_PID
-kill $BACKEND_PID 2>/dev/null || true
+# 启动前端（如果可用）
+if [ "$FRONTEND_AVAILABLE" = true ]; then
+    echo "启动 Qt 前端..."
+    ./bamboo_cut_frontend &
+    FRONTEND_PID=$!
+    
+    # 等待进程
+    wait $FRONTEND_PID
+    kill $BACKEND_PID 2>/dev/null || true
+else
+    echo "仅运行C++后端，等待信号..."
+    wait $BACKEND_PID
+fi
 
 echo "智能切竹机已停止"
 EOF
