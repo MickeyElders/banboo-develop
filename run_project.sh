@@ -51,12 +51,15 @@ show_menu() {
     echo "1. 编译整个项目"
     echo "2. 编译C++后端"
     echo "3. 编译Qt前端"
-    echo "4. 运行Qt前端"
-    echo "5. 清理构建文件"
-    echo "6. 查看系统信息"
+    echo "4. 运行C++后端"
+    echo "5. 运行Qt前端"
+    echo "6. 运行完整系统（后端+前端）"
+    echo "7. 清理构建文件"
+    echo "8. 查看系统信息"
+    echo "9. 调试Qt前端（详细日志）"
     echo "0. 退出"
     echo ""
-    echo -n "请输入选择 [0-6]: "
+    echo -n "请输入选择 [0-9]: "
 }
 
 build_cpp_backend() {
@@ -194,21 +197,121 @@ setup_qt_environment() {
     log_info "Qt环境变量已配置"
 }
 
+# 运行C++后端
+run_cpp_backend() {
+    log_info "运行C++后端..."
+    cd "$SCRIPT_DIR/cpp_backend"
+    
+    if [ ! -f "build/bamboo_cut_system" ]; then
+        log_error "C++后端未编译，请先编译"
+        return 1
+    fi
+    
+    cd build
+    log_info "启动智能切竹机后端系统..."
+    ./bamboo_cut_system
+}
+
 # 尝试不同平台启动
 try_different_platforms() {
     local app_path="$1"
+    local debug="$2"
     local platforms=("eglfs" "wayland" "xcb" "linuxfb" "minimal")
     
     for platform in "${platforms[@]}"; do
         log_info "尝试 $platform 平台..."
-        if QT_QPA_PLATFORM=$platform "$app_path" 2>/dev/null; then
-            log_success "成功使用 $platform 平台启动"
-            return 0
+        if [ "$debug" == "debug" ]; then
+            # 调试模式，显示详细信息
+            if QT_QPA_PLATFORM=$platform "$app_path"; then
+                log_success "成功使用 $platform 平台启动"
+                return 0
+            fi
+        else
+            # 正常模式，隐藏错误输出
+            if QT_QPA_PLATFORM=$platform "$app_path" 2>/dev/null; then
+                log_success "成功使用 $platform 平台启动"
+                return 0
+            fi
         fi
     done
     
     log_error "所有平台都启动失败"
     return 1
+}
+
+# 调试Qt前端
+debug_qt_frontend() {
+    log_info "调试模式运行Qt前端..."
+    cd "$SCRIPT_DIR/qt_frontend"
+    
+    if [ ! -f "build/bamboo_controller_qt" ]; then
+        log_error "Qt前端未编译，请先编译"
+        return 1
+    fi
+    
+    log_info "配置Qt环境和平台插件（调试模式）..."
+    
+    # 执行配置（不设置设备权限）
+    setup_qt_environment
+    detect_and_set_qt_platform
+    
+    # 显示当前配置
+    log_info "当前Qt配置："
+    echo "  平台插件: ${QT_QPA_PLATFORM:-未设置}"
+    echo "  OpenGL: ${QT_OPENGL:-未设置}"
+    echo "  插件路径: ${QT_PLUGIN_PATH:-未设置}"
+    
+    # 显示更多调试信息
+    log_info "调试信息："
+    echo "  Qt版本: $(qmake -v 2>/dev/null | grep Qt || echo '未找到')"
+    echo "  可执行文件: $(file build/bamboo_controller_qt)"
+    echo "  依赖库检查:"
+    ldd build/bamboo_controller_qt | head -10
+    
+    # 运行应用程序（显示详细错误）
+    cd build
+    log_info "启动智能切竹机控制程序（调试模式）..."
+    
+    # 直接运行，显示所有错误信息
+    if ! ./bamboo_controller_qt; then
+        log_warning "默认平台启动失败，尝试其他平台（调试模式）..."
+        try_different_platforms "./bamboo_controller_qt" "debug"
+    else
+        log_success "Qt前端启动成功"
+    fi
+}
+
+# 运行完整系统
+run_full_system() {
+    log_info "运行完整系统（后端+前端）..."
+    
+    # 检查编译状态
+    if [ ! -f "$SCRIPT_DIR/cpp_backend/build/bamboo_cut_system" ]; then
+        log_error "C++后端未编译，请先编译"
+        return 1
+    fi
+    
+    if [ ! -f "$SCRIPT_DIR/qt_frontend/build/bamboo_controller_qt" ]; then
+        log_error "Qt前端未编译，请先编译"
+        return 1
+    fi
+    
+    log_info "启动后端系统..."
+    cd "$SCRIPT_DIR/cpp_backend/build"
+    ./bamboo_cut_system &
+    BACKEND_PID=$!
+    
+    sleep 2  # 等待后端启动
+    
+    log_info "启动前端界面..."
+    cd "$SCRIPT_DIR"
+    run_qt_frontend
+    
+    # 清理后端进程
+    if kill -0 $BACKEND_PID 2>/dev/null; then
+        log_info "停止后端系统..."
+        kill $BACKEND_PID
+    fi
 }
 
 run_qt_frontend() {
