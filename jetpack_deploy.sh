@@ -37,6 +37,8 @@ INSTALL_DEPENDENCIES="false"
 DEPLOY_TARGET=""
 CREATE_PACKAGE="true"
 OPTIMIZE_PERFORMANCE="true"
+CLEAN_LEGACY="false"
+BACKUP_CURRENT="true"
 
 # 版本信息
 VERSION_FILE="${PROJECT_ROOT}/VERSION"
@@ -90,6 +92,7 @@ show_help() {
     -f, --force-rebuild     强制重新编译所有组件
     -u, --upgrade           自动升级现有部署
     -b, --no-backup         升级时不备份当前版本
+    -x, --clean-legacy      清理所有历史版本进程和配置
     -v, --version           显示版本信息
     -h, --help              显示此帮助信息
 
@@ -99,6 +102,7 @@ show_help() {
     $0 --deploy remote:192.168.1.100 --create-package    # 创建包并部署到远程设备
     $0 --force-rebuild --upgrade --deploy local    # 强制重新编译并升级本地部署
     $0 --upgrade --no-backup --deploy local        # 快速升级（不备份）
+    $0 --clean-legacy --upgrade --deploy local     # 清理历史版本并重新部署
 
 JetPack SDK 版本: ${JETPACK_VERSION}
 CUDA 版本: ${CUDA_VERSION}
@@ -154,6 +158,10 @@ parse_arguments() {
                 ;;
             -b|--no-backup)
                 BACKUP_CURRENT="false"
+                shift
+                ;;
+            -x|--clean-legacy)
+                CLEAN_LEGACY="true"
                 shift
                 ;;
             -v|--version)
@@ -972,9 +980,9 @@ check_upgrade_needed() {
                 backup_current_deployment
             fi
             
-            # 停止现有服务
-            log_info "停止现有服务..."
-            sudo systemctl stop bamboo-cut-jetpack || true
+            # 自动清理历史版本（升级模式下默认启用）
+            log_info "升级模式：自动清理历史版本..."
+            clean_legacy_deployment
             
             return 0
         else
@@ -983,6 +991,228 @@ check_upgrade_needed() {
         fi
     fi
     return 1
+}
+
+# 完全清理历史版本进程和配置
+clean_legacy_deployment() {
+    log_info "🧹 清理历史版本进程和配置..."
+    
+    # 停止并清理所有相关的systemd服务
+    log_info "停止和清理相关systemd服务..."
+    
+    # 智能切竹机相关服务清单
+    BAMBOO_SERVICES=(
+        "bamboo-cut-jetpack"
+        "bamboo-cut"
+        "bamboo-controller"
+        "bamboo-backend"
+        "bamboo-frontend"
+        "bamboo-cut-backend"
+        "bamboo-cut-frontend"
+        "bamboo-controller-qt"
+    )
+    
+    for service in "${BAMBOO_SERVICES[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log_info "停止服务: $service"
+            sudo systemctl stop "$service" || true
+        fi
+        
+        if systemctl is-enabled --quiet "$service" 2>/dev/null; then
+            log_info "禁用服务: $service"
+            sudo systemctl disable "$service" || true
+        fi
+        
+        if [ -f "/etc/systemd/system/${service}.service" ]; then
+            log_info "删除服务文件: ${service}.service"
+            sudo rm -f "/etc/systemd/system/${service}.service"
+        fi
+    done
+    
+    # 杀死残留的进程
+    log_info "清理残留进程..."
+    
+    BAMBOO_PROCESSES=(
+        "bamboo_cut_backend"
+        "bamboo_controller_qt"
+        "bamboo-cut"
+        "bamboo_cut_frontend"
+        "bamboo-backend"
+        "bamboo-frontend"
+    )
+    
+    for process in "${BAMBOO_PROCESSES[@]}"; do
+        if pgrep -f "$process" >/dev/null 2>&1; then
+            log_info "终止进程: $process"
+            sudo pkill -f "$process" || true
+            sleep 2
+            # 强制终止如果仍在运行
+            if pgrep -f "$process" >/dev/null 2>&1; then
+                log_warning "强制终止进程: $process"
+                sudo pkill -9 -f "$process" || true
+            fi
+        fi
+    done
+    
+    # 清理历史安装目录
+    log_info "清理历史安装目录..."
+    
+    LEGACY_INSTALL_DIRS=(
+        "/opt/bamboo-cut"
+        "/opt/bamboo-controller"
+        "/opt/bamboo-backend"
+        "/opt/bamboo-frontend"
+        "/usr/local/bin/bamboo-cut"
+        "/usr/local/share/bamboo-cut"
+        "/home/*/bamboo-cut"
+    )
+    
+    for dir in "${LEGACY_INSTALL_DIRS[@]}"; do
+        # 使用glob展开处理通配符
+        for expanded_dir in $dir; do
+            if [ -d "$expanded_dir" ] && [ "$expanded_dir" != "/opt/bamboo-cut" ]; then
+                log_info "清理历史目录: $expanded_dir"
+                sudo rm -rf "$expanded_dir"
+            fi
+        done
+    done
+    
+    # 清理历史配置文件
+    log_info "清理历史配置文件..."
+    
+    LEGACY_CONFIG_FILES=(
+        "/etc/bamboo-cut.conf"
+        "/etc/bamboo-controller.conf"
+        "/etc/default/bamboo-cut"
+        "/etc/systemd/system/multi-user.target.wants/bamboo-*.service"
+        "/var/lib/systemd/deb-systemd-helper-enabled/bamboo-*.service"
+        "/var/lib/systemd/deb-systemd-helper-enabled/multi-user.target.wants/bamboo-*.service"
+    )
+    
+    for config in "${LEGACY_CONFIG_FILES[@]}"; do
+        # 使用glob展开处理通配符
+        for expanded_config in $config; do
+            if [ -f "$expanded_config" ] || [ -L "$expanded_config" ]; then
+                log_info "删除历史配置: $expanded_config"
+                sudo rm -f "$expanded_config"
+            fi
+        done
+    done
+    
+    # 清理历史日志文件
+    log_info "清理历史日志文件..."
+    
+    LEGACY_LOG_DIRS=(
+        "/var/log/bamboo-cut"
+        "/var/log/bamboo-controller"
+        "/var/log/bamboo-backend"
+        "/var/log/bamboo-frontend"
+        "/tmp/bamboo-*.log"
+        "/tmp/bamboo_*.log"
+    )
+    
+    for log_dir in "${LEGACY_LOG_DIRS[@]}"; do
+        # 使用glob展开处理通配符
+        for expanded_log in $log_dir; do
+            if [ -d "$expanded_log" ]; then
+                log_info "清理历史日志目录: $expanded_log"
+                sudo rm -rf "$expanded_log"
+            elif [ -f "$expanded_log" ]; then
+                log_info "删除历史日志文件: $expanded_log"
+                sudo rm -f "$expanded_log"
+            fi
+        done
+    done
+    
+    # 清理历史的环境变量和PATH设置
+    log_info "清理历史环境变量配置..."
+    
+    ENV_FILES=(
+        "/etc/environment"
+        "/etc/profile"
+        "/etc/bash.bashrc"
+        "/home/*/.bashrc"
+        "/home/*/.profile"
+        "/root/.bashrc"
+        "/root/.profile"
+    )
+    
+    BAMBOO_ENV_PATTERNS=(
+        "BAMBOO_"
+        "bamboo-cut"
+        "/opt/bamboo"
+    )
+    
+    for env_file in "${ENV_FILES[@]}"; do
+        # 使用glob展开处理通配符
+        for expanded_env in $env_file; do
+            if [ -f "$expanded_env" ]; then
+                for pattern in "${BAMBOO_ENV_PATTERNS[@]}"; do
+                    if grep -q "$pattern" "$expanded_env" 2>/dev/null; then
+                        log_info "清理环境变量配置: $expanded_env (包含 $pattern)"
+                        # 创建备份
+                        sudo cp "$expanded_env" "${expanded_env}.backup.$(date +%s)" 2>/dev/null || true
+                        # 删除包含bamboo相关的行
+                        sudo sed -i "/$pattern/d" "$expanded_env" 2>/dev/null || true
+                    fi
+                done
+            fi
+        done
+    done
+    
+    # 清理历史的cron任务
+    log_info "清理历史cron任务..."
+    
+    # 检查系统crontab
+    if crontab -l 2>/dev/null | grep -q "bamboo"; then
+        log_info "清理用户cron任务中的bamboo相关项"
+        (crontab -l 2>/dev/null | grep -v "bamboo") | crontab - 2>/dev/null || true
+    fi
+    
+    # 检查root crontab
+    if sudo crontab -l 2>/dev/null | grep -q "bamboo"; then
+        log_info "清理root cron任务中的bamboo相关项"
+        (sudo crontab -l 2>/dev/null | grep -v "bamboo") | sudo crontab - 2>/dev/null || true
+    fi
+    
+    # 清理/etc/cron.d/中的bamboo任务
+    for cron_file in /etc/cron.d/bamboo*; do
+        if [ -f "$cron_file" ]; then
+            log_info "删除cron文件: $cron_file"
+            sudo rm -f "$cron_file"
+        fi
+    done
+    
+    # 清理历史用户和组
+    log_info "清理历史用户和组..."
+    
+    LEGACY_USERS=(
+        "bamboo-cut"
+        "bamboo-controller"
+        "bamboo-backend"
+        "bamboo-frontend"
+    )
+    
+    for user in "${LEGACY_USERS[@]}"; do
+        if id "$user" >/dev/null 2>&1; then
+            log_info "删除历史用户: $user"
+            sudo userdel "$user" 2>/dev/null || true
+        fi
+        
+        if getent group "$user" >/dev/null 2>&1; then
+            log_info "删除历史组: $user"
+            sudo groupdel "$user" 2>/dev/null || true
+        fi
+    done
+    
+    # 重新加载systemd配置
+    log_info "重新加载systemd配置..."
+    sudo systemctl daemon-reload
+    
+    # 清理systemd的缓存
+    sudo systemctl reset-failed 2>/dev/null || true
+    
+    log_success "✅ 历史版本清理完成"
 }
 
 # 备份当前部署
@@ -1528,6 +1758,14 @@ main() {
     log_jetpack "JetPack SDK: $JETPACK_VERSION"
     
     parse_arguments "$@"
+    
+    # 如果启用清理历史版本，先执行清理
+    if [ "$CLEAN_LEGACY" = "true" ]; then
+        clean_legacy_deployment
+    fi
+    
+    # 检查是否需要升级现有部署
+    check_upgrade_needed
     
     # 创建部署目录
     mkdir -p "$JETPACK_DEPLOY_DIR"
