@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <stdexcept>
+#include <new>
 
 namespace bamboo_cut {
 namespace core {

@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <chrono>
 #include <thread>
+#include <algorithm>
+#include <cstdlib>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
