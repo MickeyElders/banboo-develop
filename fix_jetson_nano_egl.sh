@@ -386,56 +386,147 @@ build_project() {
         fi
     fi
     
-    # 构建 Qt 前端
-    if [ -d "${PROJECT_ROOT}/qt_frontend" ]; then
-        log_qt "构建 Qt 前端..."
-        
-        cd "${PROJECT_ROOT}/qt_frontend"
-        
-        # 尝试 CMake 构建
-        if [ -f "CMakeLists.txt" ]; then
-            mkdir -p build
-            cd build
-            
-            if cmake -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DJETSON_BUILD=ON .. && make -j$(nproc); then
-                log_success "Qt 前端 CMake 构建完成"
-                
-                # 复制到统一位置
-                mkdir -p "${BUILD_DIR}/qt_frontend"
-                find . -type f -executable -name "*bamboo*" -exec cp {} "${BUILD_DIR}/qt_frontend/" \;
-            else
-                log_warning "CMake 构建失败，尝试 qmake"
-                cd ..
-                
-                # 尝试 qmake 构建
-                PRO_FILE=$(ls *.pro 2>/dev/null | head -1)
-                if [ -n "$PRO_FILE" ]; then
-                    QMAKE_CMD="qmake6"
-                    command -v qmake6 >/dev/null 2>&1 || QMAKE_CMD="qmake"
-                    
-                    if command -v $QMAKE_CMD >/dev/null 2>&1; then
-                        mkdir -p build_qmake
-                        cd build_qmake
-                        
-                        if $QMAKE_CMD CONFIG+=release "../$PRO_FILE" && make -j$(nproc); then
-                            log_success "Qt 前端 qmake 构建完成"
-                            
-                            # 复制到统一位置
-                            mkdir -p "${BUILD_DIR}/qt_frontend"
-                            find . -type f -executable -name "*bamboo*" -exec cp {} "${BUILD_DIR}/qt_frontend/" \;
-                        else
-                            log_error "qmake 构建也失败了"
-                        fi
-                    else
-                        log_error "qmake 未安装"
-                    fi
-                fi
-            fi
-        fi
-    fi
+    # 构建 Qt 前端（增强版）
+    compile_and_deploy_qt_frontend
     
     cd "$PROJECT_ROOT"
     log_success "项目构建完成"
+}
+
+# 编译和部署Qt前端（增强版）
+compile_and_deploy_qt_frontend() {
+    log_qt "编译和部署 Qt 前端..."
+    
+    if [ ! -d "${PROJECT_ROOT}/qt_frontend" ]; then
+        log_warning "未找到Qt前端目录，跳过前端编译"
+        return 1
+    fi
+    
+    cd "${PROJECT_ROOT}/qt_frontend"
+    
+    # 检查Qt6环境
+    QT6_FOUND=false
+    if command -v qmake6 >/dev/null 2>&1; then
+        QT6_FOUND=true
+        QMAKE_CMD="qmake6"
+    elif command -v qmake >/dev/null 2>&1; then
+        QMAKE_VERSION=$(qmake --version | grep -i qt | grep -o '[0-9]\+\.[0-9]\+' | head -1)
+        if [[ "$QMAKE_VERSION" == "6."* ]]; then
+            QT6_FOUND=true
+            QMAKE_CMD="qmake"
+        fi
+    fi
+    
+    if [ "$QT6_FOUND" = false ]; then
+        log_error "未找到Qt6环境，无法编译前端"
+        return 1
+    fi
+    
+    log_info "使用Qt命令: $QMAKE_CMD"
+    
+    # 清理旧构建
+    rm -rf build build_qmake 2>/dev/null || true
+    
+    # 方法1: CMake构建
+    if [ -f "CMakeLists.txt" ]; then
+        log_qt "尝试CMake构建..."
+        mkdir -p build
+        cd build
+        
+        CMAKE_ARGS=(
+            -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+            -DJETSON_BUILD=ON
+            -DQt6_DIR=/usr/lib/aarch64-linux-gnu/cmake/Qt6
+        )
+        
+        if cmake "${CMAKE_ARGS[@]}" .. && make -j$(nproc); then
+            log_success "Qt前端CMake构建成功"
+            
+            # 查找生成的可执行文件
+            FRONTEND_EXEC=$(find . -type f -executable -name "*bamboo*" | head -1)
+            if [ -n "$FRONTEND_EXEC" ]; then
+                mkdir -p "${BUILD_DIR}/qt_frontend"
+                cp "$FRONTEND_EXEC" "${BUILD_DIR}/qt_frontend/bamboo_controller_qt"
+                log_success "前端可执行文件已复制: $FRONTEND_EXEC"
+                cd "$PROJECT_ROOT"
+                return 0
+            fi
+        else
+            log_warning "CMake构建失败，尝试qmake"
+            cd ..
+        fi
+    fi
+    
+    # 方法2: qmake构建
+    PRO_FILE=$(ls *.pro 2>/dev/null | head -1)
+    if [ -n "$PRO_FILE" ]; then
+        log_qt "尝试qmake构建: $PRO_FILE"
+        mkdir -p build_qmake
+        cd build_qmake
+        
+        # 配置qmake参数
+        QMAKE_ARGS=(
+            CONFIG+=release
+            CONFIG+=c++17
+            "QMAKE_CXXFLAGS+=-DJETSON_BUILD"
+        )
+        
+        if $QMAKE_CMD "${QMAKE_ARGS[@]}" "../$PRO_FILE" && make -j$(nproc); then
+            log_success "Qt前端qmake构建成功"
+            
+            # 查找生成的可执行文件
+            FRONTEND_EXEC=$(find . -type f -executable -name "*bamboo*" | head -1)
+            if [ -n "$FRONTEND_EXEC" ]; then
+                mkdir -p "${BUILD_DIR}/qt_frontend"
+                cp "$FRONTEND_EXEC" "${BUILD_DIR}/qt_frontend/bamboo_controller_qt"
+                log_success "前端可执行文件已复制: $FRONTEND_EXEC"
+                cd "$PROJECT_ROOT"
+                return 0
+            fi
+        else
+            log_error "qmake构建失败"
+        fi
+    else
+        log_error "未找到.pro文件"
+    fi
+    
+    cd "$PROJECT_ROOT"
+    log_error "Qt前端编译失败"
+    return 1
+}
+
+# 检测Tegra GPU状态
+check_tegra_gpu() {
+    log_jetpack "检测 Tegra GPU 状态..."
+    
+    # 根据设备类型检查GPU频率文件
+    case "$JETSON_TYPE" in
+        "orin"*|"agx-orin")
+            GPU_FREQ_PATH="/sys/devices/platform/$GPU_PATH/devfreq/$GPU_PATH"
+            ;;
+        "nano"|"xavier")
+            GPU_FREQ_PATH="/sys/devices/platform/$GPU_PATH/devfreq/$GPU_PATH"
+            ;;
+        *)
+            # 通用查找
+            GPU_FREQ_PATH=$(find /sys/devices/platform -name "*gpu" -type d 2>/dev/null | head -1)
+            if [ -n "$GPU_FREQ_PATH" ]; then
+                GPU_FREQ_PATH="$GPU_FREQ_PATH/devfreq/$(basename $GPU_FREQ_PATH)"
+            fi
+            ;;
+    esac
+    
+    if [ -d "$GPU_FREQ_PATH" ]; then
+        log_success "找到GPU控制路径: $GPU_FREQ_PATH"
+        if [ -r "$GPU_FREQ_PATH/cur_freq" ]; then
+            CURRENT_FREQ=$(cat "$GPU_FREQ_PATH/cur_freq" 2>/dev/null || echo "0")
+            log_info "GPU当前频率: ${CURRENT_FREQ} Hz"
+        fi
+        return 0
+    else
+        log_warning "未找到GPU频率控制路径，使用默认配置"
+        return 1
+    fi
 }
 
 # 配置Jetson库环境
@@ -828,8 +919,9 @@ main() {
     # 执行主要流程
     install_jetpack_dependencies
     build_project
-    configure_jetpack_libraries  # 这里确保函数在调用前已定义
+    configure_jetson_libraries
     create_kms_config
+    check_tegra_gpu
     create_timeout_safe_startup
     deploy_files
     create_systemd_service
