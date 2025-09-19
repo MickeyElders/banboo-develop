@@ -423,7 +423,7 @@ deploy_qt_dependencies() {
         # 创建 Qt 环境设置脚本
         cat > "${QT_DEPLOY_DIR}/setup_qt_env.sh" << EOF
 #!/bin/bash
-# Qt 环境设置脚本 - 智能显示平台检测
+# Qt 环境设置脚本 - 专用EGLFS触摸屏配置
 
 SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 
@@ -437,38 +437,27 @@ export XDG_RUNTIME_DIR=\${XDG_RUNTIME_DIR:-/tmp/runtime-root}
 mkdir -p "\$XDG_RUNTIME_DIR"
 chmod 700 "\$XDG_RUNTIME_DIR"
 
-# 智能检测显示环境并设置合适的平台
-echo "🔍 检测显示环境..."
+# 强制使用EGLFS平台（专用触摸屏配置）
+echo "🔧 配置EGLFS触摸屏环境..."
 
-if [ -n "\$DISPLAY" ] && [ "\$DISPLAY" != ":0" ]; then
-    # X11环境
-    export QT_QPA_PLATFORM=xcb
-    echo "✅ 使用X11显示: \$DISPLAY"
-elif [ -e "/dev/dri/card0" ]; then
-    # 有DRI设备，尝试使用eglfs
-    export QT_QPA_PLATFORM=eglfs
-    export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-    export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
-    export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
-    echo "✅ 使用EGL KMS显示"
-elif [ -e "/dev/fb0" ]; then
-    # 有帧缓冲设备，使用linuxfb
-    export QT_QPA_PLATFORM=linuxfb
-    export QT_QPA_FB_DRM=1
-    export QT_QPA_FB_HIDECURSOR=1
-    echo "✅ 使用Linux帧缓冲显示"
-else
-    # 无显示环境，使用offscreen进行测试
-    export QT_QPA_PLATFORM=offscreen
-    echo "⚠️ 使用离屏渲染模式（无显示硬件）"
-fi
+export QT_QPA_PLATFORM=eglfs
+export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
+export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+export QT_QPA_EGLFS_HIDECURSOR=1
 
-# 通用Qt环境变量
-export QT_LOGGING_RULES="qt.qpa.*=true"
+# 触摸屏设备配置
+export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
+export QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event2
+
+# 触摸屏调试日志
+export QT_LOGGING_RULES="qt.qpa.*=true;qt.qpa.input*=true"
 export QT_QPA_EGLFS_DEBUG=1
 
-echo "✅ Qt 环境已配置完成"
+echo "✅ EGLFS触摸屏环境已配置完成"
 echo "   Platform: \$QT_QPA_PLATFORM"
+echo "   Touch Device: /dev/input/event2"
+echo "   Cursor Hidden: Yes"
 echo "   Runtime Dir: \$XDG_RUNTIME_DIR"
 EOF
         chmod +x "${QT_DEPLOY_DIR}/setup_qt_env.sh"
@@ -1545,27 +1534,22 @@ else
     mkdir -p "$XDG_RUNTIME_DIR"
     chmod 700 "$XDG_RUNTIME_DIR"
     
-    # 智能检测显示平台
-    if [ -n "$DISPLAY" ] && [ "$DISPLAY" != ":0" ]; then
-        export QT_QPA_PLATFORM=xcb
-        echo "✅ 使用X11显示: $DISPLAY"
-    elif [ -e "/dev/dri/card0" ]; then
-        export QT_QPA_PLATFORM=eglfs
-        export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-        export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
-        echo "✅ 使用EGL KMS显示"
-    elif [ -e "/dev/fb0" ]; then
-        export QT_QPA_PLATFORM=linuxfb
-        export QT_QPA_FB_DRM=1
-        export QT_QPA_FB_HIDECURSOR=1
-        echo "✅ 使用Linux帧缓冲显示"
-    else
-        export QT_QPA_PLATFORM=offscreen
-        echo "⚠️ 使用离屏渲染模式（测试用）"
-    fi
+    # 强制使用EGLFS平台配置（专用触摸屏）
+    export QT_QPA_PLATFORM=eglfs
+    export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+    export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
+    export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+    export QT_QPA_EGLFS_HIDECURSOR=1
     
-    export QT_LOGGING_RULES="qt.qpa.*=true"
-    echo "✅ 基础Qt环境已设置"
+    # 触摸屏设备配置
+    export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
+    export QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event2
+    
+    # 触摸屏调试日志
+    export QT_LOGGING_RULES="qt.qpa.*=true;qt.qpa.input*=true"
+    echo "✅ EGLFS触摸屏环境已设置"
+    echo "   Touch Device: /dev/input/event2"
+    echo "   Cursor Hidden: Yes"
 fi
 
 # 应用性能优化 (如果存在)
@@ -1744,49 +1728,38 @@ check_and_start_frontend() {
     echo "🔄 启动 Qt 前端: $qt_frontend_exec"
     echo "🔧 当前Qt环境变量："
     echo "   QT_QPA_PLATFORM: $QT_QPA_PLATFORM"
+    echo "   Touch Device: /dev/input/event2"
+    echo "   Cursor Hidden: Yes"
     echo "   XDG_RUNTIME_DIR: $XDG_RUNTIME_DIR"
-    echo "   DISPLAY: $DISPLAY"
     
-    # 尝试不同的平台模式启动Qt前端
-    qt_platforms=("eglfs" "linuxfb" "offscreen")
+    # 强制使用EGLFS平台（不使用fallback）
+    export QT_QPA_PLATFORM=eglfs
+    export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+    export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
+    export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+    export QT_QPA_EGLFS_HIDECURSOR=1
     
-    for platform in "${qt_platforms[@]}"; do
-        echo "🔄 尝试使用平台: $platform"
-        
-        # 设置平台特定的环境变量
-        export QT_QPA_PLATFORM="$platform"
-        case "$platform" in
-            eglfs)
-                export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-                export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
-                ;;
-            linuxfb)
-                export QT_QPA_FB_DRM=1
-                export QT_QPA_FB_HIDECURSOR=1
-                ;;
-            offscreen)
-                export QT_QPA_OFFSCREEN_NO_GLX=1
-                ;;
-        esac
-        
-        # 启动Qt前端，给它足够的时间来初始化
-        timeout 30 "$qt_frontend_exec" &
-        FRONTEND_PID=$!
-        
-        # 等待启动
-        sleep 5
-        
-        if kill -0 $FRONTEND_PID 2>/dev/null; then
-            echo "✅ Qt 前端启动成功 (PID: $FRONTEND_PID, Platform: $platform)"
-            return 0
-        else
-            echo "⚠️ 平台 $platform 启动失败，尝试下一个..."
-            wait $FRONTEND_PID 2>/dev/null || true
-        fi
-    done
+    # 触摸屏设备配置
+    export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
+    export QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event2
     
-    echo "❌ 所有Qt平台都启动失败"
-    return 1
+    echo "✅ 使用EGLFS平台启动Qt前端..."
+    
+    # 启动Qt前端
+    timeout 30 "$qt_frontend_exec" &
+    FRONTEND_PID=$!
+    
+    # 等待启动
+    sleep 5
+    
+    if kill -0 $FRONTEND_PID 2>/dev/null; then
+        echo "✅ Qt 前端启动成功 (PID: $FRONTEND_PID, Platform: eglfs)"
+        return 0
+    else
+        echo "❌ Qt前端启动失败"
+        wait $FRONTEND_PID 2>/dev/null || true
+        return 1
+    fi
 }
 
 # 主启动逻辑
@@ -1866,6 +1839,13 @@ RestartSec=30
 StartLimitBurst=3
 Environment=DISPLAY=:0
 Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+Environment=QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
+Environment=QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+Environment=QT_QPA_EGLFS_HIDECURSOR=1
+Environment=QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
+Environment=QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event2
+Environment=QT_LOGGING_RULES=qt.qpa.*=true;qt.qpa.input*=true
 Environment=BAMBOO_SKIP_CAMERA=true
 
 [Install]
