@@ -357,7 +357,7 @@ private:
                 modbus_server_->set_system_status(communication::SystemStatus::RUNNING);
                 LOG_INFO("✅ 系统状态：完全运行模式");
             } else {
-                modbus_server_->set_system_status(communication::SystemStatus::LIMITED);
+                modbus_server_->set_system_status(communication::SystemStatus::MAINTENANCE);
                 LOG_WARN("⚠️ 系统状态：有限运行模式（部分功能不可用）");
             }
         }
@@ -378,7 +378,7 @@ private:
             if (std::chrono::duration_cast<std::chrono::seconds>(now - last_simulation_time).count() >= 5) {
                 LOG_DEBUG("🎭 模拟模式：发送测试坐标数据");
                 if (modbus_server_) {
-                    communication::CoordinateData sim_data(1000, communication::BladeNumber::BLADE_1, communication::CutQuality::SIMULATION);
+                    communication::CoordinateData sim_data(1000, communication::BladeNumber::BLADE_1, communication::CutQuality::ABNORMAL);
                     modbus_server_->set_coordinate_data(sim_data);
                 }
                 last_simulation_time = now;
