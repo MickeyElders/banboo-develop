@@ -25,7 +25,7 @@ CameraManager::~CameraManager() {
 }
 
 bool CameraManager::initialize() {
-    LOG_INFO("初始化CameraManager");
+    LOG_INFO("=== 开始初始化CameraManager（增强调试版本） ===");
     
     try {
         // 检查环境变量中的摄像头类型配置
@@ -35,7 +35,10 @@ bool CameraManager::initialize() {
         std::string camera_type = camera_type_env ? camera_type_env : "auto";
         std::string camera_device = camera_device_env ? camera_device_env : config_.device_id;
         
-        LOG_INFO("摄像头配置 - 类型: {}, 设备: {}", camera_type, camera_device);
+        LOG_INFO("📋 摄像头环境变量配置:");
+        LOG_INFO("   CAMERA_TYPE: {} (环境变量: {})", camera_type, camera_type_env ? "已设置" : "未设置，使用默认");
+        LOG_INFO("   CAMERA_DEVICE: {} (环境变量: {})", camera_device, camera_device_env ? "已设置" : "未设置，使用默认");
+        LOG_INFO("   原始device_id: {}", config_.device_id);
         
         // 从device_id中提取相机ID
         std::string device_id = camera_device;
@@ -54,18 +57,36 @@ bool CameraManager::initialize() {
         config_.device_id = camera_device;
         
         // CSI摄像头检测逻辑：基于环境变量或设备路径
+        LOG_INFO("🔍 开始CSI摄像头检测...");
         bool is_csi_camera = false;
         if (camera_type == "csi" || camera_type == "mipi") {
             is_csi_camera = true;
-            LOG_INFO("检测到CSI摄像头 (环境变量)");
+            LOG_INFO("✅ 检测到CSI摄像头 (环境变量强制指定)");
         } else if (camera_type == "auto") {
-            // 自动检测：检查是否存在nvarguscamerasrc或IMX219驱动
+            LOG_INFO("🔄 自动检测摄像头类型...");
+            
+            // 检查nvarguscamerasrc命令
+            LOG_INFO("   检查nvarguscamerasrc命令可用性...");
             if (core::SystemUtils::commandExists("nvarguscamerasrc")) {
                 is_csi_camera = true;
-                LOG_INFO("检测到CSI摄像头 (nvarguscamerasrc可用)");
-            } else if (core::SystemUtils::isModuleLoaded("imx219")) {
-                is_csi_camera = true;
-                LOG_INFO("检测到CSI摄像头 (IMX219驱动)");
+                LOG_INFO("✅ 检测到CSI摄像头 (nvarguscamerasrc可用)");
+            } else {
+                LOG_INFO("❌ nvarguscamerasrc命令不可用");
+            }
+            
+            // 检查IMX219驱动模块
+            if (!is_csi_camera) {
+                LOG_INFO("   检查IMX219驱动模块...");
+                if (core::SystemUtils::isModuleLoaded("imx219")) {
+                    is_csi_camera = true;
+                    LOG_INFO("✅ 检测到CSI摄像头 (IMX219驱动已加载)");
+                } else {
+                    LOG_INFO("❌ IMX219驱动模块未加载");
+                }
+            }
+            
+            if (!is_csi_camera) {
+                LOG_INFO("🔍 未检测到CSI摄像头，将使用USB/V4L2模式");
             }
         }
         
@@ -77,32 +98,55 @@ bool CameraManager::initialize() {
         // 尝试多种方法初始化相机
         std::vector<int> camera_ids_to_try = {camera_id};
         if (camera_id == 0) {
-            camera_ids_to_try = {0, 1}; // 尝试video0和video1
+            camera_ids_to_try = {0, 1, 2}; // 尝试video0, video1, video2
         }
         
+        LOG_INFO("📹 开始相机初始化，候选ID列表: [{}]",
+                [&camera_ids_to_try]() {
+                    std::string ids;
+                    for (size_t i = 0; i < camera_ids_to_try.size(); ++i) {
+                        if (i > 0) ids += ", ";
+                        ids += std::to_string(camera_ids_to_try[i]);
+                    }
+                    return ids;
+                }());
+        
         bool success = false;
-        for (int id : camera_ids_to_try) {
-            LOG_INFO("尝试初始化相机ID: {}", id);
+        for (size_t i = 0; i < camera_ids_to_try.size(); ++i) {
+            int id = camera_ids_to_try[i];
+            LOG_INFO("🔄 尝试初始化相机ID: {} ({}/{})", id, i + 1, camera_ids_to_try.size());
             
             if (initializeCamera(id)) {
-                LOG_INFO("相机 {} 初始化成功", id);
+                LOG_INFO("✅ 相机 {} 初始化成功！", id);
                 success = true;
                 break;
             } else {
-                LOG_WARN("相机 {} 初始化失败，尝试下一个", id);
+                LOG_WARN("❌ 相机 {} 初始化失败，尝试下一个", id);
             }
         }
         
         if (!success) {
-            LOG_ERROR("所有相机初始化尝试均失败");
+            LOG_ERROR("🚫 所有相机初始化尝试均失败！");
+            LOG_ERROR("💡 调试建议:");
+            LOG_ERROR("   1. 检查摄像头硬件连接");
+            LOG_ERROR("   2. 检查设备权限: ls -la /dev/video*");
+            LOG_ERROR("   3. 检查内核模块: lsmod | grep -E '(imx219|uvcvideo)'");
+            LOG_ERROR("   4. 检查GStreamer插件: gst-inspect-1.0 nvarguscamerasrc");
+            LOG_ERROR("   5. 手动测试: v4l2-ctl --list-devices");
             return false;
         }
         
-        LOG_INFO("CameraManager初始化成功");
+        LOG_INFO("🎉 CameraManager初始化成功！");
+        LOG_INFO("📊 初始化摘要:");
+        LOG_INFO("   摄像头类型: {}", is_csi_camera ? "CSI" : "USB/V4L2");
+        LOG_INFO("   设备配置: {}", config_.device_id);
+        LOG_INFO("   活跃摄像头数量: {}", cameras_.size());
         return true;
         
     } catch (const std::exception& e) {
-        LOG_ERROR("CameraManager初始化异常: {}", e.what());
+        LOG_ERROR("💥 CameraManager初始化异常: {}", e.what());
+        LOG_ERROR("🔍 异常调试信息:");
+        LOG_ERROR("   异常类型: {}", typeid(e).name());
         return false;
     }
 }
