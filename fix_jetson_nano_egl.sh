@@ -695,50 +695,25 @@ echo "   摄像头模式: $BAMBOO_CAMERA_MODE"
 echo "   Qt平台: $QT_QPA_PLATFORM"
 echo "   EGL平台: $EGL_PLATFORM"
 
-# 安全启动函数（增强的超时和错误处理）
+# 简单可靠的启动函数
 start_backend_safe() {
     if [ -f "./bamboo_cut_backend" ] && [ -x "./bamboo_cut_backend" ]; then
-        echo "🔄 启动后端进程..."
-        
-        # 设置后端运行环境变量（防止死循环）
-        export BAMBOO_MAX_RUNTIME=300  # 最大运行时间5分钟
-        export BAMBOO_DEBUG_MODE=1     # 调试模式
-        export BAMBOO_EXIT_ON_ERROR=1  # 遇到错误立即退出
-        
-        # 使用timeout确保进程不会无限运行
-        timeout 30s ./bamboo_cut_backend --daemon --max-runtime=300 &
+        echo "🔄 启动后端..."
+        ./bamboo_cut_backend &
         BACKEND_PID=$!
         
-        # 等待进程稳定启动
-        for i in {1..10}; do
-            if ! kill -0 $BACKEND_PID 2>/dev/null; then
-                echo "⚠️ 后端进程提前退出"
-                wait $BACKEND_PID 2>/dev/null || true
-                return 1
-            fi
-            
-            # 检查进程CPU使用率（防止死循环）
-            CPU_USAGE=$(ps -p $BACKEND_PID -o %cpu --no-headers 2>/dev/null | tr -d ' ' || echo "0")
-            if [ "${CPU_USAGE%.*}" -gt 80 ]; then
-                echo "❌ 检测到后端进程CPU占用过高: ${CPU_USAGE}%"
-                kill -TERM $BACKEND_PID 2>/dev/null || true
-                sleep 2
-                kill -KILL $BACKEND_PID 2>/dev/null || true
-                return 1
-            fi
-            
-            sleep 1
-        done
+        sleep 3
         
         if kill -0 $BACKEND_PID 2>/dev/null; then
-            echo "✅ 后端启动成功 (PID: $BACKEND_PID)"
+            echo "✅ 后端启动成功"
             return 0
         else
-            echo "❌ 后端启动验证失败"
+            echo "⚠️ 后端启动失败"
+            wait $BACKEND_PID 2>/dev/null || true
             return 1
         fi
     else
-        echo "❌ 后端可执行文件不存在"
+        echo "❌ 后端不存在"
         return 1
     fi
 }
@@ -753,178 +728,68 @@ start_frontend_safe() {
     done
     
     if [ -z "$FRONTEND_EXEC" ]; then
-        echo "❌ 前端可执行文件不存在"
+        echo "❌ 前端不存在"
         return 1
     fi
     
-    echo "🔄 启动前端进程: $(basename $FRONTEND_EXEC)"
-    
-    # 检查EGL环境
-    if [ ! -e "/dev/dri/card0" ]; then
-        echo "❌ GPU设备不可用，跳过前端启动"
-        return 1
-    fi
-    
-    # 启动前端，限制最大运行时间
-    timeout 60s "$FRONTEND_EXEC" --platform=eglfs &
+    echo "🔄 启动前端: $FRONTEND_EXEC"
+    "$FRONTEND_EXEC" &
     FRONTEND_PID=$!
     
-    # 等待前端初始化
-    for i in {1..15}; do
-        if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-            echo "⚠️ 前端进程提前退出"
-            wait $FRONTEND_PID 2>/dev/null || true
-            return 1
-        fi
-        sleep 1
-    done
+    sleep 5
     
     if kill -0 $FRONTEND_PID 2>/dev/null; then
-        echo "✅ 前端启动成功 (PID: $FRONTEND_PID)"
+        echo "✅ 前端启动成功"
         return 0
     else
         echo "❌ 前端启动失败"
+        wait $FRONTEND_PID 2>/dev/null || true
         return 1
     fi
 }
 
-# 主启动逻辑（增强超时和监控）
-echo "🚀 开始启动系统（最大运行时间：5分钟）..."
+# 主启动逻辑（简单可靠）
+echo "🚀 开始启动智能切竹机系统..."
 
-# 设置严格的资源限制
-ulimit -t 300  # CPU时间限制5分钟
-ulimit -m 1048576  # 内存限制1GB
+BACKEND_STARTED=false
+FRONTEND_STARTED=false
 
-# 创建监控脚本
-cat > /tmp/bamboo_monitor.sh << 'MONITOR_SCRIPT'
-#!/bin/bash
+# 启动后端
+if start_backend_safe; then
+    BACKEND_STARTED=true
+fi
 
-BACKEND_PID=""
-FRONTEND_PID=""
-START_TIME=$(date +%s)
-MAX_RUNTIME=300  # 5分钟
+# 启动前端
+if start_frontend_safe; then
+    FRONTEND_STARTED=true
+fi
 
-monitor_process() {
-    local pid=$1
-    local name=$2
-    local max_cpu=90
-    
-    if [ -n "$pid" ] && kill -0 $pid 2>/dev/null; then
-        # 检查CPU使用率
-        local cpu_usage=$(ps -p $pid -o %cpu --no-headers 2>/dev/null | tr -d ' ' || echo "0")
-        local cpu_int=${cpu_usage%.*}
-        
-        # 检查内存使用率
-        local mem_usage=$(ps -p $pid -o %mem --no-headers 2>/dev/null | tr -d ' ' || echo "0")
-        local mem_int=${mem_usage%.*}
-        
-        # 检查运行时间
-        local current_time=$(date +%s)
-        local runtime=$((current_time - START_TIME))
-        
-        if [ $cpu_int -gt $max_cpu ]; then
-            echo "❌ $name 进程CPU占用过高: ${cpu_usage}%，强制终止"
-            kill -KILL $pid 2>/dev/null || true
-            return 1
-        fi
-        
-        if [ $mem_int -gt 80 ]; then
-            echo "❌ $name 进程内存占用过高: ${mem_usage}%，强制终止"
-            kill -KILL $pid 2>/dev/null || true
-            return 1
-        fi
-        
-        if [ $runtime -gt $MAX_RUNTIME ]; then
-            echo "❌ $name 进程运行时间超过限制: ${runtime}秒，强制终止"
-            kill -KILL $pid 2>/dev/null || true
-            return 1
-        fi
-        
-        return 0
+# 运行逻辑
+if [ "$FRONTEND_STARTED" = true ] && [ "$BACKEND_STARTED" = true ]; then
+    echo "✅ 前后端都已启动"
+    if kill -0 $FRONTEND_PID 2>/dev/null; then
+        wait $FRONTEND_PID
     fi
-    return 1
-}
-
-# 启动进程函数
-start_processes() {
-    BACKEND_STARTED=false
-    FRONTEND_STARTED=false
-    
-    # 启动后端
-    echo "🔄 尝试启动后端..."
-    if start_backend_safe; then
-        BACKEND_STARTED=true
-        echo "✅ 后端启动成功"
-    else
-        echo "⚠️ 后端启动失败"
+    if kill -0 $BACKEND_PID 2>/dev/null; then
+        kill $BACKEND_PID 2>/dev/null || true
     fi
-    
-    # 启动前端
-    echo "🔄 尝试启动前端..."
-    if start_frontend_safe; then
-        FRONTEND_STARTED=true
-        echo "✅ 前端启动成功"
-    else
-        echo "⚠️ 前端启动失败"
+elif [ "$FRONTEND_STARTED" = true ]; then
+    echo "✅ 仅前端运行"
+    if kill -0 $FRONTEND_PID 2>/dev/null; then
+        wait $FRONTEND_PID
     fi
-    
-    # 主监控循环
-    if [ "$BACKEND_STARTED" = true ] || [ "$FRONTEND_STARTED" = true ]; then
-        echo "🔍 开始监控进程..."
-        
-        while true; do
-            sleep 5
-            
-            local any_running=false
-            
-            if [ "$BACKEND_STARTED" = true ]; then
-                if monitor_process "$BACKEND_PID" "后端"; then
-                    any_running=true
-                else
-                    BACKEND_STARTED=false
-                    BACKEND_PID=""
-                fi
-            fi
-            
-            if [ "$FRONTEND_STARTED" = true ]; then
-                if monitor_process "$FRONTEND_PID" "前端"; then
-                    any_running=true
-                else
-                    FRONTEND_STARTED=false
-                    FRONTEND_PID=""
-                fi
-            fi
-            
-            if [ "$any_running" = false ]; then
-                echo "📝 所有进程已停止"
-                break
-            fi
-        done
-    else
-        echo "❌ 所有服务启动失败"
-        exit 1
+elif [ "$BACKEND_STARTED" = true ]; then
+    echo "✅ 仅后端运行"
+    if kill -0 $BACKEND_PID 2>/dev/null; then
+        wait $BACKEND_PID
     fi
-}
+else
+    echo "❌ 启动失败"
+    exit 1
+fi
 
-# 启动进程
-start_processes
-
-echo "🛑 系统监控结束"
-
-MONITOR_SCRIPT
-
-chmod +x /tmp/bamboo_monitor.sh
-
-# 使用全局超时运行监控脚本
-timeout 320s bash /tmp/bamboo_monitor.sh
-
-EXIT_CODE=$?
-
-# 清理监控脚本
-rm -f /tmp/bamboo_monitor.sh
-
-echo "🛑 系统已停止（退出码：$EXIT_CODE）"
-exit $EXIT_CODE
+echo "🛑 系统已停止"
+exit 0
 EOF
     
     chmod +x "${JETPACK_DEPLOY_DIR}/start_bamboo_safe.sh"
