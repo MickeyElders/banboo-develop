@@ -1566,10 +1566,22 @@ else
     export QT_QPA_EGLFS_HIDECURSOR=1
     export QT_QPA_EGLFS_FORCE_888=1
     
-    # GPU相关环境变量
-    export MESA_GL_VERSION_OVERRIDE=3.3
-    export MESA_GLSL_VERSION_OVERRIDE=330
+    # Jetson Nano Tegra SoC专用配置
+    export TEGRA_RM_DISABLE_SECURITY=1
+    export NV_GL_DEBUG=1
+    export __GL_SYNC_TO_VBLANK=0
+    export __GL_YIELD=NOTHING
+    
+    # 禁用Mesa，使用NVIDIA EGL
     export LIBGL_ALWAYS_SOFTWARE=0
+    export MESA_LOADER_DRIVER_OVERRIDE=""
+    unset MESA_GL_VERSION_OVERRIDE
+    unset MESA_GLSL_VERSION_OVERRIDE
+    
+    # Jetson Nano EGL配置
+    export EGL_PLATFORM=drm
+    export GBM_BACKEND=nvidia-drm
+    export __EGL_VENDOR_LIBRARY_DIRS=/usr/share/glvnd/egl_vendor.d
     
     # 触摸屏设备配置
     export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
@@ -1795,10 +1807,22 @@ check_and_start_frontend() {
     export QT_QPA_EGLFS_HIDECURSOR=1
     export QT_QPA_EGLFS_FORCE_888=1
     
-    # GPU相关环境变量
-    export MESA_GL_VERSION_OVERRIDE=3.3
-    export MESA_GLSL_VERSION_OVERRIDE=330
+    # Jetson Nano Tegra SoC专用配置
+    export TEGRA_RM_DISABLE_SECURITY=1
+    export NV_GL_DEBUG=1
+    export __GL_SYNC_TO_VBLANK=0
+    export __GL_YIELD=NOTHING
+    
+    # 禁用Mesa，使用NVIDIA EGL
     export LIBGL_ALWAYS_SOFTWARE=0
+    export MESA_LOADER_DRIVER_OVERRIDE=""
+    unset MESA_GL_VERSION_OVERRIDE
+    unset MESA_GLSL_VERSION_OVERRIDE
+    
+    # Jetson Nano EGL配置
+    export EGL_PLATFORM=drm
+    export GBM_BACKEND=nvidia-drm
+    export __EGL_VENDOR_LIBRARY_DIRS=/usr/share/glvnd/egl_vendor.d
     
     # 触摸屏设备配置
     export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
