@@ -76,38 +76,42 @@ log_qt() {
 # 显示帮助信息
 show_help() {
     cat << EOF
-智能切竹机 JetPack SDK 专用部署脚本
+智能切竹机 JetPack SDK 专用部署脚本 (一键重新部署版本)
 
 用法: $0 [选项]
 
-选项:
+📌 默认行为 (不带任何参数):
+    - 自动停止所有运行中的服务和进程
+    - 清理历史版本
+    - 强制重新编译所有组件
+    - 部署 Qt 前端和 AI 模型
+    - 创建完整部署包
+    - 重新启动服务
+
+⚙️  可选参数:
     -t, --type TYPE         构建类型 (Debug, Release) [默认: Release]
-    -d, --deploy TARGET     部署目标 (local, jetson, remote:IP)
     -i, --install-deps      安装 JetPack SDK 依赖包
-    -g, --gpu-opt           启用 GPU 内存和计算优化
-    -p, --power-opt         启用功耗管理和性能调优
-    -m, --models            自动配置和部署 AI 模型文件
-    -q, --qt-deploy         启用 Qt 依赖自动收集和部署
-    -c, --create-package    创建完整部署包
-    -f, --force-rebuild     强制重新编译所有组件
-    -u, --upgrade           自动升级现有部署
-    -b, --no-backup         升级时不备份当前版本
-    -x, --clean-legacy      清理所有历史版本进程和配置
+    -b, --no-backup         重新部署时不备份当前版本
     -v, --version           显示版本信息
     -h, --help              显示此帮助信息
 
-示例:
-    $0 --install-deps --gpu-opt --power-opt        # 安装依赖并启用全部优化
-    $0 --deploy jetson --models --qt-deploy        # 部署到 Jetson 并配置模型
-    $0 --deploy remote:192.168.1.100 --create-package    # 创建包并部署到远程设备
-    $0 --force-rebuild --upgrade --deploy local    # 强制重新编译并升级本地部署
-    $0 --upgrade --no-backup --deploy local        # 快速升级（不备份）
-    $0 --clean-legacy --upgrade --deploy local     # 清理历史版本并重新部署
+🚀 使用示例:
+    $0                                              # 一键重新部署 (推荐)
+    $0 --install-deps                               # 重新部署并安装依赖
+    $0 --type Debug                                 # 重新部署调试版本
+    $0 --no-backup                                  # 重新部署且不备份
 
-JetPack SDK 版本: ${JETPACK_VERSION}
-CUDA 版本: ${CUDA_VERSION}
-TensorRT 版本: ${TENSORRT_VERSION}
-OpenCV 版本: ${OPENCV_VERSION}
+🔧 系统信息:
+    JetPack SDK 版本: ${JETPACK_VERSION}
+    CUDA 版本: ${CUDA_VERSION}
+    TensorRT 版本: ${TENSORRT_VERSION}
+    OpenCV 版本: ${OPENCV_VERSION}
+
+💡 提示:
+    - 脚本会自动处理进程清理、编译、部署和启动
+    - 无需额外参数，直接运行即可完成完整重新部署
+    - 如果需要查看服务状态: sudo systemctl status bamboo-cut-jetpack
+    - 如果需要查看日志: sudo journalctl -u bamboo-cut-jetpack -f
 
 EOF
 }
@@ -993,6 +997,86 @@ check_upgrade_needed() {
     return 1
 }
 
+# 停止所有运行中的服务和进程
+stop_running_services() {
+    log_info "🛑 停止所有运行中的智能切竹机服务和进程..."
+    
+    # 智能切竹机相关服务清单
+    BAMBOO_SERVICES=(
+        "bamboo-cut-jetpack"
+        "bamboo-cut"
+        "bamboo-controller"
+        "bamboo-backend"
+        "bamboo-frontend"
+        "bamboo-cut-backend"
+        "bamboo-cut-frontend"
+        "bamboo-controller-qt"
+    )
+    
+    # 停止systemd服务
+    for service in "${BAMBOO_SERVICES[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log_info "停止服务: $service"
+            sudo systemctl stop "$service" || true
+            
+            # 等待服务完全停止
+            local timeout=10
+            while [ $timeout -gt 0 ] && systemctl is-active --quiet "$service" 2>/dev/null; do
+                sleep 1
+                timeout=$((timeout - 1))
+            done
+            
+            if systemctl is-active --quiet "$service" 2>/dev/null; then
+                log_warning "服务 $service 未能在10秒内停止，将强制终止"
+            else
+                log_success "服务 $service 已停止"
+            fi
+        fi
+    done
+    
+    # 强制终止所有相关进程
+    log_info "强制终止所有相关进程..."
+    
+    BAMBOO_PROCESSES=(
+        "bamboo_cut_backend"
+        "bamboo_controller_qt"
+        "bamboo-cut"
+        "bamboo_cut_frontend"
+        "bamboo-backend"
+        "bamboo-frontend"
+        "start_bamboo_cut_jetpack.sh"
+        "start_qt_frontend_only.sh"
+    )
+    
+    for process in "${BAMBOO_PROCESSES[@]}"; do
+        if pgrep -f "$process" >/dev/null 2>&1; then
+            log_info "终止进程: $process"
+            sudo pkill -TERM -f "$process" || true
+            sleep 2
+            
+            # 如果进程仍在运行，强制终止
+            if pgrep -f "$process" >/dev/null 2>&1; then
+                log_warning "强制终止进程: $process"
+                sudo pkill -KILL -f "$process" || true
+                sleep 1
+            fi
+            
+            if ! pgrep -f "$process" >/dev/null 2>&1; then
+                log_success "进程 $process 已终止"
+            fi
+        fi
+    done
+    
+    # 清理可能的僵尸进程
+    log_info "清理僵尸进程..."
+    sudo pkill -KILL -f "bamboo" 2>/dev/null || true
+    
+    # 等待所有进程完全退出
+    sleep 3
+    
+    log_success "✅ 所有运行中的服务和进程已停止"
+}
+
 # 完全清理历史版本进程和配置
 clean_legacy_deployment() {
     log_info "🧹 清理历史版本进程和配置..."
@@ -1772,13 +1856,23 @@ main() {
     
     parse_arguments "$@"
     
-    # 如果启用清理历史版本，先执行清理
-    if [ "$CLEAN_LEGACY" = "true" ]; then
-        clean_legacy_deployment
-    fi
+    # 默认启用重新部署模式
+    log_info "启动重新部署模式：自动清理运行中的进程和强制重新编译"
+    CLEAN_LEGACY="true"
+    FORCE_REBUILD="true"
+    AUTO_UPGRADE="true"
+    ENABLE_QT_DEPLOY="true"
+    DEPLOY_MODELS="true"
+    CREATE_PACKAGE="true"
+    DEPLOY_TARGET="local"
     
-    # 检查是否需要升级现有部署
-    check_upgrade_needed
+    # 首先停止所有运行中的相关服务和进程
+    log_info "🛑 停止所有运行中的智能切竹机服务和进程..."
+    stop_running_services
+    
+    # 清理历史版本
+    log_info "🧹 清理历史版本..."
+    clean_legacy_deployment
     
     # 创建部署目录
     mkdir -p "$JETPACK_DEPLOY_DIR"
@@ -1787,13 +1881,8 @@ main() {
     install_jetpack_dependencies
     configure_jetpack_performance
     
-    if [ "$ENABLE_QT_DEPLOY" = "true" ]; then
-        deploy_qt_dependencies
-    fi
-    
-    if [ "$DEPLOY_MODELS" = "true" ]; then
-        deploy_ai_models
-    fi
+    deploy_qt_dependencies
+    deploy_ai_models
     
     # 确保项目已编译
     log_jetpack "确保项目已编译..."
@@ -1863,13 +1952,45 @@ main() {
     create_jetpack_package
     deploy_to_target
     
-    log_success "JetPack SDK 部署完成!"
+    # 自动启动服务
+    log_info "🚀 启动智能切竹机服务..."
+    if systemctl is-enabled bamboo-cut-jetpack >/dev/null 2>&1; then
+        sudo systemctl start bamboo-cut-jetpack
+        sleep 3
+        
+        if systemctl is-active --quiet bamboo-cut-jetpack; then
+            log_success "✅ 智能切竹机服务启动成功"
+            log_info "服务状态: sudo systemctl status bamboo-cut-jetpack"
+            log_info "查看日志: sudo journalctl -u bamboo-cut-jetpack -f"
+        else
+            log_warning "⚠️ 服务启动可能有问题，请检查日志"
+            log_info "检查命令: sudo systemctl status bamboo-cut-jetpack"
+        fi
+    else
+        log_warning "⚠️ 服务未启用，请手动启动: sudo systemctl enable --now bamboo-cut-jetpack"
+    fi
+    
+    log_success "🎉 JetPack SDK 重新部署完成!"
     log_info "部署包位置: ${DEPLOY_DIR}/packages/bamboo-cut-jetpack-${VERSION}.tar.gz"
     
     if [ "$JETSON_DETECTED" = "true" ]; then
         log_jetpack "运行性能测试: sudo jetson_stats"
         log_jetpack "监控 GPU 使用: sudo tegrastats"
     fi
+    
+    echo ""
+    echo "🎯 部署摘要："
+    echo "✅ 已停止所有运行中的进程"
+    echo "✅ 已清理历史版本"
+    echo "✅ 已强制重新编译"
+    echo "✅ 已重新部署服务"
+    echo "✅ 已启动智能切竹机服务"
+    echo ""
+    echo "📋 常用命令："
+    echo "  查看服务状态: sudo systemctl status bamboo-cut-jetpack"
+    echo "  查看实时日志: sudo journalctl -u bamboo-cut-jetpack -f"
+    echo "  重启服务: sudo systemctl restart bamboo-cut-jetpack"
+    echo "  停止服务: sudo systemctl stop bamboo-cut-jetpack"
 }
 
 # 运行主函数
