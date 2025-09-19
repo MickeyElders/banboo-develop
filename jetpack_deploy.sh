@@ -1534,22 +1534,53 @@ else
     mkdir -p "$XDG_RUNTIME_DIR"
     chmod 700 "$XDG_RUNTIME_DIR"
     
+    # 检查GPU和显示权限
+    echo "🔧 检查GPU和显示设备权限..."
+    
+    # 添加当前用户到必要的组
+    if ! groups | grep -q video; then
+        echo "⚠️ 当前用户不在video组，添加权限..."
+        sudo usermod -a -G video $USER || true
+    fi
+    
+    if ! groups | grep -q render; then
+        echo "⚠️ 当前用户不在render组，添加权限..."
+        sudo usermod -a -G render $USER || true
+    fi
+    
+    # 检查关键设备权限
+    for device in /dev/dri/card0 /dev/dri/renderD128 /dev/input/event2; do
+        if [ -e "$device" ]; then
+            echo "📋 设备权限: $(ls -la $device)"
+            sudo chmod 666 "$device" 2>/dev/null || true
+        else
+            echo "⚠️ 设备不存在: $device"
+        fi
+    done
+    
     # 强制使用EGLFS平台配置（专用触摸屏）
     export QT_QPA_PLATFORM=eglfs
     export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
     export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
     export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
     export QT_QPA_EGLFS_HIDECURSOR=1
+    export QT_QPA_EGLFS_FORCE_888=1
+    
+    # GPU相关环境变量
+    export MESA_GL_VERSION_OVERRIDE=3.3
+    export MESA_GLSL_VERSION_OVERRIDE=330
+    export LIBGL_ALWAYS_SOFTWARE=0
     
     # 触摸屏设备配置
     export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
     export QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event2
     
     # 触摸屏调试日志
-    export QT_LOGGING_RULES="qt.qpa.*=true;qt.qpa.input*=true"
+    export QT_LOGGING_RULES="qt.qpa.*=true;qt.qpa.input*=true;qt.qpa.eglfs*=true"
     echo "✅ EGLFS触摸屏环境已设置"
     echo "   Touch Device: /dev/input/event2"
     echo "   Cursor Hidden: Yes"
+    echo "   GPU Permissions: Checked"
 fi
 
 # 应用性能优化 (如果存在)
@@ -1732,31 +1763,74 @@ check_and_start_frontend() {
     echo "   Cursor Hidden: Yes"
     echo "   XDG_RUNTIME_DIR: $XDG_RUNTIME_DIR"
     
+    # 检查GPU和显示权限
+    echo "🔧 检查GPU和显示设备权限..."
+    
+    # 添加当前用户到必要的组
+    if ! groups | grep -q video; then
+        echo "⚠️ 当前用户不在video组，添加权限..."
+        sudo usermod -a -G video $USER || true
+    fi
+    
+    if ! groups | grep -q render; then
+        echo "⚠️ 当前用户不在render组，添加权限..."
+        sudo usermod -a -G render $USER || true
+    fi
+    
+    # 检查关键设备权限
+    for device in /dev/dri/card0 /dev/dri/renderD128 /dev/input/event2; do
+        if [ -e "$device" ]; then
+            echo "📋 设备权限: $(ls -la $device)"
+            sudo chmod 666 "$device" 2>/dev/null || true
+        else
+            echo "⚠️ 设备不存在: $device"
+        fi
+    done
+    
     # 强制使用EGLFS平台（不使用fallback）
     export QT_QPA_PLATFORM=eglfs
     export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
     export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
     export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
     export QT_QPA_EGLFS_HIDECURSOR=1
+    export QT_QPA_EGLFS_FORCE_888=1
+    
+    # GPU相关环境变量
+    export MESA_GL_VERSION_OVERRIDE=3.3
+    export MESA_GLSL_VERSION_OVERRIDE=330
+    export LIBGL_ALWAYS_SOFTWARE=0
     
     # 触摸屏设备配置
     export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event2
     export QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event2
     
     echo "✅ 使用EGLFS平台启动Qt前端..."
+    echo "🔧 GPU设备权限已检查"
     
     # 启动Qt前端
     timeout 30 "$qt_frontend_exec" &
     FRONTEND_PID=$!
     
     # 等待启动
-    sleep 5
+    sleep 8
     
     if kill -0 $FRONTEND_PID 2>/dev/null; then
         echo "✅ Qt 前端启动成功 (PID: $FRONTEND_PID, Platform: eglfs)"
         return 0
     else
         echo "❌ Qt前端启动失败"
+        echo "🔍 检查EGL错误详情..."
+        
+        # 输出详细的设备信息用于诊断
+        echo "📋 DRM设备信息:"
+        ls -la /dev/dri/ 2>/dev/null || echo "  无DRM设备"
+        
+        echo "📋 显卡信息:"
+        lspci | grep -i vga 2>/dev/null || echo "  无法获取显卡信息"
+        
+        echo "📋 当前用户组:"
+        groups
+        
         wait $FRONTEND_PID 2>/dev/null || true
         return 1
     fi
