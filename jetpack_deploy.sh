@@ -1297,10 +1297,16 @@ build_project() {
     fi
     
     # 运行 CMake for C++ backend
-    cmake "${CMAKE_ARGS[@]}" "${PROJECT_ROOT}/cpp_backend"
+    if ! cmake "${CMAKE_ARGS[@]}" "${PROJECT_ROOT}/cpp_backend"; then
+        log_error "C++ 后端 CMake 配置失败"
+        return 1
+    fi
     
     # 编译 C++ 后端
-    make -j$(nproc)
+    if ! make -j$(nproc); then
+        log_error "C++ 后端编译失败"
+        return 1
+    fi
     
     log_success "C++ 后端构建完成"
     
@@ -1321,13 +1327,20 @@ build_project() {
     fi
     
     # 运行 CMake for Qt frontend
-    cmake "${QT_CMAKE_ARGS[@]}" "${PROJECT_ROOT}/qt_frontend"
+    if ! cmake "${QT_CMAKE_ARGS[@]}" "${PROJECT_ROOT}/qt_frontend"; then
+        log_error "Qt 前端 CMake 配置失败"
+        return 1
+    fi
     
     # 编译 Qt 前端
-    make -j$(nproc)
+    if ! make -j$(nproc); then
+        log_error "Qt 前端编译失败"
+        return 1
+    fi
     
     log_success "Qt 前端构建完成"
     log_success "项目构建完成"
+    return 0
 }
 
 # 创建 JetPack SDK 部署包
@@ -1784,7 +1797,10 @@ main() {
     
     # 确保项目已编译
     log_jetpack "确保项目已编译..."
-    build_project
+    if ! build_project; then
+        log_error "项目编译失败，停止部署"
+        exit 1
+    fi
     
     # 如果启用了Qt部署，确保Qt前端已编译
     if [ "$ENABLE_QT_DEPLOY" = "true" ]; then
@@ -1811,14 +1827,15 @@ main() {
             
             # 使用正确的make目标
             if [ "$BUILD_TYPE" = "Debug" ]; then
-                make qt BUILD_TYPE=debug
+                if ! make qt BUILD_TYPE=debug; then
+                    log_error "Qt前端Debug编译失败"
+                    exit 1
+                fi
             else
-                make qt BUILD_TYPE=release
-            fi
-            
-            if [ $? -ne 0 ]; then
-                log_error "Qt前端编译失败"
-                exit 1
+                if ! make qt BUILD_TYPE=release; then
+                    log_error "Qt前端Release编译失败"
+                    exit 1
+                fi
             fi
             log_success "Qt前端编译完成"
             
