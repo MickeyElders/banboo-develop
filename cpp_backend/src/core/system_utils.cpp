@@ -21,12 +21,32 @@ namespace core {
 SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& command, int timeout_ms) {
     CommandResult result;
     
+    LOG_DEBUG("🔧 SystemUtils: 准备执行命令: '{}'", command);
+    
     // 安全性检查
     if (!isCommandSafe(command)) {
         result.error = "不安全的命令被拒绝执行";
-        LOG_ERROR("拒绝执行不安全命令: {}", command);
+        LOG_ERROR("❌ 命令被安全策略拒绝: {}", command);
         return result;
     }
+    LOG_DEBUG("✅ 命令通过安全检查");
+    
+    // 解析命令参数
+    auto tokens = tokenizeCommand(command);
+    if (tokens.empty()) {
+        result.error = "无效的命令";
+        LOG_ERROR("❌ 无效的命令: {}", command);
+        return result;
+    }
+    
+    LOG_DEBUG("📋 解析后的命令参数: [{}]", [&tokens]() {
+        std::string arg_list;
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            if (i > 0) arg_list += ", ";
+            arg_list += "\"" + tokens[i] + "\"";
+        }
+        return arg_list;
+    }());
     
     try {
         int pipefd[2];
@@ -34,9 +54,12 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
         
         if (pipe(pipefd) == -1 || pipe(error_pipefd) == -1) {
             result.error = "创建管道失败";
+            LOG_ERROR("❌ 创建管道失败: {}", strerror(errno));
             return result;
         }
+        LOG_DEBUG("✅ 管道创建成功");
         
+        LOG_DEBUG("🚀 开始fork子进程...");
         pid_t pid = fork();
         if (pid == -1) {
             close(pipefd[0]);
@@ -44,11 +67,13 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
             close(error_pipefd[0]);
             close(error_pipefd[1]);
             result.error = "创建子进程失败";
+            LOG_ERROR("❌ fork失败: {}", strerror(errno));
             return result;
         }
         
         if (pid == 0) {
             // 子进程
+            LOG_DEBUG("👶 子进程启动，PID: {}", getpid());
             close(pipefd[0]);
             close(error_pipefd[0]);
             
@@ -58,22 +83,21 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
             close(pipefd[1]);
             close(error_pipefd[1]);
             
-            // 分割命令和参数
-            auto tokens = tokenizeCommand(command);
-            if (tokens.empty()) {
-                _exit(127);
-            }
-            
             std::vector<char*> args;
             for (auto& token : tokens) {
                 args.push_back(const_cast<char*>(token.c_str()));
             }
             args.push_back(nullptr);
             
+            LOG_DEBUG("🎯 子进程即将执行: {} (参数数量: {})", tokens[0], tokens.size());
             execvp(args[0], args.data());
+            
+            // execvp失败才会到这里
+            LOG_ERROR("❌ execvp失败: {}", strerror(errno));
             _exit(127);
         } else {
             // 父进程
+            LOG_DEBUG("👨‍👦 父进程等待子进程 PID: {}", pid);
             close(pipefd[1]);
             close(error_pipefd[1]);
             
@@ -83,9 +107,12 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
             
             std::string output, error;
             char buffer[4096];
+            size_t total_output = 0, total_error = 0;
             
             auto start_time = std::chrono::steady_clock::now();
             bool timeout_occurred = false;
+            
+            LOG_DEBUG("📖 开始读取命令输出...");
             
             while (true) {
                 // 检查超时
@@ -106,6 +133,8 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
                 if (n > 0) {
                     buffer[n] = '\0';
                     output += buffer;
+                    total_output += n;
+                    LOG_DEBUG("📄 读取标准输出 {} 字节（总计: {} 字节）", n, total_output);
                 }
                 
                 // 读取错误输出
@@ -113,6 +142,8 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
                 if (n > 0) {
                     buffer[n] = '\0';
                     error += buffer;
+                    total_error += n;
+                    LOG_DEBUG("⚠️ 读取错误输出 {} 字节（总计: {} 字节）", n, total_error);
                 }
                 
                 // 检查子进程状态
@@ -154,11 +185,29 @@ SystemUtils::CommandResult SystemUtils::executeCommand(const std::string& comman
                 result.error = "命令执行超时";
                 result.exit_code = -1;
                 result.success = false;
+                LOG_WARN("⏰ 命令执行超时: {} ({}ms)", command, timeout_ms);
             }
             
             result.output = output;
             if (!error.empty()) {
                 result.error += (result.error.empty() ? "" : "; ") + error;
+            }
+            
+            // 输出执行结果摘要
+            LOG_DEBUG("🏁 命令执行完成:");
+            LOG_DEBUG("   退出码: {}", result.exit_code);
+            LOG_DEBUG("   成功: {}", result.success ? "是" : "否");
+            LOG_DEBUG("   输出长度: {} 字节", output.length());
+            LOG_DEBUG("   错误长度: {} 字节", error.length());
+            if (!output.empty()) {
+                std::string preview = output.substr(0, 100);
+                if (output.length() > 100) preview += "...";
+                LOG_DEBUG("   输出预览: {}", preview);
+            }
+            if (!error.empty()) {
+                std::string preview = error.substr(0, 100);
+                if (error.length() > 100) preview += "...";
+                LOG_DEBUG("   错误预览: {}", preview);
             }
         }
         

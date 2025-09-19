@@ -36,31 +36,42 @@ public:
         // 初始化日志系统
         core::Logger::getInstance().init("/var/log/bamboo-cut/backend.log");
         
-        // 初始化视觉检测器
-        if (!initializeVisionSystem()) {
-            LOG_ERROR("视觉系统初始化失败");
-            return false;
+        // 初始化视觉检测器（非关键模块，失败时继续运行）
+        vision_system_available_ = initializeVisionSystem();
+        if (!vision_system_available_) {
+            LOG_WARN("⚠️ 视觉系统初始化失败，系统将在无视觉检测模式下运行");
         }
         
-        // 初始化相机管理器 (修复: 添加缺失的初始化调用)
-        if (!initializeCameraSystem()) {
-            LOG_ERROR("相机系统初始化失败");
-            return false;
+        // 初始化相机管理器（非关键模块，失败时继续运行）
+        camera_system_available_ = initializeCameraSystem();
+        if (!camera_system_available_) {
+            LOG_WARN("⚠️ 相机系统初始化失败，系统将在无摄像头模式下运行");
         }
         
-        // 初始化立体视觉系统
-        if (!initializeStereoVisionSystem()) {
-            LOG_ERROR("立体视觉系统初始化失败");
-            return false;
+        // 初始化立体视觉系统（非关键模块，失败时继续运行）
+        stereo_vision_available_ = initializeStereoVisionSystem();
+        if (!stereo_vision_available_) {
+            LOG_WARN("⚠️ 立体视觉系统初始化失败，系统将在2D模式下运行");
         }
         
-        // 初始化通信系统
+        // 初始化通信系统（关键模块，失败时系统无法运行）
         if (!initializeCommunicationSystem()) {
-            LOG_ERROR("通信系统初始化失败");
+            LOG_ERROR("❌ 通信系统初始化失败，系统无法运行");
             return false;
         }
         
-        LOG_INFO("系统初始化完成");
+        // 输出系统状态摘要
+        LOG_INFO("🎯 系统初始化完成，模块状态:");
+        LOG_INFO("   📹 摄像头系统: {}", camera_system_available_ ? "✅ 可用" : "❌ 不可用");
+        LOG_INFO("   🔍 视觉检测: {}", vision_system_available_ ? "✅ 可用" : "❌ 不可用");
+        LOG_INFO("   👁️ 立体视觉: {}", stereo_vision_available_ ? "✅ 可用" : "❌ 不可用");
+        LOG_INFO("   🔗 通信系统: ✅ 可用");
+        
+        if (!camera_system_available_ && !vision_system_available_) {
+            LOG_WARN("⚠️ 系统运行在模拟模式：无摄像头和视觉检测");
+            LOG_WARN("⚠️ 可以接收PLC指令但无法进行实际检测");
+        }
+        
         return true;
     }
     
@@ -115,6 +126,12 @@ private:
     std::unique_ptr<vision::CameraManager> camera_manager_;
     std::unique_ptr<vision::StereoVision> stereo_vision_;
     std::unique_ptr<communication::ModbusServer> modbus_server_;
+    
+    // 模块可用性状态
+    bool vision_system_available_ = false;
+    bool camera_system_available_ = false;
+    bool stereo_vision_available_ = false;
+    bool communication_system_available_ = false;
     
     // 当前帧数据
     vision::FrameInfo current_frame_;
@@ -311,49 +328,94 @@ private:
     }
     
     void startServices() {
-        LOG_INFO("启动所有服务...");
+        LOG_INFO("🚀 启动所有可用服务...");
         
-        // 启动Modbus服务器
-        if (!modbus_server_->start()) {
-            LOG_ERROR("Modbus服务器启动失败");
+        // 启动Modbus服务器（必需服务）
+        if (modbus_server_ && !modbus_server_->start()) {
+            LOG_ERROR("❌ Modbus服务器启动失败");
             return;
+        } else {
+            LOG_INFO("✅ Modbus服务器启动成功");
+            communication_system_available_ = true;
         }
         
-        // 启动摄像头捕获
-        if (!camera_manager_->startCapture()) {
-            LOG_ERROR("摄像头启动失败");
-            return;
+        // 启动摄像头捕获（可选服务）
+        if (camera_manager_ && camera_system_available_) {
+            if (camera_manager_->startCapture()) {
+                LOG_INFO("✅ 摄像头服务启动成功");
+            } else {
+                LOG_WARN("⚠️ 摄像头服务启动失败，切换到模拟模式");
+                camera_system_available_ = false;
+            }
+        } else {
+            LOG_WARN("⚠️ 摄像头系统不可用，跳过启动");
         }
         
-        // 设置系统状态为运行
-        modbus_server_->set_system_status(communication::SystemStatus::RUNNING);
+        // 设置系统状态
+        if (modbus_server_) {
+            if (camera_system_available_ && vision_system_available_) {
+                modbus_server_->set_system_status(communication::SystemStatus::RUNNING);
+                LOG_INFO("✅ 系统状态：完全运行模式");
+            } else {
+                modbus_server_->set_system_status(communication::SystemStatus::LIMITED);
+                LOG_WARN("⚠️ 系统状态：有限运行模式（部分功能不可用）");
+            }
+        }
         
-        LOG_INFO("所有服务启动完成");
+        LOG_INFO("🎯 服务启动完成 - 可用服务数: {}/4",
+                (communication_system_available_ ? 1 : 0) +
+                (camera_system_available_ ? 1 : 0) +
+                (vision_system_available_ ? 1 : 0) +
+                (stereo_vision_available_ ? 1 : 0));
     }
     
     void processVision() {
-        if (!stereo_vision_->is_initialized()) {
-            LOG_WARN("立体视觉系统未初始化，跳过处理");
+        // 检查是否有可用的视觉系统
+        if (!vision_system_available_ && !camera_system_available_ && !stereo_vision_available_) {
+            // 在模拟模式下，定期发送模拟数据用于测试
+            static auto last_simulation_time = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - last_simulation_time).count() >= 5) {
+                LOG_DEBUG("🎭 模拟模式：发送测试坐标数据");
+                if (modbus_server_) {
+                    communication::CoordinateData sim_data(1000, communication::BladeNumber::BLADE_1, communication::CutQuality::SIMULATION);
+                    modbus_server_->set_coordinate_data(sim_data);
+                }
+                last_simulation_time = now;
+            }
             return;
         }
         
+        // 立体视觉处理
+        if (stereo_vision_available_ && stereo_vision_ && stereo_vision_->is_initialized()) {
+            if (processStereovision()) {
+                return; // 立体视觉处理成功，直接返回
+            }
+        }
+        
+        // 传统2D视觉处理备选方案
+        if (vision_system_available_ && camera_system_available_) {
+            process2DVision();
+        }
+    }
+    
+    bool processStereovision() {
         // 捕获立体帧
         vision::StereoFrame stereo_frame;
         if (!stereo_vision_->capture_stereo_frame(stereo_frame)) {
             LOG_DEBUG("无法捕获立体帧");
-            return;
+            return false;
         }
         
         if (!stereo_frame.valid) {
             LOG_DEBUG("立体帧无效");
-            return;
+            return false;
         }
         
-        // 优先使用立体视觉系统进行检测
+        // 3D模式 - 使用深度信息过滤检测点
         if (stereo_vision_->is_calibrated() && !stereo_frame.disparity.empty()) {
-            // 3D模式 - 使用深度信息过滤检测点
             auto valid_points = stereo_vision_->detect_bamboo_with_depth(
-                stereo_frame.left_image, 
+                stereo_frame.left_image,
                 stereo_frame.disparity,
                 200.0,   // 最小深度 200mm
                 2000.0   // 最大深度 2000mm
@@ -366,55 +428,68 @@ private:
                 if (!points_3d.empty()) {
                     auto best_point_3d = points_3d[0];
                     
-                    // 确定使用的刀片（根据X坐标位置，统一使用图像中心作为分界线）
-                    communication::BladeNumber blade = (best_point_3d.x < 0) ? 
+                    // 确定使用的刀片
+                    communication::BladeNumber blade = (best_point_3d.x < 0) ?
                         communication::BladeNumber::BLADE_1 : communication::BladeNumber::BLADE_2;
                     
-                    // 创建坐标数据 (转换为0.1mm精度)
+                    // 创建坐标数据
                     communication::CoordinateData coord_data(
-                        static_cast<int32_t>(best_point_3d.x * 10), 
-                        blade, 
+                        static_cast<int32_t>(best_point_3d.x * 10),
+                        blade,
                         communication::CutQuality::NORMAL
                     );
                     
                     // 更新坐标到Modbus服务器
-                    modbus_server_->set_coordinate_data(coord_data);
+                    if (modbus_server_) {
+                        modbus_server_->set_coordinate_data(coord_data);
+                    }
                     
-                    LOG_DEBUG("检测到3D切点: X={:.1f}mm, Y={:.1f}mm, Z={:.1f}mm, 刀片={}, 置信度={:.2f}", 
-                             best_point_3d.x, best_point_3d.y, best_point_3d.z, 
-                             static_cast<int>(blade), best_point_3d.confidence);
+                    LOG_DEBUG("✅ 3D检测: X={:.1f}mm, Y={:.1f}mm, Z={:.1f}mm, 刀片={}",
+                             best_point_3d.x, best_point_3d.y, best_point_3d.z, static_cast<int>(blade));
+                    return true;
                 }
             }
-        } else {
-            // 2D模式 - 使用传统检测器作为备选
-            if (detector_ && detector_->is_initialized()) {
-                auto result = detector_->detect(stereo_frame.left_image);
-                
-                if (result.success && !result.points.empty()) {
-                    auto best_point = result.points[0];
-                    
-                    // 确定使用的刀片（根据X坐标位置，统一使用图像中心作为分界线）
-                    communication::BladeNumber blade = (best_point.x < stereo_frame.left_image.cols / 2) ? 
-                        communication::BladeNumber::BLADE_1 : communication::BladeNumber::BLADE_2;
-                    
-                    // 创建坐标数据 (转换为0.1mm精度，假设像素到mm的比例)
-                    float pixel_to_mm = 0.5f; // 假设每像素0.5mm，需要根据实际标定
-                    communication::CoordinateData coord_data(
-                        static_cast<int32_t>(best_point.x * pixel_to_mm * 10), 
-                        blade, 
-                        communication::CutQuality::NORMAL
-                    );
-                    
-                    // 更新坐标到Modbus服务器
-                    modbus_server_->set_coordinate_data(coord_data);
-                    
-                    LOG_DEBUG("检测到2D切点: X={:.1f}px ({:.1f}mm), 刀片={}, 处理时间: {:.2f}ms", 
-                             best_point.x, best_point.x * pixel_to_mm, 
-                             static_cast<int>(blade), result.processing_time_ms);
-                }
-            } else {
-                LOG_WARN("传统检测器未初始化，无法进行2D检测");
+        }
+        return false;
+    }
+    
+    void process2DVision() {
+        if (!detector_ || !detector_->is_initialized()) {
+            LOG_DEBUG("传统检测器不可用");
+            return;
+        }
+        
+        // 从摄像头获取当前帧
+        std::lock_guard<std::mutex> lock(frame_mutex_);
+        if (current_frame_.frames.empty()) {
+            LOG_DEBUG("没有可用的摄像头帧");
+            return;
+        }
+        
+        auto result = detector_->detect(current_frame_.frames[0]);
+        if (result.success && !result.points.empty()) {
+            auto best_point = result.points[0];
+            
+            // 确定使用的刀片
+            communication::BladeNumber blade = (best_point.x < current_frame_.frames[0].cols / 2) ?
+                communication::BladeNumber::BLADE_1 : communication::BladeNumber::BLADE_2;
+            
+            // 创建坐标数据
+            float pixel_to_mm = 0.5f; // 像素到mm的比例
+            communication::CoordinateData coord_data(
+                static_cast<int32_t>(best_point.x * pixel_to_mm * 10),
+                blade,
+                communication::CutQuality::NORMAL
+            );
+            
+            // 更新坐标到Modbus服务器
+            if (modbus_server_) {
+                modbus_server_->set_coordinate_data(coord_data);
             }
+            
+            LOG_DEBUG("✅ 2D检测: X={:.1f}px ({:.1f}mm), 刀片={}, 耗时: {:.2f}ms",
+                     best_point.x, best_point.x * pixel_to_mm,
+                     static_cast<int>(blade), result.processing_time_ms);
         }
     }
     
