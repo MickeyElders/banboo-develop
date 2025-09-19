@@ -27,30 +27,76 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查Jetson Nano设备
-check_jetson_nano() {
-    log_info "检查Jetson Nano设备..."
+# 检查Jetson设备（支持多种型号）
+check_jetson_device() {
+    log_info "检查Jetson设备..."
     
     if [ -f "/proc/device-tree/model" ]; then
         DEVICE_MODEL=$(cat /proc/device-tree/model | tr -d '\0')
         echo "设备型号: $DEVICE_MODEL"
         
-        if [[ "$DEVICE_MODEL" == *"Jetson Nano"* ]]; then
-            log_success "确认为Jetson Nano设备"
-            return 0
+        # 支持多种Jetson设备
+        if [[ "$DEVICE_MODEL" == *"Jetson"* ]]; then
+            if [[ "$DEVICE_MODEL" == *"Orin NX"* ]]; then
+                JETSON_TYPE="orin-nx"
+                TEGRA_CHIP="tegra234"
+                GPU_PATH="17000000.gpu"
+                log_success "确认为Jetson Orin NX设备"
+                return 0
+            elif [[ "$DEVICE_MODEL" == *"Jetson Nano"* ]]; then
+                JETSON_TYPE="nano"
+                TEGRA_CHIP="tegra210"
+                GPU_PATH="57000000.gpu"
+                log_success "确认为Jetson Nano设备"
+                return 0
+            elif [[ "$DEVICE_MODEL" == *"Jetson AGX Orin"* ]]; then
+                JETSON_TYPE="agx-orin"
+                TEGRA_CHIP="tegra234"
+                GPU_PATH="17000000.gpu"
+                log_success "确认为Jetson AGX Orin设备"
+                return 0
+            elif [[ "$DEVICE_MODEL" == *"Jetson Xavier"* ]]; then
+                JETSON_TYPE="xavier"
+                TEGRA_CHIP="tegra194"
+                GPU_PATH="17000000.gpu"
+                log_success "确认为Jetson Xavier设备"
+                return 0
+            else
+                log_success "检测到Jetson设备: $DEVICE_MODEL"
+                # 默认配置
+                JETSON_TYPE="generic"
+                TEGRA_CHIP="tegra"
+                GPU_PATH="*.gpu"
+                return 0
+            fi
         fi
     fi
     
-    # 检查Tegra芯片
+    # 检查Tegra芯片兼容性
     if [ -f "/proc/device-tree/compatible" ]; then
         COMPATIBLE=$(cat /proc/device-tree/compatible | tr -d '\0')
-        if [[ "$COMPATIBLE" == *"tegra210"* ]]; then
+        if [[ "$COMPATIBLE" == *"tegra234"* ]]; then
+            JETSON_TYPE="orin"
+            TEGRA_CHIP="tegra234"
+            GPU_PATH="17000000.gpu"
+            log_success "检测到Tegra234 SoC (Jetson Orin系列)"
+            return 0
+        elif [[ "$COMPATIBLE" == *"tegra210"* ]]; then
+            JETSON_TYPE="nano"
+            TEGRA_CHIP="tegra210"
+            GPU_PATH="57000000.gpu"
             log_success "检测到Tegra210 SoC (Jetson Nano)"
+            return 0
+        elif [[ "$COMPATIBLE" == *"tegra194"* ]]; then
+            JETSON_TYPE="xavier"
+            TEGRA_CHIP="tegra194"
+            GPU_PATH="17000000.gpu"
+            log_success "检测到Tegra194 SoC (Jetson Xavier)"
             return 0
         fi
     fi
     
-    log_error "未检测到Jetson Nano设备"
+    log_error "未检测到支持的Jetson设备"
     return 1
 }
 
@@ -173,24 +219,50 @@ EOF
 check_tegra_gpu() {
     log_info "检查Tegra GPU状态..."
     
-    echo "📋 Tegra GPU信息："
+    echo "📋 Tegra GPU信息 ($JETSON_TYPE)："
     
-    # 检查Tegra设备树信息
-    if [ -f "/proc/device-tree/gpu@57000000/compatible" ]; then
-        GPU_COMPATIBLE=$(cat /proc/device-tree/gpu@57000000/compatible 2>/dev/null | tr -d '\0')
-        echo "  GPU兼容性: $GPU_COMPATIBLE"
-    fi
+    # 根据设备类型检查GPU设备树信息
+    GPU_DEVICE_PATHS=(
+        "/proc/device-tree/gpu@${GPU_PATH}/compatible"
+        "/proc/device-tree/gpu@17000000/compatible"
+        "/proc/device-tree/gpu@57000000/compatible"
+    )
     
-    # 检查GPU频率设置
-    if [ -f "/sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/available_frequencies" ]; then
-        GPU_FREQS=$(cat /sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/available_frequencies 2>/dev/null)
-        echo "  可用频率: $GPU_FREQS"
-    fi
+    for gpu_path in "${GPU_DEVICE_PATHS[@]}"; do
+        if [ -f "$gpu_path" ]; then
+            GPU_COMPATIBLE=$(cat "$gpu_path" 2>/dev/null | tr -d '\0')
+            echo "  GPU兼容性: $GPU_COMPATIBLE"
+            break
+        fi
+    done
     
-    if [ -f "/sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/cur_freq" ]; then
-        GPU_FREQ=$(cat /sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/cur_freq 2>/dev/null)
-        echo "  当前频率: $GPU_FREQ Hz"
-    fi
+    # 检查GPU频率设置（支持不同路径）
+    GPU_FREQ_PATHS=(
+        "/sys/devices/platform/host1x/${GPU_PATH}/devfreq/${GPU_PATH}/cur_freq"
+        "/sys/devices/platform/host1x/17000000.gpu/devfreq/17000000.gpu/cur_freq"
+        "/sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/cur_freq"
+    )
+    
+    for freq_path in "${GPU_FREQ_PATHS[@]}"; do
+        if [ -f "$freq_path" ]; then
+            GPU_FREQ=$(cat "$freq_path" 2>/dev/null)
+            echo "  当前GPU频率: $GPU_FREQ Hz"
+            
+            # 也检查可用频率
+            available_freq_path="${freq_path/cur_freq/available_frequencies}"
+            if [ -f "$available_freq_path" ]; then
+                GPU_FREQS=$(cat "$available_freq_path" 2>/dev/null)
+                echo "  可用频率: $GPU_FREQS"
+            fi
+            break
+        fi
+    done
+    
+    # 检查Tegra架构信息
+    echo "📋 Tegra架构信息："
+    echo "  设备类型: $JETSON_TYPE"
+    echo "  Tegra芯片: $TEGRA_CHIP"
+    echo "  GPU路径: $GPU_PATH"
     
     # 检查3D控制器（替代显卡信息）
     echo "📋 3D控制器信息："
@@ -284,10 +356,24 @@ done
 
 # 检查Tegra GPU状态（非nvidia-smi）
 echo "🔍 检查Tegra GPU状态..."
-if [ -f "/sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/cur_freq" ]; then
-    GPU_FREQ=$(cat /sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/cur_freq 2>/dev/null)
-    echo "📋 当前GPU频率: $GPU_FREQ Hz"
-else
+
+# 支持不同Jetson设备的GPU频率路径
+GPU_FREQ_PATHS=(
+    "/sys/devices/platform/host1x/17000000.gpu/devfreq/17000000.gpu/cur_freq"
+    "/sys/devices/platform/host1x/57000000.gpu/devfreq/57000000.gpu/cur_freq"
+)
+
+GPU_FREQ_FOUND=false
+for freq_path in "${GPU_FREQ_PATHS[@]}"; do
+    if [ -f "$freq_path" ]; then
+        GPU_FREQ=$(cat "$freq_path" 2>/dev/null)
+        echo "📋 当前GPU频率: $GPU_FREQ Hz"
+        GPU_FREQ_FOUND=true
+        break
+    fi
+done
+
+if [ "$GPU_FREQ_FOUND" = false ]; then
     echo "📋 Tegra GPU: 集成在SoC中（无需nvidia-smi）"
 fi
 
@@ -484,8 +570,8 @@ main() {
         exit 1
     fi
     
-    # 检查Jetson Nano
-    if ! check_jetson_nano; then
+    # 检查Jetson设备
+    if ! check_jetson_device; then
         exit 1
     fi
     
