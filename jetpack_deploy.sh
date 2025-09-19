@@ -87,6 +87,9 @@ show_help() {
     -m, --models            自动配置和部署 AI 模型文件
     -q, --qt-deploy         启用 Qt 依赖自动收集和部署
     -c, --create-package    创建完整部署包
+    -f, --force-rebuild     强制重新编译所有组件
+    -u, --upgrade           自动升级现有部署
+    -b, --no-backup         升级时不备份当前版本
     -v, --version           显示版本信息
     -h, --help              显示此帮助信息
 
@@ -94,6 +97,8 @@ show_help() {
     $0 --install-deps --gpu-opt --power-opt        # 安装依赖并启用全部优化
     $0 --deploy jetson --models --qt-deploy        # 部署到 Jetson 并配置模型
     $0 --deploy remote:192.168.1.100 --create-package    # 创建包并部署到远程设备
+    $0 --force-rebuild --upgrade --deploy local    # 强制重新编译并升级本地部署
+    $0 --upgrade --no-backup --deploy local        # 快速升级（不备份）
 
 JetPack SDK 版本: ${JETPACK_VERSION}
 CUDA 版本: ${CUDA_VERSION}
@@ -137,6 +142,18 @@ parse_arguments() {
                 ;;
             -c|--create-package)
                 CREATE_PACKAGE="true"
+                shift
+                ;;
+            -f|--force-rebuild)
+                FORCE_REBUILD="true"
+                shift
+                ;;
+            -u|--upgrade)
+                AUTO_UPGRADE="true"
+                shift
+                ;;
+            -b|--no-backup)
+                BACKUP_CURRENT="false"
                 shift
                 ;;
             -v|--version)
@@ -941,11 +958,91 @@ EOF
     fi
 }
 
+# 检查是否需要升级现有部署
+check_upgrade_needed() {
+    if [ "$AUTO_UPGRADE" = "true" ]; then
+        log_info "检查现有部署状态..."
+        
+        # 检查是否有现有的systemd服务
+        if systemctl is-enabled bamboo-cut-jetpack >/dev/null 2>&1; then
+            log_info "检测到现有的智能切竹机服务"
+            
+            # 备份当前版本
+            if [ "$BACKUP_CURRENT" = "true" ]; then
+                backup_current_deployment
+            fi
+            
+            # 停止现有服务
+            log_info "停止现有服务..."
+            sudo systemctl stop bamboo-cut-jetpack || true
+            
+            return 0
+        else
+            log_info "未检测到现有部署，将进行全新安装"
+            return 1
+        fi
+    fi
+    return 1
+}
+
+# 备份当前部署
+backup_current_deployment() {
+    if [ -d "/opt/bamboo-cut" ]; then
+        BACKUP_DIR="/opt/bamboo-cut.backup.$(date +%Y%m%d_%H%M%S)"
+        log_info "备份当前部署到: $BACKUP_DIR"
+        
+        sudo cp -r "/opt/bamboo-cut" "$BACKUP_DIR"
+        
+        # 创建备份信息文件
+        cat > /tmp/backup_info.txt << EOF
+备份时间: $(date)
+备份路径: $BACKUP_DIR
+版本: $VERSION
+Git提交: $(git rev-parse HEAD 2>/dev/null || echo "未知")
+EOF
+        sudo mv /tmp/backup_info.txt "$BACKUP_DIR/backup_info.txt"
+        
+        log_success "当前部署已备份"
+    fi
+}
+
+# 清理构建缓存（强制重新编译时）
+clean_build_cache() {
+    if [ "$FORCE_REBUILD" = "true" ]; then
+        log_info "强制重新编译：清理构建缓存..."
+        
+        # 清理C++后端构建缓存
+        if [ -d "${BUILD_DIR}/cpp_backend" ]; then
+            rm -rf "${BUILD_DIR}/cpp_backend"
+            log_info "已清理C++后端构建缓存"
+        fi
+        
+        # 清理Qt前端构建缓存
+        if [ -d "${BUILD_DIR}/qt_frontend" ]; then
+            rm -rf "${BUILD_DIR}/qt_frontend"
+            log_info "已清理Qt前端构建缓存"
+        fi
+        
+        # 清理Qt项目内的构建目录
+        for build_dir in "${PROJECT_ROOT}/qt_frontend/build" "${PROJECT_ROOT}/qt_frontend/build_debug" "${PROJECT_ROOT}/qt_frontend/build_release"; do
+            if [ -d "$build_dir" ]; then
+                rm -rf "$build_dir"
+                log_info "已清理Qt构建目录: $(basename $build_dir)"
+            fi
+        done
+        
+        log_success "构建缓存清理完成"
+    fi
+}
+
 # 构建项目 - 修正为分别构建各子项目
 build_project() {
     log_info "构建智能切竹机项目..."
     
     cd "$PROJECT_ROOT"
+    
+    # 清理构建缓存（如果需要）
+    clean_build_cache
     
     # 创建构建目录
     mkdir -p "$BUILD_DIR"
