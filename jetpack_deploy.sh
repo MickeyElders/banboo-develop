@@ -423,7 +423,7 @@ deploy_qt_dependencies() {
         # 创建 Qt 环境设置脚本
         cat > "${QT_DEPLOY_DIR}/setup_qt_env.sh" << EOF
 #!/bin/bash
-# Qt 环境设置脚本
+# Qt 环境设置脚本 - 智能显示平台检测
 
 SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 
@@ -432,12 +432,44 @@ export QT_PLUGIN_PATH="\${SCRIPT_DIR}"
 export QML2_IMPORT_PATH="\${SCRIPT_DIR}/qml"
 export QT_QPA_PLATFORM_PLUGIN_PATH="\${SCRIPT_DIR}/platforms"
 
-# JetPack SDK 特定环境变量
-export QT_QPA_PLATFORM=eglfs
-export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
+# 设置 XDG_RUNTIME_DIR
+export XDG_RUNTIME_DIR=\${XDG_RUNTIME_DIR:-/tmp/runtime-root}
+mkdir -p "\$XDG_RUNTIME_DIR"
+chmod 700 "\$XDG_RUNTIME_DIR"
 
-echo "Qt 环境已配置完成"
+# 智能检测显示环境并设置合适的平台
+echo "🔍 检测显示环境..."
+
+if [ -n "\$DISPLAY" ] && [ "\$DISPLAY" != ":0" ]; then
+    # X11环境
+    export QT_QPA_PLATFORM=xcb
+    echo "✅ 使用X11显示: \$DISPLAY"
+elif [ -e "/dev/dri/card0" ]; then
+    # 有DRI设备，尝试使用eglfs
+    export QT_QPA_PLATFORM=eglfs
+    export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+    export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
+    export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+    echo "✅ 使用EGL KMS显示"
+elif [ -e "/dev/fb0" ]; then
+    # 有帧缓冲设备，使用linuxfb
+    export QT_QPA_PLATFORM=linuxfb
+    export QT_QPA_FB_DRM=1
+    export QT_QPA_FB_HIDECURSOR=1
+    echo "✅ 使用Linux帧缓冲显示"
+else
+    # 无显示环境，使用offscreen进行测试
+    export QT_QPA_PLATFORM=offscreen
+    echo "⚠️ 使用离屏渲染模式（无显示硬件）"
+fi
+
+# 通用Qt环境变量
+export QT_LOGGING_RULES="qt.qpa.*=true"
+export QT_QPA_EGLFS_DEBUG=1
+
+echo "✅ Qt 环境已配置完成"
+echo "   Platform: \$QT_QPA_PLATFORM"
+echo "   Runtime Dir: \$XDG_RUNTIME_DIR"
 EOF
         chmod +x "${QT_DEPLOY_DIR}/setup_qt_env.sh"
         
@@ -1506,6 +1538,34 @@ cd "$SCRIPT_DIR"
 if [ -f "./qt_libs/setup_qt_env.sh" ]; then
     source "./qt_libs/setup_qt_env.sh"
     echo "✅ Qt环境已加载"
+else
+    # 如果没有独立的Qt环境脚本，设置基础环境
+    echo "🔧 设置基础Qt环境..."
+    export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 700 "$XDG_RUNTIME_DIR"
+    
+    # 智能检测显示平台
+    if [ -n "$DISPLAY" ] && [ "$DISPLAY" != ":0" ]; then
+        export QT_QPA_PLATFORM=xcb
+        echo "✅ 使用X11显示: $DISPLAY"
+    elif [ -e "/dev/dri/card0" ]; then
+        export QT_QPA_PLATFORM=eglfs
+        export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+        export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+        echo "✅ 使用EGL KMS显示"
+    elif [ -e "/dev/fb0" ]; then
+        export QT_QPA_PLATFORM=linuxfb
+        export QT_QPA_FB_DRM=1
+        export QT_QPA_FB_HIDECURSOR=1
+        echo "✅ 使用Linux帧缓冲显示"
+    else
+        export QT_QPA_PLATFORM=offscreen
+        echo "⚠️ 使用离屏渲染模式（测试用）"
+    fi
+    
+    export QT_LOGGING_RULES="qt.qpa.*=true"
+    echo "✅ 基础Qt环境已设置"
 fi
 
 # 应用性能优化 (如果存在)
@@ -1682,17 +1742,51 @@ check_and_start_frontend() {
     fi
     
     echo "🔄 启动 Qt 前端: $qt_frontend_exec"
-    "$qt_frontend_exec" &
-    FRONTEND_PID=$!
+    echo "🔧 当前Qt环境变量："
+    echo "   QT_QPA_PLATFORM: $QT_QPA_PLATFORM"
+    echo "   XDG_RUNTIME_DIR: $XDG_RUNTIME_DIR"
+    echo "   DISPLAY: $DISPLAY"
     
-    sleep 3
-    if kill -0 $FRONTEND_PID 2>/dev/null; then
-        echo "✅ Qt 前端启动成功 (PID: $FRONTEND_PID)"
-        return 0
-    else
-        echo "⚠️ Qt 前端启动失败"
-        return 1
-    fi
+    # 尝试不同的平台模式启动Qt前端
+    qt_platforms=("eglfs" "linuxfb" "offscreen")
+    
+    for platform in "${qt_platforms[@]}"; do
+        echo "🔄 尝试使用平台: $platform"
+        
+        # 设置平台特定的环境变量
+        export QT_QPA_PLATFORM="$platform"
+        case "$platform" in
+            eglfs)
+                export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+                export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+                ;;
+            linuxfb)
+                export QT_QPA_FB_DRM=1
+                export QT_QPA_FB_HIDECURSOR=1
+                ;;
+            offscreen)
+                export QT_QPA_OFFSCREEN_NO_GLX=1
+                ;;
+        esac
+        
+        # 启动Qt前端，给它足够的时间来初始化
+        timeout 30 "$qt_frontend_exec" &
+        FRONTEND_PID=$!
+        
+        # 等待启动
+        sleep 5
+        
+        if kill -0 $FRONTEND_PID 2>/dev/null; then
+            echo "✅ Qt 前端启动成功 (PID: $FRONTEND_PID, Platform: $platform)"
+            return 0
+        else
+            echo "⚠️ 平台 $platform 启动失败，尝试下一个..."
+            wait $FRONTEND_PID 2>/dev/null || true
+        fi
+    done
+    
+    echo "❌ 所有Qt平台都启动失败"
+    return 1
 }
 
 # 主启动逻辑
