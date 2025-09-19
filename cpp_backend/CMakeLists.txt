@@ -310,6 +310,7 @@ endif()
 # 只包含实际存在的源文件
 set(SOURCES
     src/core/logger.cpp
+    src/core/system_utils.cpp
     src/vision/stereo_vision.cpp
     src/vision/detector.cpp
     src/vision/camera_manager.cpp
