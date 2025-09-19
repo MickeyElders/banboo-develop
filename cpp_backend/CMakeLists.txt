@@ -238,39 +238,74 @@ else()
     endif()
 endif()
 
-# ModbusTCP库 - 使用 FetchContent 自动下载和构建
-FetchContent_Declare(
-    libmodbus
-    GIT_REPOSITORY https://github.com/stephane/libmodbus.git
-    GIT_TAG v3.1.10  # 使用稳定版本
-    GIT_SHALLOW TRUE
-)
+# ModbusTCP库 - 优先使用系统安装版本
+message(STATUS "Looking for system libmodbus...")
 
-# 配置 libmodbus 构建选项
-set(libmodbus_BUILD_TESTS OFF CACHE BOOL "Build libmodbus tests" FORCE)
-set(libmodbus_BUILD_EXAMPLES OFF CACHE BOOL "Build libmodbus examples" FORCE)
+# 首先尝试系统安装的版本
+find_library(MODBUS_LIBRARY modbus
+    PATHS
+        /usr/lib
+        /usr/local/lib
+        /usr/lib/aarch64-linux-gnu
+        /usr/lib/x86_64-linux-gnu
+    NO_DEFAULT_PATH)
 
-# 下载并构建 libmodbus
-FetchContent_MakeAvailable(libmodbus)
+find_path(MODBUS_INCLUDE_DIR modbus/modbus.h
+    PATHS
+        /usr/include
+        /usr/local/include
+    NO_DEFAULT_PATH)
 
-if(libmodbus_POPULATED)
-    message(STATUS "libmodbus fetched and built successfully")
+if(MODBUS_LIBRARY AND MODBUS_INCLUDE_DIR)
+    message(STATUS "Found system libmodbus: ${MODBUS_LIBRARY}")
+    message(STATUS "libmodbus include dir: ${MODBUS_INCLUDE_DIR}")
     set(ENABLE_MODBUS ON)
-    set(MODBUS_LIBRARY modbus)
-    # 设置 libmodbus 的 include 路径
-    set(MODBUS_INCLUDE_DIRS ${libmodbus_SOURCE_DIR}/src)
+    set(MODBUS_INCLUDE_DIRS ${MODBUS_INCLUDE_DIR})
     include_directories(${MODBUS_INCLUDE_DIRS})
 else()
-    message(WARNING "Failed to fetch libmodbus, trying system installation")
-    # 回退到系统安装的版本
-    find_library(MODBUS_LIBRARY modbus PATHS /usr/lib /usr/local/lib)
-    if(MODBUS_LIBRARY)
-        message(STATUS "Found system libmodbus: ${MODBUS_LIBRARY}")
-        set(ENABLE_MODBUS ON)
-        # 系统安装的 libmodbus include 路径
-        include_directories(/usr/include /usr/local/include)
+    message(WARNING "System libmodbus not found, trying FetchContent as fallback...")
+    
+    # 网络可用时才尝试FetchContent
+    execute_process(
+        COMMAND ping -c 1 -W 3 github.com
+        RESULT_VARIABLE PING_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    
+    if(PING_RESULT EQUAL 0)
+        message(STATUS "Network available, trying to fetch libmodbus...")
+        
+        FetchContent_Declare(
+            libmodbus
+            GIT_REPOSITORY https://github.com/stephane/libmodbus.git
+            GIT_TAG v3.1.10  # 使用稳定版本
+            GIT_SHALLOW TRUE
+            TIMEOUT 60  # 设置超时
+        )
+
+        # 配置 libmodbus 构建选项
+        set(libmodbus_BUILD_TESTS OFF CACHE BOOL "Build libmodbus tests" FORCE)
+        set(libmodbus_BUILD_EXAMPLES OFF CACHE BOOL "Build libmodbus examples" FORCE)
+
+        # 尝试下载并构建 libmodbus
+        FetchContent_MakeAvailable(libmodbus)
+
+        if(libmodbus_POPULATED)
+            message(STATUS "libmodbus fetched and built successfully")
+            set(ENABLE_MODBUS ON)
+            set(MODBUS_LIBRARY modbus)
+            set(MODBUS_INCLUDE_DIRS ${libmodbus_SOURCE_DIR}/src)
+            include_directories(${MODBUS_INCLUDE_DIRS})
+        else()
+            message(WARNING "Failed to fetch libmodbus")
+            set(ENABLE_MODBUS OFF)
+        endif()
     else()
-        message(WARNING "libmodbus not found, will use custom implementation")
+        message(WARNING "Network not available or GitHub unreachable")
+        message(WARNING "libmodbus not found, Modbus functionality will be disabled")
+        message(WARNING "To enable Modbus support, install libmodbus-dev:")
+        message(WARNING "  Ubuntu/Debian: sudo apt-get install libmodbus-dev")
         set(ENABLE_MODBUS OFF)
     endif()
 endif()
