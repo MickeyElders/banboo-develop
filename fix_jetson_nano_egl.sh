@@ -51,27 +51,33 @@ fi
 
 # 日志函数
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    printf "${BLUE}[INFO]${NC} %s\n" "$1"
+    sync
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    printf "${GREEN}[SUCCESS]${NC} %s\n" "$1"
+    sync
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    printf "${YELLOW}[WARNING]${NC} %s\n" "$1"
+    sync
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    printf "${RED}[ERROR]${NC} %s\n" "$1"
+    sync
 }
 
 log_jetpack() {
-    echo -e "${PURPLE}[JETPACK]${NC} $1"
+    printf "${PURPLE}[JETPACK]${NC} %s\n" "$1"
+    sync
 }
 
 log_qt() {
-    echo -e "${CYAN}[QT-DEPLOY]${NC} $1"
+    printf "${CYAN}[QT-DEPLOY]${NC} %s\n" "$1"
+    sync
 }
 
 # 显示帮助信息
@@ -276,8 +282,9 @@ force_stop_all_services() {
     done
     
     # 清理可能的僵尸进程和孤儿进程
-    sudo pkill -KILL -f "bamboo" 2>/dev/null || true
-    sudo pkill -KILL -f "start_bamboo" 2>/dev/null || true
+    log_warning "清理残留进程..."
+    sudo pkill -KILL -f "bamboo" >/dev/null 2>&1 || true
+    sudo pkill -KILL -f "start_bamboo" >/dev/null 2>&1 || true
     
     # 重新加载systemd以清理失败状态
     sudo systemctl daemon-reload
