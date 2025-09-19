@@ -318,7 +318,9 @@ bool SystemUtils::isCommandSafe(const std::string& command) {
     // 只允许特定的安全命令
     std::vector<std::string> allowed_commands = {
         "which", "lsmod", "grep", "ls", "cat", "echo",
-        "nvarguscamerasrc", "gst-inspect", "v4l2-ctl"
+        "nvarguscamerasrc", "gst-inspect", "v4l2-ctl",
+        "lsusb", "dmesg", "i2cdetect", "find", "modprobe",
+        "v4l2-compliance", "media-ctl", "test", "stat"
     };
     
     auto tokens = tokenizeCommand(command);

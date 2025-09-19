@@ -1024,15 +1024,30 @@ exit 1' > "$PACKAGE_DIR/bamboo_cut_backend"
             chmod +x "$PACKAGE_DIR/bamboo_cut_backend"
         fi
         
-        if [ -f "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" ]; then
-            cp "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend" "$PACKAGE_DIR/"
-            echo "✅ Qt前端可执行文件已复制"
-        else
+        # 检查Qt前端可执行文件（支持多种可能的名称）
+        qt_frontend_found=false
+        qt_frontend_candidates=(
+            "${BUILD_DIR}/qt_frontend/bamboo_controller_qt"
+            "${BUILD_DIR}/qt_frontend/bamboo_cut_frontend"
+            "${PROJECT_ROOT}/qt_frontend/build/bamboo_controller_qt"
+            "${PROJECT_ROOT}/qt_frontend/build_release/bamboo_controller_qt"
+        )
+        
+        for candidate in "${qt_frontend_candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+                cp "$candidate" "$PACKAGE_DIR/bamboo_controller_qt"
+                echo "✅ Qt前端可执行文件已复制: $(basename $candidate) -> bamboo_controller_qt"
+                qt_frontend_found=true
+                break
+            fi
+        done
+        
+        if [ "$qt_frontend_found" = false ]; then
             echo "⚠️ Qt前端可执行文件不存在，创建占位符"
             echo '#!/bin/bash
 echo "Qt前端尚未编译，请先编译项目"
-exit 1' > "$PACKAGE_DIR/bamboo_cut_frontend"
-            chmod +x "$PACKAGE_DIR/bamboo_cut_frontend"
+exit 1' > "$PACKAGE_DIR/bamboo_controller_qt"
+            chmod +x "$PACKAGE_DIR/bamboo_controller_qt"
         fi
         
         # 复制配置文件
@@ -1226,13 +1241,24 @@ check_and_start_backend() {
 }
 
 check_and_start_frontend() {
-    if [ ! -f "./bamboo_cut_frontend" ] || [ ! -x "./bamboo_cut_frontend" ]; then
+    # 检查Qt前端可执行文件（支持多种可能的名称）
+    qt_frontend_exec=""
+    qt_frontend_candidates=("./bamboo_controller_qt" "./bamboo_cut_frontend")
+    
+    for candidate in "${qt_frontend_candidates[@]}"; do
+        if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+            qt_frontend_exec="$candidate"
+            break
+        fi
+    done
+    
+    if [ -z "$qt_frontend_exec" ]; then
         echo "⚠️ Qt前端可执行文件不存在，仅运行后端模式"
         return 1
     fi
     
-    echo "🔄 启动 Qt 前端..."
-    ./bamboo_cut_frontend &
+    echo "🔄 启动 Qt 前端: $qt_frontend_exec"
+    "$qt_frontend_exec" &
     FRONTEND_PID=$!
     
     sleep 3
@@ -1428,11 +1454,23 @@ main() {
     # 如果启用了Qt部署，确保Qt前端已编译
     if [ "$ENABLE_QT_DEPLOY" = "true" ]; then
         log_qt "检查Qt前端编译状态..."
-        # 检查编译输出位置
-        QT_FRONTEND_RELEASE="${PROJECT_ROOT}/qt_frontend/build/bamboo_cut_frontend"
-        QT_FRONTEND_DEBUG="${PROJECT_ROOT}/qt_frontend/build_debug/bamboo_cut_frontend"
+        # 检查编译输出位置（支持正确的可执行文件名）
+        QT_FRONTEND_CANDIDATES=(
+            "${PROJECT_ROOT}/qt_frontend/build/bamboo_controller_qt"
+            "${PROJECT_ROOT}/qt_frontend/build_debug/bamboo_controller_qt"
+            "${PROJECT_ROOT}/qt_frontend/build_release/bamboo_controller_qt"
+            "${BUILD_DIR}/qt_frontend/bamboo_controller_qt"
+        )
         
-        if [ ! -f "$QT_FRONTEND_RELEASE" ] && [ ! -f "$QT_FRONTEND_DEBUG" ]; then
+        qt_exists=false
+        for candidate in "${QT_FRONTEND_CANDIDATES[@]}"; do
+            if [ -f "$candidate" ]; then
+                qt_exists=true
+                break
+            fi
+        done
+        
+        if [ "$qt_exists" = false ]; then
             log_qt "Qt前端未编译，开始编译..."
             cd "$PROJECT_ROOT"
             
@@ -1451,22 +1489,22 @@ main() {
             
             # 复制到BUILD_DIR以便后续使用
             mkdir -p "${BUILD_DIR}/qt_frontend"
-            if [ -f "$QT_FRONTEND_RELEASE" ]; then
-                cp "$QT_FRONTEND_RELEASE" "${BUILD_DIR}/qt_frontend/"
-            elif [ -f "$QT_FRONTEND_DEBUG" ]; then
-                cp "$QT_FRONTEND_DEBUG" "${BUILD_DIR}/qt_frontend/"
-            fi
+            for candidate in "${QT_FRONTEND_CANDIDATES[@]}"; do
+                if [ -f "$candidate" ]; then
+                    cp "$candidate" "${BUILD_DIR}/qt_frontend/bamboo_controller_qt"
+                    break
+                fi
+            done
         else
             log_qt "Qt前端已编译"
             
             # 确保复制到BUILD_DIR
             mkdir -p "${BUILD_DIR}/qt_frontend"
-            if [ -f "$QT_FRONTEND_RELEASE" ]; then
-                cp "$QT_FRONTEND_RELEASE" "${BUILD_DIR}/qt_frontend/" 2>/dev/null || true
-            fi
-            if [ -f "$QT_FRONTEND_DEBUG" ]; then
-                cp "$QT_FRONTEND_DEBUG" "${BUILD_DIR}/qt_frontend/" 2>/dev/null || true
-            fi
+            for candidate in "${QT_FRONTEND_CANDIDATES[@]}"; do
+                if [ -f "$candidate" ]; then
+                    cp "$candidate" "${BUILD_DIR}/qt_frontend/bamboo_controller_qt" 2>/dev/null || true
+                fi
+            done
         fi
     fi
     
