@@ -139,6 +139,39 @@ cleanup_old_versions() {
         fi
     done
     
+    # 杀死占用显示器的关键进程
+    print_info "检查并终止占用显示器的进程..."
+    local display_processes=(
+        "yegra"
+        "camrtc"
+        "capture-control"
+        "capture"
+        "vi-output"
+        "nvidiaPvaAllowd"
+        "gnome-shell"
+        "unity"
+        "xorg"
+        "wayland"
+        "gdm"
+        "lightdm"
+        "sddm"
+    )
+    
+    for process in "${display_processes[@]}"; do
+        if pgrep -f "$process" > /dev/null; then
+            print_warn "发现占用显示器的进程: $process"
+            pkill -f "$process" 2>/dev/null || true
+            sleep 1
+        fi
+    done
+    
+    # 特别处理vi-output进程
+    if pgrep -f "vi-output" > /dev/null; then
+        print_warn "强制终止vi-output进程..."
+        pkill -9 -f "vi-output" 2>/dev/null || true
+        sleep 2
+    fi
+    
     # 清理构建缓存和临时文件
     print_info "清理构建缓存..."
     local cleanup_dirs=(
@@ -292,6 +325,66 @@ setup_permissions() {
     print_success "权限设置完成"
 }
 
+# 配置framebuffer和显示器
+configure_framebuffer() {
+    print_step "配置framebuffer和显示器..."
+    
+    # 检查framebuffer设备
+    if [[ ! -e "/dev/fb0" ]]; then
+        print_error "找不到framebuffer设备 /dev/fb0"
+        exit 1
+    fi
+    
+    # 显示framebuffer信息
+    print_info "Framebuffer设备信息:"
+    if command -v fbset >/dev/null 2>&1; then
+        fbset -fb /dev/fb0 | head -10
+    else
+        ls -la /dev/fb* 2>/dev/null || true
+        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null || echo "无法获取framebuffer尺寸"
+    fi
+    
+    # 设置framebuffer环境变量
+    export FRAMEBUFFER=/dev/fb0
+    export DISPLAY=""
+    export WAYLAND_DISPLAY=""
+    export XDG_SESSION_TYPE=""
+    export QT_QPA_PLATFORM=""
+    
+    # 配置framebuffer权限
+    print_info "配置framebuffer权限..."
+    chmod 666 /dev/fb* 2>/dev/null || true
+    chmod 666 /dev/input/event* 2>/dev/null || true
+    chmod 666 /dev/tty* 2>/dev/null || true
+    
+    # 停止所有可能干扰的显示服务
+    print_info "停止显示服务..."
+    systemctl stop gdm3 2>/dev/null || true
+    systemctl stop lightdm 2>/dev/null || true
+    systemctl stop sddm 2>/dev/null || true
+    systemctl stop xdm 2>/dev/null || true
+    
+    # 禁用console光标和文本显示
+    print_info "配置console显示..."
+    echo 0 > /sys/class/graphics/fbcon/cursor_blink 2>/dev/null || true
+    
+    # 解绑console from framebuffer
+    echo 0 > /sys/class/vtconsole/vtcon0/bind 2>/dev/null || true
+    echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true
+    
+    # 清空framebuffer
+    print_info "清空framebuffer..."
+    if command -v dd >/dev/null 2>&1; then
+        dd if=/dev/zero of=/dev/fb0 bs=1024 count=8192 2>/dev/null || true
+    fi
+    
+    # 检查并释放其他可能占用framebuffer的进程
+    print_info "检查framebuffer占用情况..."
+    lsof /dev/fb0 2>/dev/null || true
+    
+    print_success "Framebuffer配置完成"
+}
+
 # 启动应用程序
 start_application() {
     print_step "启动LVGL前端应用..."
@@ -303,9 +396,11 @@ start_application() {
         exit 1
     fi
     
+    # 配置framebuffer
+    configure_framebuffer
+    
     # 设置环境变量
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
-    export DISPLAY=${DISPLAY:-:0}
     
     # 配置文件路径
     local config_file="resources/config/default_config.json"
