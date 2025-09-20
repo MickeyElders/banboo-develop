@@ -593,9 +593,9 @@ EOF
     log_success "Jetson 库环境配置完成"
 }
 
-# 创建KMS配置
+# 创建Jetson专用KMS配置
 create_kms_config() {
-    log_jetpack "创建 KMS 配置..."
+    log_jetpack "创建 Jetson 专用 KMS 配置..."
     
     mkdir -p "${JETPACK_DEPLOY_DIR}/config"
     
@@ -614,50 +614,27 @@ create_kms_config() {
         fi
     fi
     
-    # 根据设备类型创建KMS配置
-    case "$JETSON_TYPE" in
-        "orin"*|"agx-orin")
-            KMS_CONFIG="{
-  \"device\": \"/dev/dri/card0\",
-  \"hwcursor\": true,
-  \"pbuffers\": true,
-  \"outputs\": [
-    {
-      \"name\": \"DP-1\",
-      \"mode\": \"$DISPLAY_MODE\",
-      \"primary\": true
-    },
-    {
-      \"name\": \"HDMI-A-1\",
-      \"mode\": \"$DISPLAY_MODE\",
-      \"primary\": false
-    }
-  ]
-}"
-            ;;
-        *)
-            KMS_CONFIG="{
+    # 创建系统级Jetson KMS配置文件
+    JETSON_KMS_CONFIG="{
   \"device\": \"/dev/dri/card0\",
   \"hwcursor\": false,
   \"pbuffers\": true,
   \"outputs\": [
     {
-      \"name\": \"HDMI-A-1\",
-      \"mode\": \"$DISPLAY_MODE\",
-      \"primary\": true
-    },
-    {
       \"name\": \"DP-1\",
-      \"mode\": \"$DISPLAY_MODE\",
-      \"primary\": false
+      \"mode\": \"$DISPLAY_MODE\"
     }
   ]
 }"
-            ;;
-    esac
     
-    echo "$KMS_CONFIG" > "${JETPACK_DEPLOY_DIR}/config/kms.conf"
-    log_success "KMS 配置已创建 (${DISPLAY_MODE})"
+    # 写入系统配置文件
+    echo "$JETSON_KMS_CONFIG" | sudo tee /etc/qt_eglfs_kms_jetson.json > /dev/null
+    
+    # 同时保留本地配置文件作为备份
+    echo "$JETSON_KMS_CONFIG" > "${JETPACK_DEPLOY_DIR}/config/kms.conf"
+    
+    log_success "Jetson KMS 配置已创建 (${DISPLAY_MODE})"
+    log_info "系统配置文件: /etc/qt_eglfs_kms_jetson.json"
 }
 
 # 创建无超时的启动脚本
@@ -683,28 +660,16 @@ export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
-# Qt 配置 (增强版)
+# Qt 配置 (Jetson专用)
 export QT_QPA_PLATFORM=eglfs
 export QT_QPA_EGLFS_INTEGRATION=eglfs_kms_egldevice
-export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
-export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
-export QT_QPA_EGLFS_HIDECURSOR=1
-export QT_QPA_EGLFS_FORCE_888=1
-export QT_QPA_EGLFS_DISABLE_INPUT=0
-export QT_QPA_FONTDIR=/usr/share/fonts
-export QT_QPA_GENERIC_PLUGINS=evdevtouch,evdevkeyboard,evdevmouse
-
-# 强制使用EGL设备模式
+export QT_QPA_EGLFS_KMS_CONFIG=/etc/qt_eglfs_kms_jetson.json
 export QT_QPA_EGLFS_KMS_ATOMIC=1
-export QT_QPA_EGLFS_KMS_HEADLESS=0
+export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
 
 # 确保X11不干扰
 unset DISPLAY
 unset WAYLAND_DISPLAY
-
-# OpenGL配置
-export MESA_GL_VERSION_OVERRIDE=3.3
-export MESA_GLSL_VERSION_OVERRIDE=330
 
 # 设备权限
 for device in /dev/dri/card0 /dev/dri/renderD128 /dev/nvidia0 /dev/nvidiactl; do
