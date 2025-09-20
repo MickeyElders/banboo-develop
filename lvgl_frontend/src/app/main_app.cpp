@@ -34,10 +34,12 @@ bool MainApp::initialize() {
             return false;
         }
         
+        // 初始化GUI界面
+        setup_gui();
+        
         // TODO: 初始化其他组件
         // setup_camera();
         // setup_ai_detector();
-        // setup_gui();
         // setup_touch_input();
         
         initialized_ = true;
@@ -88,7 +90,12 @@ void MainApp::process_events() {
 }
 
 void MainApp::setup_gui() {
-    // TODO: 设置LVGL GUI
+    printf("设置LVGL GUI界面...\n");
+    
+    // GUI界面已经在lvgl_display_init()中的create_test_ui()函数中创建
+    // 这里可以添加额外的GUI组件或事件处理
+    
+    printf("LVGL GUI界面设置完成\n");
 }
 
 void MainApp::setup_camera() {
