@@ -627,7 +627,8 @@ main() {
         if [[ "$clean_build" == "true" ]]; then
             print_info "清理模式：将重新构建项目"
         fi
-        build_project
+        build_backend
+        build_frontend
         
         if [[ "$install_system" == "true" ]]; then
             print_step "安装到系统..."
@@ -641,7 +642,8 @@ main() {
     # 根据参数决定是否启动
     if [[ "$build_only" != "true" ]]; then
         setup_permissions
-        start_application
+        start_backend
+        start_frontend
     else
         print_success "构建完成！"
         print_info "可执行文件位置: $FRONTEND_DIR/build/$BINARY_NAME"
