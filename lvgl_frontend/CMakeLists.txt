@@ -99,6 +99,9 @@ set(SOURCES
     src/camera/cuda_processor.cpp
     src/camera/camera_manager.cpp
     
+    # 后端通信系统
+    src/backend/backend_client.cpp
+    
     # AI推理系统
     src/ai/tensorrt_engine.cpp
     src/ai/yolo_detector.cpp

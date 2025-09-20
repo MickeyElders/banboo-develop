@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# 智能切竹机控制系统 - LVGL前端一键启动脚本
+# 智能切竹机控制系统 - 完整系统启动脚本
 # 版本: 2.0.0
 # 作者: BambooTech开发团队
+# 包含C++后端和LVGL前端
 
 set -e  # 遇到错误时退出
 
@@ -16,10 +17,13 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 项目配置
-PROJECT_NAME="智能切竹机控制系统 - LVGL版本"
+PROJECT_NAME="智能切竹机控制系统 - C++后端+LVGL前端"
 FRONTEND_DIR="lvgl_frontend"
+BACKEND_DIR="cpp_backend"
 BUILD_DIR="$FRONTEND_DIR/build"
+BACKEND_BUILD_DIR="$BACKEND_DIR/build"
 BINARY_NAME="bamboo_controller_lvgl"
+BACKEND_BINARY="bamboo_cut_backend"
 INSTALL_PREFIX="/opt/bamboo"
 
 # 打印函数
@@ -68,6 +72,12 @@ check_environment() {
     else
         print_warn "当前不是Jetson设备，部分功能可能受限"
         export JETSON_DEVICE=false
+    fi
+    
+    # 检查项目目录结构
+    if [[ ! -d "$BACKEND_DIR" ]] || [[ ! -d "$FRONTEND_DIR" ]]; then
+        print_error "请在项目根目录运行此脚本"
+        exit 1
     fi
     
     # 检查基础工具
@@ -121,7 +131,7 @@ cleanup_old_versions() {
     print_step "清理老版本进程和配置..."
     
     # 停止可能运行的老版本进程
-    local process_names=("bamboo_controller_lvgl" "bamboo_controller" "qt_frontend")
+    local process_names=("bamboo_controller_lvgl" "bamboo_controller" "qt_frontend" "bamboo_cut_backend")
     for process in "${process_names[@]}"; do
         if pgrep -f "$process" > /dev/null; then
             print_warn "发现运行中的进程: $process"
@@ -292,9 +302,37 @@ initialize_frontend() {
     print_success "前端初始化完成"
 }
 
-# 构建项目
-build_project() {
+# 构建C++后端
+build_backend() {
+    print_step "构建C++后端项目..."
+    
+    cd "$BACKEND_DIR"
+    
+    # 创建构建目录
+    if [[ ! -d "build" ]]; then
+        mkdir build
+    fi
+    
+    cd build
+    
+    # CMake配置
+    print_info "配置后端CMake..."
+    cmake .. -DCMAKE_BUILD_TYPE=Release
+    
+    # 编译
+    print_info "编译后端项目..."
+    local num_cores=$(nproc)
+    make -j$num_cores
+    
+    cd ../..
+    print_success "C++后端构建完成"
+}
+
+# 构建LVGL前端
+build_frontend() {
     print_step "构建LVGL前端项目..."
+    
+    cd "$FRONTEND_DIR"
     
     # 清理旧的构建
     if [[ -d "build" ]]; then
@@ -307,7 +345,7 @@ build_project() {
     cd build
     
     # CMake配置
-    print_info "配置CMake..."
+    print_info "配置前端CMake..."
     local cmake_args=(
         "-DCMAKE_BUILD_TYPE=Release"
         "-DCMAKE_CXX_STANDARD=17"
@@ -333,13 +371,13 @@ build_project() {
     cmake "${cmake_args[@]}" ..
     
     # 编译
-    print_info "编译项目..."
+    print_info "编译前端项目..."
     local num_cores=$(nproc)
     print_info "使用 $num_cores 个CPU核心进行编译"
     make -j$num_cores
     
-    cd ..
-    print_success "项目构建完成"
+    cd ../..
+    print_success "LVGL前端构建完成"
 }
 
 # 设置权限
@@ -424,14 +462,46 @@ configure_framebuffer() {
     print_success "Framebuffer配置完成"
 }
 
-# 启动应用程序
-start_application() {
+# 启动C++后端
+start_backend() {
+    print_step "启动C++后端..."
+    
+    # 检查后端可执行文件
+    local backend_binary_path="$BACKEND_DIR/build/$BACKEND_BINARY"
+    if [[ ! -f "$backend_binary_path" ]]; then
+        print_error "找不到后端可执行文件: $backend_binary_path"
+        exit 1
+    fi
+    
+    # 启动后端进程
+    cd "$BACKEND_DIR/build"
+    print_info "启动后端进程..."
+    nohup "./$BACKEND_BINARY" > ../../backend.log 2>&1 &
+    local backend_pid=$!
+    cd ../..
+    
+    # 等待后端启动
+    sleep 3
+    
+    if kill -0 $backend_pid 2>/dev/null; then
+        print_success "C++后端启动成功 (PID: $backend_pid)"
+        echo $backend_pid > backend.pid
+    else
+        print_error "C++后端启动失败，检查backend.log"
+        exit 1
+    fi
+}
+
+# 启动LVGL前端
+start_frontend() {
     print_step "启动LVGL前端应用..."
+    
+    cd "$FRONTEND_DIR"
     
     # 检查可执行文件
     local binary_path="build/$BINARY_NAME"
     if [[ ! -f "$binary_path" ]]; then
-        print_error "找不到可执行文件: $binary_path"
+        print_error "找不到前端可执行文件: $binary_path"
         exit 1
     fi
     
@@ -448,13 +518,14 @@ start_application() {
         config_file=""
     fi
     
-    print_success "正在启动应用程序..."
-    print_info "可执行文件: $binary_path"
+    print_success "正在启动前端应用程序..."
+    print_info "前端可执行文件: $binary_path"
+    print_info "后端日志: backend.log"
     print_info "配置文件: ${config_file:-"使用默认配置"}"
     print_info "按 Ctrl+C 退出应用程序"
     echo
     
-    # 启动应用程序
+    # 启动前端应用程序
     if [[ -n "$config_file" ]]; then
         exec "./$binary_path" -c "$config_file" -f
     else
