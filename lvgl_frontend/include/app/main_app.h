@@ -11,7 +11,7 @@
 
 class ConfigManager;
 class EventManager;
-class CameraManager;
+class Camera_manager;
 class Yolo_detector;
 class Video_view;
 // TouchController使用C风格函数，不需要类声明
@@ -35,7 +35,7 @@ private:
 
     // 核心组件
     std::unique_ptr<EventManager> event_manager_;
-    std::unique_ptr<CameraManager> camera_manager_;
+    std::unique_ptr<Camera_manager> camera_manager_;
     std::unique_ptr<Yolo_detector> ai_detector_;
     std::unique_ptr<Video_view> video_renderer_;
     // TouchController使用C风格函数，不需要unique_ptr

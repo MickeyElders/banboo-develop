@@ -131,13 +131,13 @@ void print_system_info() {
     printf("================================\n");
     
     // 打印CPU信息
-    system("cat /proc/cpuinfo | grep 'model name' | head -1");
+    (void)system("cat /proc/cpuinfo | grep 'model name' | head -1");
     
-    // 打印内存信息  
-    system("cat /proc/meminfo | grep 'MemTotal'");
+    // 打印内存信息
+    (void)system("cat /proc/meminfo | grep 'MemTotal'");
     
     // 打印GPU信息
-    system("nvidia-smi -L 2>/dev/null || echo '未检测到NVIDIA GPU'");
+    (void)system("nvidia-smi -L 2>/dev/null || echo '未检测到NVIDIA GPU'");
     
     printf("================================\n");
 }
@@ -220,7 +220,7 @@ int main(int argc, char* argv[]) {
     }
     
     /* 创建主应用程序 */
-    g_app = new MainApp(config);
+    g_app = new MainApp(config.get_config());
     if (!g_app->initialize()) {
         fprintf(stderr, "错误: 应用程序初始化失败\n");
         delete g_app;
