@@ -152,11 +152,37 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
         "/opt/nvidia/vpi2/lib64"
     )
     
-    # 设置库搜索路径
-    link_directories(${CUDA_LIB_PATHS} ${TENSORRT_LIB_PATHS})
+    # 使用find_library确保库文件存在并获取完整路径
+    find_library(CUDART_LIB cudart PATHS ${CUDA_LIB_PATHS} NO_DEFAULT_PATH)
+    find_library(CUBLAS_LIB cublas PATHS ${CUDA_LIB_PATHS} NO_DEFAULT_PATH)
+    find_library(CURAND_LIB curand PATHS ${CUDA_LIB_PATHS} NO_DEFAULT_PATH)
+    find_library(NVINFER_LIB nvinfer PATHS ${TENSORRT_LIB_PATHS} NO_DEFAULT_PATH)
+    find_library(NVONNXPARSER_LIB nvonnxparser PATHS ${TENSORRT_LIB_PATHS} NO_DEFAULT_PATH)
     
+    # 检查库是否找到
     message(STATUS "Jetson Orin NX detected - configuring CUDA 12.6 libraries")
     message(STATUS "CUDA library paths: ${CUDA_LIB_PATHS}")
+    message(STATUS "Found CUDART: ${CUDART_LIB}")
+    message(STATUS "Found CUBLAS: ${CUBLAS_LIB}")
+    message(STATUS "Found CURAND: ${CURAND_LIB}")
+    message(STATUS "Found NVINFER: ${NVINFER_LIB}")
+    message(STATUS "Found NVONNXPARSER: ${NVONNXPARSER_LIB}")
+    
+    # 如果找不到库，显示警告并使用备用方案
+    if(NOT CUDART_LIB)
+        message(WARNING "CUDART library not found, trying fallback search")
+        find_library(CUDART_LIB cudart)
+    endif()
+    
+    if(NOT CUBLAS_LIB)
+        message(WARNING "CUBLAS library not found, trying fallback search")
+        find_library(CUBLAS_LIB cublas)
+    endif()
+    
+    if(NOT CURAND_LIB)
+        message(WARNING "CURAND library not found, trying fallback search")
+        find_library(CURAND_LIB curand)
+    endif()
 endif()
 
 # 链接库
@@ -171,15 +197,37 @@ target_link_libraries(bamboo_controller_lvgl
 
 # Jetson设备的CUDA和TensorRT库
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    target_link_libraries(bamboo_controller_lvgl
-        PRIVATE
-        cudart
-        cublas
-        curand
-        nvinfer
-        nvonnxparser
-    )
-    message(STATUS "CUDA and TensorRT libraries linked for Jetson")
+    # 只链接找到的库
+    set(JETSON_LIBS)
+    
+    if(CUDART_LIB)
+        list(APPEND JETSON_LIBS ${CUDART_LIB})
+    endif()
+    
+    if(CUBLAS_LIB)
+        list(APPEND JETSON_LIBS ${CUBLAS_LIB})
+    endif()
+    
+    if(CURAND_LIB)
+        list(APPEND JETSON_LIBS ${CURAND_LIB})
+    endif()
+    
+    if(NVINFER_LIB)
+        list(APPEND JETSON_LIBS ${NVINFER_LIB})
+    endif()
+    
+    if(NVONNXPARSER_LIB)
+        list(APPEND JETSON_LIBS ${NVONNXPARSER_LIB})
+    endif()
+    
+    if(JETSON_LIBS)
+        target_link_libraries(bamboo_controller_lvgl PRIVATE ${JETSON_LIBS})
+        message(STATUS "CUDA and TensorRT libraries linked for Jetson: ${JETSON_LIBS}")
+    else()
+        message(WARNING "No CUDA/TensorRT libraries found - AI功能将被禁用")
+        # 暂时禁用CUDA和TensorRT相关的编译定义
+        target_compile_definitions(bamboo_controller_lvgl PRIVATE DISABLE_CUDA DISABLE_TENSORRT)
+    endif()
 endif()
 
 # 编译定义
