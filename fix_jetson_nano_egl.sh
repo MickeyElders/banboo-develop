@@ -682,38 +682,150 @@ if [ ! -f "/usr/lib/aarch64-linux-gnu/libEGL.so" ]; then
         qt6-declarative-dev
 fi
 
-# 3. 确保DRM设备权限
+# 3. 检查内核显示状态
+echo "🔍 检查内核显示状态..."
+echo "DRM/显示相关内核消息:"
+dmesg | grep -i -E "(drm|tegra|display|hdmi|connector)" | tail -10
+
+echo "连接器状态:"
+find /sys/class/drm -name "*status" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null | head -20
+
+echo "可用显示模式:"
+find /sys/class/drm -name "*modes" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null | head -20
+
+# 4. 检测分离式触摸屏设备
+echo "🖱️ 检测分离式触摸屏设备..."
+
+# 检查HDMI显示连接
+HDMI_CONNECTED=false
+if [ -f "/sys/class/drm/card0-HDMI-A-1/status" ]; then
+    HDMI_STATUS=$(cat /sys/class/drm/card0-HDMI-A-1/status 2>/dev/null)
+    if [ "$HDMI_STATUS" = "connected" ]; then
+        HDMI_CONNECTED=true
+        echo "✅ HDMI显示已连接"
+    fi
+fi
+
+# 检查USB触摸设备
+TOUCH_DEVICE=""
+USB_TOUCH_FOUND=false
+
+# 检查常见的USB触摸设备路径
+TOUCH_CANDIDATES=(
+    "/dev/input/event0"
+    "/dev/input/event1"
+    "/dev/input/event2"
+    "/dev/input/event3"
+)
+
+echo "🔍 搜索USB触摸设备..."
+for event_device in "${TOUCH_CANDIDATES[@]}"; do
+    if [ -e "$event_device" ]; then
+        # 检查设备信息
+        DEVICE_INFO=$(udevadm info --name="$event_device" 2>/dev/null | grep -E "(ID_INPUT_TOUCHSCREEN|ID_INPUT_TABLET|ID_VENDOR)" || true)
+        if [[ "$DEVICE_INFO" == *"ID_INPUT_TOUCHSCREEN=1"* ]] || [[ "$DEVICE_INFO" == *"ID_INPUT_TABLET=1"* ]]; then
+            TOUCH_DEVICE="$event_device"
+            USB_TOUCH_FOUND=true
+            echo "✅ 找到USB触摸设备: $event_device"
+            echo "   设备信息: $DEVICE_INFO"
+            break
+        fi
+    fi
+done
+
+# 如果没找到触摸设备，列出所有input设备供调试
+if [ "$USB_TOUCH_FOUND" = false ]; then
+    echo "⚠️ 未找到USB触摸设备，列出所有input设备:"
+    ls -la /dev/input/event* 2>/dev/null | head -10
+    echo "USB设备信息:"
+    lsusb | grep -i -E "(touch|tablet|hid)" | head -5
+    # 默认尝试第一个event设备
+    if [ -e "/dev/input/event0" ]; then
+        TOUCH_DEVICE="/dev/input/event0"
+        echo "🔄 默认使用: $TOUCH_DEVICE"
+    fi
+fi
+
+# 配置分离式触摸屏的Qt环境变量
+if [ "$USB_TOUCH_FOUND" = true ] || [ -n "$TOUCH_DEVICE" ]; then
+    echo "⚙️ 配置分离式触摸屏..."
+    
+    # 设置触摸设备
+    export QT_QPA_GENERIC_PLUGINS="evdevtouch:$TOUCH_DEVICE"
+    export QT_QPA_EVDEV_TOUCH_DEVICE="$TOUCH_DEVICE"
+    
+    # 分离式配置：HDMI显示 + USB触摸
+    export QT_QPA_EGLFS_HIDECURSOR=1
+    export QT_QPA_EGLFS_DISABLE_INPUT=0
+    
+    echo "✅ 分离式触摸屏配置完成:"
+    echo "   显示: HDMI"
+    echo "   触摸: $TOUCH_DEVICE"
+else
+    echo "⚠️ 未检测到触摸设备，使用标准配置"
+    export QT_QPA_GENERIC_PLUGINS="evdevtouch"
+fi
+
+# 5. 强制启用Jetson显示连接器
+echo "🔧 强制启用Jetson显示连接器..."
+
+# 重新初始化显示子系统
+sudo sh -c 'echo "U:1920x1200p-0" > /sys/class/graphics/fb0/mode' 2>/dev/null || true
+sudo sh -c 'echo "0" > /sys/class/graphics/fb0/blank' 2>/dev/null || true
+
+# 强制检测连接的显示器
+if [ -d "/sys/class/drm" ]; then
+    for connector in /sys/class/drm/card*; do
+        if [ -f "$connector/status" ]; then
+            echo "检测连接器: $connector"
+            echo "connected" | sudo tee "$connector/status" 2>/dev/null || true
+        fi
+    done
+fi
+
+# 重新加载DRM模块来刷新连接器状态
+echo "🔄 重新加载DRM驱动..."
+sudo modprobe -r tegra_drm 2>/dev/null || true
+sleep 2
+sudo modprobe tegra_drm 2>/dev/null || true
+sleep 3
+
+# 5. 确保DRM设备权限
 echo "🔧 配置DRM设备权限..."
 sudo chmod 666 /dev/dri/card0 2>/dev/null || true
 sudo chmod 666 /dev/dri/renderD128 2>/dev/null || true
 sudo chmod 666 /dev/nvidia0 2>/dev/null || true
 sudo chmod 666 /dev/nvidiactl 2>/dev/null || true
 
-# 4. 配置库路径
+# 6. 配置库路径
 export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
 
-# 5. 使用EGLDevice模式（绕过连接器检测）
+# 7. 使用EGLDevice模式（绕过连接器检测）
 export QT_QPA_PLATFORM=eglfs
 export QT_QPA_EGLFS_INTEGRATION=eglfs_kms_egldevice
 export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
 export QT_QPA_EGLFS_KMS_ATOMIC=1
 export QT_QPA_GENERIC_PLUGINS=evdevtouch
 
-# 6. 强制使用Tegra GPU
+# 8. 强制使用Tegra GPU
 export __GL_SYNC_TO_VBLANK=1
 export __GL_MaxFramesAllowed=1
 
-# 7. EGL调试（可选）
+# 9. EGL调试（增强版）
 export QT_LOGGING_RULES="qt.qpa.eglfs.kms=true"
 
 # 确保X11不干扰
 unset DISPLAY
 unset WAYLAND_DISPLAY
 
-echo "📺 EGLFS配置完成:"
+echo "📺 EGLFS强制连接器模式配置完成:"
 echo "  平台: $QT_QPA_PLATFORM"
 echo "  集成: $QT_QPA_EGLFS_INTEGRATION"
 echo "  DRM设备: $(ls -la /dev/dri/ 2>/dev/null | grep -E 'card|render' || echo '未找到')"
+
+# 最终验证连接器状态
+echo "🔍 最终连接器状态:"
+find /sys/class/drm -name "*status" -exec echo "{}: $(cat {})" \; 2>/dev/null | head -5
 
 # 摄像头检测
 CAMERA_FOUND=false
