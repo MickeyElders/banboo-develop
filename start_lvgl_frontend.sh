@@ -116,6 +116,77 @@ check_dependencies() {
     print_success "依赖检查完成"
 }
 
+# 清理老版本和缓存
+cleanup_old_versions() {
+    print_step "清理老版本进程和配置..."
+    
+    # 停止可能运行的老版本进程
+    local process_names=("bamboo_controller_lvgl" "bamboo_controller" "qt_frontend")
+    for process in "${process_names[@]}"; do
+        if pgrep -f "$process" > /dev/null; then
+            print_warn "发现运行中的进程: $process"
+            print_info "正在终止进程..."
+            pkill -f "$process" || true
+            sleep 2
+            
+            # 强制终止如果还在运行
+            if pgrep -f "$process" > /dev/null; then
+                print_warn "强制终止进程: $process"
+                pkill -9 -f "$process" || true
+                sleep 1
+            fi
+            print_success "进程 $process 已终止"
+        fi
+    done
+    
+    # 清理构建缓存和临时文件
+    print_info "清理构建缓存..."
+    local cleanup_dirs=(
+        "$FRONTEND_DIR/build"
+        "$FRONTEND_DIR/.cmake"
+        "$FRONTEND_DIR/CMakeCache.txt"
+        "$FRONTEND_DIR/third_party/lvgl/build"
+        "/tmp/bamboo_*"
+        "/var/tmp/bamboo_*"
+    )
+    
+    for cleanup_path in "${cleanup_dirs[@]}"; do
+        if [[ -e "$cleanup_path" ]]; then
+            print_info "删除: $cleanup_path"
+            rm -rf "$cleanup_path" 2>/dev/null || true
+        fi
+    done
+    
+    # 清理可能存在的配置冲突文件
+    print_info "清理配置冲突文件..."
+    local config_files=(
+        "$FRONTEND_DIR/third_party/lvgl/lv_conf_internal.h.bak"
+        "$FRONTEND_DIR/third_party/lvgl/examples"
+        "$FRONTEND_DIR/third_party/lvgl/demos"
+    )
+    
+    for config_file in "${config_files[@]}"; do
+        if [[ -e "$config_file" ]]; then
+            print_info "删除配置文件: $config_file"
+            rm -rf "$config_file" 2>/dev/null || true
+        fi
+    done
+    
+    # 清理systemd服务（如果存在）
+    if systemctl is-enabled bamboo-controller.service >/dev/null 2>&1; then
+        print_info "停止并禁用旧版本systemd服务..."
+        sudo systemctl stop bamboo-controller.service || true
+        sudo systemctl disable bamboo-controller.service || true
+    fi
+    
+    # 清理共享内存和IPC资源
+    print_info "清理共享资源..."
+    ipcs -m | grep $(whoami) | awk '{print $2}' | xargs -r ipcrm -m 2>/dev/null || true
+    ipcs -s | grep $(whoami) | awk '{print $2}' | xargs -r ipcrm -s 2>/dev/null || true
+    
+    print_success "老版本清理完成"
+}
+
 # 初始化LVGL前端
 initialize_frontend() {
     print_step "初始化LVGL前端..."
@@ -340,6 +411,10 @@ main() {
     # 执行主要流程
     check_environment
     check_dependencies
+    
+    # 清理老版本（在初始化和构建之前）
+    cleanup_old_versions
+    
     initialize_frontend
     
     # 根据参数决定是否构建
