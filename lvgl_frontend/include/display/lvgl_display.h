@@ -7,9 +7,6 @@
 extern "C" {
 #endif
 
-// 前向声明 - 移除重复的typedef
-struct backend_client_t;
-
 // LVGL显示驱动初始化和清理
 bool lvgl_display_init();
 void lvgl_display_deinit();
@@ -31,7 +28,7 @@ double get_camera_fps();
 void init_backend_system();
 void deinit_backend_system();
 void update_system_status_display();
-struct backend_client_t* get_backend_client();
+void* get_backend_client(); // 使用void*避免类型依赖
 
 #ifdef __cplusplus
 }

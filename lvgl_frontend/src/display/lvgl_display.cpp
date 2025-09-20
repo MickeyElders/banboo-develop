@@ -488,6 +488,6 @@ void update_system_status_display() {
 }
 
 // 获取后端客户端
-backend_client_t* get_backend_client() {
-    return g_backend_client;
+void* get_backend_client() {
+    return (void*)g_backend_client;
 }
