@@ -34,16 +34,33 @@ if(EXISTS /usr/include/aarch64-linux-gnu)
     set(TENSORRT_ROOT /usr/include/aarch64-linux-gnu)
 endif()
 
-# LVGL配置
+# LVGL配置 - 手动集成以避免examples/demos冲突
 set(LVGL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl)
-# 禁用LVGL Examples和Demos，避免配置冲突
-set(LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_WIDGETS OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_KEYPAD_AND_ENCODER OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_BENCHMARK OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_STRESS OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_MUSIC OFF CACHE BOOL "" FORCE)
-add_subdirectory(${LVGL_DIR})
+
+# 收集LVGL源文件
+file(GLOB_RECURSE LVGL_SOURCES
+    ${LVGL_DIR}/src/*.c
+    ${LVGL_DIR}/src/*.h
+)
+
+# 排除examples和demos目录
+list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*/examples/.*")
+list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*/demos/.*")
+
+# 创建LVGL库
+add_library(lvgl STATIC ${LVGL_SOURCES})
+
+# LVGL头文件目录
+target_include_directories(lvgl PUBLIC
+    ${LVGL_DIR}
+    ${LVGL_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}  # 包含lv_conf.h
+)
+
+# 编译定义
+target_compile_definitions(lvgl PUBLIC
+    LV_CONF_INCLUDE_SIMPLE=1
+)
 
 # 头文件目录
 include_directories(
