@@ -46,8 +46,14 @@ void* main_loop(void* arg) {
             g_app->process_events();
         }
         
-        /* 控制帧率 - 60fps */
-        usleep(16667); // 约16.67ms
+        /* 更新摄像头显示 */
+        update_camera_display();
+        
+        /* 更新系统状态显示 */
+        update_system_status_display();
+        
+        /* 控制帧率 - 30fps */
+        usleep(33333); // 约33.33ms，适合摄像头帧率
     }
     
     printf("LVGL主循环线程退出\n");

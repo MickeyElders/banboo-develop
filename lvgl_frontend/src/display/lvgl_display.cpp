@@ -1,5 +1,7 @@
 #include "display/lvgl_display.h"
 #include "display/framebuffer_driver.h"
+#include "camera/camera_manager.h"
+#include "backend/backend_client.h"
 #include "lvgl.h"
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +10,23 @@
 static lv_disp_drv_t disp_drv;
 static lv_disp_t *disp;
 static lv_disp_draw_buf_t disp_buf;
+
+// 摄像头管理器
+static camera_manager_t *g_camera_manager = nullptr;
+
+// 后端客户端
+static backend_client_t *g_backend_client = nullptr;
+
+// 视频面板对象
+static lv_obj_t *g_video_panel = nullptr;
+
+// 状态显示对象
+static lv_obj_t *g_system_status_label = nullptr;
+static lv_obj_t *g_plc_status_label = nullptr;
+static lv_obj_t *g_ai_status_label = nullptr;
+static lv_obj_t *g_camera_status_label = nullptr;
+static lv_obj_t *g_performance_label = nullptr;
+static lv_obj_t *g_detection_data_label = nullptr;
 
 // 显示刷新回调函数
 void lvgl_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
@@ -101,12 +120,24 @@ bool lvgl_display_init() {
     // 创建测试界面
     create_test_ui();
     
+    // 初始化摄像头
+    init_camera_system();
+    
+    // 初始化后端系统
+    init_backend_system();
+    
     printf("LVGL显示驱动初始化成功\n");
     return true;
 }
 
 void lvgl_display_deinit() {
     printf("清理 LVGL显示驱动\n");
+    
+    // 清理后端系统
+    deinit_backend_system();
+    
+    // 清理摄像头系统
+    deinit_camera_system();
     
     if (disp) {
         lv_obj_clean(lv_scr_act());
@@ -133,9 +164,9 @@ void create_test_ui() {
     lv_obj_set_style_bg_color(header, lv_color_hex(0x2c5282), LV_PART_MAIN);
     lv_obj_set_style_border_width(header, 0, LV_PART_MAIN);
     
-    // 系统标题
+    // 系统标题 (使用英文避免乱码)
     lv_obj_t *title_label = lv_label_create(header);
-    lv_label_set_text(title_label, "智能切竹机系统 v2.0");
+    lv_label_set_text(title_label, "Bamboo Cutting System v2.0");
     lv_obj_set_style_text_font(title_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
     lv_obj_align(title_label, LV_ALIGN_LEFT_MID, 20, 0);
@@ -146,9 +177,9 @@ void create_test_ui() {
     lv_led_on(status_led);
     lv_obj_align(status_led, LV_ALIGN_RIGHT_MID, -80, 0);
     
-    // 状态文本
+    // 状态文本 (使用英文避免乱码)
     lv_obj_t *status_text = lv_label_create(header);
-    lv_label_set_text(status_text, "系统就绪");
+    lv_label_set_text(status_text, "System Ready");
     lv_obj_set_style_text_color(status_text, lv_color_white(), 0);
     lv_obj_align(status_text, LV_ALIGN_RIGHT_MID, -20, 0);
     
@@ -160,49 +191,55 @@ void create_test_ui() {
     lv_obj_set_style_border_color(control_panel, lv_color_hex(0x4a5568), LV_PART_MAIN);
     lv_obj_set_style_border_width(control_panel, 2, LV_PART_MAIN);
     
-    // 控制面板标题
+    // 控制面板标题 (使用英文避免乱码)
     lv_obj_t *panel_title = lv_label_create(control_panel);
-    lv_label_set_text(panel_title, "控制面板");
+    lv_label_set_text(panel_title, "Control Panel");
     lv_obj_set_style_text_color(panel_title, lv_color_hex(0xE2E8F0), 0);
     lv_obj_align(panel_title, LV_ALIGN_TOP_MID, 0, 15);
     
+    // 系统状态
+    g_system_status_label = lv_label_create(control_panel);
+    lv_label_set_text(g_system_status_label, "System: Initializing...");
+    lv_obj_set_style_text_color(g_system_status_label, lv_color_hex(0xFBBF24), 0);
+    lv_obj_align(g_system_status_label, LV_ALIGN_TOP_LEFT, 20, 50);
+    
     // AI检测状态
-    lv_obj_t *ai_status = lv_label_create(control_panel);
-    lv_label_set_text(ai_status, "AI推理引擎: TensorRT");
-    lv_obj_set_style_text_color(ai_status, lv_color_hex(0x68D391), 0);
-    lv_obj_align(ai_status, LV_ALIGN_TOP_LEFT, 20, 50);
+    g_ai_status_label = lv_label_create(control_panel);
+    lv_label_set_text(g_ai_status_label, "AI Engine: Connecting...");
+    lv_obj_set_style_text_color(g_ai_status_label, lv_color_hex(0xFBBF24), 0);
+    lv_obj_align(g_ai_status_label, LV_ALIGN_TOP_LEFT, 20, 80);
     
     // 摄像头状态
-    lv_obj_t *camera_status = lv_label_create(control_panel);
-    lv_label_set_text(camera_status, "摄像头: 1920x1080@30fps");
-    lv_obj_set_style_text_color(camera_status, lv_color_hex(0x68D391), 0);
-    lv_obj_align(camera_status, LV_ALIGN_TOP_LEFT, 20, 80);
+    g_camera_status_label = lv_label_create(control_panel);
+    lv_label_set_text(g_camera_status_label, "Camera: 640x480@30fps");
+    lv_obj_set_style_text_color(g_camera_status_label, lv_color_hex(0x68D391), 0);
+    lv_obj_align(g_camera_status_label, LV_ALIGN_TOP_LEFT, 20, 110);
     
     // PLC通信状态
-    lv_obj_t *plc_status = lv_label_create(control_panel);
-    lv_label_set_text(plc_status, "PLC通信: Modbus TCP");
-    lv_obj_set_style_text_color(plc_status, lv_color_hex(0x68D391), 0);
-    lv_obj_align(plc_status, LV_ALIGN_TOP_LEFT, 20, 110);
+    g_plc_status_label = lv_label_create(control_panel);
+    lv_label_set_text(g_plc_status_label, "PLC: Connecting...");
+    lv_obj_set_style_text_color(g_plc_status_label, lv_color_hex(0xFBBF24), 0);
+    lv_obj_align(g_plc_status_label, LV_ALIGN_TOP_LEFT, 20, 140);
     
     // 主要控制按钮
     lv_obj_t *start_btn = lv_btn_create(control_panel);
     lv_obj_set_size(start_btn, 250, 50);
-    lv_obj_align(start_btn, LV_ALIGN_TOP_MID, 0, 150);
+    lv_obj_align(start_btn, LV_ALIGN_TOP_MID, 0, 180);
     lv_obj_set_style_bg_color(start_btn, lv_color_hex(0x38A169), LV_PART_MAIN);
     
     lv_obj_t *start_label = lv_label_create(start_btn);
-    lv_label_set_text(start_label, "启动AI检测");
+    lv_label_set_text(start_label, "Start AI Detection");
     lv_obj_set_style_text_color(start_label, lv_color_white(), 0);
     lv_obj_center(start_label);
     
     // 停止按钮
     lv_obj_t *stop_btn = lv_btn_create(control_panel);
     lv_obj_set_size(stop_btn, 250, 50);
-    lv_obj_align(stop_btn, LV_ALIGN_TOP_MID, 0, 220);
+    lv_obj_align(stop_btn, LV_ALIGN_TOP_MID, 0, 250);
     lv_obj_set_style_bg_color(stop_btn, lv_color_hex(0xE53E3E), LV_PART_MAIN);
     
     lv_obj_t *stop_label = lv_label_create(stop_btn);
-    lv_label_set_text(stop_label, "停止检测");
+    lv_label_set_text(stop_label, "Stop Detection");
     lv_obj_set_style_text_color(stop_label, lv_color_white(), 0);
     lv_obj_center(stop_label);
     
@@ -216,13 +253,16 @@ void create_test_ui() {
     
     // 视频区域标题
     lv_obj_t *video_title = lv_label_create(video_panel);
-    lv_label_set_text(video_title, "实时视频监控");
+    lv_label_set_text(video_title, "Live Video Monitor");
     lv_obj_set_style_text_color(video_title, lv_color_white(), 0);
     lv_obj_align(video_title, LV_ALIGN_TOP_MID, 0, 15);
     
+    // 保存视频面板引用，用于后续创建摄像头显示
+    g_video_panel = video_panel;
+    
     // 视频占位符
     lv_obj_t *video_placeholder = lv_label_create(video_panel);
-    lv_label_set_text(video_placeholder, "摄像头初始化中...\n等待视频流");
+    lv_label_set_text(video_placeholder, "Camera Initializing...\nWaiting for video stream");
     lv_obj_set_style_text_color(video_placeholder, lv_color_hex(0x888888), 0);
     lv_obj_set_style_text_align(video_placeholder, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(video_placeholder);
@@ -237,27 +277,217 @@ void create_test_ui() {
     
     // 数据面板标题
     lv_obj_t *data_title = lv_label_create(data_panel);
-    lv_label_set_text(data_title, "检测数据");
+    lv_label_set_text(data_title, "Detection Data");
     lv_obj_set_style_text_color(data_title, lv_color_hex(0xE2E8F0), 0);
     lv_obj_align(data_title, LV_ALIGN_TOP_LEFT, 20, 10);
     
     // 检测结果显示
-    lv_obj_t *detection_data = lv_label_create(data_panel);
-    lv_label_set_text(detection_data, "切点数量: 0 | 坐标数据: 等待检测结果...");
-    lv_obj_set_style_text_color(detection_data, lv_color_hex(0xA0AEC0), 0);
-    lv_obj_align(detection_data, LV_ALIGN_TOP_LEFT, 20, 40);
-    
-    // PLC通信数据
-    lv_obj_t *plc_data = lv_label_create(data_panel);
-    lv_label_set_text(plc_data, "PLC连接: 192.168.1.10:502 | 心跳: 正常 | 寄存器状态: 就绪");
-    lv_obj_set_style_text_color(plc_data, lv_color_hex(0xA0AEC0), 0);
-    lv_obj_align(plc_data, LV_ALIGN_TOP_LEFT, 20, 70);
+    g_detection_data_label = lv_label_create(data_panel);
+    lv_label_set_text(g_detection_data_label, "Cut Points: 0 | Coordinates: Waiting for results...");
+    lv_obj_set_style_text_color(g_detection_data_label, lv_color_hex(0xA0AEC0), 0);
+    lv_obj_align(g_detection_data_label, LV_ALIGN_TOP_LEFT, 20, 40);
     
     // 性能指标
-    lv_obj_t *perf_data = lv_label_create(data_panel);
-    lv_label_set_text(perf_data, "推理性能: 30 FPS | 延迟: <33ms | CPU负载: 25%");
-    lv_obj_set_style_text_color(perf_data, lv_color_hex(0x68D391), 0);
-    lv_obj_align(perf_data, LV_ALIGN_BOTTOM_LEFT, 20, -15);
+    g_performance_label = lv_label_create(data_panel);
+    lv_label_set_text(g_performance_label, "Performance: Initializing...");
+    lv_obj_set_style_text_color(g_performance_label, lv_color_hex(0x68D391), 0);
+    lv_obj_align(g_performance_label, LV_ALIGN_BOTTOM_LEFT, 20, -15);
     
-    printf("智能切竹机工业控制界面创建完成\n");
+    printf("Bamboo cutting industrial control interface created\n");
+}
+
+// 初始化摄像头系统
+void init_camera_system() {
+    printf("初始化摄像头系统...\n");
+    
+    // 创建摄像头管理器（640x480分辨率适合嵌入式显示）
+    g_camera_manager = camera_manager_create("/dev/video0", 640, 480, 30);
+    if (!g_camera_manager) {
+        printf("错误：创建摄像头管理器失败\n");
+        return;
+    }
+    
+    // 初始化摄像头
+    if (!camera_manager_init(g_camera_manager)) {
+        printf("错误：初始化摄像头失败\n");
+        camera_manager_destroy(g_camera_manager);
+        g_camera_manager = nullptr;
+        return;
+    }
+    
+    // 在视频面板中创建摄像头显示对象
+    if (g_video_panel && !camera_manager_create_video_object(g_camera_manager, g_video_panel)) {
+        printf("错误：创建摄像头显示对象失败\n");
+        camera_manager_destroy(g_camera_manager);
+        g_camera_manager = nullptr;
+        return;
+    }
+    
+    // 开始摄像头捕获
+    if (!camera_manager_start_capture(g_camera_manager)) {
+        printf("错误：启动摄像头捕获失败\n");
+        camera_manager_destroy(g_camera_manager);
+        g_camera_manager = nullptr;
+        return;
+    }
+    
+    printf("摄像头系统初始化成功\n");
+}
+
+// 清理摄像头系统
+void deinit_camera_system() {
+    if (g_camera_manager) {
+        printf("清理摄像头系统\n");
+        camera_manager_destroy(g_camera_manager);
+        g_camera_manager = nullptr;
+    }
+}
+
+// 更新摄像头显示
+void update_camera_display() {
+    if (g_camera_manager) {
+        camera_manager_update_display(g_camera_manager);
+    }
+}
+
+// 获取摄像头状态
+bool is_camera_running() {
+    return g_camera_manager && camera_manager_is_running(g_camera_manager);
+}
+
+// 获取摄像头帧率
+double get_camera_fps() {
+    return g_camera_manager ? camera_manager_get_fps(g_camera_manager) : 0.0;
+}
+
+// 初始化后端系统
+void init_backend_system() {
+    printf("初始化后端系统...\n");
+    
+    // 检查后端进程是否运行
+    if (!backend_client_is_backend_running()) {
+        printf("后端进程未运行，正在启动...\n");
+        if (!backend_client_start_backend_process()) {
+            printf("警告：启动后端进程失败\n");
+        }
+    }
+    
+    // 创建后端客户端
+    g_backend_client = backend_client_create("localhost", 8080);
+    if (!g_backend_client) {
+        printf("错误：创建后端客户端失败\n");
+        return;
+    }
+    
+    // 连接到后端
+    if (!backend_client_connect(g_backend_client)) {
+        printf("警告：连接后端失败\n");
+    }
+    
+    // 启动通信线程
+    if (!backend_client_start_communication(g_backend_client)) {
+        printf("错误：启动后端通信失败\n");
+        backend_client_destroy(g_backend_client);
+        g_backend_client = nullptr;
+        return;
+    }
+    
+    printf("后端系统初始化完成\n");
+}
+
+// 清理后端系统
+void deinit_backend_system() {
+    if (g_backend_client) {
+        printf("清理后端系统\n");
+        backend_client_destroy(g_backend_client);
+        g_backend_client = nullptr;
+    }
+}
+
+// 更新系统状态显示
+void update_system_status_display() {
+    if (!g_backend_client) return;
+    
+    // 获取系统健康信息
+    system_health_t health;
+    if (backend_client_get_system_health(g_backend_client, &health)) {
+        // 更新性能标签
+        if (g_performance_label) {
+            char perf_text[256];
+            snprintf(perf_text, sizeof(perf_text),
+                    "CPU: %.1f%% | Memory: %.1f%% | GPU: %.1f%% | Temp: %.1f°C",
+                    health.cpu_usage, health.memory_usage, health.gpu_usage, health.temperature);
+            lv_label_set_text(g_performance_label, perf_text);
+        }
+    }
+    
+    // 获取后端状态
+    backend_status_t backend_status = backend_client_get_backend_status(g_backend_client);
+    if (g_system_status_label) {
+        switch (backend_status) {
+            case BACKEND_CONNECTED:
+                lv_label_set_text(g_system_status_label, "System: Running");
+                lv_obj_set_style_text_color(g_system_status_label, lv_color_hex(0x68D391), 0);
+                break;
+            case BACKEND_CONNECTING:
+                lv_label_set_text(g_system_status_label, "System: Connecting...");
+                lv_obj_set_style_text_color(g_system_status_label, lv_color_hex(0xFBBF24), 0);
+                break;
+            default:
+                lv_label_set_text(g_system_status_label, "System: Disconnected");
+                lv_obj_set_style_text_color(g_system_status_label, lv_color_hex(0xEF4444), 0);
+                break;
+        }
+    }
+    
+    // 获取PLC状态
+    plc_status_t plc_status = backend_client_get_plc_status(g_backend_client);
+    if (g_plc_status_label) {
+        switch (plc_status) {
+            case PLC_CONNECTED:
+                lv_label_set_text(g_plc_status_label, "PLC: 192.168.1.10:502 Connected");
+                lv_obj_set_style_text_color(g_plc_status_label, lv_color_hex(0x68D391), 0);
+                break;
+            case PLC_ERROR:
+                lv_label_set_text(g_plc_status_label, "PLC: Communication Error");
+                lv_obj_set_style_text_color(g_plc_status_label, lv_color_hex(0xEF4444), 0);
+                break;
+            default:
+                lv_label_set_text(g_plc_status_label, "PLC: Disconnected");
+                lv_obj_set_style_text_color(g_plc_status_label, lv_color_hex(0xFBBF24), 0);
+                break;
+        }
+    }
+    
+    // 更新AI状态
+    if (g_ai_status_label) {
+        if (backend_status == BACKEND_CONNECTED) {
+            lv_label_set_text(g_ai_status_label, "AI Engine: TensorRT Ready");
+            lv_obj_set_style_text_color(g_ai_status_label, lv_color_hex(0x68D391), 0);
+        } else {
+            lv_label_set_text(g_ai_status_label, "AI Engine: Offline");
+            lv_obj_set_style_text_color(g_ai_status_label, lv_color_hex(0xFBBF24), 0);
+        }
+    }
+    
+    // 获取切割坐标
+    cutting_coordinate_t coordinate;
+    if (backend_client_get_coordinate(g_backend_client, &coordinate) && g_detection_data_label) {
+        if (coordinate.coordinate_ready) {
+            char coord_text[256];
+            snprintf(coord_text, sizeof(coord_text),
+                    "Cut Point: X=%.1fmm | Blade=%d | Quality=%s",
+                    coordinate.x_coordinate / 10.0f,
+                    coordinate.blade_number,
+                    coordinate.cutting_quality == 0 ? "Good" : "Poor");
+            lv_label_set_text(g_detection_data_label, coord_text);
+        } else {
+            lv_label_set_text(g_detection_data_label, "Cut Points: 0 | Coordinates: Waiting for detection...");
+        }
+    }
+}
+
+// 获取后端客户端
+backend_client_t* get_backend_client() {
+    return g_backend_client;
 }

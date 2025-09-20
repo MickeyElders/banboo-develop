@@ -17,6 +17,19 @@ void lvgl_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *colo
 // 测试UI创建函数
 void create_test_ui();
 
+// 摄像头系统函数
+void init_camera_system();
+void deinit_camera_system();
+void update_camera_display();
+bool is_camera_running();
+double get_camera_fps();
+
+// 后端系统函数
+void init_backend_system();
+void deinit_backend_system();
+void update_system_status_display();
+struct backend_client_t* get_backend_client();
+
 #ifdef __cplusplus
 }
 #endif
