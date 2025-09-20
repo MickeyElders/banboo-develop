@@ -16,6 +16,7 @@
 #include "lvgl.h"
 #include "app/main_app.h"
 #include "app/config_manager.h"
+#include "system/lv_port_tick.h"
 #include "display/framebuffer_driver.h"
 #include "display/lvgl_display.h"
 #include "input/touch_driver.h"
@@ -31,12 +32,6 @@ void signal_handler(int sig) {
     g_running = false;
 }
 
-/* LVGL时钟获取函数 */
-uint32_t lv_tick_get_ms(void) {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (tv.tv_sec * 1000 + tv.tv_usec / 1000);
-}
 
 /* 主线程循环 */
 void* main_loop(void* arg) {
@@ -94,6 +89,9 @@ bool initialize_lvgl() {
     
     /* 初始化LVGL */
     lv_init();
+    
+    /* 初始化LVGL时钟系统 */
+    lv_port_tick_init();
     
     /* 初始化显示驱动 */
     if (!lvgl_display_init()) {

@@ -82,6 +82,9 @@ set(SOURCES
     src/app/event_manager.cpp
     src/app/config_manager.cpp
     
+    # 系统层 - LVGL移植
+    src/system/lv_port_tick.c
+    
     # 显示系统
     src/display/framebuffer_driver.cpp
     src/display/lvgl_display.cpp
@@ -113,6 +116,7 @@ set(HEADERS
     include/app/main_app.h
     include/app/event_manager.h
     include/app/config_manager.h
+    include/system/lv_port_tick.h
     include/display/framebuffer_driver.h
     include/display/lvgl_display.h
     include/display/gpu_accelerated.h
