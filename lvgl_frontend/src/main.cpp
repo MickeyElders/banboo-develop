@@ -131,13 +131,16 @@ void print_system_info() {
     printf("================================\n");
     
     // 打印CPU信息
-    (void)system("cat /proc/cpuinfo | grep 'model name' | head -1");
+    int ret1 = system("cat /proc/cpuinfo | grep 'model name' | head -1");
+    (void)ret1; // 明确忽略返回值
     
     // 打印内存信息
-    (void)system("cat /proc/meminfo | grep 'MemTotal'");
+    int ret2 = system("cat /proc/meminfo | grep 'MemTotal'");
+    (void)ret2; // 明确忽略返回值
     
     // 打印GPU信息
-    (void)system("nvidia-smi -L 2>/dev/null || echo '未检测到NVIDIA GPU'");
+    int ret3 = system("nvidia-smi -L 2>/dev/null || echo '未检测到NVIDIA GPU'");
+    (void)ret3; // 明确忽略返回值
     
     printf("================================\n");
 }

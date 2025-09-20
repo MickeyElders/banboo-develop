@@ -137,10 +137,11 @@ add_executable(bamboo_controller_lvgl ${SOURCES} ${HEADERS})
 
 # Jetson设备特定的CUDA库路径配置
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    # Jetson设备的CUDA库路径
+    # 根据实际检查结果配置CUDA 12.6库路径
     set(CUDA_LIB_PATHS
-        "/usr/local/cuda/lib64"
+        "/usr/local/cuda-12.6/targets/aarch64-linux/lib"
         "/usr/local/cuda/targets/aarch64-linux/lib"
+        "/usr/local/cuda/lib64"
         "/usr/lib/aarch64-linux-gnu"
     )
     
@@ -154,7 +155,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
     # 设置库搜索路径
     link_directories(${CUDA_LIB_PATHS} ${TENSORRT_LIB_PATHS})
     
-    message(STATUS "Jetson Orin NX detected - configuring CUDA libraries")
+    message(STATUS "Jetson Orin NX detected - configuring CUDA 12.6 libraries")
+    message(STATUS "CUDA library paths: ${CUDA_LIB_PATHS}")
 endif()
 
 # 链接库
