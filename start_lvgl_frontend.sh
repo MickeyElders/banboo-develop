@@ -157,19 +157,58 @@ cleanup_old_versions() {
         "sddm"
     )
     
+    # 第一轮：尝试优雅终止
     for process in "${display_processes[@]}"; do
         if pgrep -f "$process" > /dev/null; then
             print_warn "发现占用显示器的进程: $process"
-            pkill -f "$process" 2>/dev/null || true
-            sleep 1
+            print_info "尝试优雅终止进程: $process"
+            pkill -TERM -f "$process" 2>/dev/null || true
         fi
     done
     
-    # 特别处理vi-output进程
-    if pgrep -f "vi-output" > /dev/null; then
-        print_warn "强制终止vi-output进程..."
-        pkill -9 -f "vi-output" 2>/dev/null || true
-        sleep 2
+    # 等待进程退出
+    sleep 3
+    
+    # 第二轮：强制终止仍在运行的进程
+    for process in "${display_processes[@]}"; do
+        if pgrep -f "$process" > /dev/null; then
+            print_warn "强制终止顽固进程: $process"
+            pkill -9 -f "$process" 2>/dev/null || true
+            sleep 1
+            
+            # 再次检查并强制终止
+            if pgrep -f "$process" > /dev/null; then
+                print_warn "进程 $process 仍在运行，使用killall强制终止"
+                killall -9 "$process" 2>/dev/null || true
+            fi
+        fi
+    done
+    
+    # 最终检查
+    sleep 2
+    local remaining_processes=()
+    for process in "${display_processes[@]}"; do
+        if pgrep -f "$process" > /dev/null; then
+            remaining_processes+=("$process")
+        fi
+    done
+    
+    if [ ${#remaining_processes[@]} -gt 0 ]; then
+        print_warn "以下进程仍在运行: ${remaining_processes[*]}"
+        print_info "尝试通过PID直接终止..."
+        
+        # 通过PID直接终止
+        for process in "${remaining_processes[@]}"; do
+            local pids=$(pgrep -f "$process" 2>/dev/null || true)
+            if [ -n "$pids" ]; then
+                for pid in $pids; do
+                    print_info "强制终止PID: $pid ($process)"
+                    kill -9 "$pid" 2>/dev/null || true
+                done
+            fi
+        done
+    else
+        print_success "所有显示器占用进程已成功终止"
     fi
     
     # 清理构建缓存和临时文件
