@@ -12,9 +12,9 @@
 class ConfigManager;
 class EventManager;
 class CameraManager;
-class AIDetector;
-class VideoRenderer;
-class TouchController;
+class Yolo_detector;
+class Video_view;
+// TouchController使用C风格函数，不需要类声明
 
 class MainApp {
 public:
@@ -36,9 +36,9 @@ private:
     // 核心组件
     std::unique_ptr<EventManager> event_manager_;
     std::unique_ptr<CameraManager> camera_manager_;
-    std::unique_ptr<AIDetector> ai_detector_;
-    std::unique_ptr<VideoRenderer> video_renderer_;
-    std::unique_ptr<TouchController> touch_controller_;
+    std::unique_ptr<Yolo_detector> ai_detector_;
+    std::unique_ptr<Video_view> video_renderer_;
+    // TouchController使用C风格函数，不需要unique_ptr
 
     void setup_gui();
     void setup_camera();

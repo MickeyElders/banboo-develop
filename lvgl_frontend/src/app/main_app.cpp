@@ -5,6 +5,10 @@
 #include "app/main_app.h"
 #include "app/event_manager.h"
 #include "app/config_manager.h"
+#include "camera/camera_manager.h"
+#include "ai/yolo_detector.h"
+#include "gui/video_view.h"
+#include "input/touch_driver.h"
 #include "common/utils.h"
 #include <stdio.h>
 

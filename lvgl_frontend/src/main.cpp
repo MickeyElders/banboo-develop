@@ -13,7 +13,7 @@
 #include <string.h>
 #include <sched.h>
 
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 #include "app/main_app.h"
 #include "app/config_manager.h"
 #include "display/framebuffer_driver.h"
