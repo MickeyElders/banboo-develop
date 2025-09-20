@@ -660,48 +660,60 @@ export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
-# Jetson Orin NX 完整启动流程
-echo "🔧 Jetson Orin NX 完整启动流程..."
+# Jetson Orin NX EGLFS高性能配置
+echo "🚀 Jetson Orin NX EGLFS高性能配置..."
 
 # 1. 设置性能模式
 echo "⚡ 设置性能模式..."
 sudo /usr/sbin/nvpmodel -m 0 2>/dev/null || echo "⚠️ nvpmodel设置失败"
 sudo /usr/bin/jetson_clocks 2>/dev/null || echo "⚠️ jetson_clocks设置失败"
 
-# 2. 显示驱动重置（可选）
-# sudo modprobe -r tegra_drm && sleep 1 && sudo modprobe tegra_drm
-
-# 3. 强制framebuffer配置
-echo "📺 配置framebuffer..."
-sudo sh -c 'echo "U:1920x1200p-0" > /sys/class/graphics/fb0/mode' 2>/dev/null
-sudo sh -c 'echo "0" > /sys/class/graphics/fb0/blank' 2>/dev/null
-sudo chmod 666 /dev/fb0 2>/dev/null
-sleep 3
-
-# 4. 验证显示状态
-current_mode=$(cat /sys/class/graphics/fb0/mode 2>/dev/null)
-if [ "$current_mode" = "U:1920x1200p-0" ]; then
-    echo "✅ 显示模式: $current_mode"
-else
-    echo "⚠️ 显示模式可能有问题: $current_mode"
+# 2. 检查和安装EGL/OpenGL依赖
+echo "🔍 检查OpenGL/EGL依赖..."
+if [ ! -f "/usr/lib/aarch64-linux-gnu/libEGL.so" ]; then
+    echo "📦 安装缺失的EGL依赖..."
+    sudo apt update
+    sudo apt install -y \
+        libegl1-mesa-dev \
+        libgles2-mesa-dev \
+        libdrm-dev \
+        libgbm-dev \
+        qt6-base-dev \
+        qt6-declarative-dev
 fi
 
-# 5. Qt配置 (LinuxFB模式)
-export QT_QPA_PLATFORM=linuxfb
-export QT_QPA_FB_DEVICE=/dev/fb0
+# 3. 确保DRM设备权限
+echo "🔧 配置DRM设备权限..."
+sudo chmod 666 /dev/dri/card0 2>/dev/null || true
+sudo chmod 666 /dev/dri/renderD128 2>/dev/null || true
+sudo chmod 666 /dev/nvidia0 2>/dev/null || true
+sudo chmod 666 /dev/nvidiactl 2>/dev/null || true
+
+# 4. 配置库路径
+export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+
+# 5. 使用EGLDevice模式（绕过连接器检测）
+export QT_QPA_PLATFORM=eglfs
+export QT_QPA_EGLFS_INTEGRATION=eglfs_kms_egldevice
+export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+export QT_QPA_EGLFS_KMS_ATOMIC=1
 export QT_QPA_GENERIC_PLUGINS=evdevtouch
-export QT_QPA_FB_FORCE_FULLSCREEN=1
+
+# 6. 强制使用Tegra GPU
+export __GL_SYNC_TO_VBLANK=1
+export __GL_MaxFramesAllowed=1
+
+# 7. EGL调试（可选）
+export QT_LOGGING_RULES="qt.qpa.eglfs.kms=true"
 
 # 确保X11不干扰
 unset DISPLAY
 unset WAYLAND_DISPLAY
 
-# 设备权限
-for device in /dev/dri/card0 /dev/dri/renderD128 /dev/nvidia0 /dev/nvidiactl; do
-    if [ -e "$device" ]; then
-        chmod 666 "$device" 2>/dev/null || true
-    fi
-done
+echo "📺 EGLFS配置完成:"
+echo "  平台: $QT_QPA_PLATFORM"
+echo "  集成: $QT_QPA_EGLFS_INTEGRATION"
+echo "  DRM设备: $(ls -la /dev/dri/ 2>/dev/null | grep -E 'card|render' || echo '未找到')"
 
 # 摄像头检测
 CAMERA_FOUND=false
