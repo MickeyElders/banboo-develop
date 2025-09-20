@@ -273,6 +273,9 @@ cleanup_old_versions() {
 initialize_frontend() {
     print_step "初始化LVGL前端..."
     
+    # 确保在项目根目录
+    cd "$SCRIPT_DIR"
+    
     # 检查前端目录是否存在
     if [[ ! -d "$FRONTEND_DIR" ]]; then
         print_error "LVGL前端目录不存在: $FRONTEND_DIR"
@@ -306,6 +309,16 @@ initialize_frontend() {
 build_backend() {
     print_step "构建C++后端项目..."
     
+    # 确保在项目根目录
+    cd "$SCRIPT_DIR"
+    
+    # 检查后端目录是否存在
+    if [[ ! -d "$BACKEND_DIR" ]]; then
+        print_error "后端目录不存在: $BACKEND_DIR"
+        print_info "请确保已正确设置项目结构"
+        exit 1
+    fi
+    
     cd "$BACKEND_DIR"
     
     # 创建构建目录
@@ -331,6 +344,16 @@ build_backend() {
 # 构建LVGL前端
 build_frontend() {
     print_step "构建LVGL前端项目..."
+    
+    # 确保在项目根目录
+    cd "$SCRIPT_DIR"
+    
+    # 检查前端目录是否存在
+    if [[ ! -d "$FRONTEND_DIR" ]]; then
+        print_error "前端目录不存在: $FRONTEND_DIR"
+        print_info "请确保已正确设置项目结构"
+        exit 1
+    fi
     
     cd "$FRONTEND_DIR"
     
@@ -466,6 +489,9 @@ configure_framebuffer() {
 start_backend() {
     print_step "启动C++后端..."
     
+    # 确保在项目根目录
+    cd "$SCRIPT_DIR"
+    
     # 检查后端可执行文件
     local backend_binary_path="$BACKEND_DIR/build/$BACKEND_BINARY"
     if [[ ! -f "$backend_binary_path" ]]; then
@@ -495,6 +521,9 @@ start_backend() {
 # 启动LVGL前端
 start_frontend() {
     print_step "启动LVGL前端应用..."
+    
+    # 确保在项目根目录
+    cd "$SCRIPT_DIR"
     
     cd "$FRONTEND_DIR"
     
