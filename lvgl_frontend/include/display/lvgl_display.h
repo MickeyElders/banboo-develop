@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+// 前向声明
+typedef struct backend_client_t backend_client_t;
+
 // LVGL显示驱动初始化和清理
 bool lvgl_display_init();
 void lvgl_display_deinit();
@@ -28,7 +31,7 @@ double get_camera_fps();
 void init_backend_system();
 void deinit_backend_system();
 void update_system_status_display();
-struct backend_client_t* get_backend_client();
+backend_client_t* get_backend_client();
 
 #ifdef __cplusplus
 }

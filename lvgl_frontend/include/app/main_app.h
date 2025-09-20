@@ -9,12 +9,8 @@
 #include <atomic>
 #include "common/types.h"
 
-class ConfigManager;
 class EventManager;
-class Camera_manager;
-class Yolo_detector;
-class Video_view;
-// TouchController使用C风格函数，不需要类声明
+// 其他类暂时未实现，使用前向声明避免编译错误
 
 class MainApp {
 public:
@@ -35,10 +31,10 @@ private:
 
     // 核心组件
     std::unique_ptr<EventManager> event_manager_;
-    std::unique_ptr<Camera_manager> camera_manager_;
-    std::unique_ptr<Yolo_detector> ai_detector_;
-    std::unique_ptr<Video_view> video_renderer_;
-    // TouchController使用C风格函数，不需要unique_ptr
+    // 其他组件暂时注释掉，避免不完整类型问题
+    // std::unique_ptr<Camera_manager> camera_manager_;
+    // std::unique_ptr<Yolo_detector> ai_detector_;
+    // std::unique_ptr<Video_view> video_renderer_;
 
     void setup_gui();
     void setup_camera();

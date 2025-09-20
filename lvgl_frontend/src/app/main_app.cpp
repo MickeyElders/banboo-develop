@@ -4,13 +4,14 @@
 
 #include "app/main_app.h"
 #include "app/event_manager.h"
-#include "app/config_manager.h"
-#include "camera/camera_manager.h"
-#include "ai/yolo_detector.h"
-#include "gui/video_view.h"
-#include "input/touch_driver.h"
 #include "common/utils.h"
 #include <stdio.h>
+// 其他头文件暂时注释掉，避免不完整类型问题
+// #include "app/config_manager.h"
+// #include "camera/camera_manager.h"
+// #include "ai/yolo_detector.h"
+// #include "gui/video_view.h"
+// #include "input/touch_driver.h"
 
 MainApp::MainApp(const system_config_t& config)
     : config_(config)

@@ -30,15 +30,15 @@ typedef enum {
     PLC_ERROR
 } plc_status_t;
 
-/* 系统状态 */
+/* 后端系统状态 */
 typedef enum {
-    SYSTEM_STOPPED = 0,
-    SYSTEM_RUNNING = 1,
-    SYSTEM_ERROR = 2,
-    SYSTEM_PAUSED = 3,
-    SYSTEM_EMERGENCY = 4,
-    SYSTEM_MAINTENANCE = 5
-} system_status_t;
+    BACKEND_SYSTEM_STOPPED = 0,
+    BACKEND_SYSTEM_RUNNING = 1,
+    BACKEND_SYSTEM_ERROR = 2,
+    BACKEND_SYSTEM_PAUSED = 3,
+    BACKEND_SYSTEM_EMERGENCY = 4,
+    BACKEND_SYSTEM_MAINTENANCE = 5
+} backend_system_status_t;
 
 /* 切割坐标数据 */
 typedef struct {
@@ -71,7 +71,7 @@ typedef struct {
     // 状态信息
     backend_status_t backend_status;
     plc_status_t plc_status;
-    system_status_t system_status;
+    backend_system_status_t system_status;
     
     // 数据缓存
     cutting_coordinate_t current_coordinate;
@@ -171,7 +171,7 @@ plc_status_t backend_client_get_plc_status(backend_client_t* client);
  * @param client 客户端指针
  * @return 系统状态
  */
-system_status_t backend_client_get_system_status(backend_client_t* client);
+backend_system_status_t backend_client_get_system_status(backend_client_t* client);
 
 /**
  * 检查后端进程是否运行

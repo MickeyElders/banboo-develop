@@ -139,7 +139,7 @@ backend_client_t* backend_client_create(const char* host, int port) {
     // 初始化状态
     client->backend_status = BACKEND_DISCONNECTED;
     client->plc_status = PLC_DISCONNECTED;
-    client->system_status = SYSTEM_STOPPED;
+    client->system_status = BACKEND_SYSTEM_STOPPED;
     
     // 初始化数据
     memset(&client->current_coordinate, 0, sizeof(client->current_coordinate));
@@ -183,7 +183,7 @@ bool backend_client_connect(backend_client_t* client) {
     // 模拟连接（实际应该建立TCP连接）
     client->backend_status = BACKEND_CONNECTED;
     client->plc_status = PLC_CONNECTED; // 模拟PLC也连接
-    client->system_status = SYSTEM_RUNNING;
+    client->system_status = BACKEND_SYSTEM_RUNNING;
     
     printf("后端连接成功\n");
     return true;
@@ -201,7 +201,7 @@ void backend_client_disconnect(backend_client_t* client) {
     
     client->backend_status = BACKEND_DISCONNECTED;
     client->plc_status = PLC_DISCONNECTED;
-    client->system_status = SYSTEM_STOPPED;
+    client->system_status = BACKEND_SYSTEM_STOPPED;
 }
 
 bool backend_client_start_communication(backend_client_t* client) {
@@ -280,8 +280,8 @@ plc_status_t backend_client_get_plc_status(backend_client_t* client) {
     return client ? client->plc_status : PLC_DISCONNECTED;
 }
 
-system_status_t backend_client_get_system_status(backend_client_t* client) {
-    return client ? client->system_status : SYSTEM_STOPPED;
+backend_system_status_t backend_client_get_system_status(backend_client_t* client) {
+    return client ? client->system_status : BACKEND_SYSTEM_STOPPED;
 }
 
 bool backend_client_is_backend_running(void) {
@@ -333,7 +333,7 @@ bool backend_client_stop_backend_process(void) {
         } else {
             // 强制终止
             printf("强制终止后端进程\n");
-            system("pkill -KILL -f bamboo_cut_backend");
+            int unused __attribute__((unused)) = system("pkill -KILL -f bamboo_cut_backend");
             return true;
         }
     } else {
