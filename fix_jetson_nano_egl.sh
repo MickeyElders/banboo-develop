@@ -660,12 +660,37 @@ export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
-# Qt 配置 (Jetson专用)
-export QT_QPA_PLATFORM=eglfs
-export QT_QPA_EGLFS_INTEGRATION=eglfs_kms_egldevice
-export QT_QPA_EGLFS_KMS_CONFIG=/etc/qt_eglfs_kms_jetson.json
-export QT_QPA_EGLFS_KMS_ATOMIC=1
-export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+# Jetson Orin NX 完整启动流程
+echo "🔧 Jetson Orin NX 完整启动流程..."
+
+# 1. 设置性能模式
+echo "⚡ 设置性能模式..."
+sudo /usr/sbin/nvpmodel -m 0 2>/dev/null || echo "⚠️ nvpmodel设置失败"
+sudo /usr/bin/jetson_clocks 2>/dev/null || echo "⚠️ jetson_clocks设置失败"
+
+# 2. 显示驱动重置（可选）
+# sudo modprobe -r tegra_drm && sleep 1 && sudo modprobe tegra_drm
+
+# 3. 强制framebuffer配置
+echo "📺 配置framebuffer..."
+sudo sh -c 'echo "U:1920x1200p-0" > /sys/class/graphics/fb0/mode' 2>/dev/null
+sudo sh -c 'echo "0" > /sys/class/graphics/fb0/blank' 2>/dev/null
+sudo chmod 666 /dev/fb0 2>/dev/null
+sleep 3
+
+# 4. 验证显示状态
+current_mode=$(cat /sys/class/graphics/fb0/mode 2>/dev/null)
+if [ "$current_mode" = "U:1920x1200p-0" ]; then
+    echo "✅ 显示模式: $current_mode"
+else
+    echo "⚠️ 显示模式可能有问题: $current_mode"
+fi
+
+# 5. Qt配置 (LinuxFB模式)
+export QT_QPA_PLATFORM=linuxfb
+export QT_QPA_FB_DEVICE=/dev/fb0
+export QT_QPA_GENERIC_PLUGINS=evdevtouch
+export QT_QPA_FB_FORCE_FULLSCREEN=1
 
 # 确保X11不干扰
 unset DISPLAY
