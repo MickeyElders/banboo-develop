@@ -599,40 +599,65 @@ create_kms_config() {
     
     mkdir -p "${JETPACK_DEPLOY_DIR}/config"
     
+    # 检测实际显示器分辨率
+    DISPLAY_MODE="1920x1080"
+    if [ -f "/sys/class/graphics/fb0/modes" ]; then
+        FB_MODE=$(cat /sys/class/graphics/fb0/modes | head -1)
+        if [[ "$FB_MODE" == *"1920x1200"* ]]; then
+            DISPLAY_MODE="1920x1200"
+            log_info "检测到1920x1200显示器"
+        elif [[ "$FB_MODE" == *"1920x1080"* ]]; then
+            DISPLAY_MODE="1920x1080"
+            log_info "检测到1920x1080显示器"
+        else
+            log_warning "未识别的显示模式: $FB_MODE，使用默认1920x1080"
+        fi
+    fi
+    
     # 根据设备类型创建KMS配置
     case "$JETSON_TYPE" in
         "orin"*|"agx-orin")
-            KMS_CONFIG='{
-  "device": "/dev/dri/card0",
-  "hwcursor": true,
-  "pbuffers": true,
-  "outputs": [
+            KMS_CONFIG="{
+  \"device\": \"/dev/dri/card0\",
+  \"hwcursor\": true,
+  \"pbuffers\": true,
+  \"outputs\": [
     {
-      "name": "DP-1",
-      "mode": "1920x1080",
-      "primary": true
+      \"name\": \"DP-1\",
+      \"mode\": \"$DISPLAY_MODE\",
+      \"primary\": true
+    },
+    {
+      \"name\": \"HDMI-A-1\",
+      \"mode\": \"$DISPLAY_MODE\",
+      \"primary\": false
     }
   ]
-}'
+}"
             ;;
         *)
-            KMS_CONFIG='{
-  "device": "/dev/dri/card0",
-  "hwcursor": false,
-  "pbuffers": true,
-  "outputs": [
+            KMS_CONFIG="{
+  \"device\": \"/dev/dri/card0\",
+  \"hwcursor\": false,
+  \"pbuffers\": true,
+  \"outputs\": [
     {
-      "name": "HDMI-A-1",
-      "mode": "1920x1080",
-      "primary": true
+      \"name\": \"HDMI-A-1\",
+      \"mode\": \"$DISPLAY_MODE\",
+      \"primary\": true
+    },
+    {
+      \"name\": \"DP-1\",
+      \"mode\": \"$DISPLAY_MODE\",
+      \"primary\": false
     }
   ]
-}'
+}"
             ;;
     esac
     
     echo "$KMS_CONFIG" > "${JETPACK_DEPLOY_DIR}/config/kms.conf"
-    log_success "KMS 配置已创建"
+    log_success "KMS 配置已创建 (${DISPLAY_MODE})"
 }
 
 # 创建无超时的启动脚本
@@ -658,12 +683,28 @@ export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp/runtime-root}
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
-# Qt 配置
+# Qt 配置 (增强版)
 export QT_QPA_PLATFORM=eglfs
 export QT_QPA_EGLFS_INTEGRATION=eglfs_kms_egldevice
 export QT_QPA_EGLFS_KMS_CONFIG=/opt/bamboo-cut/config/kms.conf
 export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
 export QT_QPA_EGLFS_HIDECURSOR=1
+export QT_QPA_EGLFS_FORCE_888=1
+export QT_QPA_EGLFS_DISABLE_INPUT=0
+export QT_QPA_FONTDIR=/usr/share/fonts
+export QT_QPA_GENERIC_PLUGINS=evdevtouch,evdevkeyboard,evdevmouse
+
+# 强制使用EGL设备模式
+export QT_QPA_EGLFS_KMS_ATOMIC=1
+export QT_QPA_EGLFS_KMS_HEADLESS=0
+
+# 确保X11不干扰
+unset DISPLAY
+unset WAYLAND_DISPLAY
+
+# OpenGL配置
+export MESA_GL_VERSION_OVERRIDE=3.3
+export MESA_GLSL_VERSION_OVERRIDE=330
 
 # 设备权限
 for device in /dev/dri/card0 /dev/dri/renderD128 /dev/nvidia0 /dev/nvidiactl; do
