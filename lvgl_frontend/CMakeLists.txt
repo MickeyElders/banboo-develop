@@ -135,21 +135,50 @@ set(HEADERS
 # 可执行文件
 add_executable(bamboo_controller_lvgl ${SOURCES} ${HEADERS})
 
+# Jetson设备特定的CUDA库路径配置
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    # Jetson设备的CUDA库路径
+    set(CUDA_LIB_PATHS
+        "/usr/local/cuda/lib64"
+        "/usr/local/cuda/targets/aarch64-linux/lib"
+        "/usr/lib/aarch64-linux-gnu"
+    )
+    
+    # TensorRT库路径
+    set(TENSORRT_LIB_PATHS
+        "/usr/lib/aarch64-linux-gnu"
+        "/usr/local/lib"
+        "/opt/nvidia/vpi2/lib64"
+    )
+    
+    # 设置库搜索路径
+    link_directories(${CUDA_LIB_PATHS} ${TENSORRT_LIB_PATHS})
+    
+    message(STATUS "Jetson Orin NX detected - configuring CUDA libraries")
+endif()
+
 # 链接库
 target_link_libraries(bamboo_controller_lvgl
     PRIVATE
     lvgl
     ${OpenCV_LIBS}
-    ${CUDA_LIBRARIES}
-    nvinfer
-    nvonnxparser
-    cudart
-    cublas
-    curand
     pthread
     dl
     m
 )
+
+# Jetson设备的CUDA和TensorRT库
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    target_link_libraries(bamboo_controller_lvgl
+        PRIVATE
+        cudart
+        cublas
+        curand
+        nvinfer
+        nvonnxparser
+    )
+    message(STATUS "CUDA and TensorRT libraries linked for Jetson")
+endif()
 
 # 编译定义
 target_compile_definitions(bamboo_controller_lvgl
