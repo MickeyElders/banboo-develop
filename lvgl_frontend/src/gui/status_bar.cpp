@@ -1,4 +1,5 @@
 #include "gui/status_bar.h"
+#include "resources/fonts/lv_font_noto_sans_cjk.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -75,7 +76,7 @@ void Status_bar::create_layout() {
     // 创建系统标题
     system_title_ = lv_label_create(container_);
     lv_label_set_text(system_title_, "AI竹节识别切割系统 v2.1 - Modbus TCP");
-    lv_obj_set_style_text_font(system_title_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(system_title_, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_set_style_text_color(system_title_, lv_color_hex(0xFFFFFF), 0);
     
     // 创建工作流程状态容器
@@ -105,7 +106,7 @@ void Status_bar::create_workflow_steps() {
         workflow_steps_[i] = lv_label_create(workflow_container_);
         lv_label_set_text(workflow_steps_[i], step_names[i]);
         lv_obj_add_style(workflow_steps_[i], &style_step_, 0);
-        lv_obj_set_style_text_font(workflow_steps_[i], &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(workflow_steps_[i], &lv_font_noto_sans_cjk_14, 0);
     }
 }
 
@@ -133,13 +134,13 @@ void Status_bar::create_heartbeat_monitor() {
     heartbeat_label_ = lv_label_create(heartbeat_monitor_);
     lv_label_set_text(heartbeat_label_, "心跳: 12345");
     lv_obj_set_style_text_color(heartbeat_label_, lv_color_hex(0x4CAF50), 0);
-    lv_obj_set_style_text_font(heartbeat_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(heartbeat_label_, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建响应时间标签
     response_label_ = lv_label_create(heartbeat_monitor_);
     lv_label_set_text(response_label_, "响应: 12ms");
     lv_obj_set_style_text_color(response_label_, lv_color_hex(0x4CAF50), 0);
-    lv_obj_set_style_text_font(response_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(response_label_, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_set_style_pad_left(response_label_, 15, 0);
 }
 

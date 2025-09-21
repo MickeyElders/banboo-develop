@@ -1,4 +1,5 @@
 #include "gui/control_panel.h"
+#include "resources/fonts/lv_font_noto_sans_cjk.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -122,7 +123,7 @@ void Control_panel::create_modbus_section() {
     lv_obj_t* title = lv_label_create(modbus_section_);
     lv_label_set_text(title, "📊 Modbus寄存器状态");
     lv_obj_set_style_text_color(title, lv_color_hex(0x2196F3), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建寄存器表格
     modbus_table_ = lv_table_create(modbus_section_);
@@ -158,7 +159,7 @@ void Control_panel::create_modbus_section() {
     }
     
     // 设置表格样式
-    lv_obj_set_style_text_font(modbus_table_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(modbus_table_, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFF6B35), LV_PART_ITEMS | LV_STATE_USER_1);
 }
@@ -179,7 +180,7 @@ void Control_panel::create_plc_section() {
     lv_obj_t* title = lv_label_create(plc_section_);
     lv_label_set_text(title, "🔗 PLC通信状态");
     lv_obj_set_style_text_color(title, lv_color_hex(0x4CAF50), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建状态网格容器
     lv_obj_t* status_grid = lv_obj_create(plc_section_);
@@ -212,12 +213,12 @@ void Control_panel::create_plc_section() {
         lv_obj_t* label = lv_label_create(status_item);
         lv_label_set_text(label, status_labels[i]);
         lv_obj_set_style_text_color(label, lv_color_hex(0xB0B0B0), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(label, &lv_font_noto_sans_cjk_14, 0);
         
         *status_value_labels[i] = lv_label_create(status_item);
         lv_label_set_text(*status_value_labels[i], status_values[i]);
         lv_obj_set_style_text_color(*status_value_labels[i], lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(*status_value_labels[i], &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(*status_value_labels[i], &lv_font_noto_sans_cjk_14, 0);
         
         // 连接状态显示为绿色
         if(i == 0) {
@@ -247,7 +248,7 @@ void Control_panel::create_plc_section() {
         
         lv_obj_t* label = lv_label_create(blade_buttons_[i]);
         lv_label_set_text(label, blade_names[i]);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(label, &lv_font_noto_sans_cjk_14, 0);
         lv_obj_center(label);
         
         // 设置事件回调
@@ -277,7 +278,7 @@ void Control_panel::create_jetson_section() {
     lv_obj_t* title = lv_label_create(jetson_section_);
     lv_label_set_text(title, "🟢 Jetson Orin Nano 8GB  15W");
     lv_obj_set_style_text_color(title, lv_color_hex(0x76B900), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建CPU进度条
     lv_obj_t* cpu_container = lv_obj_create(jetson_section_);
@@ -299,12 +300,12 @@ void Control_panel::create_jetson_section() {
     lv_obj_t* cpu_desc = lv_label_create(cpu_label_container);
     lv_label_set_text(cpu_desc, "CPU (6核 ARM Cortex-A78AE)");
     lv_obj_set_style_text_color(cpu_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(cpu_desc, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(cpu_desc, &lv_font_noto_sans_cjk_14, 0);
     
     cpu_usage_label_ = lv_label_create(cpu_label_container);
     lv_label_set_text(cpu_usage_label_, "45%");
     lv_obj_set_style_text_color(cpu_usage_label_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(cpu_usage_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(cpu_usage_label_, &lv_font_noto_sans_cjk_14, 0);
     
     cpu_progress_ = lv_bar_create(cpu_container);
     lv_obj_set_size(cpu_progress_, LV_PCT(100), 6);
@@ -332,12 +333,12 @@ void Control_panel::create_jetson_section() {
     lv_obj_t* gpu_desc = lv_label_create(gpu_label_container);
     lv_label_set_text(gpu_desc, "GPU (1024-core NVIDIA Ampere)");
     lv_obj_set_style_text_color(gpu_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(gpu_desc, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(gpu_desc, &lv_font_noto_sans_cjk_14, 0);
     
     gpu_usage_label_ = lv_label_create(gpu_label_container);
     lv_label_set_text(gpu_usage_label_, "32%");
     lv_obj_set_style_text_color(gpu_usage_label_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(gpu_usage_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(gpu_usage_label_, &lv_font_noto_sans_cjk_14, 0);
     
     gpu_progress_ = lv_bar_create(gpu_container);
     lv_obj_set_size(gpu_progress_, LV_PCT(100), 6);
@@ -365,12 +366,12 @@ void Control_panel::create_jetson_section() {
     lv_obj_t* memory_desc = lv_label_create(memory_label_container);
     lv_label_set_text(memory_desc, "内存 (LPDDR5)");
     lv_obj_set_style_text_color(memory_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(memory_desc, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(memory_desc, &lv_font_noto_sans_cjk_14, 0);
     
     memory_usage_label_ = lv_label_create(memory_label_container);
     lv_label_set_text(memory_usage_label_, "2.1GB/8GB");
     lv_obj_set_style_text_color(memory_usage_label_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(memory_usage_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(memory_usage_label_, &lv_font_noto_sans_cjk_14, 0);
     
     memory_progress_ = lv_bar_create(memory_container);
     lv_obj_set_size(memory_progress_, LV_PCT(100), 6);
@@ -395,7 +396,7 @@ void Control_panel::create_ai_section() {
     lv_obj_t* title = lv_label_create(ai_section_);
     lv_label_set_text(title, "🤖 AI模型状态");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建状态网格容器
     lv_obj_t* ai_grid = lv_obj_create(ai_section_);
@@ -428,12 +429,12 @@ void Control_panel::create_ai_section() {
         lv_obj_t* label = lv_label_create(ai_item);
         lv_label_set_text(label, ai_labels[i]);
         lv_obj_set_style_text_color(label, lv_color_hex(0xB0B0B0), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(label, &lv_font_noto_sans_cjk_14, 0);
         
         lv_obj_t* value_label = lv_label_create(ai_item);
         lv_label_set_text(value_label, ai_values[i]);
         lv_obj_set_style_text_color(value_label, lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(value_label, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(value_label, &lv_font_noto_sans_cjk_14, 0);
         
         if(ai_value_labels[i]) {
             *ai_value_labels[i] = value_label;
@@ -457,7 +458,7 @@ void Control_panel::create_comm_section() {
     lv_obj_t* title = lv_label_create(comm_section_);
     lv_label_set_text(title, "📈 通信统计");
     lv_obj_set_style_text_color(title, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建状态网格容器
     lv_obj_t* comm_grid = lv_obj_create(comm_section_);
@@ -490,12 +491,12 @@ void Control_panel::create_comm_section() {
         lv_obj_t* label = lv_label_create(comm_item);
         lv_label_set_text(label, comm_labels[i]);
         lv_obj_set_style_text_color(label, lv_color_hex(0xB0B0B0), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(label, &lv_font_noto_sans_cjk_14, 0);
         
         *comm_value_labels[i] = lv_label_create(comm_item);
         lv_label_set_text(*comm_value_labels[i], comm_values[i]);
         lv_obj_set_style_text_color(*comm_value_labels[i], lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(*comm_value_labels[i], &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(*comm_value_labels[i], &lv_font_noto_sans_cjk_14, 0);
     }
 }
 

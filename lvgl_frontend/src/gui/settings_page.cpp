@@ -1,4 +1,5 @@
 #include "gui/settings_page.h"
+#include "resources/fonts/lv_font_noto_sans_cjk.h"
 #include "gui/status_bar.h"
 #include "gui/video_view.h"
 #include "gui/control_panel.h"
@@ -152,7 +153,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_add_style(start_btn_, &style_btn_start_, 0);
     lv_obj_t* start_label = lv_label_create(start_btn_);
     lv_label_set_text(start_label, "▶ 启动系统");
-    lv_obj_set_style_text_font(start_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(start_label, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_center(start_label);
     lv_obj_add_event_cb(start_btn_, button_event_cb, LV_EVENT_CLICKED, (void*)0);
     
@@ -163,7 +164,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_style_text_color(pause_btn_, lv_color_hex(0xFFC107), 0);
     lv_obj_t* pause_label = lv_label_create(pause_btn_);
     lv_label_set_text(pause_label, "⏸ 暂停");
-    lv_obj_set_style_text_font(pause_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(pause_label, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_center(pause_label);
     lv_obj_add_event_cb(pause_btn_, button_event_cb, LV_EVENT_CLICKED, (void*)1);
     
@@ -174,7 +175,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_style_text_color(stop_btn_, lv_color_hex(0xF44336), 0);
     lv_obj_t* stop_label = lv_label_create(stop_btn_);
     lv_label_set_text(stop_label, "⏹ 停止");
-    lv_obj_set_style_text_font(stop_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(stop_label, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_center(stop_label);
     lv_obj_add_event_cb(stop_btn_, button_event_cb, LV_EVENT_CLICKED, (void*)2);
     
@@ -192,13 +193,13 @@ void Settings_page::create_footer_panel() {
     current_process_label_ = lv_label_create(status_info_);
     lv_label_set_text(current_process_label_, "当前工序: 进料检测中");
     lv_obj_set_style_text_color(current_process_label_, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(current_process_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(current_process_label_, &lv_font_noto_sans_cjk_14, 0);
     
     // 状态信息标签
     status_info_label_ = lv_label_create(status_info_);
     lv_label_set_text(status_info_label_, "上次切割: 14:25:33 | 今日切割: 89次 | 效率: 94.2%");
     lv_obj_set_style_text_color(status_info_label_, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(status_info_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(status_info_label_, &lv_font_noto_sans_cjk_14, 0);
     
     // 创建紧急操作按钮容器 - 对应HTML中的emergency-section
     emergency_buttons_ = lv_obj_create(footer_panel_);
@@ -216,7 +217,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_add_style(emergency_btn_, &style_btn_emergency_, 0);
     lv_obj_t* emergency_label = lv_label_create(emergency_btn_);
     lv_label_set_text(emergency_label, "🚨 紧急停止");
-    lv_obj_set_style_text_font(emergency_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(emergency_label, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_center(emergency_label);
     lv_obj_add_event_cb(emergency_btn_, emergency_event_cb, LV_EVENT_CLICKED, (void*)0);
     
@@ -227,7 +228,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_style_text_color(power_btn_, lv_color_hex(0x9C27B0), 0);
     lv_obj_t* power_label = lv_label_create(power_btn_);
     lv_label_set_text(power_label, "⏻ 关机");
-    lv_obj_set_style_text_font(power_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(power_label, &lv_font_noto_sans_cjk_14, 0);
     lv_obj_center(power_label);
     lv_obj_add_event_cb(power_btn_, emergency_event_cb, LV_EVENT_CLICKED, (void*)1);
 }

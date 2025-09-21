@@ -268,10 +268,13 @@ typedef int16_t lv_coord_t;
 #define LV_USE_FONT_SIMSUN_16_CJK            1  /*1000 most common CJK radicals*/
 
 /* Enable additional CJK fonts for better Chinese support */
-#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_simsun_16_cjk)
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_noto_sans_cjk_14) LV_FONT_DECLARE(lv_font_noto_sans_cjk_16)
 
 /* Set default font to support Chinese characters */
-#define LV_FONT_DEFAULT &lv_font_simsun_16_cjk
+#define LV_FONT_DEFAULT &lv_font_noto_sans_cjk_14
+
+/* Enable large font format support for complex fonts */
+#define LV_FONT_FMT_TXT_LARGE 1
 
 /* Pixel perfect monospace fonts */
 #define LV_USE_FONT_UNSCII_8  0
@@ -280,7 +283,7 @@ typedef int16_t lv_coord_t;
 /* Optionally declare custom fonts here.
  * You can use these fonts as default font too and they will be available globally.
  * E.g. #define LV_FONT_CUSTOM_DECLARE   LV_FONT_DECLARE(my_font_1) LV_FONT_DECLARE(my_font_2) */
-#define LV_FONT_CUSTOM_DECLARE
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_noto_sans_cjk_14) LV_FONT_DECLARE(lv_font_noto_sans_cjk_16)
 
 /* Enables a custom font in the form of a binary file */
 #define LV_USE_FONT_BIN 1
