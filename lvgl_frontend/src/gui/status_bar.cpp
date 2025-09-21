@@ -75,7 +75,7 @@ void Status_bar::create_layout() {
     // 创建系统标题
     system_title_ = lv_label_create(container_);
     lv_label_set_text(system_title_, "AI竹节识别切割系统 v2.1 - Modbus TCP");
-    lv_obj_set_style_text_font(system_title_, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(system_title_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(system_title_, lv_color_hex(0xFFFFFF), 0);
     
     // 创建工作流程状态容器
@@ -91,7 +91,7 @@ void Status_bar::create_workflow_steps() {
     lv_obj_set_size(workflow_container_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(workflow_container_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(workflow_container_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(workflow_container_, 0);
+    lv_obj_set_style_pad_all(workflow_container_, 0, LV_PART_MAIN);
     
     // 设置Flex布局
     lv_obj_set_flex_flow(workflow_container_, LV_FLEX_FLOW_ROW);
@@ -115,7 +115,7 @@ void Status_bar::create_heartbeat_monitor() {
     lv_obj_set_size(heartbeat_monitor_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(heartbeat_monitor_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(heartbeat_monitor_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(heartbeat_monitor_, 0);
+    lv_obj_set_style_pad_all(heartbeat_monitor_, 0, LV_PART_MAIN);
     
     // 设置Flex布局
     lv_obj_set_flex_flow(heartbeat_monitor_, LV_FLEX_FLOW_ROW);

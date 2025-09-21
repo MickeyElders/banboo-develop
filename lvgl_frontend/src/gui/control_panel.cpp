@@ -94,7 +94,7 @@ void Control_panel::create_layout() {
     // 设置容器为Flex布局，垂直排列，带滚动
     lv_obj_add_style(container_, &style_container_, 0);
     lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(container_, 6, 0);
     lv_obj_set_scroll_dir(container_, LV_DIR_VER);
     
@@ -115,14 +115,14 @@ void Control_panel::create_modbus_section() {
     
     // 设置Flex布局
     lv_obj_set_flex_flow(modbus_section_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(modbus_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(modbus_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(modbus_section_, 6, 0);
     
     // 创建标题
     lv_obj_t* title = lv_label_create(modbus_section_);
     lv_label_set_text(title, "📊 Modbus寄存器状态");
     lv_obj_set_style_text_color(title, lv_color_hex(0x2196F3), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_13, 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
     
     // 创建寄存器表格
     modbus_table_ = lv_table_create(modbus_section_);
@@ -149,11 +149,16 @@ void Control_panel::create_modbus_section() {
         lv_table_set_cell_value(modbus_table_, i + 1, 2, register_values[i]);
         
         // 设置值列的颜色
-        lv_table_set_cell_ctrl(modbus_table_, i + 1, 2, LV_TABLE_CELL_CTRL_CUSTOM_1);
+        // 设置状态单元格样式（替代 lv_table_set_cell_ctrl）
+        if (i == 0) {  // 连接状态为绿色
+            lv_table_set_cell_value(modbus_table_, i + 1, 2, "✓");
+        } else {  // 其他状态为灰色
+            lv_table_set_cell_value(modbus_table_, i + 1, 2, "-");
+        }
     }
     
     // 设置表格样式
-    lv_obj_set_style_text_font(modbus_table_, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(modbus_table_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFF6B35), LV_PART_ITEMS | LV_STATE_USER_1);
 }
@@ -167,21 +172,21 @@ void Control_panel::create_plc_section() {
     
     // 设置Flex布局
     lv_obj_set_flex_flow(plc_section_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(plc_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(plc_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(plc_section_, 6, 0);
     
     // 创建标题
     lv_obj_t* title = lv_label_create(plc_section_);
     lv_label_set_text(title, "🔗 PLC通信状态");
     lv_obj_set_style_text_color(title, lv_color_hex(0x4CAF50), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_13, 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
     
     // 创建状态网格容器
     lv_obj_t* status_grid = lv_obj_create(plc_section_);
     lv_obj_set_size(status_grid, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(status_grid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(status_grid, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(status_grid, 0);
+    lv_obj_set_style_pad_all(status_grid, 0, LV_PART_MAIN);
     
     // 设置2x2网格布局
     static lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
@@ -207,7 +212,7 @@ void Control_panel::create_plc_section() {
         lv_obj_t* label = lv_label_create(status_item);
         lv_label_set_text(label, status_labels[i]);
         lv_obj_set_style_text_color(label, lv_color_hex(0xB0B0B0), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
         
         *status_value_labels[i] = lv_label_create(status_item);
         lv_label_set_text(*status_value_labels[i], status_values[i]);
@@ -225,7 +230,7 @@ void Control_panel::create_plc_section() {
     lv_obj_set_size(blade_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(blade_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(blade_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(blade_container, 0);
+    lv_obj_set_style_pad_all(blade_container, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_top(blade_container, 4, 0);
     
     lv_obj_set_flex_flow(blade_container, LV_FLEX_FLOW_ROW);
@@ -242,7 +247,7 @@ void Control_panel::create_plc_section() {
         
         lv_obj_t* label = lv_label_create(blade_buttons_[i]);
         lv_label_set_text(label, blade_names[i]);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_9, 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
         lv_obj_center(label);
         
         // 设置事件回调
@@ -265,21 +270,21 @@ void Control_panel::create_jetson_section() {
     
     // 设置Flex布局
     lv_obj_set_flex_flow(jetson_section_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(jetson_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(jetson_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(jetson_section_, 4, 0);
     
     // 创建标题
     lv_obj_t* title = lv_label_create(jetson_section_);
     lv_label_set_text(title, "🟢 Jetson Orin Nano 8GB  15W");
     lv_obj_set_style_text_color(title, lv_color_hex(0x76B900), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_13, 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
     
     // 创建CPU进度条
     lv_obj_t* cpu_container = lv_obj_create(jetson_section_);
     lv_obj_set_size(cpu_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(cpu_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(cpu_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(cpu_container, 0);
+    lv_obj_set_style_pad_all(cpu_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(cpu_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_gap(cpu_container, 2, 0);
     
@@ -287,14 +292,14 @@ void Control_panel::create_jetson_section() {
     lv_obj_set_size(cpu_label_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(cpu_label_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(cpu_label_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(cpu_label_container, 0);
+    lv_obj_set_style_pad_all(cpu_label_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(cpu_label_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(cpu_label_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     lv_obj_t* cpu_desc = lv_label_create(cpu_label_container);
     lv_label_set_text(cpu_desc, "CPU (6核 ARM Cortex-A78AE)");
     lv_obj_set_style_text_color(cpu_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(cpu_desc, &lv_font_montserrat_9, 0);
+    lv_obj_set_style_text_font(cpu_desc, &lv_font_montserrat_14, 0);
     
     cpu_usage_label_ = lv_label_create(cpu_label_container);
     lv_label_set_text(cpu_usage_label_, "45%");
@@ -312,7 +317,7 @@ void Control_panel::create_jetson_section() {
     lv_obj_set_size(gpu_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(gpu_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(gpu_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(gpu_container, 0);
+    lv_obj_set_style_pad_all(gpu_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(gpu_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_gap(gpu_container, 2, 0);
     
@@ -320,7 +325,7 @@ void Control_panel::create_jetson_section() {
     lv_obj_set_size(gpu_label_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(gpu_label_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(gpu_label_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(gpu_label_container, 0);
+    lv_obj_set_style_pad_all(gpu_label_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(gpu_label_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(gpu_label_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
@@ -345,7 +350,7 @@ void Control_panel::create_jetson_section() {
     lv_obj_set_size(memory_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(memory_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(memory_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(memory_container, 0);
+    lv_obj_set_style_pad_all(memory_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(memory_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_gap(memory_container, 2, 0);
     
@@ -353,7 +358,7 @@ void Control_panel::create_jetson_section() {
     lv_obj_set_size(memory_label_container, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(memory_label_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(memory_label_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(memory_label_container, 0);
+    lv_obj_set_style_pad_all(memory_label_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(memory_label_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(memory_label_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
@@ -383,21 +388,21 @@ void Control_panel::create_ai_section() {
     
     // 设置Flex布局
     lv_obj_set_flex_flow(ai_section_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(ai_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(ai_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(ai_section_, 4, 0);
     
     // 创建标题
     lv_obj_t* title = lv_label_create(ai_section_);
     lv_label_set_text(title, "🤖 AI模型状态");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_13, 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
     
     // 创建状态网格容器
     lv_obj_t* ai_grid = lv_obj_create(ai_section_);
     lv_obj_set_size(ai_grid, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(ai_grid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(ai_grid, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(ai_grid, 0);
+    lv_obj_set_style_pad_all(ai_grid, 0, LV_PART_MAIN);
     
     // 设置2x3网格布局
     static lv_coord_t ai_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
@@ -423,7 +428,7 @@ void Control_panel::create_ai_section() {
         lv_obj_t* label = lv_label_create(ai_item);
         lv_label_set_text(label, ai_labels[i]);
         lv_obj_set_style_text_color(label, lv_color_hex(0xB0B0B0), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
         
         lv_obj_t* value_label = lv_label_create(ai_item);
         lv_label_set_text(value_label, ai_values[i]);
@@ -445,21 +450,21 @@ void Control_panel::create_comm_section() {
     
     // 设置Flex布局
     lv_obj_set_flex_flow(comm_section_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(comm_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(comm_section_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(comm_section_, 4, 0);
     
     // 创建标题
     lv_obj_t* title = lv_label_create(comm_section_);
     lv_label_set_text(title, "📈 通信统计");
     lv_obj_set_style_text_color(title, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_13, 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
     
     // 创建状态网格容器
     lv_obj_t* comm_grid = lv_obj_create(comm_section_);
     lv_obj_set_size(comm_grid, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(comm_grid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(comm_grid, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(comm_grid, 0);
+    lv_obj_set_style_pad_all(comm_grid, 0, LV_PART_MAIN);
     
     // 设置2x2网格布局
     static lv_coord_t comm_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
@@ -485,7 +490,7 @@ void Control_panel::create_comm_section() {
         lv_obj_t* label = lv_label_create(comm_item);
         lv_label_set_text(label, comm_labels[i]);
         lv_obj_set_style_text_color(label, lv_color_hex(0xB0B0B0), 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
         
         *comm_value_labels[i] = lv_label_create(comm_item);
         lv_label_set_text(*comm_value_labels[i], comm_values[i]);

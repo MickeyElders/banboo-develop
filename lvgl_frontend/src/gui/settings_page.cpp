@@ -82,7 +82,7 @@ void Settings_page::create_main_layout(Status_bar* status_bar, Video_view* video
     lv_obj_set_pos(main_grid_, 0, 0);
     lv_obj_set_style_bg_opa(main_grid_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(main_grid_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(main_grid_, 10);
+    lv_obj_set_style_pad_all(main_grid_, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_top(main_grid_, 0, 0);
     lv_obj_set_style_pad_gap(main_grid_, 10, 0);
     
@@ -102,7 +102,7 @@ void Settings_page::create_main_layout(Status_bar* status_bar, Video_view* video
     lv_obj_set_grid_cell(main_content, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
     lv_obj_set_style_bg_opa(main_content, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(main_content, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(main_content, 0);
+    lv_obj_set_style_pad_all(main_content, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_gap(main_content, 10, 0);
     
     // 设置主内容区域的Grid布局 - 2列: camera(1fr), control(380px)
@@ -141,7 +141,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_size(control_buttons_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(control_buttons_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(control_buttons_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(control_buttons_, 0);
+    lv_obj_set_style_pad_all(control_buttons_, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(control_buttons_, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(control_buttons_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(control_buttons_, 15, 0);
@@ -183,7 +183,7 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_size(status_info_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(status_info_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(status_info_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(status_info_, 0);
+    lv_obj_set_style_pad_all(status_info_, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(status_info_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(status_info_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(status_info_, 5, 0);
@@ -198,14 +198,14 @@ void Settings_page::create_footer_panel() {
     status_info_label_ = lv_label_create(status_info_);
     lv_label_set_text(status_info_label_, "上次切割: 14:25:33 | 今日切割: 89次 | 效率: 94.2%");
     lv_obj_set_style_text_color(status_info_label_, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(status_info_label_, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(status_info_label_, &lv_font_montserrat_14, 0);
     
     // 创建紧急操作按钮容器 - 对应HTML中的emergency-section
     emergency_buttons_ = lv_obj_create(footer_panel_);
     lv_obj_set_size(emergency_buttons_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(emergency_buttons_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(emergency_buttons_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(emergency_buttons_, 0);
+    lv_obj_set_style_pad_all(emergency_buttons_, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(emergency_buttons_, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(emergency_buttons_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(emergency_buttons_, 10, 0);

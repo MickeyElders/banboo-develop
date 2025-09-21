@@ -69,7 +69,7 @@ void Video_view::create_layout() {
     // 设置容器为Flex布局，垂直排列
     lv_obj_add_style(container_, &style_container_, 0);
     lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(container_, 10, 0);
     
     // 创建摄像头标题
@@ -88,7 +88,7 @@ void Video_view::create_camera_title() {
     lv_obj_set_size(camera_title_, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(camera_title_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(camera_title_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(camera_title_, 0);
+    lv_obj_set_style_pad_all(camera_title_, 0, LV_PART_MAIN);
     
     // 设置Flex布局
     lv_obj_set_flex_flow(camera_title_, LV_FLEX_FLOW_ROW);
@@ -98,13 +98,13 @@ void Video_view::create_camera_title() {
     title_label_ = lv_label_create(camera_title_);
     lv_label_set_text(title_label_, "📹 实时检测画面");
     lv_obj_set_style_text_color(title_label_, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(title_label_, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(title_label_, &lv_font_montserrat_14, 0);
     
     // 创建检测信息标签
     detection_info_ = lv_label_create(camera_title_);
     lv_label_set_text(detection_info_, "导轨范围: 0-1000.0mm | 精度: 0.1mm | FPS: 28.5");
     lv_obj_set_style_text_color(detection_info_, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(detection_info_, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(detection_info_, &lv_font_montserrat_14, 0);
 }
 
 void Video_view::create_camera_canvas() {
@@ -123,14 +123,14 @@ void Video_view::create_camera_canvas() {
     // 创建导轨指示器 - 对应HTML中的rail-indicator
     rail_indicator_ = lv_obj_create(camera_canvas_);
     lv_obj_set_size(rail_indicator_, LV_PCT(95), 30);
-    lv_obj_set_pos(rail_indicator_, LV_PCT(2.5), LV_PCT(85));
+    lv_obj_set_pos(rail_indicator_, LV_PCT(3), LV_PCT(85));
     lv_obj_add_style(rail_indicator_, &style_rail_, 0);
     
     // 导轨标签
     lv_obj_t* rail_label = lv_label_create(rail_indicator_);
     lv_label_set_text(rail_label, "X轴导轨 (0-1000.0mm)");
     lv_obj_set_style_text_color(rail_label, lv_color_hex(0x2196F3), 0);
-    lv_obj_set_style_text_font(rail_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(rail_label, &lv_font_montserrat_14, 0);
     lv_obj_center(rail_label);
     
     // 创建切割位置指示器
@@ -158,26 +158,26 @@ void Video_view::create_coordinate_display() {
     lv_obj_set_grid_cell(x_coord_container, LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 0, 2);
     lv_obj_set_style_bg_opa(x_coord_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(x_coord_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(x_coord_container, 0);
+    lv_obj_set_style_pad_all(x_coord_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(x_coord_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(x_coord_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     lv_obj_t* x_label = lv_label_create(x_coord_container);
     lv_label_set_text(x_label, "X坐标");
     lv_obj_set_style_text_color(x_label, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(x_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(x_label, &lv_font_montserrat_14, 0);
     
     x_coord_label_ = lv_label_create(x_coord_container);
     lv_label_set_text(x_coord_label_, "245.8mm");
     lv_obj_set_style_text_color(x_coord_label_, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(x_coord_label_, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(x_coord_label_, &lv_font_montserrat_14, 0);
     
     // 创建切割质量显示
     lv_obj_t* quality_container = lv_obj_create(coordinate_display_);
     lv_obj_set_grid_cell(quality_container, LV_GRID_ALIGN_CENTER, 1, 1, LV_GRID_ALIGN_CENTER, 0, 2);
     lv_obj_set_style_bg_opa(quality_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(quality_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(quality_container, 0);
+    lv_obj_set_style_pad_all(quality_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(quality_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(quality_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
@@ -196,7 +196,7 @@ void Video_view::create_coordinate_display() {
     lv_obj_set_grid_cell(blade_container, LV_GRID_ALIGN_CENTER, 2, 1, LV_GRID_ALIGN_CENTER, 0, 2);
     lv_obj_set_style_bg_opa(blade_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(blade_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(blade_container, 0);
+    lv_obj_set_style_pad_all(blade_container, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(blade_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(blade_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
