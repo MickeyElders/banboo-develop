@@ -15,7 +15,7 @@ typedef struct {
 
 // 触摸设备配置 (使用不同的名称避免与common/types.h冲突)
 typedef struct {
-    const char* device_path;     // 设备路径，如 /dev/input/event0
+    char device_path[256];      // 设备路径，如 /dev/input/event0
     int16_t max_x;              // 最大X坐标
     int16_t max_y;              // 最大Y坐标
     int16_t screen_width;       // 屏幕宽度

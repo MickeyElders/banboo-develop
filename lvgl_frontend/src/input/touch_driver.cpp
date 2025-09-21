@@ -68,8 +68,9 @@ bool usb_touch_detect() {
                         strstr(device_name, "USB") || strstr(device_name, "HID")) {
                         printf("检测到USB触摸屏设备: %s (%s)\n", device_name, device_path);
                         
-                        // 更新配置
-                        strncpy((char*)touch_config.device_path, device_path, strlen(device_path) + 1);
+                        // 更新配置 - 安全地复制设备路径
+                        strncpy(touch_config.device_path, device_path, sizeof(touch_config.device_path) - 1);
+                        touch_config.device_path[sizeof(touch_config.device_path) - 1] = '\0';
                         found = true;
                         close(fd);
                         break;

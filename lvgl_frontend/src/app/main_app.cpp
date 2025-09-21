@@ -11,6 +11,7 @@
 #include "gui/settings_page.h"
 #include "input/touch_driver.h"
 #include <stdio.h>
+#include <string.h>
 // 其他头文件暂时注释掉，避免不完整类型问题
 // #include "app/config_manager.h"
 // #include "camera/camera_manager.h"
@@ -188,16 +189,16 @@ void MainApp::setup_touch_input() {
     }
     
     // 设置触摸屏配置（根据实际显示器调整）
-    touch_driver_config_t config = {
-        .device_path = "/dev/input/event0",  // 会自动检测
-        .max_x = 4095,
-        .max_y = 4095,
-        .screen_width = 1920,
-        .screen_height = 1080,
-        .swap_xy = false,
-        .invert_x = false,
-        .invert_y = false
-    };
+    touch_driver_config_t config;
+    strcpy(config.device_path, "/dev/input/event0");  // 会自动检测
+    config.max_x = 4095;
+    config.max_y = 4095;
+    config.screen_width = 1920;
+    config.screen_height = 1080;
+    config.swap_xy = false;
+    config.invert_x = false;
+    config.invert_y = false;
+    
     touch_driver_set_config(&config);
     
     printf("USB Type-C触摸屏设置完成\n");
