@@ -89,12 +89,6 @@ PLC → 视觉系统: 写入指令码 (40003寄存器)
 - **数据吞吐**: 1000+ 坐标/秒
 - **可靠性**: 心跳监控 + 自动重连
 
-**详细文档:**
-- [C++版PLC通信协议文档](docs/cpp_plc_communication_protocol.md) - 完整协议规范
-- [工业通信标准技术规范](docs/industrial_communication_standards.md) - 技术实现细节
-
-## 🔧 开发指南
-
 ### 构建环境
 
 ```bash
@@ -105,65 +99,3 @@ sudo apt install libopencv-dev libgstreamer1.0-dev libmodbus-dev
 # Jetson额外依赖
 sudo apt install nvidia-jetpack  # TensorRT + DeepStream
 ```
-
-### 项目结构
-
-```
-bamboo-cut-develop/
-├── README.md                 # 项目主文档
-├── VERSION                   # 版本标识文件 (2.0.0)
-├── Makefile                  # 跨平台统一编译配置
-├── build_all.sh              # Linux/macOS 编译脚本
-├── build_all.ps1             # Windows PowerShell 编译脚本
-├── .vscode/                  # VS Code 配置
-├── config/                   # 系统配置文件
-│   ├── system_config.yaml    # 硬件和系统配置
-│   ├── ai_optimization.yaml  # AI模型优化配置
-│   └── performance_config.yaml # 性能调优配置
-├── models/                   # AI模型文件目录 ⭐
-│   ├── README.md             # 模型使用说明
-│   ├── bamboo_detection.onnx # 竹节检测ONNX模型
-│   └── bamboo_detection.trt  # TensorRT优化引擎
-├── cpp_backend/              # C++ 后端源码
-│   ├── CMakeLists.txt        # CMake 构建配置
-│   ├── include/              # 头文件目录
-│   ├── src/                  # 源文件目录
-│   ├── tools/                # 开发工具
-│   └── examples/             # 示例代码
-├── flutter_frontend/         # Flutter 前端源码
-│   ├── pubspec.yaml          # Flutter 项目配置
-│   └── lib/                  # Dart 源文件
-├── deploy/                   # 部署相关
-│   └── scripts/              # 部署脚本
-└── docs/                     # 技术文档
-    ├── BUILD_GUIDE.md        # 详细编译指南
-    ├── cpp_plc_communication_protocol.md  # PLC通信协议
-    └── ... (其他技术文档)
-```
-
-## 📈 版本历史
-
-- **v2.0.0** (当前版本) - C++/Flutter全新架构重构
-- **v1.x.x** - Python版本 (已废弃)
-
-## 🤝 贡献指南
-
-1. Fork项目仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启Pull Request
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 📞 技术支持
-
-- 📧 邮箱: support@bamboo-cut.com
-- 📚 文档: https://docs.bamboo-cut.com
-- 🐛 问题反馈: GitHub Issues
-
----
-
-**智能切竹机 v2.0 - 工业4.0智能制造解决方案** 🏭⚡ 

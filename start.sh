@@ -343,7 +343,7 @@ build_backend() {
 
 # 构建LVGL前端
 build_frontend() {
-    print_step "构建LVGL前端项目..."
+    print_step "构建LVGL前端项目 (Grid/Flex布局版本)..."
     
     # 确保在项目根目录
     cd "$SCRIPT_DIR"
@@ -357,6 +357,27 @@ build_frontend() {
     
     cd "$FRONTEND_DIR"
     
+    # 验证新布局相关的源文件是否存在
+    print_info "验证Grid/Flex布局源文件..."
+    local required_files=(
+        "src/gui/status_bar.cpp"
+        "src/gui/video_view.cpp"
+        "src/gui/control_panel.cpp"
+        "src/gui/settings_page.cpp"
+        "include/gui/status_bar.h"
+        "include/gui/video_view.h"
+        "include/gui/control_panel.h"
+        "include/gui/settings_page.h"
+    )
+    
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "$file" ]]; then
+            print_error "缺少必需的源文件: $file"
+            exit 1
+        fi
+    done
+    print_success "所有Grid/Flex布局源文件验证通过"
+    
     # 清理旧的构建
     if [[ -d "build" ]]; then
         print_info "清理旧的构建目录..."
@@ -368,19 +389,20 @@ build_frontend() {
     cd build
     
     # CMake配置
-    print_info "配置前端CMake..."
+    print_info "配置前端CMake (Grid/Flex布局支持)..."
     local cmake_args=(
         "-DCMAKE_BUILD_TYPE=Release"
         "-DCMAKE_CXX_STANDARD=17"
         "-DCMAKE_C_STANDARD=11"
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
     )
     
     # Jetson优化
     if [[ "$JETSON_DEVICE" == "true" ]]; then
         cmake_args+=(
             "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
-            "-DCMAKE_C_FLAGS=-mcpu=cortex-a78 -O3 -ffast-math"
-            "-DCMAKE_CXX_FLAGS=-mcpu=cortex-a78 -O3 -ffast-math"
+            "-DCMAKE_C_FLAGS=-mcpu=cortex-a78 -O3 -ffast-math -DLVGL_GRID_LAYOUT=1 -DLVGL_FLEX_LAYOUT=1"
+            "-DCMAKE_CXX_FLAGS=-mcpu=cortex-a78 -O3 -ffast-math -DLVGL_GRID_LAYOUT=1 -DLVGL_FLEX_LAYOUT=1"
         )
         
         # 查找Jetson OpenCV
@@ -388,19 +410,52 @@ build_frontend() {
         if [[ -d "$opencv_dir" ]]; then
             cmake_args+=("-DOpenCV_DIR=$opencv_dir")
         fi
+    else
+        # 非Jetson设备也启用Grid/Flex布局
+        cmake_args+=(
+            "-DCMAKE_C_FLAGS=-O3 -ffast-math -DLVGL_GRID_LAYOUT=1 -DLVGL_FLEX_LAYOUT=1"
+            "-DCMAKE_CXX_FLAGS=-O3 -ffast-math -DLVGL_GRID_LAYOUT=1 -DLVGL_FLEX_LAYOUT=1"
+        )
     fi
     
     # 运行CMake
+    print_info "CMake配置参数: ${cmake_args[*]}"
     cmake "${cmake_args[@]}" ..
     
-    # 编译
-    print_info "编译前端项目..."
+    # 检查CMake是否成功
+    if [[ $? -ne 0 ]]; then
+        print_error "CMake配置失败"
+        exit 1
+    fi
+    
+    # 编译前显示编译信息
+    print_info "开始编译Grid/Flex布局LVGL前端..."
     local num_cores=$(nproc)
     print_info "使用 $num_cores 个CPU核心进行编译"
-    make -j$num_cores
+    print_info "启用LVGL Grid和Flex布局支持"
+    
+    # 编译
+    make -j$num_cores VERBOSE=1
+    
+    # 检查编译是否成功
+    if [[ $? -ne 0 ]]; then
+        print_error "前端编译失败"
+        print_info "请检查编译错误信息"
+        exit 1
+    fi
+    
+    # 验证可执行文件是否生成
+    if [[ ! -f "$BINARY_NAME" ]]; then
+        print_error "可执行文件未生成: $BINARY_NAME"
+        exit 1
+    fi
+    
+    # 显示可执行文件信息
+    print_info "可执行文件大小: $(du -h $BINARY_NAME | cut -f1)"
+    print_info "可执行文件路径: $(pwd)/$BINARY_NAME"
     
     cd ../..
-    print_success "LVGL前端构建完成"
+    print_success "LVGL前端构建完成 (Grid/Flex布局)"
 }
 
 # 设置权限

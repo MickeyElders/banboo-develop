@@ -401,6 +401,16 @@ typedef int16_t lv_coord_t;
 #define LV_USE_WIN          1
 
 /*==================
+   LAYOUT SETTINGS
+ *==================*/
+
+/* Enable LVGL's Grid Layout system */
+#define LV_USE_GRID 1
+
+/* Enable LVGL's Flex Layout system */
+#define LV_USE_FLEX 1
+
+/*==================
    OTHERS
  *==================*/
 

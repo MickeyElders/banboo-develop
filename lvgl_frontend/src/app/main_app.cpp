@@ -5,12 +5,15 @@
 #include "app/main_app.h"
 #include "app/event_manager.h"
 #include "common/utils.h"
+#include "gui/status_bar.h"
+#include "gui/video_view.h"
+#include "gui/control_panel.h"
+#include "gui/settings_page.h"
 #include <stdio.h>
 // 其他头文件暂时注释掉，避免不完整类型问题
 // #include "app/config_manager.h"
 // #include "camera/camera_manager.h"
 // #include "ai/yolo_detector.h"
-// #include "gui/video_view.h"
 // #include "input/touch_driver.h"
 
 MainApp::MainApp(const system_config_t& config)
@@ -91,12 +94,62 @@ void MainApp::process_events() {
 }
 
 void MainApp::setup_gui() {
-    printf("设置LVGL GUI界面...\n");
+    printf("设置LVGL GUI界面 with Grid/Flex layout...\n");
     
-    // GUI界面已经在lvgl_display_init()中的create_test_ui()函数中创建
-    // 这里可以添加额外的GUI组件或事件处理
+    // 创建GUI组件实例
+    #include "gui/status_bar.h"
+    #include "gui/video_view.h"
+    #include "gui/control_panel.h"
+    #include "gui/settings_page.h"
     
-    printf("LVGL GUI界面设置完成\n");
+    // 创建各个GUI组件
+    static Status_bar status_bar;
+    static Video_view video_view;
+    static Control_panel control_panel;
+    static Settings_page main_layout;
+    
+    // 初始化各个组件
+    if (!status_bar.initialize()) {
+        printf("错误: 状态栏初始化失败\n");
+        return;
+    }
+    
+    if (!video_view.initialize()) {
+        printf("错误: 视频视图初始化失败\n");
+        return;
+    }
+    
+    if (!control_panel.initialize()) {
+        printf("错误: 控制面板初始化失败\n");
+        return;
+    }
+    
+    if (!main_layout.initialize()) {
+        printf("错误: 主布局管理器初始化失败\n");
+        return;
+    }
+    
+    // 创建主布局整合所有组件
+    main_layout.create_main_layout(&status_bar, &video_view, &control_panel);
+    
+    // 测试数据更新
+    status_bar.update_workflow_status(1);
+    status_bar.update_heartbeat(12345, 12);
+    
+    video_view.update_detection_info(28.5f, 15.3f);
+    video_view.update_coordinate_display(245.8f, "正常", "双刀片");
+    video_view.update_cutting_position(245.8f, 1000.0f);
+    
+    performance_stats_t test_stats = {0};
+    test_stats.cpu_usage = 45.0f;
+    test_stats.gpu_usage = 32.0f;
+    test_stats.memory_usage_mb = 2150.0f; // 2.1GB in MB
+    control_panel.update_jetson_info(test_stats);
+    
+    control_panel.update_ai_model_status(15.3f, 94.2f, 15432, 89);
+    control_panel.update_communication_stats("2h 15m", 15432, 0.02f, "1.2KB/s");
+    
+    printf("LVGL GUI界面设置完成 - 基于Grid和Flex布局\n");
 }
 
 void MainApp::setup_camera() {
