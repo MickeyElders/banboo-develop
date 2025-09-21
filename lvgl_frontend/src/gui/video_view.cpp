@@ -203,12 +203,12 @@ void Video_view::create_coordinate_display() {
     lv_obj_t* blade_desc = lv_label_create(blade_container);
     lv_label_set_text(blade_desc, "刀片选择");
     lv_obj_set_style_text_color(blade_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(blade_desc, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(blade_desc, &lv_font_montserrat_14, 0);
     
     blade_label_ = lv_label_create(blade_container);
     lv_label_set_text(blade_label_, "双刀片");
     lv_obj_set_style_text_color(blade_label_, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(blade_label_, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(blade_label_, &lv_font_montserrat_14, 0);
 }
 
 void Video_view::update_camera_frame(const frame_info_t& frame) {

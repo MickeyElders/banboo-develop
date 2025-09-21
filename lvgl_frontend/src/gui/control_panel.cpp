@@ -332,12 +332,12 @@ void Control_panel::create_jetson_section() {
     lv_obj_t* gpu_desc = lv_label_create(gpu_label_container);
     lv_label_set_text(gpu_desc, "GPU (1024-core NVIDIA Ampere)");
     lv_obj_set_style_text_color(gpu_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(gpu_desc, &lv_font_montserrat_9, 0);
+    lv_obj_set_style_text_font(gpu_desc, &lv_font_montserrat_14, 0);
     
     gpu_usage_label_ = lv_label_create(gpu_label_container);
     lv_label_set_text(gpu_usage_label_, "32%");
     lv_obj_set_style_text_color(gpu_usage_label_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(gpu_usage_label_, &lv_font_montserrat_9, 0);
+    lv_obj_set_style_text_font(gpu_usage_label_, &lv_font_montserrat_14, 0);
     
     gpu_progress_ = lv_bar_create(gpu_container);
     lv_obj_set_size(gpu_progress_, LV_PCT(100), 6);
@@ -365,12 +365,12 @@ void Control_panel::create_jetson_section() {
     lv_obj_t* memory_desc = lv_label_create(memory_label_container);
     lv_label_set_text(memory_desc, "内存 (LPDDR5)");
     lv_obj_set_style_text_color(memory_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(memory_desc, &lv_font_montserrat_9, 0);
+    lv_obj_set_style_text_font(memory_desc, &lv_font_montserrat_14, 0);
     
     memory_usage_label_ = lv_label_create(memory_label_container);
     lv_label_set_text(memory_usage_label_, "2.1GB/8GB");
     lv_obj_set_style_text_color(memory_usage_label_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(memory_usage_label_, &lv_font_montserrat_9, 0);
+    lv_obj_set_style_text_font(memory_usage_label_, &lv_font_montserrat_14, 0);
     
     memory_progress_ = lv_bar_create(memory_container);
     lv_obj_set_size(memory_progress_, LV_PCT(100), 6);
