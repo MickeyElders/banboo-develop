@@ -13,7 +13,7 @@ typedef struct {
     uint32_t timestamp;
 } touch_point_t;
 
-// 触摸设备配置
+// 触摸设备配置 (使用不同的名称避免与common/types.h冲突)
 typedef struct {
     const char* device_path;     // 设备路径，如 /dev/input/event0
     int16_t max_x;              // 最大X坐标
@@ -23,13 +23,13 @@ typedef struct {
     bool swap_xy;               // 是否交换X/Y坐标
     bool invert_x;              // 是否反转X坐标
     bool invert_y;              // 是否反转Y坐标
-} touch_config_t;
+} touch_driver_config_t;
 
 // 触摸驱动函数
 bool touch_driver_init();
 void touch_driver_deinit();
-bool touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data);
-void touch_driver_set_config(const touch_config_t* config);
+void touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data);
+void touch_driver_set_config(const touch_driver_config_t* config);
 bool touch_driver_is_available();
 
 // USB触摸屏检测和配置

@@ -23,7 +23,7 @@
 
 // 全局变量
 static int touch_fd = -1;
-static touch_config_t touch_config;
+static touch_driver_config_t touch_config;
 static touch_point_t last_point = {0, 0, false, 0};
 static bool driver_initialized = false;
 static pthread_t touch_thread;
@@ -31,7 +31,7 @@ static bool thread_running = false;
 static pthread_mutex_t touch_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // 默认配置
-static const touch_config_t default_config = {
+static const touch_driver_config_t default_config = {
     .device_path = "/dev/input/event0",
     .max_x = 4095,
     .max_y = 4095,
@@ -207,7 +207,7 @@ void* touch_read_thread(void* arg) {
 }
 
 // LVGL触摸读取回调
-bool touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data) {
+void touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data) {
     pthread_mutex_lock(&touch_mutex);
     
     data->point.x = last_point.x;
@@ -215,8 +215,6 @@ bool touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data) {
     data->state = last_point.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
     
     pthread_mutex_unlock(&touch_mutex);
-    
-    return false; // 表示没有更多数据需要读取
 }
 
 // 获取USB触摸屏设备路径
@@ -225,9 +223,9 @@ const char* usb_touch_get_device_path() {
 }
 
 // 设置触摸配置
-void touch_driver_set_config(const touch_config_t* config) {
+void touch_driver_set_config(const touch_driver_config_t* config) {
     if (config) {
-        memcpy(&touch_config, config, sizeof(touch_config_t));
+        memcpy(&touch_config, config, sizeof(touch_driver_config_t));
     }
 }
 
@@ -246,7 +244,7 @@ bool touch_driver_init() {
     }
     
     // 使用默认配置
-    memcpy(&touch_config, &default_config, sizeof(touch_config_t));
+    memcpy(&touch_config, &default_config, sizeof(touch_driver_config_t));
     
     // 检测USB触摸屏
     if (!usb_touch_detect()) {

@@ -188,7 +188,7 @@ void MainApp::setup_touch_input() {
     }
     
     // 设置触摸屏配置（根据实际显示器调整）
-    touch_config_t config = {
+    touch_driver_config_t config = {
         .device_path = "/dev/input/event0",  // 会自动检测
         .max_x = 4095,
         .max_y = 4095,
