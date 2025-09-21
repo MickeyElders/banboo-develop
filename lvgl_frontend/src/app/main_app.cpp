@@ -9,12 +9,12 @@
 #include "gui/video_view.h"
 #include "gui/control_panel.h"
 #include "gui/settings_page.h"
+#include "input/touch_driver.h"
 #include <stdio.h>
 // 其他头文件暂时注释掉，避免不完整类型问题
 // #include "app/config_manager.h"
 // #include "camera/camera_manager.h"
 // #include "ai/yolo_detector.h"
-// #include "input/touch_driver.h"
 
 MainApp::MainApp(const system_config_t& config)
     : config_(config)
@@ -41,10 +41,12 @@ bool MainApp::initialize() {
         // 初始化GUI界面
         setup_gui();
         
+        // 初始化触摸输入
+        setup_touch_input();
+        
         // TODO: 初始化其他组件
         // setup_camera();
         // setup_ai_detector();
-        // setup_touch_input();
         
         initialized_ = true;
         printf("主应用程序初始化成功\n");
@@ -79,7 +81,10 @@ void MainApp::stop() {
     printf("停止主应用程序...\n");
     running_ = false;
     
-    // TODO: 停止各个组件
+    // 清理触摸驱动
+    touch_driver_deinit();
+    
+    // TODO: 停止其他组件
     
     printf("主应用程序已停止\n");
 }
@@ -161,5 +166,39 @@ void MainApp::setup_ai_detector() {
 }
 
 void MainApp::setup_touch_input() {
-    // TODO: 设置触摸输入
+    printf("设置USB Type-C触摸屏输入...\n");
+    
+    // 初始化触摸驱动
+    if (!touch_driver_init()) {
+        printf("警告: 触摸驱动初始化失败，将在无触摸模式下运行\n");
+        return;
+    }
+    
+    // 创建LVGL输入设备
+    static lv_indev_drv_t indev_drv;
+    lv_indev_drv_init(&indev_drv);
+    indev_drv.type = LV_INDEV_TYPE_POINTER;
+    indev_drv.read_cb = touch_driver_read;
+    
+    lv_indev_t* touch_indev = lv_indev_drv_register(&indev_drv);
+    if (!touch_indev) {
+        printf("错误: 无法注册LVGL触摸输入设备\n");
+        touch_driver_deinit();
+        return;
+    }
+    
+    // 设置触摸屏配置（根据实际显示器调整）
+    touch_config_t config = {
+        .device_path = "/dev/input/event0",  // 会自动检测
+        .max_x = 4095,
+        .max_y = 4095,
+        .screen_width = 1920,
+        .screen_height = 1080,
+        .swap_xy = false,
+        .invert_x = false,
+        .invert_y = false
+    };
+    touch_driver_set_config(&config);
+    
+    printf("USB Type-C触摸屏设置完成\n");
 }

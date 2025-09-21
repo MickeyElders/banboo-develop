@@ -267,6 +267,12 @@ typedef int16_t lv_coord_t;
 #define LV_USE_FONT_DEJAVU_16_PERSIAN_HEBREW 0  /*Hebrew, Arabic, Persian letters and all their forms*/
 #define LV_USE_FONT_SIMSUN_16_CJK            1  /*1000 most common CJK radicals*/
 
+/* Enable additional CJK fonts for better Chinese support */
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_simsun_16_cjk)
+
+/* Set default font to support Chinese characters */
+#define LV_FONT_DEFAULT &lv_font_simsun_16_cjk
+
 /* Pixel perfect monospace fonts */
 #define LV_USE_FONT_UNSCII_8  0
 #define LV_USE_FONT_UNSCII_16 0
