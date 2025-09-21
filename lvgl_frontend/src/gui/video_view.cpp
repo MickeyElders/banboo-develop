@@ -113,7 +113,7 @@ void Video_view::create_camera_canvas() {
     lv_obj_set_flex_grow(camera_canvas_, 1); // 占据剩余空间
     lv_obj_set_size(camera_canvas_, LV_PCT(100), LV_PCT(100)); // 完全占满
     lv_obj_set_style_pad_all(camera_canvas_, 2, LV_PART_MAIN); // 最小边距
-    lv_obj_set_style_margin_all(camera_canvas_, 0, LV_PART_MAIN); // 无外边距
+    lv_obj_set_style_pad_all(camera_canvas_, 0, LV_PART_MAIN); // 无内边距
     lv_obj_add_style(camera_canvas_, &style_canvas_, 0);
     
     // 创建视频画面提示文字
@@ -133,7 +133,7 @@ void Video_view::create_camera_canvas() {
     lv_obj_t* rail_label = lv_label_create(rail_indicator_);
     lv_label_set_text(rail_label, "X轴导轨 (0-1000.0mm)");
     lv_obj_set_style_text_color(rail_label, lv_color_hex(0x2196F3), 0);
-    lv_obj_set_style_text_font(rail_label, &lv_font_simsun_16_cjk, 0);
+    lv_obj_set_style_text_font(rail_label, &lv_font_montserrat_16, 0);
     lv_obj_center(rail_label);
     
     // 创建切割位置指示器
@@ -168,7 +168,7 @@ void Video_view::create_coordinate_display() {
     lv_obj_t* x_label = lv_label_create(x_coord_container);
     lv_label_set_text(x_label, "X坐标");
     lv_obj_set_style_text_color(x_label, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(x_label, &lv_font_simsun_16_cjk, 0);
+    lv_obj_set_style_text_font(x_label, &lv_font_montserrat_16, 0);
     
     x_coord_label_ = lv_label_create(x_coord_container);
     lv_label_set_text(x_coord_label_, "245.8mm");
@@ -187,12 +187,12 @@ void Video_view::create_coordinate_display() {
     lv_obj_t* quality_desc = lv_label_create(quality_container);
     lv_label_set_text(quality_desc, "切割质量");
     lv_obj_set_style_text_color(quality_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(quality_desc, &lv_font_simsun_16_cjk, 0);
+    lv_obj_set_style_text_font(quality_desc, &lv_font_montserrat_16, 0);
     
     quality_label_ = lv_label_create(quality_container);
     lv_label_set_text(quality_label_, "正常");
     lv_obj_set_style_text_color(quality_label_, lv_color_hex(0x4CAF50), 0);
-    lv_obj_set_style_text_font(quality_label_, &lv_font_simsun_16_cjk, 0);
+    lv_obj_set_style_text_font(quality_label_, &lv_font_montserrat_16, 0);
     
     // 创建刀片选择显示
     lv_obj_t* blade_container = lv_obj_create(coordinate_display_);
@@ -206,12 +206,12 @@ void Video_view::create_coordinate_display() {
     lv_obj_t* blade_desc = lv_label_create(blade_container);
     lv_label_set_text(blade_desc, "刀片选择");
     lv_obj_set_style_text_color(blade_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(blade_desc, &lv_font_simsun_16_cjk, 0);
+    lv_obj_set_style_text_font(blade_desc, &lv_font_montserrat_16, 0);
     
     blade_label_ = lv_label_create(blade_container);
     lv_label_set_text(blade_label_, "双刀片");
     lv_obj_set_style_text_color(blade_label_, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(blade_label_, &lv_font_simsun_16_cjk, 0);
+    lv_obj_set_style_text_font(blade_label_, &lv_font_montserrat_16, 0);
 }
 
 void Video_view::update_camera_frame(const frame_info_t& frame) {
