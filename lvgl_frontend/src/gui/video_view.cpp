@@ -184,12 +184,12 @@ void Video_view::create_coordinate_display() {
     lv_obj_t* quality_desc = lv_label_create(quality_container);
     lv_label_set_text(quality_desc, "切割质量");
     lv_obj_set_style_text_color(quality_desc, lv_color_hex(0xB0B0B0), 0);
-    lv_obj_set_style_text_font(quality_desc, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(quality_desc, &lv_font_montserrat_14, 0);
     
     quality_label_ = lv_label_create(quality_container);
     lv_label_set_text(quality_label_, "正常");
     lv_obj_set_style_text_color(quality_label_, lv_color_hex(0x4CAF50), 0);
-    lv_obj_set_style_text_font(quality_label_, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(quality_label_, &lv_font_montserrat_14, 0);
     
     // 创建刀片选择显示
     lv_obj_t* blade_container = lv_obj_create(coordinate_display_);

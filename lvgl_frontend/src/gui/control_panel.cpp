@@ -217,7 +217,7 @@ void Control_panel::create_plc_section() {
         *status_value_labels[i] = lv_label_create(status_item);
         lv_label_set_text(*status_value_labels[i], status_values[i]);
         lv_obj_set_style_text_color(*status_value_labels[i], lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(*status_value_labels[i], &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(*status_value_labels[i], &lv_font_montserrat_14, 0);
         
         // 连接状态显示为绿色
         if(i == 0) {
@@ -304,7 +304,7 @@ void Control_panel::create_jetson_section() {
     cpu_usage_label_ = lv_label_create(cpu_label_container);
     lv_label_set_text(cpu_usage_label_, "45%");
     lv_obj_set_style_text_color(cpu_usage_label_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(cpu_usage_label_, &lv_font_montserrat_9, 0);
+    lv_obj_set_style_text_font(cpu_usage_label_, &lv_font_montserrat_14, 0);
     
     cpu_progress_ = lv_bar_create(cpu_container);
     lv_obj_set_size(cpu_progress_, LV_PCT(100), 6);
@@ -433,7 +433,7 @@ void Control_panel::create_ai_section() {
         lv_obj_t* value_label = lv_label_create(ai_item);
         lv_label_set_text(value_label, ai_values[i]);
         lv_obj_set_style_text_color(value_label, lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(value_label, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(value_label, &lv_font_montserrat_14, 0);
         
         if(ai_value_labels[i]) {
             *ai_value_labels[i] = value_label;
@@ -495,7 +495,7 @@ void Control_panel::create_comm_section() {
         *comm_value_labels[i] = lv_label_create(comm_item);
         lv_label_set_text(*comm_value_labels[i], comm_values[i]);
         lv_obj_set_style_text_color(*comm_value_labels[i], lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(*comm_value_labels[i], &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(*comm_value_labels[i], &lv_font_montserrat_14, 0);
     }
 }
 

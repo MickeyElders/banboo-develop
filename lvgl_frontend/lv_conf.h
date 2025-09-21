@@ -84,7 +84,7 @@ typedef int16_t lv_coord_t;
 
 /* Maximal horizontal and vertical resolution to support by the library.
  * Leave undefined to let LVGL calculate automatically based on lv_coord_t type */
-/* #define LV_COORD_MAX (16383) */  /* Let LVGL auto-calculate */
+#undef LV_COORD_MAX  /* Let LVGL auto-calculate to avoid redefinition warning */
 
 /* The target "Dots per inch" (DPI) of the display.
  * Default value is `LV_DPI_DEF` from above.
