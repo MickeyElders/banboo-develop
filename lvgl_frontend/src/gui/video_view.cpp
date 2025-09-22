@@ -114,12 +114,23 @@ void Video_view::create_camera_canvas() {
     lv_obj_set_style_pad_all(camera_canvas_, 0, LV_PART_MAIN); // No inner padding
     lv_obj_add_style(camera_canvas_, &style_canvas_, 0);
     
-    // Create video view hint text
+    // Create video view hint text (centered)
     lv_obj_t* video_label = lv_label_create(camera_canvas_);
-    lv_label_set_text(video_label, "Bamboo Detection View\n1280 x 720 | YOLOv8 Inference\nInference Time: 15.3ms");
+    lv_label_set_text(video_label, "Bamboo Detection View\nYOLOv8 Inference\nInference Time: 15.3ms");
     lv_obj_set_style_text_color(video_label, lv_color_hex(0xB0B0B0), 0);
     lv_obj_set_style_text_align(video_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(video_label);
+    
+    // Create resolution info in top-left corner
+    lv_obj_t* resolution_label = lv_label_create(camera_canvas_);
+    lv_label_set_text(resolution_label, "1280 x 720");
+    lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xFF6B35), 0);
+    lv_obj_set_style_text_font(resolution_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_bg_color(resolution_label, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(resolution_label, 128, 0);
+    lv_obj_set_style_pad_all(resolution_label, 5, 0);
+    lv_obj_set_style_radius(resolution_label, 3, 0);
+    lv_obj_set_pos(resolution_label, 10, 10);  // Position in top-left corner
     
     // Create rail indicator - corresponds to rail-indicator in HTML
     rail_indicator_ = lv_obj_create(camera_canvas_);

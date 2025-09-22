@@ -5,6 +5,10 @@
 #include "lvgl.h"
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 // LVGL显示驱动变量
 static lv_disp_drv_t disp_drv;
@@ -296,42 +300,156 @@ void create_test_ui() {
     printf("Bamboo cutting industrial control interface created\n");
 }
 
-// 初始化摄像头系统
+// 释放可能占用摄像头的进程
+bool release_camera_device(const char* device_path) {
+    printf("尝试释放摄像头设备: %s\n", device_path);
+    
+    // 查找使用摄像头设备的进程
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "lsof %s 2>/dev/null", device_path);
+    
+    FILE* fp = popen(cmd, "r");
+    if (fp) {
+        char line[256];
+        bool found_processes = false;
+        
+        while (fgets(line, sizeof(line), fp)) {
+            if (strstr(line, device_path)) {
+                found_processes = true;
+                printf("发现占用摄像头的进程: %s", line);
+            }
+        }
+        pclose(fp);
+        
+        if (found_processes) {
+            printf("尝试终止占用摄像头的进程...\n");
+            // 强制终止占用摄像头的进程
+            snprintf(cmd, sizeof(cmd), "fuser -k %s 2>/dev/null", device_path);
+            int ret = system(cmd);
+            (void)ret; // 忽略返回值
+            
+            // 等待进程释放设备
+            usleep(500000); // 500ms
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 检测可用的摄像头设备
+const char* detect_available_camera() {
+    static const char* camera_devices[] = {
+        "/dev/video0",
+        "/dev/video1",
+        "/dev/video2",
+        "/dev/video3",
+        NULL
+    };
+    
+    for (int i = 0; camera_devices[i] != NULL; i++) {
+        if (access(camera_devices[i], F_OK) == 0) {
+            printf("检测到摄像头设备: %s\n", camera_devices[i]);
+            
+            // 尝试简单打开测试设备是否可用
+            int fd = open(camera_devices[i], O_RDWR | O_NONBLOCK);
+            if (fd >= 0) {
+                close(fd);
+                printf("摄像头设备 %s 可用\n", camera_devices[i]);
+                return camera_devices[i];
+            } else {
+                printf("摄像头设备 %s 被占用: %s\n", camera_devices[i], strerror(errno));
+            }
+        }
+    }
+    
+    return NULL;
+}
+
+// 初始化摄像头系统（增强版本，带设备释放和重试机制）
 void init_camera_system() {
     printf("初始化摄像头系统...\n");
     
-    // 创建摄像头管理器（640x480分辨率适合嵌入式显示）
-    g_camera_manager = camera_manager_create("/dev/video0", 640, 480, 30);
-    if (!g_camera_manager) {
-        printf("错误：创建摄像头管理器失败\n");
+    // 首先检测可用的摄像头设备
+    const char* camera_device = detect_available_camera();
+    if (!camera_device) {
+        printf("错误：未检测到可用的摄像头设备\n");
         return;
     }
     
-    // 初始化摄像头
-    if (!camera_manager_init(g_camera_manager)) {
-        printf("错误：初始化摄像头失败\n");
-        camera_manager_destroy(g_camera_manager);
-        g_camera_manager = nullptr;
-        return;
+    // 尝试释放设备（如果被占用）
+    bool device_released = false;
+    int retry_count = 0;
+    const int max_retries = 3;
+    
+    while (retry_count < max_retries) {
+        printf("摄像头初始化尝试 %d/%d\n", retry_count + 1, max_retries);
+        
+        // 创建摄像头管理器（640x480分辨率适合嵌入式显示）
+        g_camera_manager = camera_manager_create(camera_device, 640, 480, 30);
+        if (!g_camera_manager) {
+            printf("错误：创建摄像头管理器失败\n");
+            break;
+        }
+        
+        // 尝试初始化摄像头
+        if (camera_manager_init(g_camera_manager)) {
+            printf("摄像头初始化成功\n");
+            
+            // 在视频面板中创建摄像头显示对象
+            if (g_video_panel && camera_manager_create_video_object(g_camera_manager, g_video_panel)) {
+                // 开始摄像头捕获
+                if (camera_manager_start_capture(g_camera_manager)) {
+                    printf("摄像头系统初始化成功\n");
+                    
+                    // 更新摄像头状态显示
+                    if (g_camera_status_label) {
+                        char status_text[128];
+                        snprintf(status_text, sizeof(status_text), "Camera: %s@30fps", camera_device);
+                        lv_label_set_text(g_camera_status_label, status_text);
+                        lv_obj_set_style_text_color(g_camera_status_label, lv_color_hex(0x68D391), 0);
+                    }
+                    return;
+                } else {
+                    printf("错误：启动摄像头捕获失败\n");
+                }
+            } else {
+                printf("错误：创建摄像头显示对象失败\n");
+            }
+        } else {
+            printf("错误：初始化摄像头失败，设备可能被占用\n");
+            
+            // 如果还没有尝试释放设备，则尝试释放
+            if (!device_released) {
+                device_released = release_camera_device(camera_device);
+                if (device_released) {
+                    printf("已释放摄像头设备，将重试初始化\n");
+                }
+            }
+        }
+        
+        // 清理失败的摄像头管理器
+        if (g_camera_manager) {
+            camera_manager_destroy(g_camera_manager);
+            g_camera_manager = nullptr;
+        }
+        
+        retry_count++;
+        
+        // 如果不是最后一次尝试，等待一段时间再重试
+        if (retry_count < max_retries) {
+            printf("等待 1 秒后重试...\n");
+            sleep(1);
+        }
     }
     
-    // 在视频面板中创建摄像头显示对象
-    if (g_video_panel && !camera_manager_create_video_object(g_camera_manager, g_video_panel)) {
-        printf("错误：创建摄像头显示对象失败\n");
-        camera_manager_destroy(g_camera_manager);
-        g_camera_manager = nullptr;
-        return;
-    }
+    printf("错误：摄像头系统初始化失败，已达到最大重试次数\n");
     
-    // 开始摄像头捕获
-    if (!camera_manager_start_capture(g_camera_manager)) {
-        printf("错误：启动摄像头捕获失败\n");
-        camera_manager_destroy(g_camera_manager);
-        g_camera_manager = nullptr;
-        return;
+    // 更新摄像头状态显示为错误状态
+    if (g_camera_status_label) {
+        lv_label_set_text(g_camera_status_label, "Camera: Initialization Failed");
+        lv_obj_set_style_text_color(g_camera_status_label, lv_color_hex(0xEF4444), 0);
     }
-    
-    printf("摄像头系统初始化成功\n");
 }
 
 // 清理摄像头系统
