@@ -344,8 +344,14 @@ private:
             communication_system_available_ = true;
         }
         
+        // 详细调试摄像头系统状态
+        LOG_INFO("🔍 检查摄像头系统状态:");
+        LOG_INFO("   camera_manager_存在: {}", camera_manager_ ? "是" : "否");
+        LOG_INFO("   camera_system_available_: {}", camera_system_available_ ? "是" : "否");
+        
         // 启动摄像头捕获（可选服务）
         if (camera_manager_ && camera_system_available_) {
+            LOG_INFO("📹 开始启动摄像头服务...");
             if (camera_manager_->startCapture()) {
                 LOG_INFO("✅ 摄像头服务启动成功");
             } else {
@@ -353,7 +359,13 @@ private:
                 camera_system_available_ = false;
             }
         } else {
-            LOG_WARN("⚠️ 摄像头系统不可用，跳过启动");
+            if (!camera_manager_) {
+                LOG_WARN("⚠️ 摄像头管理器未初始化，跳过启动");
+            } else if (!camera_system_available_) {
+                LOG_WARN("⚠️ 摄像头系统标记为不可用，跳过启动");
+            } else {
+                LOG_WARN("⚠️ 摄像头系统不可用，跳过启动");
+            }
         }
         
         // 设置系统状态
