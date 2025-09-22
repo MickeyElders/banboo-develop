@@ -30,11 +30,11 @@ static void* shared_memory_read_thread(void* arg) {
             } else {
                 // 连接失败，等待重试
                 uint64_t current_time = get_timestamp_ms();
-                if (current_time - manager->connection_retry_time > 5000) { // 5秒重试一次
+                if (current_time - manager->connection_retry_time > 2000) { // 2秒重试一次，更频繁
                     printf("尝试重新连接共享内存...\n");
                     manager->connection_retry_time = current_time;
                 }
-                usleep(100000); // 100ms
+                usleep(200000); // 200ms，给后端更多时间
                 continue;
             }
         }
@@ -182,9 +182,10 @@ bool camera_manager_init(camera_manager_t* manager) {
     
     printf("初始化摄像头管理器（共享内存模式）...\n");
     
-    // 等待共享内存可用（最多等待10秒）
-    if (!shared_memory_reader_wait_for_availability(manager->shared_memory_key, 10000)) {
-        printf("警告：共享内存暂不可用，将在运行时重试连接\n");
+    // 等待共享内存可用（最多等待15秒，给后端更多初始化时间）
+    printf("等待后端共享内存初始化...\n");
+    if (!shared_memory_reader_wait_for_availability(manager->shared_memory_key, 15000)) {
+        printf("警告：共享内存暂不可用（15秒超时），将在运行时重试连接\n");
         return true; // 不阻止初始化，允许后续重试连接
     }
     

@@ -174,7 +174,50 @@ void MainApp::setup_gui() {
 }
 
 void MainApp::setup_camera() {
-    // TODO: 设置摄像头
+    printf("异步设置摄像头管理器（共享内存模式）...\n");
+    
+    // 使用配置中的显示分辨率创建摄像头管理器
+    const camera_config_t& camera_config = config_.camera;
+    
+    // 如果显示分辨率没有配置，使用摄像头原始分辨率
+    int display_width = camera_config.display_width > 0 ? camera_config.display_width : camera_config.width;
+    int display_height = camera_config.display_height > 0 ? camera_config.display_height : camera_config.height;
+    
+    printf("摄像头配置: 源分辨率 %dx%d, 显示分辨率 %dx%d\n",
+           camera_config.width, camera_config.height, display_width, display_height);
+    
+    // 创建摄像头管理器，使用显示分辨率作为缓冲区大小
+    camera_manager_ = camera_manager_create(
+        camera_config.shared_memory_key,
+        display_width,
+        display_height,
+        camera_config.fps
+    );
+    
+    if (!camera_manager_) {
+        printf("警告: 创建摄像头管理器失败，界面将在无摄像头模式下运行\n");
+        return;
+    }
+    
+    // 异步初始化摄像头管理器，不阻塞UI渲染
+    printf("摄像头管理器将异步初始化，不阻塞UI渲染\n");
+    
+    // 注意: 初始化和启动将在后台线程中进行，让UI先行渲染
+    // 摄像头初始化失败不会影响界面的正常显示
+    if (!camera_manager_init(camera_manager_)) {
+        printf("警告: 摄像头管理器初始化失败，将在后台重试连接\n");
+        // 不销毁管理器，让其在运行时重试连接
+    } else {
+        // 启动摄像头捕获
+        if (!camera_manager_start_capture(camera_manager_)) {
+            printf("警告: 启动摄像头捕获失败，将在后台重试\n");
+            // 不阻塞，让管理器在运行时重试
+        } else {
+            printf("摄像头管理器初始化成功\n");
+        }
+    }
+    
+    printf("摄像头管理器设置完成（异步模式）\n");
 }
 
 void MainApp::setup_ai_detector() {

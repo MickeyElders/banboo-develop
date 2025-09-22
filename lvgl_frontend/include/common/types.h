@@ -50,8 +50,8 @@ typedef enum {
 /* 摄像头配置 */
 typedef struct {
     char device_path[64];           // 设备路径
-    int width;                      // 宽度
-    int height;                     // 高度
+    int width;                      // 摄像头宽度
+    int height;                     // 摄像头高度
     int fps;                        // 帧率
     int buffer_count;               // 缓冲区数量
     bool use_hardware_acceleration; // 硬件加速
@@ -59,6 +59,8 @@ typedef struct {
     int gain;                       // 增益
     char shared_memory_key[256];    // 共享内存key路径
     bool use_shared_memory;         // 使用共享内存
+    int display_width;              // 显示宽度
+    int display_height;             // 显示高度
 } camera_config_t;
 
 /* AI模型配置 */
