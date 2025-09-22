@@ -617,19 +617,40 @@ void* touch_read_thread(void* arg) {
     return NULL;
 }
 
-// LVGL触摸读取回调
+// LVGL触摸读取回调（安全版本）
 void touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data) {
+    // 安全检查
+    if (!data) {
+        return;
+    }
+    
+    // 初始化数据结构
+    data->point.x = 0;
+    data->point.y = 0;
+    data->state = LV_INDEV_STATE_RELEASED;
+    
+    // 检查驱动是否已初始化
+    if (!driver_initialized || touch_fd < 0) {
+        return;
+    }
+    
     pthread_mutex_lock(&touch_mutex);
     
     data->point.x = last_point.x;
     data->point.y = last_point.y;
     data->state = last_point.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
     
+    // 边界检查
+    if (data->point.x < 0) data->point.x = 0;
+    if (data->point.y < 0) data->point.y = 0;
+    if (data->point.x >= touch_config.screen_width) data->point.x = touch_config.screen_width - 1;
+    if (data->point.y >= touch_config.screen_height) data->point.y = touch_config.screen_height - 1;
+    
     // 临时调试输出 - 检查LVGL是否接收到触摸数据
     static uint32_t last_print_time = 0;
     uint32_t current_time = last_point.timestamp;
     if (last_point.pressed && (current_time - last_print_time > 500)) { // 每500ms打印一次
-        printf("LVGL触摸回调: (%d, %d) 状态: %s\\n",
+        printf("LVGL触摸回调: (%d, %d) 状态: %s\n",
                data->point.x, data->point.y,
                data->state == LV_INDEV_STATE_PRESSED ? "按下" : "释放");
         last_print_time = current_time;
@@ -643,8 +664,23 @@ const char* touch_device_get_path() {
     return touch_config.device_path;
 }
 
-// 获取触摸设备信息
+// 获取触摸设备信息（安全版本）
 touch_device_info_t* touch_device_get_info() {
+    // 安全检查：如果设备信息为空，填充基本信息
+    if (device_info.device_path[0] == '\0' && touch_config.device_path[0] != '\0') {
+        strncpy(device_info.device_path, touch_config.device_path, sizeof(device_info.device_path) - 1);
+        device_info.device_path[sizeof(device_info.device_path) - 1] = '\0';
+        
+        // 如果设备名称为空，尝试从设备路径获取
+        if (device_info.device_name[0] == '\0') {
+            strncpy(device_info.device_name, "Touch Device", sizeof(device_info.device_name) - 1);
+            device_info.device_name[sizeof(device_info.device_name) - 1] = '\0';
+        }
+        
+        // 设置默认的多点触控支持
+        device_info.is_multitouch = touch_config.enable_multitouch;
+    }
+    
     return &device_info;
 }
 
@@ -697,7 +733,7 @@ void touch_driver_print_info() {
     printf("====================\n");
 }
 
-// 初始化触摸驱动
+// 初始化触摸驱动（安全版本）
 bool touch_driver_init() {
     printf("初始化智能触摸驱动 (Jetson Orin NX 优化版)\n");
     
@@ -705,6 +741,12 @@ bool touch_driver_init() {
         printf("触摸驱动已初始化\n");
         return true;
     }
+    
+    // 初始化全局变量
+    memset(&last_point, 0, sizeof(last_point));
+    memset(&multitouch_data, 0, sizeof(multitouch_data));
+    memset(&device_info, 0, sizeof(device_info));
+    memset(&screen_info, 0, sizeof(screen_info));
     
     // 使用默认配置
     memcpy(&touch_config, &default_config, sizeof(touch_driver_config_t));
@@ -720,6 +762,11 @@ bool touch_driver_init() {
     // 智能检测触摸设备
     if (!touch_device_smart_detect()) {
         printf("未检测到触摸设备，使用默认路径: %s\n", touch_config.device_path);
+        
+        // 手动设置基本设备信息
+        strncpy(device_info.device_path, touch_config.device_path, sizeof(device_info.device_path) - 1);
+        strncpy(device_info.device_name, "Default Touch Device", sizeof(device_info.device_name) - 1);
+        device_info.is_multitouch = touch_config.enable_multitouch;
     }
     
     // 打开触摸设备
