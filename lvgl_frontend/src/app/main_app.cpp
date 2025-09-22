@@ -167,11 +167,11 @@ void MainApp::setup_ai_detector() {
 }
 
 void MainApp::setup_touch_input() {
-    printf("设置USB Type-C触摸屏输入...\n");
+    printf("设置LVGL触摸输入设备...\n");
     
-    // 初始化触摸驱动
-    if (!touch_driver_init()) {
-        printf("警告: 触摸驱动初始化失败，将在无触摸模式下运行\n");
+    // 检查触摸驱动是否已经初始化（避免重复初始化）
+    if (!touch_driver_is_available()) {
+        printf("警告: 触摸驱动未初始化，将在无触摸模式下运行\n");
         return;
     }
     
@@ -184,22 +184,17 @@ void MainApp::setup_touch_input() {
     lv_indev_t* touch_indev = lv_indev_drv_register(&indev_drv);
     if (!touch_indev) {
         printf("错误: 无法注册LVGL触摸输入设备\n");
-        touch_driver_deinit();
         return;
     }
     
-    // 设置触摸屏配置（根据实际显示器调整）
-    touch_driver_config_t config;
-    strcpy(config.device_path, "/dev/input/event0");  // 会自动检测
-    config.max_x = 4095;
-    config.max_y = 4095;
-    config.screen_width = 1920;
-    config.screen_height = 1080;
-    config.swap_xy = false;
-    config.invert_x = false;
-    config.invert_y = false;
+    // 打印触摸设备信息用于调试
+    touch_device_info_t* device_info = touch_device_get_info();
+    if (device_info) {
+        printf("LVGL触摸设备已注册:\n");
+        printf("  设备路径: %s\n", device_info->device_path);
+        printf("  设备名称: %s\n", device_info->device_name);
+        printf("  多点触控: %s\n", device_info->is_multitouch ? "支持" : "不支持");
+    }
     
-    touch_driver_set_config(&config);
-    
-    printf("USB Type-C触摸屏设置完成\n");
+    printf("LVGL触摸输入设备设置完成\n");
 }

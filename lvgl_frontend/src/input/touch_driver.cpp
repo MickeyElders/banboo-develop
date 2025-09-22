@@ -593,10 +593,10 @@ void* touch_read_thread(void* arg) {
                             multitouch_data.point_count = count;
                         }
                         
-                        // 调试输出
-                        if (debug_enabled && touch_down) {
-                            printf("触摸: (%d, %d) -> 屏幕: (%d, %d) 压力: %d\n",
-                                   raw_x, raw_y, screen_x, screen_y, pressure);
+                        // 调试输出（无论是否为debug模式都输出，用于诊断）
+                        if (touch_down) {
+                            printf("触摸事件: 原始坐标(%d, %d) -> 屏幕坐标(%d, %d) 压力: %d 按下: %s\n",
+                                   raw_x, raw_y, screen_x, screen_y, pressure, touch_down ? "是" : "否");
                         }
                     }
                     break;
@@ -624,6 +624,16 @@ void touch_driver_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data) {
     data->point.x = last_point.x;
     data->point.y = last_point.y;
     data->state = last_point.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    
+    // 临时调试输出 - 检查LVGL是否接收到触摸数据
+    static uint32_t last_print_time = 0;
+    uint32_t current_time = last_point.timestamp;
+    if (last_point.pressed && (current_time - last_print_time > 500)) { // 每500ms打印一次
+        printf("LVGL触摸回调: (%d, %d) 状态: %s\\n",
+               data->point.x, data->point.y,
+               data->state == LV_INDEV_STATE_PRESSED ? "按下" : "释放");
+        last_print_time = current_time;
+    }
     
     pthread_mutex_unlock(&touch_mutex);
 }
