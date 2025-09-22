@@ -133,20 +133,39 @@ uint32_t* get_lvgl_buffer2() {
     return lvgl_buffer2;
 }
 
-// 刷新显示 - 从LVGL缓冲区复制到framebuffer
+// 刷新显示 - 从LVGL缓冲区复制到framebuffer（安全版本）
 void framebuffer_flush(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, const uint32_t* color_map) {
-    if (!fb_buffer || !color_map) {
+    // 安全检查
+    if (!fb_buffer || !color_map || fb_fd < 0) {
         return;
     }
     
-    // 限制坐标范围
+    // 严格的边界检查
+    if (x1 >= vinfo.xres || y1 >= vinfo.yres) {
+        return;
+    }
+    
     if (x2 >= vinfo.xres) x2 = vinfo.xres - 1;
     if (y2 >= vinfo.yres) y2 = vinfo.yres - 1;
+    if (x1 > x2 || y1 > y2) {
+        return;
+    }
+    
+    // 计算总像素数以防止越界
+    uint32_t total_pixels = vinfo.xres * vinfo.yres;
     
     // 根据色深进行像素格式转换
     for (uint32_t y = y1; y <= y2; y++) {
         for (uint32_t x = x1; x <= x2; x++) {
-            uint32_t color = color_map[(y * vinfo.xres) + x];
+            // 安全的索引计算
+            uint32_t color_index = (y * vinfo.xres) + x;
+            
+            // 越界检查
+            if (color_index >= total_pixels) {
+                continue;
+            }
+            
+            uint32_t color = color_map[color_index];
             
             // 提取RGB分量
             uint8_t r = (color >> 16) & 0xFF;
@@ -156,15 +175,22 @@ void framebuffer_flush(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, const
             // 计算framebuffer位置
             long fb_offset = (y * finfo.line_length) + (x * (vinfo.bits_per_pixel / 8));
             
+            // 检查framebuffer边界
+            if (fb_offset >= screensize - (vinfo.bits_per_pixel / 8)) {
+                continue;
+            }
+            
             if (vinfo.bits_per_pixel == 32) {
                 // 32位ARGB
                 uint32_t *fb_pixel = (uint32_t*)(fb_buffer + fb_offset);
                 *fb_pixel = (0xFF << 24) | (r << 16) | (g << 8) | b;
             } else if (vinfo.bits_per_pixel == 24) {
-                // 24位RGB
-                fb_buffer[fb_offset + 0] = b;
-                fb_buffer[fb_offset + 1] = g;
-                fb_buffer[fb_offset + 2] = r;
+                // 24位RGB - 检查3字节边界
+                if (fb_offset + 2 < screensize) {
+                    fb_buffer[fb_offset + 0] = b;
+                    fb_buffer[fb_offset + 1] = g;
+                    fb_buffer[fb_offset + 2] = r;
+                }
             } else if (vinfo.bits_per_pixel == 16) {
                 // 16位RGB565
                 uint16_t *fb_pixel = (uint16_t*)(fb_buffer + fb_offset);
