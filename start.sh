@@ -279,8 +279,27 @@ cleanup_old_versions() {
     
     # 清理共享内存和IPC资源
     print_info "清理共享资源..."
+    
+    # 清理竹切机专用共享内存段
+    print_info "清理竹切机共享内存段..."
+    local shm_keys=("/tmp/bamboo_camera_shm")
+    for key in "${shm_keys[@]}"; do
+        if [[ -e "$key" ]]; then
+            local shm_key=$(ftok "$key" 66 2>/dev/null || echo "")
+            if [[ -n "$shm_key" ]]; then
+                ipcrm -M "$shm_key" 2>/dev/null || true
+                print_info "清理共享内存段: $key"
+            fi
+        fi
+    done
+    
+    # 清理用户相关的IPC资源
     ipcs -m | grep $(whoami) | awk '{print $2}' | xargs -r ipcrm -m 2>/dev/null || true
     ipcs -s | grep $(whoami) | awk '{print $2}' | xargs -r ipcrm -s 2>/dev/null || true
+    
+    # 清理可能残留的共享内存文件
+    rm -f /tmp/bamboo_camera_shm 2>/dev/null || true
+    rm -f /dev/shm/bamboo_* 2>/dev/null || true
     
     print_success "老版本清理完成"
 }
@@ -582,21 +601,65 @@ start_backend() {
         exit 1
     fi
     
+    # 创建共享内存key文件（如果不存在）
+    local shared_memory_key="/tmp/bamboo_camera_shm"
+    if [[ ! -f "$shared_memory_key" ]]; then
+        print_info "创建共享内存key文件: $shared_memory_key"
+        touch "$shared_memory_key"
+        chmod 666 "$shared_memory_key"
+    fi
+    
+    # 设置共享内存环境变量
+    export BAMBOO_SHARED_MEMORY_KEY="$shared_memory_key"
+    export BAMBOO_ENABLE_SHARED_MEMORY="true"
+    
     # 启动后端进程
     cd "$BACKEND_DIR/build"
-    print_info "启动后端进程..."
+    print_info "启动后端进程（共享内存模式）..."
+    print_info "共享内存key: $shared_memory_key"
     nohup "./$BACKEND_BINARY" > ../../backend.log 2>&1 &
     local backend_pid=$!
     cd ../..
     
-    # 等待后端启动
-    sleep 3
+    # 等待后端启动和共享内存初始化
+    print_info "等待后端启动和共享内存初始化..."
+    local max_wait=15
+    local wait_count=0
+    
+    while [[ $wait_count -lt $max_wait ]]; do
+        # 检查进程是否还在运行
+        if ! kill -0 $backend_pid 2>/dev/null; then
+            print_error "后端进程意外退出"
+            cat backend.log | tail -20
+            exit 1
+        fi
+        
+        # 检查共享内存是否已创建
+        local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
+        if [[ -n "$shm_key" ]]; then
+            if ipcs -m | grep -q "$shm_key" 2>/dev/null; then
+                print_success "共享内存已创建 (key: $shm_key)"
+                break
+            fi
+        fi
+        
+        wait_count=$((wait_count + 1))
+        print_info "等待共享内存创建... ($wait_count/$max_wait)"
+        sleep 1
+    done
+    
+    if [[ $wait_count -ge $max_wait ]]; then
+        print_error "共享内存创建超时，检查后端日志"
+        cat backend.log | tail -20
+        exit 1
+    fi
     
     if kill -0 $backend_pid 2>/dev/null; then
         print_success "C++后端启动成功 (PID: $backend_pid)"
         echo $backend_pid > backend.pid
     else
         print_error "C++后端启动失败，检查backend.log"
+        cat backend.log | tail -20
         exit 1
     fi
 }
@@ -618,11 +681,36 @@ start_frontend() {
         exit 1
     fi
     
+    # 验证共享内存可用性
+    local shared_memory_key="/tmp/bamboo_camera_shm"
+    print_info "验证共享内存连接..."
+    
+    if [[ ! -f "$shared_memory_key" ]]; then
+        print_error "共享内存key文件不存在: $shared_memory_key"
+        exit 1
+    fi
+    
+    # 检查共享内存段是否存在
+    local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
+    if [[ -n "$shm_key" ]]; then
+        if ipcs -m | grep -q "$shm_key" 2>/dev/null; then
+            print_success "共享内存验证通过 (key: $shm_key)"
+        else
+            print_error "共享内存段不存在，请确保后端已正常启动"
+            exit 1
+        fi
+    else
+        print_error "无法生成共享内存key"
+        exit 1
+    fi
+    
     # 配置framebuffer
     configure_framebuffer
     
     # 设置环境变量
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+    export BAMBOO_SHARED_MEMORY_KEY="$shared_memory_key"
+    export BAMBOO_FRONTEND_MODE="shared_memory"
     
     # 配置文件路径
     local config_file="resources/config/default_config.json"
@@ -637,13 +725,15 @@ start_frontend() {
         print_info "找到触摸配置文件: $touch_config_file"
     fi
     
-    print_success "正在启动前端应用程序..."
+    print_success "正在启动前端应用程序（共享内存模式）..."
     print_info "前端可执行文件: $binary_path"
     print_info "后端日志: backend.log"
+    print_info "共享内存key: $shared_memory_key"
     print_info "配置文件: ${config_file:-"使用默认配置"}"
     if [[ "$debug_mode_param" == "true" ]]; then
         print_info "调试模式: 已启用 (详细触摸信息将显示)"
     fi
+    print_info "架构模式: 后端摄像头管理 + 前端共享内存显示"
     print_info "按 Ctrl+C 退出应用程序"
     echo
     
@@ -660,6 +750,56 @@ start_frontend() {
         else
             exec "./$binary_path" -f
         fi
+    fi
+}
+
+# 测试共享内存架构
+test_shared_memory_architecture() {
+    print_step "测试共享内存架构..."
+    
+    # 确保在项目根目录
+    cd "$SCRIPT_DIR"
+    
+    # 编译测试程序
+    print_info "编译测试程序..."
+    if [[ -f "test_shared_memory_architecture.cpp" ]]; then
+        g++ -std=c++17 -O2 -o test_shared_memory_architecture test_shared_memory_architecture.cpp \
+            -I./cpp_backend/include \
+            -I./lvgl_frontend/include \
+            `pkg-config --cflags --libs opencv4` \
+            -pthread
+        
+        if [[ $? -ne 0 ]]; then
+            print_error "测试程序编译失败"
+            exit 1
+        fi
+        
+        print_success "测试程序编译完成"
+        
+        # 运行测试
+        print_info "运行共享内存架构测试..."
+        print_info "测试将验证："
+        print_info "1. 共享内存段创建和连接"
+        print_info "2. 图像数据写入和读取"
+        print_info "3. 多进程并发访问"
+        print_info "4. 性能基准测试"
+        echo
+        
+        ./test_shared_memory_architecture
+        local test_result=$?
+        
+        # 清理测试程序
+        rm -f test_shared_memory_architecture
+        
+        if [[ $test_result -eq 0 ]]; then
+            print_success "共享内存架构测试通过"
+        else
+            print_error "共享内存架构测试失败"
+            exit 1
+        fi
+    else
+        print_error "测试程序源文件不存在: test_shared_memory_architecture.cpp"
+        exit 1
     fi
 }
 

@@ -14,9 +14,26 @@
 namespace bamboo_cut {
 namespace vision {
 
-CameraManager::CameraManager(const CameraConfig& config) 
-    : config_(config), is_running_(false), frame_callback_(nullptr) {
+CameraManager::CameraManager(const CameraConfig& config)
+    : config_(config), is_running_(false), frame_callback_(nullptr),
+      shared_memory_enabled_(false) {
     LOG_INFO("创建CameraManager实例");
+    
+    // 初始化共享内存（如果启用）
+    if (config_.enable_shared_memory) {
+        shared_memory_manager_ = SharedMemoryFactory::createProducer(
+            config_.shared_memory_key,
+            config_.width,
+            config_.height,
+            3  // BGR 3通道
+        );
+        if (shared_memory_manager_) {
+            shared_memory_enabled_ = true;
+            LOG_INFO("共享内存输出已启用: {}", config_.shared_memory_key);
+        } else {
+            LOG_WARN("共享内存初始化失败，将禁用共享内存输出");
+        }
+    }
 }
 
 CameraManager::~CameraManager() {
@@ -348,6 +365,18 @@ void CameraManager::captureLoop() {
             frame_info.camera_ids = camera_ids;
             frame_info.frame_count = frames.size();
             
+            // 写入共享内存（如果启用）
+            if (shared_memory_enabled_ && shared_memory_manager_ && !frames.empty()) {
+                try {
+                    // 使用第一个摄像头的帧作为主要输出
+                    if (!shared_memory_manager_->writeFrame(frames[0])) {
+                        LOG_WARN("写入共享内存失败");
+                    }
+                } catch (const std::exception& e) {
+                    LOG_ERROR("共享内存写入异常: {}", e.what());
+                }
+            }
+            
             // 调用回调函数
             {
                 std::lock_guard<std::mutex> lock(callback_mutex_);
@@ -495,6 +524,45 @@ CameraManager::PerformanceStats CameraManager::getPerformanceStats() const {
     stats.fps = static_cast<double>(config_.framerate);
     stats.avg_processing_time_ms = 0.0;
     return stats;
+}
+
+bool CameraManager::enableSharedMemory(bool enable) {
+    if (enable && !shared_memory_enabled_) {
+        if (!shared_memory_manager_) {
+            shared_memory_manager_ = SharedMemoryFactory::createProducer(
+                config_.shared_memory_key,
+                config_.width,
+                config_.height,
+                3  // BGR 3通道
+            );
+        }
+        
+        if (shared_memory_manager_) {
+            shared_memory_enabled_ = true;
+            LOG_INFO("共享内存输出已启用");
+            return true;
+        } else {
+            LOG_ERROR("无法启用共享内存输出");
+            return false;
+        }
+    } else if (!enable && shared_memory_enabled_) {
+        shared_memory_enabled_ = false;
+        shared_memory_manager_.reset();
+        LOG_INFO("共享内存输出已禁用");
+        return true;
+    }
+    
+    return shared_memory_enabled_ == enable;
+}
+
+SharedMemoryStats CameraManager::getSharedMemoryStats() const {
+    if (shared_memory_manager_) {
+        return shared_memory_manager_->getStats();
+    }
+    
+    SharedMemoryStats empty_stats;
+    memset(&empty_stats, 0, sizeof(empty_stats));
+    return empty_stats;
 }
 
 } // namespace vision
