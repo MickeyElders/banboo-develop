@@ -113,9 +113,25 @@ check_dependencies() {
         fi
     fi
     
-    # 检查设备文件
-    local devices=("/dev/fb0" "/dev/input/event0" "/dev/video0")
-    for device in "${devices[@]}"; do
+    # 检查设备文件 - 优先检查 event2
+    print_info "检查触摸设备..."
+    local touch_devices=("/dev/input/event2" "/dev/input/event1" "/dev/input/event0")
+    local touch_found=false
+    for device in "${touch_devices[@]}"; do
+        if [[ -e "$device" ]]; then
+            print_success "检测到触摸设备: $device"
+            touch_found=true
+            break
+        fi
+    done
+    
+    if [[ "$touch_found" != "true" ]]; then
+        print_warn "未检测到优先触摸设备"
+    fi
+    
+    # 检查其他设备文件
+    local other_devices=("/dev/fb0" "/dev/video0")
+    for device in "${other_devices[@]}"; do
         if [[ -e "$device" ]]; then
             print_info "检测到设备: $device"
         else
@@ -468,8 +484,20 @@ setup_permissions() {
         return
     fi
     
-    # 设置设备权限
-    local devices=("/dev/fb0" "/dev/input/event0" "/dev/video0" "/dev/nvidia0")
+    # 设置设备权限 - 包含所有触摸设备
+    local devices=("/dev/fb0" "/dev/video0" "/dev/nvidia0")
+    # 优先设置触摸设备权限
+    local touch_devices=("/dev/input/event2" "/dev/input/event1" "/dev/input/event0" "/dev/input/event3" "/dev/input/event4")
+    
+    print_info "设置触摸设备权限..."
+    for device in "${touch_devices[@]}"; do
+        if [[ -e "$device" ]]; then
+            sudo chmod 666 "$device" 2>/dev/null || true
+            print_info "设置触摸设备权限: $device"
+        fi
+    done
+    
+    # 设置其他设备权限
     for device in "${devices[@]}"; do
         if [[ -e "$device" ]]; then
             sudo chmod 666 "$device" 2>/dev/null || true
@@ -575,6 +603,7 @@ start_backend() {
 
 # 启动LVGL前端
 start_frontend() {
+    local debug_mode_param="$1"
     print_step "启动LVGL前端应用..."
     
     # 确保在项目根目录
@@ -602,18 +631,35 @@ start_frontend() {
         config_file=""
     fi
     
+    # 检查触摸配置文件
+    local touch_config_file="resources/config/touch_config.json"
+    if [[ -f "$touch_config_file" ]]; then
+        print_info "找到触摸配置文件: $touch_config_file"
+    fi
+    
     print_success "正在启动前端应用程序..."
     print_info "前端可执行文件: $binary_path"
     print_info "后端日志: backend.log"
     print_info "配置文件: ${config_file:-"使用默认配置"}"
+    if [[ "$debug_mode_param" == "true" ]]; then
+        print_info "调试模式: 已启用 (详细触摸信息将显示)"
+    fi
     print_info "按 Ctrl+C 退出应用程序"
     echo
     
     # 启动前端应用程序
     if [[ -n "$config_file" ]]; then
-        exec "./$binary_path" -c "$config_file" -f
+        if [[ "$debug_mode_param" == "true" ]]; then
+            exec "./$binary_path" -c "$config_file" -f --debug
+        else
+            exec "./$binary_path" -c "$config_file" -f
+        fi
     else
-        exec "./$binary_path" -f
+        if [[ "$debug_mode_param" == "true" ]]; then
+            exec "./$binary_path" -f --debug
+        else
+            exec "./$binary_path" -f
+        fi
     fi
 }
 
@@ -727,10 +773,13 @@ main() {
     if [[ "$build_only" != "true" ]]; then
         setup_permissions
         start_backend
-        start_frontend
+        start_frontend "$debug_mode"
     else
         print_success "构建完成！"
         print_info "可执行文件位置: $FRONTEND_DIR/build/$BINARY_NAME"
+        if [[ "$debug_mode" == "true" ]]; then
+            print_info "调试模式已启用，运行时使用 --debug 参数"
+        fi
     fi
 }
 

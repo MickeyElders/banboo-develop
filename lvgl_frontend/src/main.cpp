@@ -121,11 +121,6 @@ bool initialize_lvgl() {
         printf("警告: 触摸驱动初始化失败，将禁用触摸功能\n");
     } else {
         printf("触摸驱动初始化成功\n");
-        // 在调试模式下启用详细日志
-        if (debug_mode) {
-            touch_driver_enable_debug(true);
-            touch_driver_print_info();
-        }
     }
     
     printf("LVGL初始化完成\n");
@@ -242,6 +237,8 @@ int main(int argc, char* argv[]) {
     /* 应用调试模式设置 */
     if (debug_mode) {
         config.set_debug_mode(true);
+        // 启用触摸驱动调试模式
+        touch_driver_enable_debug(true);
     }
     
     /* 创建主应用程序 */
