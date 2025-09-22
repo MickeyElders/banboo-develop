@@ -70,9 +70,20 @@ bool check_system_requirements() {
         return false;
     }
     
-    // 检查触摸设备
-    if (access("/dev/input/event0", F_OK) != 0) {
-        printf("警告: 找不到触摸设备 /dev/input/event0\n");
+    // 检查触摸设备 - 优先检查 event2
+    bool touch_found = false;
+    const char* touch_devices[] = {"/dev/input/event2", "/dev/input/event1", "/dev/input/event0", NULL};
+    
+    for (int i = 0; touch_devices[i] != NULL; i++) {
+        if (access(touch_devices[i], F_OK) == 0) {
+            printf("找到触摸设备: %s\n", touch_devices[i]);
+            touch_found = true;
+            break;
+        }
+    }
+    
+    if (!touch_found) {
+        printf("警告: 未找到触摸设备\n");
     }
     
     // 检查摄像头设备
@@ -108,6 +119,13 @@ bool initialize_lvgl() {
     /* 初始化触摸驱动 */
     if (!touch_driver_init()) {
         printf("警告: 触摸驱动初始化失败，将禁用触摸功能\n");
+    } else {
+        printf("触摸驱动初始化成功\n");
+        // 在调试模式下启用详细日志
+        if (debug_mode) {
+            touch_driver_enable_debug(true);
+            touch_driver_print_info();
+        }
     }
     
     printf("LVGL初始化完成\n");

@@ -1,0 +1,53 @@
+{
+  "touch_driver": {
+    "preferred_devices": [
+      "/dev/input/event2",
+      "/dev/input/event1", 
+      "/dev/input/event0"
+    ],
+    "jetson_orin_nx": {
+      "device_path": "/dev/input/event2",
+      "max_x": 32767,
+      "max_y": 32767,
+      "screen_width": 1920,
+      "screen_height": 1080,
+      "swap_xy": false,
+      "invert_x": false,
+      "invert_y": false,
+      "scale_x": 1.0,
+      "scale_y": 1.0,
+      "offset_x": 0,
+      "offset_y": 0,
+      "enable_multitouch": true,
+      "touch_threshold": 10
+    },
+    "default": {
+      "device_path": "/dev/input/event0",
+      "max_x": 4095,
+      "max_y": 4095,
+      "screen_width": 1920,
+      "screen_height": 1080,
+      "swap_xy": false,
+      "invert_x": false,
+      "invert_y": false,
+      "scale_x": 1.0,
+      "scale_y": 1.0,
+      "offset_x": 0,
+      "offset_y": 0,
+      "enable_multitouch": false,
+      "touch_threshold": 5
+    },
+    "debug": {
+      "enable_debug_output": false,
+      "log_touch_events": false,
+      "show_raw_coordinates": false,
+      "monitor_screen_changes": true
+    },
+    "optimization": {
+      "enable_gpu_boost": true,
+      "enable_cpu_performance": true,
+      "thread_priority": 50,
+      "touch_poll_rate_us": 500
+    }
+  }
+}
