@@ -2,7 +2,11 @@
 #include "bamboo_cut/core/logger.h"
 #include <cstring>
 #include <chrono>
+#include <thread>
 #include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
 
