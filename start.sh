@@ -621,37 +621,27 @@ start_backend() {
     local backend_pid=$!
     cd ../..
     
-    # 等待后端启动和共享内存初始化
-    print_info "等待后端启动和共享内存初始化..."
-    local max_wait=15
-    local wait_count=0
+    # 异步模式：简化后端启动检查，不等待共享内存创建
+    print_info "检查后端进程启动状态（异步模式）..."
+    sleep 2  # 给后端2秒时间启动
     
-    while [[ $wait_count -lt $max_wait ]]; do
-        # 检查进程是否还在运行
-        if ! kill -0 $backend_pid 2>/dev/null; then
-            print_error "后端进程意外退出"
-            cat backend.log | tail -20
-            exit 1
+    # 检查进程是否还在运行
+    if ! kill -0 $backend_pid 2>/dev/null; then
+        print_warn "后端进程可能启动失败，检查日志"
+        if [[ -f "backend.log" ]]; then
+            cat backend.log | tail -10
         fi
-        
-        # 检查共享内存是否已创建
-        local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
-        if [[ -n "$shm_key" ]]; then
-            if ipcs -m | grep -q "$shm_key" 2>/dev/null; then
-                print_success "共享内存已创建 (key: $shm_key)"
-                break
-            fi
-        fi
-        
-        wait_count=$((wait_count + 1))
-        print_info "等待共享内存创建... ($wait_count/$max_wait)"
-        sleep 1
-    done
+        print_info "前端将继续启动，可能显示黑屏直到后端可用"
+    else
+        print_success "后端进程启动成功，共享内存将异步创建"
+    fi
     
-    if [[ $wait_count -ge $max_wait ]]; then
-        print_error "共享内存创建超时，检查后端日志"
-        cat backend.log | tail -20
-        exit 1
+    # 检查是否有共享内存创建（不强制要求）
+    local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
+    if [[ -n "$shm_key" ]] && ipcs -m | grep -q "$shm_key" 2>/dev/null; then
+        print_success "共享内存已可用 (key: $shm_key)"
+    else
+        print_info "共享内存尚未创建，前端将异步连接"
     fi
     
     if kill -0 $backend_pid 2>/dev/null; then
