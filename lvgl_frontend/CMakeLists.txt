@@ -66,7 +66,6 @@ target_compile_definitions(lvgl PUBLIC
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl
-    ${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts
     ${OpenCV_INCLUDE_DIRS}
     ${CUDA_INCLUDE_DIRS}
     ${TENSORRT_ROOT}
@@ -113,10 +112,6 @@ set(SOURCES
     src/gui/control_panel.cpp
     src/gui/status_bar.cpp
     src/gui/settings_page.cpp
-    
-    # 中文字体文件 (轻量级版本)
-    resources/fonts/lv_font_noto_sans_cjk_14_minimal.c
-    resources/fonts/lv_font_noto_sans_cjk_16_minimal.c
 )
 
 # 头文件
@@ -262,13 +257,10 @@ install(DIRECTORY resources/config/
     DESTINATION /opt/bamboo/config
 )
 
-# 字体和资源安装  
-install(DIRECTORY resources/fonts/
-    DESTINATION /opt/bamboo/fonts
-)
-
+# 资源安装
 install(DIRECTORY resources/images/
     DESTINATION /opt/bamboo/images
+    OPTIONAL
 )
 
 # 创建systemd服务文件
