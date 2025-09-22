@@ -1,4 +1,5 @@
 #include "gui/settings_page.h"
+#include "lv_font_awesome_16.h"
 #include "gui/status_bar.h"
 #include "gui/video_view.h"
 #include "gui/control_panel.h"
@@ -151,7 +152,8 @@ void Settings_page::create_footer_panel() {
     lv_obj_add_style(start_btn_, &style_btn_, 0);
     lv_obj_add_style(start_btn_, &style_btn_start_, 0);
     lv_obj_t* start_label = lv_label_create(start_btn_);
-    lv_label_set_text(start_label, "▶ Start System");
+    lv_label_set_text(start_label, FA_PLAY " Start System");
+    lv_obj_set_style_text_font(start_label, &lv_font_awesome_16, 0);
     lv_obj_center(start_label);
     lv_obj_add_event_cb(start_btn_, button_event_cb, LV_EVENT_CLICKED, (void*)0);
     
@@ -161,7 +163,8 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_style_border_color(pause_btn_, lv_color_hex(0xFFC107), 0);
     lv_obj_set_style_text_color(pause_btn_, lv_color_hex(0xFFC107), 0);
     lv_obj_t* pause_label = lv_label_create(pause_btn_);
-    lv_label_set_text(pause_label, "⏸ Pause");
+    lv_label_set_text(pause_label, FA_PAUSE " Pause");
+    lv_obj_set_style_text_font(pause_label, &lv_font_awesome_16, 0);
     lv_obj_center(pause_label);
     lv_obj_add_event_cb(pause_btn_, button_event_cb, LV_EVENT_CLICKED, (void*)1);
     
@@ -171,7 +174,8 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_style_border_color(stop_btn_, lv_color_hex(0xF44336), 0);
     lv_obj_set_style_text_color(stop_btn_, lv_color_hex(0xF44336), 0);
     lv_obj_t* stop_label = lv_label_create(stop_btn_);
-    lv_label_set_text(stop_label, "⏹ Stop");
+    lv_label_set_text(stop_label, FA_STOP " Stop");
+    lv_obj_set_style_text_font(stop_label, &lv_font_awesome_16, 0);
     lv_obj_center(stop_label);
     lv_obj_add_event_cb(stop_btn_, button_event_cb, LV_EVENT_CLICKED, (void*)2);
     
@@ -210,7 +214,8 @@ void Settings_page::create_footer_panel() {
     lv_obj_add_style(emergency_btn_, &style_btn_, 0);
     lv_obj_add_style(emergency_btn_, &style_btn_emergency_, 0);
     lv_obj_t* emergency_label = lv_label_create(emergency_btn_);
-    lv_label_set_text(emergency_label, "🚨 Emergency Stop");
+    lv_label_set_text(emergency_label, FA_EXCLAMATION_TRIANGLE " Emergency Stop");
+    lv_obj_set_style_text_font(emergency_label, &lv_font_awesome_16, 0);
     lv_obj_center(emergency_label);
     lv_obj_add_event_cb(emergency_btn_, emergency_event_cb, LV_EVENT_CLICKED, (void*)0);
     
@@ -220,7 +225,8 @@ void Settings_page::create_footer_panel() {
     lv_obj_set_style_border_color(power_btn_, lv_color_hex(0x9C27B0), 0);
     lv_obj_set_style_text_color(power_btn_, lv_color_hex(0x9C27B0), 0);
     lv_obj_t* power_label = lv_label_create(power_btn_);
-    lv_label_set_text(power_label, "⏻ Shutdown");
+    lv_label_set_text(power_label, FA_POWER_OFF " Shutdown");
+    lv_obj_set_style_text_font(power_label, &lv_font_awesome_16, 0);
     lv_obj_center(power_label);
     lv_obj_add_event_cb(power_btn_, emergency_event_cb, LV_EVENT_CLICKED, (void*)1);
 }

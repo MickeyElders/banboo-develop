@@ -1,4 +1,5 @@
 #include "gui/video_view.h"
+#include "lv_font_awesome_16.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -96,8 +97,9 @@ void Video_view::create_camera_title() {
     
     // Create title label
     title_label_ = lv_label_create(camera_title_);
-    lv_label_set_text(title_label_, "📹 Live Detection View");
+    lv_label_set_text(title_label_, FA_VIDEO " Live Detection View");
     lv_obj_set_style_text_color(title_label_, lv_color_hex(0xFF6B35), 0);
+    lv_obj_set_style_text_font(title_label_, &lv_font_awesome_16, 0);
     
     // Create detection info label
     detection_info_ = lv_label_create(camera_title_);

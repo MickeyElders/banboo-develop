@@ -66,6 +66,7 @@ target_compile_definitions(lvgl PUBLIC
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts
     ${OpenCV_INCLUDE_DIRS}
     ${CUDA_INCLUDE_DIRS}
     ${TENSORRT_ROOT}
@@ -112,6 +113,9 @@ set(SOURCES
     src/gui/control_panel.cpp
     src/gui/status_bar.cpp
     src/gui/settings_page.cpp
+    
+    # Font Awesome图标字体
+    resources/fonts/lv_font_awesome_16.c
 )
 
 # 头文件

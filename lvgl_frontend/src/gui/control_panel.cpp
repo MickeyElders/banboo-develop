@@ -1,4 +1,5 @@
 #include "gui/control_panel.h"
+#include "lv_font_awesome_16.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -120,7 +121,7 @@ void Control_panel::create_modbus_section() {
     
     // Create title
     lv_obj_t* title = lv_label_create(modbus_section_);
-    lv_label_set_text(title, "📊 Modbus Registers");
+    lv_label_set_text(title, "Modbus Registers");
     lv_obj_set_style_text_color(title, lv_color_hex(0x2196F3), 0);
     
     // Create register table
@@ -150,7 +151,7 @@ void Control_panel::create_modbus_section() {
         // Set value column color
         // Set status cell style (replacement for lv_table_set_cell_ctrl)
         if (i == 0) {  // Connection status in green
-            lv_table_set_cell_value(modbus_table_, i + 1, 2, "✓");
+            lv_table_set_cell_value(modbus_table_, i + 1, 2, FA_CHECK);
         } else {  // Other statuses in gray
             lv_table_set_cell_value(modbus_table_, i + 1, 2, "-");
         }
@@ -175,8 +176,9 @@ void Control_panel::create_plc_section() {
     
     // Create title
     lv_obj_t* title = lv_label_create(plc_section_);
-    lv_label_set_text(title, "🔗 PLC Communication");
+    lv_label_set_text(title, FA_LINK " PLC Communication");
     lv_obj_set_style_text_color(title, lv_color_hex(0x4CAF50), 0);
+    lv_obj_set_style_text_font(title, &lv_font_awesome_16, 0);
     
     // Create status grid container
     lv_obj_t* status_grid = lv_obj_create(plc_section_);
@@ -269,8 +271,9 @@ void Control_panel::create_jetson_section() {
     
     // Create title
     lv_obj_t* title = lv_label_create(jetson_section_);
-    lv_label_set_text(title, "🟢 Jetson Orin Nano 8GB  15W");
+    lv_label_set_text(title, FA_CIRCLE " Jetson Orin Nano 8GB 15W");
     lv_obj_set_style_text_color(title, lv_color_hex(0x76B900), 0);
+    lv_obj_set_style_text_font(title, &lv_font_awesome_16, 0);
     
     // Create CPU progress bar
     lv_obj_t* cpu_container = lv_obj_create(jetson_section_);
@@ -380,8 +383,9 @@ void Control_panel::create_ai_section() {
     
     // Create title
     lv_obj_t* title = lv_label_create(ai_section_);
-    lv_label_set_text(title, "🤖 AI Model Status");
+    lv_label_set_text(title, FA_ROBOT " AI Model Status");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFF6B35), 0);
+    lv_obj_set_style_text_font(title, &lv_font_awesome_16, 0);
     
     // Create status grid container
     lv_obj_t* ai_grid = lv_obj_create(ai_section_);
@@ -439,8 +443,9 @@ void Control_panel::create_comm_section() {
     
     // Create title
     lv_obj_t* title = lv_label_create(comm_section_);
-    lv_label_set_text(title, "📈 Communication Stats");
+    lv_label_set_text(title, FA_CHART_LINE " Communication Stats");
     lv_obj_set_style_text_color(title, lv_color_hex(0xB0B0B0), 0);
+    lv_obj_set_style_text_font(title, &lv_font_awesome_16, 0);
     
     // Create status grid container
     lv_obj_t* comm_grid = lv_obj_create(comm_section_);
