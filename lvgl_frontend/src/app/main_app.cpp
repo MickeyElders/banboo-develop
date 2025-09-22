@@ -21,11 +21,18 @@ MainApp::MainApp(const system_config_t& config)
     : config_(config)
     , running_(false)
     , initialized_(false)
+    , camera_manager_(nullptr)
 {
 }
 
 MainApp::~MainApp() {
     stop();
+    
+    // 清理摄像头管理器
+    if (camera_manager_) {
+        camera_manager_destroy(camera_manager_);
+        camera_manager_ = nullptr;
+    }
 }
 
 bool MainApp::initialize() {
@@ -45,8 +52,10 @@ bool MainApp::initialize() {
         // 初始化触摸输入
         setup_touch_input();
         
-        // TODO: 初始化其他组件
-        // setup_camera();
+        // 初始化摄像头组件
+        setup_camera();
+        
+        // TODO: 初始化AI检测器
         // setup_ai_detector();
         
         initialized_ = true;
@@ -81,6 +90,12 @@ void MainApp::stop() {
     
     printf("停止主应用程序...\n");
     running_ = false;
+    
+    // 停止摄像头组件
+    if (camera_manager_) {
+        camera_manager_stop_capture(camera_manager_);
+        camera_manager_deinit(camera_manager_);
+    }
     
     // 清理触摸驱动
     touch_driver_deinit();

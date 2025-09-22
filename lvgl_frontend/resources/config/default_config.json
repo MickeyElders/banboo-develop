@@ -8,13 +8,15 @@
   },
   "camera": {
     "device_path": "/dev/video0",
-    "width": 1920,
-    "height": 1080,
+    "width": 1280,
+    "height": 720,
     "fps": 30,
     "buffer_count": 4,
     "use_hardware_acceleration": true,
     "exposure": -1,
-    "gain": -1
+    "gain": -1,
+    "shared_memory_key": "/tmp/bamboo_camera_shm",
+    "use_shared_memory": true
   },
   "ai": {
     "model_path": "/opt/bamboo/models/yolov8n.onnx",

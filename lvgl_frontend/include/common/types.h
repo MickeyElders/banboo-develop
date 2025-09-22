@@ -57,6 +57,8 @@ typedef struct {
     bool use_hardware_acceleration; // 硬件加速
     int exposure;                   // 曝光值
     int gain;                       // 增益
+    char shared_memory_key[256];    // 共享内存key路径
+    bool use_shared_memory;         // 使用共享内存
 } camera_config_t;
 
 /* AI模型配置 */

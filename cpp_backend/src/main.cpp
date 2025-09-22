@@ -79,13 +79,26 @@ public:
         LOG_INFO("启动主循环");
         
         // 启动所有服务
+        LOG_INFO("🔄 准备启动服务...");
         startServices();
+        LOG_INFO("🔄 服务启动完成，进入主循环");
+        
+        // 检查全局退出标志
+        LOG_INFO("🔍 检查退出标志: {}", g_shutdown_requested.load() ? "已设置" : "未设置");
         
         // 主循环
         auto last_stats_time = std::chrono::steady_clock::now();
         const auto stats_interval = std::chrono::seconds(30);
         
+        LOG_INFO("🔄 开始执行主循环...");
+        int loop_count = 0;
+        
         while (!g_shutdown_requested) {
+            loop_count++;
+            if (loop_count <= 5 || loop_count % 100 == 0) {
+                LOG_INFO("🔄 主循环迭代 #{}, 退出标志: {}", loop_count, g_shutdown_requested.load() ? "是" : "否");
+            }
+            
             // 处理视觉检测
             processVision();
             
@@ -100,7 +113,7 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         
-        LOG_INFO("主循环结束");
+        LOG_INFO("主循环结束，退出原因: g_shutdown_requested = {}", g_shutdown_requested.load());
     }
     
     void shutdown() {
@@ -336,13 +349,27 @@ private:
         LOG_INFO("🚀 启动所有可用服务...");
         
         // 启动Modbus服务器（必需服务）
-        if (modbus_server_ && !modbus_server_->start()) {
-            LOG_ERROR("❌ Modbus服务器启动失败");
-            return;
+        LOG_INFO("📡 检查Modbus服务器状态: {}", modbus_server_ ? "存在" : "不存在");
+        
+        if (modbus_server_) {
+            LOG_INFO("📡 开始启动Modbus服务器...");
+            bool modbus_start_result = modbus_server_->start();
+            LOG_INFO("📡 Modbus启动结果: {}", modbus_start_result ? "成功" : "失败");
+            
+            if (!modbus_start_result) {
+                LOG_ERROR("❌ Modbus服务器启动失败");
+                return;
+            } else {
+                LOG_INFO("✅ Modbus服务器启动成功");
+                communication_system_available_ = true;
+            }
         } else {
-            LOG_INFO("✅ Modbus服务器启动成功");
-            communication_system_available_ = true;
+            LOG_ERROR("❌ Modbus服务器对象为空");
+            return;
         }
+        
+        LOG_INFO("📋 Modbus启动后的状态检查...");
+        LOG_INFO("   communication_system_available_: {}", communication_system_available_ ? "是" : "否");
         
         // 详细调试摄像头系统状态
         LOG_INFO("🔍 检查摄像头系统状态:");
