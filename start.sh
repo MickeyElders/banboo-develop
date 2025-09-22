@@ -667,7 +667,7 @@ start_backend() {
 # 启动LVGL前端
 start_frontend() {
     local debug_mode_param="$1"
-    print_step "启动LVGL前端应用..."
+    print_step "启动LVGL前端应用（异步模式）..."
     
     # 确保在项目根目录
     cd "$SCRIPT_DIR"
@@ -681,28 +681,20 @@ start_frontend() {
         exit 1
     fi
     
-    # 验证共享内存可用性
+    # 异步模式：不验证共享内存存在，让前端自己处理
     local shared_memory_key="/tmp/bamboo_camera_shm"
-    print_info "验证共享内存连接..."
+    print_info "设置异步共享内存模式..."
     
+    # 确保共享内存key文件存在（用于后端连接）
     if [[ ! -f "$shared_memory_key" ]]; then
-        print_error "共享内存key文件不存在: $shared_memory_key"
-        exit 1
+        print_info "创建共享内存key文件: $shared_memory_key"
+        touch "$shared_memory_key"
+        chmod 666 "$shared_memory_key"
     fi
     
-    # 检查共享内存段是否存在
-    local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
-    if [[ -n "$shm_key" ]]; then
-        if ipcs -m | grep -q "$shm_key" 2>/dev/null; then
-            print_success "共享内存验证通过 (key: $shm_key)"
-        else
-            print_error "共享内存段不存在，请确保后端已正常启动"
-            exit 1
-        fi
-    else
-        print_error "无法生成共享内存key"
-        exit 1
-    fi
+    # 不检查共享内存段是否存在，允许前端异步连接
+    print_success "跳过共享内存验证，前端将异步连接"
+    print_info "摄像头状态: 有数据时自动显示，无数据时显示黑屏"
     
     # 配置framebuffer
     configure_framebuffer
@@ -710,7 +702,7 @@ start_frontend() {
     # 设置环境变量
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
     export BAMBOO_SHARED_MEMORY_KEY="$shared_memory_key"
-    export BAMBOO_FRONTEND_MODE="shared_memory"
+    export BAMBOO_FRONTEND_MODE="async_shared_memory"
     
     # 配置文件路径
     local config_file="resources/config/default_config.json"
@@ -725,7 +717,7 @@ start_frontend() {
         print_info "找到触摸配置文件: $touch_config_file"
     fi
     
-    print_success "正在启动前端应用程序（共享内存模式）..."
+    print_success "正在启动前端应用程序（异步共享内存模式）..."
     print_info "前端可执行文件: $binary_path"
     print_info "后端日志: backend.log"
     print_info "共享内存key: $shared_memory_key"
@@ -733,7 +725,8 @@ start_frontend() {
     if [[ "$debug_mode_param" == "true" ]]; then
         print_info "调试模式: 已启用 (详细触摸信息将显示)"
     fi
-    print_info "架构模式: 后端摄像头管理 + 前端共享内存显示"
+    print_info "架构模式: 后端摄像头管理 + 前端异步共享内存显示"
+    print_info "UI渲染: 立即开始，不等待摄像头数据"
     print_info "按 Ctrl+C 退出应用程序"
     echo
     
@@ -955,6 +948,7 @@ show_help() {
     echo "  -s, --skip-build    跳过构建，直接启动"
     echo "  -c, --clean         清理构建后重新构建"
     echo "  -i, --install       构建并安装到系统"
+    echo "  -t, --test          测试摄像头架构修复"
     echo "  --debug             调试模式构建"
     echo
     echo "示例:"
@@ -962,6 +956,7 @@ show_help() {
     echo "  $0 -b               # 仅构建，不启动"
     echo "  $0 -s               # 跳过构建，直接启动"
     echo "  $0 -c               # 清理后重新构建和启动"
+    echo "  $0 -t               # 测试摄像头架构修复"
 }
 
 # 主函数
@@ -971,6 +966,7 @@ main() {
     local clean_build=false
     local install_system=false
     local debug_mode=false
+    local test_mode=false
     
     # 保存脚本目录
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
@@ -996,6 +992,10 @@ main() {
                 ;;
             -i|--install)
                 install_system=true
+                shift
+                ;;
+            -t|--test)
+                test_mode=true
                 shift
                 ;;
             --debug)
@@ -1042,8 +1042,12 @@ main() {
         fi
     fi
     
-    # 根据参数决定是否启动
-    if [[ "$build_only" != "true" ]]; then
+    # 根据参数决定是否测试或启动
+    if [[ "$test_mode" == "true" ]]; then
+        test_shared_memory_architecture
+        print_success "测试完成！"
+        exit 0
+    elif [[ "$build_only" != "true" ]]; then
         setup_permissions
         start_backend
         start_frontend "$debug_mode"
