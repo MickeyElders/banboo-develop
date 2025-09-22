@@ -156,10 +156,13 @@ void Control_panel::create_modbus_section() {
         }
     }
     
-    // Set table style
-    lv_obj_set_style_bg_color(modbus_table_, lv_color_hex(0x1A237E), 0);  // Deep blue background
-    lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFF6B35), LV_PART_ITEMS | LV_STATE_USER_1);
+    // Set table style - 设置整个表格和单元格的背景色
+    lv_obj_set_style_bg_color(modbus_table_, lv_color_hex(0x1A237E), 0);  // Deep blue background for table
+    lv_obj_set_style_bg_color(modbus_table_, lv_color_hex(0x1A237E), LV_PART_ITEMS);  // Deep blue background for cells
+    lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFFFFFF), 0);  // White text for table
+    lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFFFFFF), LV_PART_ITEMS);  // White text for cells
+    lv_obj_set_style_border_color(modbus_table_, lv_color_hex(0x404040), LV_PART_ITEMS);  // Dark border for cells
+    lv_obj_set_style_border_width(modbus_table_, 1, LV_PART_ITEMS);  // Border width for cells
 }
 
 void Control_panel::create_plc_section() {
