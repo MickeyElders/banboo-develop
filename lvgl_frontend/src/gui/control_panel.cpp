@@ -140,19 +140,20 @@ void Control_panel::create_modbus_section() {
     // Set data rows
     const char* register_addrs[] = {"40001", "40002", "40003", "40004-40005", "40006", "40007-40008", "40009", "40010"};
     const char* register_descs[] = {"System State", "PLC Command", "Coord Ready", "X Coordinate", "Cut Quality", "Heartbeat", "Blade ID", "Health"};
-    const char* register_values[] = {"1", "2", "1", "2458", "0", "12345", "3", "0"};
+    const char* register_values[] = {"1", "2", "1", "2458", LV_SYMBOL_OK, "12345", "3", "0"};
     
     for(int i = 0; i < 8; i++) {
         lv_table_set_cell_value(modbus_table_, i + 1, 0, register_addrs[i]);
         lv_table_set_cell_value(modbus_table_, i + 1, 1, register_descs[i]);
         lv_table_set_cell_value(modbus_table_, i + 1, 2, register_values[i]);
         
-        // Set value column color
-        // Set status cell style (replacement for lv_table_set_cell_ctrl)
-        if (i == 0) {  // Connection status in green
+        // Set value column with specific symbols for different statuses
+        if (i == 0) {  // System State - OK
             lv_table_set_cell_value(modbus_table_, i + 1, 2, LV_SYMBOL_OK);
-        } else {  // Other statuses in gray
-            lv_table_set_cell_value(modbus_table_, i + 1, 2, "-");
+        } else if (i == 4) {  // Cut Quality - Good quality symbol
+            lv_table_set_cell_value(modbus_table_, i + 1, 2, LV_SYMBOL_OK " Normal");
+        } else {  // Other statuses with their values
+            lv_table_set_cell_value(modbus_table_, i + 1, 2, register_values[i]);
         }
     }
     
@@ -237,7 +238,7 @@ void Control_panel::create_plc_section() {
     lv_obj_set_flex_align(blade_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(blade_container, 3, 0);
     
-    const char* blade_names[] = {"Blade 1", "Blade 2", "Dual Blade"};
+    const char* blade_names[] = {"Single Blade 1", "Single Blade 2", "Dual Blade"};
     for(int i = 0; i < 3; i++) {
         blade_buttons_[i] = lv_btn_create(blade_container);
         lv_obj_set_flex_grow(blade_buttons_[i], 1);
@@ -412,9 +413,10 @@ void Control_panel::create_ai_section() {
         lv_obj_set_style_bg_color(ai_item, lv_color_hex(0x0D0D0D), 0);
         lv_obj_set_style_border_opa(ai_item, LV_OPA_TRANSP, 0);
         lv_obj_set_style_radius(ai_item, 3, 0);
-        lv_obj_set_style_pad_all(ai_item, 6, 0);
+        lv_obj_set_style_pad_all(ai_item, 3, 0);  // 减少内边距从6px到3px
+        lv_obj_set_style_pad_gap(ai_item, 1, 0);  // 设置标签之间的间距为1px
         lv_obj_set_flex_flow(ai_item, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(ai_item, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+        lv_obj_set_flex_align(ai_item, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);  // 垂直居中对齐
         
         lv_obj_t* label = lv_label_create(ai_item);
         lv_label_set_text(label, ai_labels[i]);
@@ -471,9 +473,10 @@ void Control_panel::create_comm_section() {
         lv_obj_set_style_bg_color(comm_item, lv_color_hex(0x0D0D0D), 0);
         lv_obj_set_style_border_opa(comm_item, LV_OPA_TRANSP, 0);
         lv_obj_set_style_radius(comm_item, 3, 0);
-        lv_obj_set_style_pad_all(comm_item, 6, 0);
+        lv_obj_set_style_pad_all(comm_item, 3, 0);  // 减少内边距从6px到3px
+        lv_obj_set_style_pad_gap(comm_item, 1, 0);  // 设置标签之间的间距为1px
         lv_obj_set_flex_flow(comm_item, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(comm_item, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+        lv_obj_set_flex_align(comm_item, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);  // 垂直居中对齐
         
         lv_obj_t* label = lv_label_create(comm_item);
         lv_label_set_text(label, comm_labels[i]);
