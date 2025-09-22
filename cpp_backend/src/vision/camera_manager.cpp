@@ -318,10 +318,39 @@ bool CameraManager::initializeCamera(int camera_id) {
         LOG_INFO("相机 {} 初始化成功: {}x{} @ {}fps",
                 camera_id, actual_width, actual_height, actual_fps);
         
-        // 测试捕获一帧来验证摄像头工作正常
+        // 测试捕获一帧来验证摄像头工作正常并获取实际尺寸
         cv::Mat test_frame;
         if (successful_cap->read(test_frame) && !test_frame.empty()) {
             LOG_INFO("相机 {} 测试帧捕获成功: {}x{}", camera_id, test_frame.cols, test_frame.rows);
+            
+            // 检查实际输出尺寸是否与配置不符，如果不符则重新初始化共享内存
+            if (shared_memory_enabled_ && shared_memory_manager_ &&
+                (test_frame.cols != config_.width || test_frame.rows != config_.height)) {
+                
+                LOG_WARN("检测到摄像头实际输出尺寸 {}x{} 与配置尺寸 {}x{} 不匹配",
+                        test_frame.cols, test_frame.rows, config_.width, config_.height);
+                LOG_INFO("重新初始化共享内存以匹配实际尺寸...");
+                
+                // 更新配置为实际尺寸
+                config_.width = test_frame.cols;
+                config_.height = test_frame.rows;
+                
+                // 重新创建共享内存管理器
+                shared_memory_manager_.reset();
+                shared_memory_manager_ = SharedMemoryFactory::createProducer(
+                    config_.shared_memory_key,
+                    config_.width,
+                    config_.height,
+                    3  // BGR 3通道
+                );
+                
+                if (shared_memory_manager_) {
+                    LOG_INFO("共享内存重新初始化成功: {}x{}", config_.width, config_.height);
+                } else {
+                    LOG_ERROR("共享内存重新初始化失败，将禁用共享内存输出");
+                    shared_memory_enabled_ = false;
+                }
+            }
         } else {
             LOG_WARN("相机 {} 无法捕获测试帧，但连接已建立", camera_id);
         }
