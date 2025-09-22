@@ -351,58 +351,26 @@ bool shared_memory_reader_is_connected(shared_memory_reader_t* reader) {
 bool shared_memory_reader_wait_for_availability(const char* key_path, int timeout_ms) {
     if (!key_path) return false;
     
-    uint64_t start_time = get_timestamp_ms();
-    int retry_count = 0;
-    const int max_retries = 50; // 增加重试次数到50次
+    printf("检查共享内存可用性（非阻塞模式）: %s\n", key_path);
     
-    printf("等待共享内存可用: %s (超时: %dms)\n", key_path, timeout_ms);
-    
-    while (true) {
-        retry_count++;
-        
-        // 尝试生成IPC密钥
-        key_t shm_key = ftok(key_path, 'B');
-        if (shm_key != -1) {
-            // 尝试连接到共享内存段
-            int shm_id = shmget(shm_key, 0, 0666);
-            if (shm_id != -1) {
-                // 验证共享内存是否包含有效数据
-                void* shm_ptr = shmat(shm_id, nullptr, 0);
-                if (shm_ptr != (void*)-1) {
-                    // 检查第一个帧头是否有效
-                    shared_frame_header_t* header = (shared_frame_header_t*)shm_ptr;
-                    if (header->width > 0 && header->height > 0) {
-                        printf("共享内存可用: %dx%d, 重试次数: %d\n",
-                               header->width, header->height, retry_count);
-                        shmdt(shm_ptr);
-                        return true;
-                    }
+    // 立即检查一次，不等待
+    key_t shm_key = ftok(key_path, 'B');
+    if (shm_key != -1) {
+        int shm_id = shmget(shm_key, 0, 0666);
+        if (shm_id != -1) {
+            void* shm_ptr = shmat(shm_id, nullptr, 0);
+            if (shm_ptr != (void*)-1) {
+                shared_frame_header_t* header = (shared_frame_header_t*)shm_ptr;
+                if (header->width > 0 && header->height > 0) {
+                    printf("共享内存立即可用: %dx%d\n", header->width, header->height);
                     shmdt(shm_ptr);
+                    return true;
                 }
+                shmdt(shm_ptr);
             }
         }
-        
-        // 每5次重试输出一次进度
-        if (retry_count % 5 == 0) {
-            printf("等待共享内存... (%d/%d)\n", retry_count, max_retries);
-        }
-        
-        // 检查超时
-        if (timeout_ms > 0) {
-            uint64_t elapsed = get_timestamp_ms() - start_time;
-            if (elapsed >= (uint64_t)timeout_ms) {
-                printf("共享内存等待超时: %dms, 重试次数: %d\n", timeout_ms, retry_count);
-                return false;
-            }
-        }
-        
-        // 达到最大重试次数
-        if (retry_count >= max_retries) {
-            printf("共享内存等待达到最大重试次数: %d\n", max_retries);
-            return false;
-        }
-        
-        // 短暂休眠后重试，增加等待时间
-        usleep(200000); // 200ms，给后端更多时间初始化
     }
+    
+    printf("共享内存当前不可用，将在后台线程中继续重试\n");
+    return false; // 立即返回，不阻塞UI
 }

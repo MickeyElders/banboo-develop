@@ -180,33 +180,17 @@ void camera_manager_destroy(camera_manager_t* manager) {
 bool camera_manager_init(camera_manager_t* manager) {
     if (!manager) return false;
     
-    printf("初始化摄像头管理器（共享内存模式）...\n");
+    printf("异步初始化摄像头管理器（共享内存模式）...\n");
     
-    // 等待共享内存可用（最多等待15秒，给后端更多初始化时间）
-    printf("等待后端共享内存初始化...\n");
-    if (!shared_memory_reader_wait_for_availability(manager->shared_memory_key, 15000)) {
-        printf("警告：共享内存暂不可用（15秒超时），将在运行时重试连接\n");
-        return true; // 不阻止初始化，允许后续重试连接
-    }
+    // 完全异步模式：不等待共享内存，立即返回成功
+    // 共享内存连接和数据获取将在后台线程中处理
+    manager->connected = false;
+    manager->connection_retry_time = 0;
     
-    // 尝试连接到共享内存
-    if (shared_memory_reader_connect(manager->shared_reader)) {
-        manager->connected = true;
-        printf("共享内存连接成功\n");
-        
-        // 获取实际的帧尺寸信息
-        uint32_t actual_width, actual_height, actual_channels;
-        if (shared_memory_reader_get_frame_info(manager->shared_reader,
-                                              &actual_width, &actual_height, &actual_channels)) {
-            printf("共享内存帧信息: %dx%dx%d\n", actual_width, actual_height, actual_channels);
-        }
-    } else {
-        printf("共享内存连接失败，将在运行时重试\n");
-        manager->connected = false;
-    }
+    printf("摄像头管理器异步初始化完成（无阻塞模式）\n");
+    printf("共享内存连接将在后台线程中自动重试\n");
     
-    printf("摄像头管理器初始化完成\n");
-    return true;
+    return true; // 总是返回成功，不阻塞UI启动
 }
 
 void camera_manager_deinit(camera_manager_t* manager) {

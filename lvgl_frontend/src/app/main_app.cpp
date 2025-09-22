@@ -174,7 +174,7 @@ void MainApp::setup_gui() {
 }
 
 void MainApp::setup_camera() {
-    printf("异步设置摄像头管理器（共享内存模式）...\n");
+    printf("设置异步摄像头管理器（完全非阻塞模式）...\n");
     
     // 使用配置中的显示分辨率创建摄像头管理器
     const camera_config_t& camera_config = config_.camera;
@@ -199,25 +199,18 @@ void MainApp::setup_camera() {
         return;
     }
     
-    // 异步初始化摄像头管理器，不阻塞UI渲染
-    printf("摄像头管理器将异步初始化，不阻塞UI渲染\n");
+    // 完全异步初始化：不等待任何结果，立即启动后台线程
+    printf("启动完全异步摄像头管理器...\n");
+    printf("UI将立即渲染，摄像头数据将在后台异步获取\n");
     
-    // 注意: 初始化和启动将在后台线程中进行，让UI先行渲染
-    // 摄像头初始化失败不会影响界面的正常显示
-    if (!camera_manager_init(camera_manager_)) {
-        printf("警告: 摄像头管理器初始化失败，将在后台重试连接\n");
-        // 不销毁管理器，让其在运行时重试连接
-    } else {
-        // 启动摄像头捕获
-        if (!camera_manager_start_capture(camera_manager_)) {
-            printf("警告: 启动摄像头捕获失败，将在后台重试\n");
-            // 不阻塞，让管理器在运行时重试
-        } else {
-            printf("摄像头管理器初始化成功\n");
-        }
-    }
+    // 直接初始化（无阻塞）
+    camera_manager_init(camera_manager_);
     
-    printf("摄像头管理器设置完成（异步模式）\n");
+    // 直接启动捕获线程（无阻塞）
+    camera_manager_start_capture(camera_manager_);
+    
+    printf("异步摄像头管理器启动完成 - UI渲染不受影响\n");
+    printf("摄像头状态: 后台连接中，有数据时自动显示，无数据时显示黑屏\n");
 }
 
 void MainApp::setup_ai_detector() {
