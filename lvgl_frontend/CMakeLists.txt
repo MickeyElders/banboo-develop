@@ -98,6 +98,7 @@ set(SOURCES
     src/camera/v4l2_camera.cpp
     src/camera/cuda_processor.cpp
     src/camera/camera_manager.cpp
+    src/camera/shared_memory_reader.cpp
     
     # 后端通信系统
     src/backend/backend_client.cpp
@@ -128,6 +129,7 @@ set(HEADERS
     include/camera/v4l2_camera.h
     include/camera/cuda_processor.h
     include/camera/camera_manager.h
+    include/camera/shared_memory_reader.h
     include/ai/tensorrt_engine.h
     include/ai/yolo_detector.h
     include/ai/detection_processor.h
