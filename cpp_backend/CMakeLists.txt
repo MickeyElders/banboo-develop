@@ -349,6 +349,7 @@ set(SOURCES
     src/vision/stereo_vision.cpp
     src/vision/detector.cpp
     src/vision/camera_manager.cpp
+    src/vision/shared_memory_manager.cpp
     src/vision/optimized_detector.cpp
     src/vision/nam_attention.cpp
     src/vision/ghost_conv.cpp
