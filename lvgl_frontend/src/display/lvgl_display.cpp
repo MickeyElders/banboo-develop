@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 // LVGL显示驱动变量
 static lv_disp_drv_t disp_drv;
@@ -463,7 +464,7 @@ void deinit_camera_system() {
 
 // 更新摄像头显示
 void update_camera_display() {
-    if (g_camera_manager) {
+    if (g_camera_manager && camera_manager_is_running(g_camera_manager)) {
         camera_manager_update_display(g_camera_manager);
     }
 }
@@ -522,12 +523,18 @@ void deinit_backend_system() {
     }
 }
 
-// 更新系统状态显示
+// 更新系统状态显示（安全版本）
 void update_system_status_display() {
-    if (!g_backend_client) return;
+    // 安全检查：如果后端客户端不存在，直接返回，不进行任何操作
+    if (!g_backend_client) {
+        // 静默返回，避免在初始化期间产生错误
+        return;
+    }
     
-    // 获取系统健康信息
+    // 获取系统健康信息（安全版本）
     system_health_t health;
+    memset(&health, 0, sizeof(health)); // 初始化结构体
+    
     if (backend_client_get_system_health(g_backend_client, &health)) {
         // 更新性能标签
         if (g_performance_label) {
@@ -539,7 +546,7 @@ void update_system_status_display() {
         }
     }
     
-    // 获取后端状态
+    // 安全获取后端状态
     backend_status_t backend_status = backend_client_get_backend_status(g_backend_client);
     if (g_system_status_label) {
         switch (backend_status) {
@@ -558,7 +565,7 @@ void update_system_status_display() {
         }
     }
     
-    // 获取PLC状态
+    // 安全获取PLC状态
     plc_status_t plc_status = backend_client_get_plc_status(g_backend_client);
     if (g_plc_status_label) {
         switch (plc_status) {
@@ -588,8 +595,10 @@ void update_system_status_display() {
         }
     }
     
-    // 获取切割坐标
+    // 安全获取切割坐标
     cutting_coordinate_t coordinate;
+    memset(&coordinate, 0, sizeof(coordinate)); // 初始化结构体
+    
     if (backend_client_get_coordinate(g_backend_client, &coordinate) && g_detection_data_label) {
         if (coordinate.coordinate_ready) {
             char coord_text[256];
