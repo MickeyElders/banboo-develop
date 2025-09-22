@@ -114,9 +114,9 @@ set(SOURCES
     src/gui/status_bar.cpp
     src/gui/settings_page.cpp
     
-    # 中文字体文件
-    resources/fonts/lv_font_noto_sans_cjk_14.c
-    resources/fonts/lv_font_noto_sans_cjk_16.c
+    # 中文字体文件 (轻量级版本)
+    resources/fonts/lv_font_noto_sans_cjk_14_minimal.c
+    resources/fonts/lv_font_noto_sans_cjk_16_minimal.c
 )
 
 # 头文件

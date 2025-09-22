@@ -37,9 +37,11 @@ def update_font_references():
                 count=1
             )
         
-        # 替换字体引用
-        content = content.replace('&lv_font_montserrat_14', '&lv_font_noto_sans_cjk_14')
-        content = content.replace('&lv_font_montserrat_16', '&lv_font_noto_sans_cjk_16')
+        # 替换字体引用 (使用轻量级版本)
+        content = content.replace('&lv_font_montserrat_14', '&lv_font_noto_sans_cjk_14_minimal')
+        content = content.replace('&lv_font_montserrat_16', '&lv_font_noto_sans_cjk_16_minimal')
+        content = content.replace('&lv_font_noto_sans_cjk_14', '&lv_font_noto_sans_cjk_14_minimal')
+        content = content.replace('&lv_font_noto_sans_cjk_16', '&lv_font_noto_sans_cjk_16_minimal')
         
         # 写回文件
         with open(file_path, 'w', encoding='utf-8') as f:
