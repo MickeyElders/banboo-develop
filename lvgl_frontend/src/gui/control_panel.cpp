@@ -206,9 +206,10 @@ void Control_panel::create_plc_section() {
         lv_obj_set_style_bg_color(status_item, lv_color_hex(0x0D0D0D), 0);
         lv_obj_set_style_border_opa(status_item, LV_OPA_TRANSP, 0);
         lv_obj_set_style_radius(status_item, 3, 0);
-        lv_obj_set_style_pad_all(status_item, 6, 0);
+        lv_obj_set_style_pad_all(status_item, 3, 0);  // 减少内边距从6px到3px
+        lv_obj_set_style_pad_gap(status_item, 1, 0);  // 设置标签之间的间距为1px
         lv_obj_set_flex_flow(status_item, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(status_item, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+        lv_obj_set_flex_align(status_item, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);  // 垂直居中对齐
         
         lv_obj_t* label = lv_label_create(status_item);
         lv_label_set_text(label, status_labels[i]);
