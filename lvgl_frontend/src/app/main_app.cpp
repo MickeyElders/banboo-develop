@@ -33,7 +33,7 @@ MainApp::~MainApp() {
     
     // 清理TCP Socket客户端
     if (tcp_socket_client_) {
-        tcp_socket_client_->stop();
+        tcp_socket_client_->disconnect();
         tcp_socket_client_.reset();
     }
     
@@ -102,8 +102,8 @@ bool MainApp::start() {
     
     // 启动TCP Socket客户端
     if (tcp_socket_client_) {
-        if (!tcp_socket_client_->start()) {
-            printf("警告: TCP Socket客户端启动失败\n");
+        if (!tcp_socket_client_->connect()) {
+            printf("警告: TCP Socket客户端连接失败\n");
         }
     }
     
@@ -128,7 +128,7 @@ void MainApp::stop() {
     
     // 停止TCP Socket客户端
     if (tcp_socket_client_) {
-        tcp_socket_client_->stop();
+        tcp_socket_client_->disconnect();
     }
     
     // 停止后端通信（向后兼容）
@@ -311,27 +311,39 @@ void MainApp::setup_backend_communication() {
     tcp_socket_client_ = std::make_unique<TcpSocketClient>(server_host, server_port);
     
     // 设置连接回调
-    tcp_socket_client_->setConnectionCallback([this](bool connected) {
-        if (connected) {
-            printf("前端已连接到后端服务器\n");
-        } else {
-            printf("前端与后端服务器连接断开\n");
+    tcp_socket_client_->set_connection_callback([this](ConnectionStatus status) {
+        switch (status) {
+            case ConnectionStatus::CONNECTED:
+                printf("前端已连接到后端服务器\n");
+                break;
+            case ConnectionStatus::DISCONNECTED:
+                printf("前端与后端服务器连接断开\n");
+                break;
+            case ConnectionStatus::CONNECTING:
+                printf("正在连接后端服务器...\n");
+                break;
+            case ConnectionStatus::RECONNECTING:
+                printf("正在重新连接后端服务器...\n");
+                break;
+            case ConnectionStatus::CONNECTION_ERROR:
+                printf("后端服务器连接错误\n");
+                break;
         }
     });
     
     // 设置消息回调
-    tcp_socket_client_->setMessageCallback([this](const std::string& message) {
+    tcp_socket_client_->set_message_callback([this](const CommunicationMessage& message) {
         // 处理从后端接收到的消息
-        printf("收到后端消息: %s\n", message.c_str());
+        printf("收到后端消息，类型: %d\n", static_cast<int>(message.type));
         // TODO: 解析消息并更新UI
     });
     
     // 非阻塞连接启动
-    if (!tcp_socket_client_->start()) {
-        printf("警告: TCP Socket客户端启动失败，前端将在无后端模式下运行\n");
+    if (!tcp_socket_client_->connect()) {
+        printf("警告: TCP Socket客户端连接失败，前端将在无后端模式下运行\n");
         tcp_socket_client_.reset();
     } else {
-        printf("TCP Socket客户端启动成功\n");
+        printf("TCP Socket客户端连接成功\n");
     }
     
     // 为了向后兼容，保持backend_client_为nullptr
