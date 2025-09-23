@@ -403,7 +403,6 @@ target_compile_definitions(bamboo_cut_lib PUBLIC
 # 为库目标链接依赖
 target_link_libraries(bamboo_cut_lib
     Threads::Threads
-    systemd
 )
 
 if(OpenCV_FOUND)

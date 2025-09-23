@@ -4,7 +4,15 @@
 #include <thread>
 #include <chrono>
 #include <nlohmann/json.hpp>
+
+// SystemD支持 - 可选依赖
+#ifdef ENABLE_SYSTEMD
 #include <systemd/sd-daemon.h>
+#else
+// 如果没有systemd，提供空的实现
+static inline int sd_notify(int unset_environment, const char *state) { return 0; }
+static inline int sd_watchdog_enabled(int unset_environment, uint64_t *usec) { return 0; }
+#endif
 
 #include <bamboo_cut/config.h>
 #include <bamboo_cut/core/logger.h>
@@ -22,6 +30,7 @@ std::atomic<bool> g_shutdown_requested{false};
 
 // SystemD watchdog心跳线程
 void watchdog_thread() {
+#ifdef ENABLE_SYSTEMD
     uint64_t watchdog_usec = 0;
     if (sd_watchdog_enabled(0, &watchdog_usec) > 0) {
         auto interval = std::chrono::microseconds(watchdog_usec / 2); // 发送间隔为超时时间的一半
@@ -30,6 +39,12 @@ void watchdog_thread() {
             std::this_thread::sleep_for(interval);
         }
     }
+#else
+    // 没有systemd时，简单的空循环防止线程退出
+    while (!g_shutdown_requested) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+#endif
 }
 
 // 信号处理函数

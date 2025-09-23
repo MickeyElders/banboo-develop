@@ -12,7 +12,15 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sched.h>
+
+// SystemD支持 - 可选依赖
+#ifdef ENABLE_SYSTEMD
 #include <systemd/sd-daemon.h>
+#else
+// 如果没有systemd，提供空的实现
+static inline int sd_notify(int unset_environment, const char *state) { return 0; }
+static inline int sd_watchdog_enabled(int unset_environment, uint64_t *usec) { return 0; }
+#endif
 
 #include "lvgl.h"
 #include "app/main_app.h"
@@ -29,6 +37,7 @@ static volatile bool g_running = true;
 
 /* SystemD watchdog心跳线程 */
 void* watchdog_thread(void* arg) {
+#ifdef ENABLE_SYSTEMD
     uint64_t watchdog_usec = 0;
     if (sd_watchdog_enabled(0, &watchdog_usec) > 0) {
         uint64_t interval_usec = watchdog_usec / 2; // 发送间隔为超时时间的一半
@@ -37,6 +46,12 @@ void* watchdog_thread(void* arg) {
             usleep(interval_usec);
         }
     }
+#else
+    // 没有systemd时，简单的空循环防止线程退出
+    while (g_running) {
+        usleep(1000000); // 1秒
+    }
+#endif
     return nullptr;
 }
 
