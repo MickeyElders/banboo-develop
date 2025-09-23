@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sched.h>
+#include <systemd/sd-daemon.h>
 
 #include "lvgl.h"
 #include "app/main_app.h"
@@ -25,6 +26,19 @@
 /* 全局变量 */
 static MainApp* g_app = nullptr;
 static volatile bool g_running = true;
+
+/* SystemD watchdog心跳线程 */
+void* watchdog_thread(void* arg) {
+    uint64_t watchdog_usec = 0;
+    if (sd_watchdog_enabled(0, &watchdog_usec) > 0) {
+        uint64_t interval_usec = watchdog_usec / 2; // 发送间隔为超时时间的一半
+        while (g_running) {
+            sd_notify(0, "WATCHDOG=1");
+            usleep(interval_usec);
+        }
+    }
+    return nullptr;
+}
 
 /* 信号处理函数 */
 void signal_handler(int sig) {
@@ -269,6 +283,12 @@ int main(int argc, char* argv[]) {
     
     /* 等待主循环线程结束 */
     pthread_join(main_thread, nullptr);
+    
+    /* 通知systemd服务正在停止 */
+    sd_notify(0, "STOPPING=1");
+    
+    /* 等待watchdog线程结束 */
+    pthread_join(watchdog_th, nullptr);
     
     /* 清理资源 */
     printf("正在清理资源...\n");

@@ -215,6 +215,7 @@ target_link_libraries(bamboo_controller_lvgl
     pthread
     dl
     m
+    systemd
 )
 
 # Jetson设备的CUDA和TensorRT库

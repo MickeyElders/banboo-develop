@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <nlohmann/json.hpp>
+#include <systemd/sd-daemon.h>
 
 #include <bamboo_cut/config.h>
 #include <bamboo_cut/core/logger.h>
@@ -18,6 +19,18 @@ using namespace bamboo_cut;
 
 // 全局变量用于信号处理
 std::atomic<bool> g_shutdown_requested{false};
+
+// SystemD watchdog心跳线程
+void watchdog_thread() {
+    uint64_t watchdog_usec = 0;
+    if (sd_watchdog_enabled(0, &watchdog_usec) > 0) {
+        auto interval = std::chrono::microseconds(watchdog_usec / 2); // 发送间隔为超时时间的一半
+        while (!g_shutdown_requested) {
+            sd_notify(0, "WATCHDOG=1");
+            std::this_thread::sleep_for(interval);
+        }
+    }
+}
 
 // 信号处理函数
 void signalHandler(int signal) {
@@ -87,6 +100,12 @@ public:
     void run() {
         LOG_INFO("启动主循环");
         
+        // 通知systemd服务已准备就绪
+        sd_notify(0, "READY=1");
+        
+        // 启动SystemD watchdog心跳线程
+        std::thread watchdog_th(watchdog_thread);
+        
         // 启动所有服务
         LOG_INFO("🔄 准备启动服务...");
         startServices();
@@ -123,10 +142,18 @@ public:
         }
         
         LOG_INFO("主循环结束，退出原因: g_shutdown_requested = {}", g_shutdown_requested.load());
+        
+        // 等待心跳线程结束
+        if (watchdog_th.joinable()) {
+            watchdog_th.join();
+        }
     }
     
     void shutdown() {
         LOG_INFO("开始关闭系统...");
+        
+        // 通知systemd服务正在停止
+        sd_notify(0, "STOPPING=1");
         
         // 停止UNIX Socket服务器
         if (unix_socket_server_) {
