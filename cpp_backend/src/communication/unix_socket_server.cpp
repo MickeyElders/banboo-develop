@@ -571,6 +571,33 @@ std::string UnixSocketServer::get_current_timestamp() const {
     return ss.str();
 }
 
+// 回调函数设置实现
+void UnixSocketServer::set_message_callback(MessageCallback callback) {
+    message_callback_ = callback;
+}
+
+void UnixSocketServer::set_client_connected_callback(ClientConnectedCallback callback) {
+    client_connected_callback_ = callback;
+}
+
+void UnixSocketServer::set_client_disconnected_callback(ClientDisconnectedCallback callback) {
+    client_disconnected_callback_ = callback;
+}
+
+bool UnixSocketServer::is_client_connected(int client_fd) const {
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+    for (const auto& client : clients_) {
+        if (client.socket_fd == client_fd && client.is_active) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void UnixSocketServer::disconnect_client(int client_fd) {
+    remove_client(client_fd);
+}
+
 #ifdef ENABLE_JSON
 json UnixSocketServer::system_status_to_json(const UnixSocketStatusData& status) const {
     json j;
