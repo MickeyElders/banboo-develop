@@ -384,7 +384,7 @@ void UnixSocketServer::remove_client(int client_fd) {
 
 void UnixSocketServer::heartbeat_monitor_thread() {
     while (running_.load()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(HEARTBEAT_INTERVAL_MS));
+        std::this_thread::sleep_for(std::chrono::milliseconds(UNIX_SOCKET_HEARTBEAT_INTERVAL_MS));
         
         if (!running_.load()) break;
         

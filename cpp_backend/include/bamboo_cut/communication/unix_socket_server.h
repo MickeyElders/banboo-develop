@@ -221,7 +221,7 @@ private:
     
     // 配置参数
     static constexpr int MAX_CLIENTS = 10;
-    static constexpr int HEARTBEAT_INTERVAL_MS = 1000;
+    static constexpr int UNIX_SOCKET_HEARTBEAT_INTERVAL_MS = 1000;
     static constexpr int CLIENT_TIMEOUT_MS = 5000;
     static constexpr int POLL_TIMEOUT_MS = 100;
 };

@@ -365,28 +365,23 @@ private:
     bool initializeUnixSocketServer() {
         LOG_INFO("初始化UNIX Socket服务器...");
         
-        // 创建UNIX Socket服务器配置
-        communication::UnixSocketConfig socket_config;
-        socket_config.socket_path = "/tmp/bamboo_socket";
-        socket_config.max_connections = 5;
-        socket_config.buffer_size = 8192;
-        socket_config.timeout_ms = 1000;
+        // 创建UNIX Socket服务器，只需要socket路径参数
+        unix_socket_server_ = std::make_unique<communication::UnixSocketServer>("/tmp/bamboo_socket");
         
-        unix_socket_server_ = std::make_unique<communication::UnixSocketServer>(socket_config);
-        
-        // 设置数据回调函数
-        unix_socket_server_->set_data_callback([this](const std::string& client_id, const std::string& message) {
-            LOG_INFO("收到前端消息: {}", message);
-            handleFrontendMessage(client_id, message);
+        // 设置消息回调函数
+        unix_socket_server_->set_message_callback([this](const communication::CommunicationMessage& msg, int client_fd) {
+            LOG_INFO("收到前端消息，类型: {}", static_cast<int>(msg.type));
+            handleFrontendMessage(msg, client_fd);
         });
         
-        // 设置连接回调函数
-        unix_socket_server_->set_connection_callback([](const std::string& client_id, bool connected) {
-            if (connected) {
-                LOG_INFO("前端已连接: {}", client_id);
-            } else {
-                LOG_WARN("前端已断开: {}", client_id);
-            }
+        // 设置客户端连接回调函数
+        unix_socket_server_->set_client_connected_callback([](int client_fd, const std::string& client_name) {
+            LOG_INFO("前端已连接: {} (fd={})", client_name, client_fd);
+        });
+        
+        // 设置客户端断开回调函数
+        unix_socket_server_->set_client_disconnected_callback([](int client_fd) {
+            LOG_INFO("前端已断开: fd={}", client_fd);
         });
         
         unix_socket_available_ = true;
