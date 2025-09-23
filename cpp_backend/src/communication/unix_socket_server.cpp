@@ -303,7 +303,7 @@ bool UnixSocketServer::process_message(const CommunicationMessage& msg, int clie
 }
 
 void UnixSocketServer::handle_status_request(int client_fd, uint32_t sequence) {
-    SystemStatusData status;
+    UnixSocketStatusData status;
     {
         std::lock_guard<std::mutex> lock(status_mutex_);
         status = system_status_;
@@ -469,7 +469,7 @@ bool UnixSocketServer::send_status_update(const SystemStatusData& status) {
 #endif
 }
 
-bool UnixSocketServer::send_modbus_data_update(const SystemStatusData::ModbusData& data) {
+bool UnixSocketServer::send_modbus_data_update(const UnixSocketStatusData::ModbusData& data) {
 #ifdef ENABLE_JSON
     CommunicationMessage msg;
     msg.type = MessageType::MODBUS_DATA;
@@ -488,7 +488,7 @@ bool UnixSocketServer::send_modbus_data_update(const SystemStatusData::ModbusDat
 #endif
 }
 
-void UnixSocketServer::update_system_status(const SystemStatusData& status) {
+void UnixSocketServer::update_system_status(const UnixSocketStatusData& status) {
     std::lock_guard<std::mutex> lock(status_mutex_);
     system_status_ = status;
 }
@@ -499,7 +499,7 @@ void UnixSocketServer::update_plc_status(PLCConnectionStatus status, uint32_t re
     system_status_.plc_response_time_ms = response_time_ms;
 }
 
-void UnixSocketServer::update_modbus_registers(const SystemStatusData::ModbusData& data) {
+void UnixSocketServer::update_modbus_registers(const UnixSocketStatusData::ModbusData& data) {
     {
         std::lock_guard<std::mutex> lock(status_mutex_);
         system_status_.modbus_data = data;
@@ -519,7 +519,7 @@ void UnixSocketServer::set_last_error(const std::string& error) {
     system_status_.last_error = error;
 }
 
-SystemStatusData UnixSocketServer::get_system_status() const {
+UnixSocketStatusData UnixSocketServer::get_system_status() const {
     std::lock_guard<std::mutex> lock(status_mutex_);
     return system_status_;
 }
@@ -572,7 +572,7 @@ std::string UnixSocketServer::get_current_timestamp() const {
 }
 
 #ifdef ENABLE_JSON
-json UnixSocketServer::system_status_to_json(const SystemStatusData& status) const {
+json UnixSocketServer::system_status_to_json(const UnixSocketStatusData& status) const {
     json j;
     j["plc_status"] = static_cast<int>(status.plc_status);
     j["heartbeat_counter"] = status.heartbeat_counter;
@@ -586,7 +586,7 @@ json UnixSocketServer::system_status_to_json(const SystemStatusData& status) con
     return j;
 }
 
-json UnixSocketServer::modbus_data_to_json(const SystemStatusData::ModbusData& data) const {
+json UnixSocketServer::modbus_data_to_json(const UnixSocketStatusData::ModbusData& data) const {
     json j;
     j["system_status"] = data.system_status;
     j["plc_command"] = data.plc_command;

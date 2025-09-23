@@ -54,8 +54,11 @@ enum class PLCConnectionStatus {
     TIMEOUT = 4
 };
 
-// 系统状态数据
-struct SystemStatusData {
+// 前向声明，避免重复定义
+struct SystemStatusData;
+
+// Unix Socket特有的状态数据
+struct UnixSocketStatusData {
     PLCConnectionStatus plc_status;
     uint32_t heartbeat_counter;
     uint32_t plc_response_time_ms;
@@ -126,13 +129,13 @@ public:
     // 消息发送
     bool send_message(int client_fd, const CommunicationMessage& msg);
     bool broadcast_message(const CommunicationMessage& msg);
-    bool send_status_update(const SystemStatusData& status);
-    bool send_modbus_data_update(const SystemStatusData::ModbusData& data);
+    bool send_status_update(const UnixSocketStatusData& status);
+    bool send_modbus_data_update(const UnixSocketStatusData::ModbusData& data);
     
     // 系统状态管理
-    void update_system_status(const SystemStatusData& status);
+    void update_system_status(const UnixSocketStatusData& status);
     void update_plc_status(PLCConnectionStatus status, uint32_t response_time_ms = 0);
-    void update_modbus_registers(const SystemStatusData::ModbusData& data);
+    void update_modbus_registers(const UnixSocketStatusData::ModbusData& data);
     void set_emergency_stop(bool emergency);
     void set_last_error(const std::string& error);
     
@@ -148,7 +151,7 @@ public:
     void set_client_disconnected_callback(ClientDisconnectedCallback callback);
     
     // 获取状态
-    SystemStatusData get_system_status() const;
+    UnixSocketStatusData get_system_status() const;
     std::string get_last_error() const;
     
     // 统计信息
@@ -187,8 +190,8 @@ private:
     uint64_t get_unix_timestamp() const;
     
     // JSON序列化/反序列化
-    json system_status_to_json(const SystemStatusData& status) const;
-    json modbus_data_to_json(const SystemStatusData::ModbusData& data) const;
+    json system_status_to_json(const UnixSocketStatusData& status) const;
+    json modbus_data_to_json(const UnixSocketStatusData::ModbusData& data) const;
     
     // 配置
     std::string socket_path_;
@@ -205,7 +208,7 @@ private:
     
     // 系统状态
     mutable std::mutex status_mutex_;
-    SystemStatusData system_status_;
+    UnixSocketStatusData system_status_;
     
     // 事件回调
     MessageCallback message_callback_;
