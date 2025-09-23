@@ -331,7 +331,7 @@ private:
         // 配置双摄像头参数
         vision::CameraSyncConfig stereo_config;
         stereo_config.left_device = "/dev/video0";   // 左摄像头
-        stereo_config.right_device = "/dev/video2";  // 右摄像头
+        stereo_config.right_device = "/dev/video1";  // 右摄像头 - 修复：从video2改为video1
         stereo_config.width = 1280;                  // 降低分辨率以提高处理速度
         stereo_config.height = 720;
         stereo_config.fps = 30;
