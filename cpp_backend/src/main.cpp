@@ -229,10 +229,12 @@ private:
         camera_config.height = 1080;
         camera_config.framerate = 30;
         
-        // 启用共享内存输出
-        camera_config.enable_shared_memory = true;
-        camera_config.shared_memory_key = "/tmp/bamboo_camera_shm";
-        camera_config.shared_memory_buffers = 2;
+        // 启用GStreamer流输出
+        camera_config.enable_stream_output = true;
+        camera_config.stream_host = "127.0.0.1";
+        camera_config.stream_port = 5000;
+        camera_config.stream_format = "H264";
+        camera_config.stream_bitrate = 2000000;
         
 #ifdef TARGET_ARCH_AARCH64
         camera_config.pipeline = DEFAULT_CAMERA_PIPELINE;
