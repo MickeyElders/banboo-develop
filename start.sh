@@ -543,8 +543,8 @@ configure_framebuffer() {
     
     # 检查framebuffer设备
     if [[ ! -e "/dev/fb0" ]]; then
-        print_error "找不到framebuffer设备 /dev/fb0"
-        exit 1
+        print_warn "找不到framebuffer设备 /dev/fb0，跳过framebuffer配置"
+        return
     fi
     
     # 显示framebuffer信息
@@ -673,11 +673,15 @@ start_backend() {
     fi
     
     # 检查是否有共享内存创建（视频流可选）
-    local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
-    if [[ -n "$shm_key" ]] && ipcs -m | grep -q "$shm_key" 2>/dev/null; then
-        print_success "共享内存已可用 (key: $shm_key)"
+    if command -v ftok >/dev/null 2>&1; then
+        local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
+        if [[ -n "$shm_key" ]] && ipcs -m | grep -q "$shm_key" 2>/dev/null; then
+            print_success "共享内存已可用 (key: $shm_key)"
+        else
+            print_info "共享内存尚未创建，视频流将异步连接"
+        fi
     else
-        print_info "共享内存尚未创建，视频流将异步连接"
+        print_info "ftok命令不可用，跳过共享内存检查"
     fi
     
     if kill -0 $backend_pid 2>/dev/null; then
@@ -1099,8 +1103,10 @@ main() {
         print_success "测试完成！"
         exit 0
     elif [[ "$build_only" != "true" ]]; then
+        print_info "开始启动应用程序..."
         setup_permissions
         start_backend
+        print_info "后端启动完成，准备启动前端..."
         start_frontend "$debug_mode"
     else
         print_success "构建完成！"
