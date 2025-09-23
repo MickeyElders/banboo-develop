@@ -494,7 +494,7 @@ void init_backend_system() {
     }
     
     // 创建后端客户端
-    g_backend_client = backend_client_create("/tmp/bamboo_cut_backend.sock");
+    g_backend_client = backend_client_create("/tmp/bamboo_socket");
     if (!g_backend_client) {
         printf("错误：创建后端客户端失败\n");
         return;

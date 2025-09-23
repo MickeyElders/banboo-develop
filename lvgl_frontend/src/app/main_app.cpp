@@ -276,8 +276,8 @@ void MainApp::setup_touch_input() {
 void MainApp::setup_backend_communication() {
     printf("设置后端通信...\n");
     
-    // 创建后端客户端，使用UNIX Domain Socket路径
-    const char* socket_path = "/tmp/bamboo_cut_backend.sock";
+    // 创建后端客户端，使用UNIX Domain Socket路径（与后端保持一致）
+    const char* socket_path = "/tmp/bamboo_socket";
     backend_client_ = backend_client_create(socket_path);
     
     if (!backend_client_) {
