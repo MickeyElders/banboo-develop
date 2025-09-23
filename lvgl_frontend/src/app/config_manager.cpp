@@ -52,6 +52,10 @@ void ConfigManager::set_defaults() {
     config_.camera.use_hardware_acceleration = true;
     config_.camera.exposure = -1;
     config_.camera.gain = -1;
+    config_.camera.display_width = 640;   // 设置合理的显示分辨率
+    config_.camera.display_height = 480;  // 设置合理的显示分辨率
+    config_.camera.use_shared_memory = false;  // 禁用共享内存，使用UNIX Socket
+    strcpy(config_.camera.shared_memory_key, "");  // 清空共享内存key
     
     // AI配置
     strcpy(config_.ai.model_path, "/opt/bamboo/models/yolov8n.onnx");

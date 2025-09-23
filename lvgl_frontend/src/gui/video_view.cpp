@@ -239,7 +239,7 @@ void Video_view::update_coordinate_display(float x_mm, const char* quality, cons
     if (quality_label_ && quality) {
         lv_label_set_text(quality_label_, quality);
         // Set color based on quality
-        if (strcmp(quality, "Normal") == 0 || strcmp(quality, "正常") == 0) {
+        if (strcmp(quality, "Normal") == 0) {
             lv_obj_set_style_text_color(quality_label_, lv_color_hex(0x4CAF50), 0);
         } else {
             lv_obj_set_style_text_color(quality_label_, lv_color_hex(0xF44336), 0);

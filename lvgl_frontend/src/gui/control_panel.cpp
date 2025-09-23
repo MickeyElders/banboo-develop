@@ -242,7 +242,7 @@ void Control_panel::create_plc_section() {
     lv_obj_set_style_pad_gap(blade_container, 3, 0);
     
     // 根据PLC.md文档创建PLC控制按键
-    const char* plc_control_names[] = {"启动送料", "进料检测", "切割准备"};
+    const char* plc_control_names[] = {"Start Feed", "Feed Detect", "Cut Prepare"};
     const char* plc_control_symbols[] = {LV_SYMBOL_PLAY, LV_SYMBOL_EYE_OPEN, LV_SYMBOL_SETTINGS};
     
     for(int i = 0; i < 3; i++) {
@@ -678,9 +678,9 @@ void Control_panel::plc_command_button_event_cb(lv_event_t* e) {
     
     if(panel) {
         const char* command_names[] = {
-            "", "进料检测", "切割准备", "切割完成", "启动送料",
-            "暂停", "紧急停止", "恢复运行", "废料推出", "开始检测",
-            "位置就绪", "夹持完成", "安全检查"
+            "", "Feed Detect", "Cut Prepare", "Cut Done", "Start Feed",
+            "Pause", "Emergency", "Resume", "Waste Out", "Start Detect",
+            "Pos Ready", "Grip Done", "Safety Check"
         };
         
         if(plc_command >= 1 && plc_command <= 12) {
