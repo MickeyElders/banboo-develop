@@ -86,6 +86,7 @@ private:
     
     // 事件处理
     static void blade_button_event_cb(lv_event_t* e);
+    static void plc_command_button_event_cb(lv_event_t* e);
 };
 
 #endif

@@ -97,8 +97,8 @@ void Status_bar::create_workflow_steps() {
     lv_obj_set_flex_align(workflow_container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(workflow_container_, 15, 0);
     
-    // Create 5 workflow steps
-    const char* step_names[] = {"Feed Detect", "Vision Scan", "Coord Send", "Cut Prepare", "Execute Cut"};
+    // Create workflow steps based on PLC.md document
+    const char* step_names[] = {"送料检测", "视觉识别", "坐标定位", "夹持切割", "完成推出"};
     
     for(int i = 0; i < 5; i++) {
         workflow_steps_[i] = lv_label_create(workflow_container_);

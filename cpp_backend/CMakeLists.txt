@@ -360,6 +360,7 @@ set(SOURCES
     src/vision/tensorrt_engine.cpp
     src/vision/deepstream_pipeline.cpp
     src/communication/modbus_server.cpp
+    src/communication/unix_socket_server.cpp
 )
 
 # ================================

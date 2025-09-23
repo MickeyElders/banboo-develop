@@ -137,12 +137,15 @@ void Control_panel::create_modbus_section() {
     lv_table_set_cell_value(modbus_table_, 0, 1, "Description");
     lv_table_set_cell_value(modbus_table_, 0, 2, "Value");
     
-    // Set data rows
-    const char* register_addrs[] = {"40001", "40002", "40003", "40004-40005", "40006", "40007-40008", "40009", "40010"};
-    const char* register_descs[] = {"System State", "PLC Command", "Coord Ready", "X Coordinate", "Cut Quality", "Heartbeat", "Blade ID", "Health"};
-    const char* register_values[] = {"1", "2", "1", "2458", LV_SYMBOL_OK, "12345", "3", "0"};
+    // Set data rows - 根据PLC.md文档扩展显示
+    const char* register_addrs[] = {"40001", "40002", "40003", "40004-05", "40006", "40007-08", "40009", "40010", "40011", "40014", "40015-16", "40017", "40018", "40019"};
+    const char* register_descs[] = {"系统状态", "PLC命令", "坐标就绪", "X坐标", "切割质量", "心跳", "刀片号", "系统健康", "废料检测", "导轨方向", "剩余长度", "覆盖率", "检测状态", "处理模式"};
+    const char* register_values[] = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"};
     
-    for(int i = 0; i < 8; i++) {
+    // 创建更大的表格来显示所有寄存器
+    lv_table_set_row_cnt(modbus_table_, 15); // 1 header + 14 data rows
+    
+    for(int i = 0; i < 14; i++) {
         lv_table_set_cell_value(modbus_table_, i + 1, 0, register_addrs[i]);
         lv_table_set_cell_value(modbus_table_, i + 1, 1, register_descs[i]);
         lv_table_set_cell_value(modbus_table_, i + 1, 2, register_values[i]);
@@ -238,7 +241,10 @@ void Control_panel::create_plc_section() {
     lv_obj_set_flex_align(blade_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(blade_container, 3, 0);
     
-    const char* blade_names[] = {"Single Blade 1", "Single Blade 2", "Dual Blade"};
+    // 根据PLC.md文档创建PLC控制按键
+    const char* plc_control_names[] = {"启动送料", "进料检测", "切割准备"};
+    const char* plc_control_symbols[] = {LV_SYMBOL_PLAY, LV_SYMBOL_EYE_OPEN, LV_SYMBOL_SETTINGS};
+    
     for(int i = 0; i < 3; i++) {
         blade_buttons_[i] = lv_btn_create(blade_container);
         lv_obj_set_flex_grow(blade_buttons_[i], 1);
@@ -247,18 +253,55 @@ void Control_panel::create_plc_section() {
         lv_obj_set_style_pad_ver(blade_buttons_[i], 3, 0);
         
         lv_obj_t* label = lv_label_create(blade_buttons_[i]);
-        lv_label_set_text(label, blade_names[i]);
+        char button_text[64];
+        snprintf(button_text, sizeof(button_text), "%s %s", plc_control_symbols[i], plc_control_names[i]);
+        lv_label_set_text(label, button_text);
         lv_obj_center(label);
         
-        // Set event callback
-        lv_obj_add_event_cb(blade_buttons_[i], blade_button_event_cb, LV_EVENT_CLICKED, this);
-        lv_obj_set_user_data(blade_buttons_[i], (void*)(intptr_t)i);
-        
-        // Activate third button by default (Dual Blade)
-        if(i == 2) {
-            lv_obj_add_style(blade_buttons_[i], &style_button_active_, 0);
-        }
+        // Set event callback for PLC commands
+        lv_obj_add_event_cb(blade_buttons_[i], plc_command_button_event_cb, LV_EVENT_CLICKED, this);
+        lv_obj_set_user_data(blade_buttons_[i], (void*)(intptr_t)(i + 4)); // PLC命令值: 4=启动送料, 1=进料检测, 2=切割准备
     }
+    
+    // 添加废料处理和紧急停止按钮
+    lv_obj_t* emergency_container = lv_obj_create(plc_section_);
+    lv_obj_set_size(emergency_container, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(emergency_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(emergency_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(emergency_container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_top(emergency_container, 4, 0);
+    
+    lv_obj_set_flex_flow(emergency_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(emergency_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(emergency_container, 3, 0);
+    
+    // 废料推出按钮
+    lv_obj_t* waste_btn = lv_btn_create(emergency_container);
+    lv_obj_set_flex_grow(waste_btn, 1);
+    lv_obj_set_height(waste_btn, LV_SIZE_CONTENT);
+    lv_obj_add_style(waste_btn, &style_button_, 0);
+    lv_obj_set_style_pad_ver(waste_btn, 3, 0);
+    lv_obj_set_style_bg_color(waste_btn, lv_color_hex(0xFFC107), 0); // 黄色
+    
+    lv_obj_t* waste_label = lv_label_create(waste_btn);
+    lv_label_set_text(waste_label, LV_SYMBOL_TRASH " 废料推出");
+    lv_obj_center(waste_label);
+    lv_obj_add_event_cb(waste_btn, plc_command_button_event_cb, LV_EVENT_CLICKED, this);
+    lv_obj_set_user_data(waste_btn, (void*)(intptr_t)8); // PLC命令: 8=废料推出
+    
+    // 紧急停止按钮
+    lv_obj_t* emergency_btn = lv_btn_create(emergency_container);
+    lv_obj_set_flex_grow(emergency_btn, 1);
+    lv_obj_set_height(emergency_btn, LV_SIZE_CONTENT);
+    lv_obj_add_style(emergency_btn, &style_button_, 0);
+    lv_obj_set_style_pad_ver(emergency_btn, 3, 0);
+    lv_obj_set_style_bg_color(emergency_btn, lv_color_hex(0xDC3545), 0); // 红色
+    
+    lv_obj_t* emergency_label = lv_label_create(emergency_btn);
+    lv_label_set_text(emergency_label, LV_SYMBOL_STOP " 紧急停止");
+    lv_obj_center(emergency_label);
+    lv_obj_add_event_cb(emergency_btn, plc_command_button_event_cb, LV_EVENT_CLICKED, this);
+    lv_obj_set_user_data(emergency_btn, (void*)(intptr_t)6); // PLC命令: 6=紧急停止
 }
 
 void Control_panel::create_jetson_section() {
@@ -624,5 +667,31 @@ void Control_panel::blade_button_event_cb(lv_event_t* e) {
     if(panel) {
         panel->set_blade_selection(blade_id);
         printf("Blade selected: %d\n", blade_id + 1);
+    }
+}
+
+// PLC命令按钮事件处理 - 根据PLC.md文档实现
+void Control_panel::plc_command_button_event_cb(lv_event_t* e) {
+    lv_obj_t* btn = lv_event_get_target(e);
+    Control_panel* panel = (Control_panel*)lv_event_get_user_data(e);
+    int plc_command = (int)(intptr_t)lv_obj_get_user_data(btn);
+    
+    if(panel) {
+        const char* command_names[] = {
+            "", "进料检测", "切割准备", "切割完成", "启动送料",
+            "暂停", "紧急停止", "恢复运行", "废料推出", "开始检测",
+            "位置就绪", "夹持完成", "安全检查"
+        };
+        
+        if(plc_command >= 1 && plc_command <= 12) {
+            printf("发送PLC命令: %d (%s)\n", plc_command, command_names[plc_command]);
+            
+            // TODO: 通过Unix Socket客户端发送命令到后端
+            // unix_socket_client_send_plc_command(client, plc_command);
+            
+            // 临时视觉反馈 - 按钮短暂高亮
+            lv_obj_add_style(btn, &panel->style_button_active_, 0);
+            // TODO: 添加定时器来移除高亮效果
+        }
     }
 }

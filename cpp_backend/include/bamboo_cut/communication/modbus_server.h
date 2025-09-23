@@ -17,10 +17,16 @@ extern "C" {
 }
 #endif
 
+// 前向声明Unix Socket服务器
+namespace bamboo_cut { namespace communication {
+    class UnixSocketServer;
+    struct CommunicationMessage;
+} }
+
 namespace bamboo_cut {
 namespace communication {
 
-// 寄存器地址定义 (基于协议文档 40001-40010)
+// 寄存器地址定义 (基于PLC.md文档扩展)
 constexpr int REG_SYSTEM_STATUS = 40001;      // 系统状态
 constexpr int REG_PLC_COMMAND = 40002;        // PLC命令
 constexpr int REG_COORD_READY = 40003;        // 坐标就绪标志
@@ -30,7 +36,15 @@ constexpr int REG_HEARTBEAT = 40007;          // 心跳计数器 (INT32, 占用4
 constexpr int REG_BLADE_NUMBER = 40009;       // 刀片编号
 constexpr int REG_SYSTEM_HEALTH = 40010;      // 系统健康状态
 
-constexpr int REG_COUNT = 10;                 // 总寄存器数量 (40001-40010)
+// 新增寄存器 (基于PLC.md)
+constexpr int REG_WASTE_DETECTION = 40011;    // 废料检测状态 (0=不是废料, 1=是废料, 9=尾料)
+constexpr int REG_RAIL_DIRECTION = 40014;     // 导轨方向 (0=正向, 1=反向)
+constexpr int REG_REMAINING_LENGTH = 40015;   // 剩余长度 (INT32, 占用40015-40016)
+constexpr int REG_COVERAGE_RATE = 40017;      // 覆盖率
+constexpr int REG_DETECTION_STATUS = 40018;   // 检测状态 (0=待机, 1=检测中, 2=完成, 3=重复检测)
+constexpr int REG_PROCESS_MODE = 40019;       // 处理模式 (0=自动, 1=手动)
+
+constexpr int REG_COUNT = 19;                 // 总寄存器数量 (40001-40019)
 
 // 系统状态枚举
 enum class SystemStatus : uint16_t {
@@ -42,16 +56,21 @@ enum class SystemStatus : uint16_t {
     MAINTENANCE = 5      // 维护模式
 };
 
-// PLC命令枚举
+// PLC命令枚举 (基于PLC.md文档)
 enum class PLCCommand : uint16_t {
     NONE = 0,             // 无命令
-    FEED_DETECTION = 1,   // 进料检测
-    CUT_PREPARE = 2,      // 切割准备
-    CUT_COMPLETE = 3,     // 切割完成
-    START_FEEDING = 4,    // 启动送料
+    FEED_DETECTION = 1,   // 进料检测 - 物料进入识别区时发送
+    CUT_PREPARE = 2,      // 切割准备 - 夹持完成，准备切割
+    CUT_COMPLETE = 3,     // 切割完成 - 切割操作完成
+    START_FEEDING = 4,    // 启动送料 - 启动滚筒正向进料
     PAUSE = 5,            // 暂停
     EMERGENCY_STOP = 6,   // 紧急停止
-    RESUME = 7            // 恢复运行
+    RESUME = 7,           // 恢复运行
+    WASTE_REJECT = 8,     // 废料推出 - 启动反向推出废料
+    DETECTION_START = 9,  // 开始检测 - 视觉系统开始检测
+    POSITION_READY = 10,  // 位置就绪 - 导轨移动到位
+    CLAMP_ENGAGED = 11,   // 夹持完成 - 夹持气缸动作完成
+    SAFETY_CHECK = 12     // 安全检查 - 系统安全状态检查
 };
 
 // 坐标就绪标志
@@ -139,6 +158,7 @@ class ModbusServer {
 public:
     ModbusServer();
     explicit ModbusServer(const ModbusConfig& config);
+    explicit ModbusServer(const ModbusConfig& config, const std::string& unix_socket_path);
     ~ModbusServer();
 
     // 禁用拷贝构造和赋值
@@ -150,6 +170,12 @@ public:
     void stop();
     bool is_running() const { return running_.load(); }
     bool is_connected() const { return client_connected_.load(); }
+    bool is_plc_connected() const;
+    
+    // Unix Socket通信控制
+    bool start_unix_socket_server();
+    void stop_unix_socket_server();
+    bool is_unix_socket_running() const;
 
     // 坐标数据管理 (主动推送)
     void set_coordinate_data(const CoordinateData& data);
@@ -273,6 +299,26 @@ private:
     // 统计信息
     mutable std::mutex stats_mutex_;
     Statistics statistics_;
+    
+    // Unix Socket服务器集成
+    std::unique_ptr<UnixSocketServer> unix_socket_server_;
+    std::string unix_socket_path_;
+    bool enable_unix_socket_;
+    
+    // PLC连接状态监控
+    std::atomic<bool> plc_connection_active_;
+    std::chrono::steady_clock::time_point last_plc_communication_;
+    std::thread plc_monitor_thread_;
+    void plc_connection_monitor_thread();
+    
+    // Unix Socket事件回调处理
+    void on_unix_socket_message(const CommunicationMessage& msg, int client_fd);
+    void on_unix_socket_client_connected(int client_fd, const std::string& client_name);
+    void on_unix_socket_client_disconnected(int client_fd);
+    
+    // 数据同步方法
+    void sync_data_to_unix_socket();
+    void handle_frontend_plc_command(const std::string& command_json);
 };
 
 } // namespace communication

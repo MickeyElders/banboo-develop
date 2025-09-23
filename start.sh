@@ -17,7 +17,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 项目配置
-PROJECT_NAME="智能切竹机控制系统 - C++后端+LVGL前端"
+PROJECT_NAME="智能切竹机控制系统 - C++后端(libmodbus+UNIX Socket)+LVGL前端"
 FRONTEND_DIR="lvgl_frontend"
 BACKEND_DIR="cpp_backend"
 BUILD_DIR="$FRONTEND_DIR/build"
@@ -102,6 +102,15 @@ check_dependencies() {
         print_error "未找到OpenCV 4.x"
         print_info "请安装OpenCV: sudo apt install -y libopencv-dev"
         exit 1
+    fi
+    
+    # 检查libmodbus
+    if ! pkg-config --exists libmodbus; then
+        print_error "未找到libmodbus库"
+        print_info "请安装libmodbus: sudo apt install -y libmodbus-dev"
+        exit 1
+    else
+        print_success "检测到libmodbus库"
     fi
     
     # 检查CUDA（仅在Jetson设备上）
@@ -286,6 +295,10 @@ cleanup_old_versions() {
     
     # 清理可能残留的流临时文件
     rm -f /tmp/bamboo_stream_* 2>/dev/null || true
+    
+    # 清理UNIX Domain Socket文件
+    print_info "清理UNIX Domain Socket文件..."
+    rm -f /tmp/bamboo_socket 2>/dev/null || true
     
     # 释放可能占用的网络端口
     print_info "检查并释放流端口..."
@@ -586,7 +599,7 @@ configure_framebuffer() {
 
 # 启动C++后端
 start_backend() {
-    print_step "启动C++后端..."
+    print_step "启动C++后端（Modbus+UNIX Domain Socket模式）..."
     
     # 确保在项目根目录
     cd "$SCRIPT_DIR"
@@ -606,21 +619,34 @@ start_backend() {
         chmod 666 "$shared_memory_key"
     fi
     
-    # 设置共享内存环境变量
+    # 清理UNIX Domain Socket文件（如果存在）
+    local unix_socket_path="/tmp/bamboo_socket"
+    if [[ -e "$unix_socket_path" ]]; then
+        print_info "清理旧的UNIX Domain Socket: $unix_socket_path"
+        rm -f "$unix_socket_path"
+    fi
+    
+    # 设置环境变量
     export BAMBOO_SHARED_MEMORY_KEY="$shared_memory_key"
     export BAMBOO_ENABLE_SHARED_MEMORY="true"
+    export BAMBOO_UNIX_SOCKET_PATH="$unix_socket_path"
+    export BAMBOO_PLC_IP="${BAMBOO_PLC_IP:-192.168.1.100}"
+    export BAMBOO_PLC_PORT="${BAMBOO_PLC_PORT:-502}"
     
     # 启动后端进程
     cd "$BACKEND_DIR/build"
-    print_info "启动后端进程（共享内存模式）..."
+    print_info "启动后端进程（Modbus+UNIX Socket模式）..."
     print_info "共享内存key: $shared_memory_key"
+    print_info "UNIX Socket路径: $unix_socket_path"
+    print_info "PLC地址: ${BAMBOO_PLC_IP}:${BAMBOO_PLC_PORT}"
+    print_info "支持无PLC连接启动（健壮性模式）"
     nohup "./$BACKEND_BINARY" > ../../backend.log 2>&1 &
     local backend_pid=$!
     cd ../..
     
-    # 异步模式：简化后端启动检查，不等待共享内存创建
-    print_info "检查后端进程启动状态（异步模式）..."
-    sleep 2  # 给后端2秒时间启动
+    # 等待后端启动并检查状态
+    print_info "检查后端进程启动状态..."
+    sleep 3  # 给后端3秒时间启动
     
     # 检查进程是否还在运行
     if ! kill -0 $backend_pid 2>/dev/null; then
@@ -628,17 +654,30 @@ start_backend() {
         if [[ -f "backend.log" ]]; then
             cat backend.log | tail -10
         fi
-        print_info "前端将继续启动，可能显示黑屏直到后端可用"
+        print_info "前端将继续启动，可能显示离线状态"
     else
-        print_success "后端进程启动成功，共享内存将异步创建"
+        print_success "后端进程启动成功"
     fi
     
-    # 检查是否有共享内存创建（不强制要求）
+    # 检查UNIX Domain Socket是否创建
+    local socket_check_count=0
+    while [[ $socket_check_count -lt 5 ]] && [[ ! -e "$unix_socket_path" ]]; do
+        sleep 1
+        ((socket_check_count++))
+    done
+    
+    if [[ -e "$unix_socket_path" ]]; then
+        print_success "UNIX Domain Socket已创建: $unix_socket_path"
+    else
+        print_warn "UNIX Domain Socket尚未创建，前端将重试连接"
+    fi
+    
+    # 检查是否有共享内存创建（视频流可选）
     local shm_key=$(ftok "$shared_memory_key" 66 2>/dev/null || echo "")
     if [[ -n "$shm_key" ]] && ipcs -m | grep -q "$shm_key" 2>/dev/null; then
         print_success "共享内存已可用 (key: $shm_key)"
     else
-        print_info "共享内存尚未创建，前端将异步连接"
+        print_info "共享内存尚未创建，视频流将异步连接"
     fi
     
     if kill -0 $backend_pid 2>/dev/null; then
@@ -654,7 +693,7 @@ start_backend() {
 # 启动LVGL前端
 start_frontend() {
     local debug_mode_param="$1"
-    print_step "启动LVGL前端应用（GStreamer流模式）..."
+    print_step "启动LVGL前端应用（Modbus+UNIX Socket+GStreamer流模式）..."
     
     # 确保在项目根目录
     cd "$SCRIPT_DIR"
@@ -685,6 +724,10 @@ start_frontend() {
     export BAMBOO_STREAM_URL="udp://$stream_host:$stream_port"
     export BAMBOO_STREAM_FORMAT="$stream_format"
     export BAMBOO_FRONTEND_MODE="gstreamer_stream"
+    
+    # 设置UNIX Domain Socket通信
+    export BAMBOO_UNIX_SOCKET_PATH="/tmp/bamboo_socket"
+    export BAMBOO_ENABLE_UNIX_SOCKET="true"
     
     # 检查GStreamer插件可用性
     print_info "检查GStreamer插件..."
@@ -722,17 +765,19 @@ start_frontend() {
         print_info "找到触摸配置文件: $touch_config_file"
     fi
     
-    print_success "正在启动前端应用程序（GStreamer流模式）..."
+    print_success "正在启动前端应用程序（Modbus+UNIX Socket+GStreamer流模式）..."
     print_info "前端可执行文件: $binary_path"
     print_info "后端日志: backend.log"
     print_info "流URL: $BAMBOO_STREAM_URL"
     print_info "流格式: $BAMBOO_STREAM_FORMAT"
+    print_info "UNIX Socket: $BAMBOO_UNIX_SOCKET_PATH"
     print_info "配置文件: ${config_file:-"使用默认配置"}"
     if [[ "$debug_mode_param" == "true" ]]; then
         print_info "调试模式: 已启用 (详细触摸信息将显示)"
     fi
-    print_info "架构模式: 后端摄像头管理 + GStreamer视频流 + 前端异步接收"
-    print_info "UI渲染: 立即开始，不等待视频流连接"
+    print_info "架构模式: 后端libmodbus+UNIX Socket + GStreamer视频流 + 前端实时通信"
+    print_info "通信特性: PLC实时数据 + 按键控制 + 状态同步 + 健壮性连接"
+    print_info "UI渲染: 立即开始，支持离线模式和实时数据切换"
     print_info "按 Ctrl+C 退出应用程序"
     echo
     
