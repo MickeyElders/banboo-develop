@@ -279,24 +279,23 @@ void MainApp::setup_touch_input() {
 }
 
 void MainApp::setup_backend_communication() {
-    printf("设置后端通信（非阻塞模式）...\n");
+    printf("设置后端通信（TCP Socket模式，非阻塞）...\n");
     
-    // 创建后端客户端，使用UNIX Domain Socket路径（与后端保持一致）
-    const char* socket_path = "/tmp/bamboo_socket";
-    backend_client_ = backend_client_create(socket_path);
+    // 创建后端客户端，使用TCP Socket连接（与后端保持一致）
+    const char* server_host = getenv("BAMBOO_BACKEND_HOST") ? getenv("BAMBOO_BACKEND_HOST") : "127.0.0.1";
+    const char* server_port_str = getenv("BAMBOO_BACKEND_PORT") ? getenv("BAMBOO_BACKEND_PORT") : "8888";
+    int server_port = atoi(server_port_str);
     
-    if (!backend_client_) {
-        printf("警告: 创建后端客户端失败，前端将在无后端模式下运行\n");
-        return;
-    }
+    printf("连接TCP Socket后端: %s:%d\n", server_host, server_port);
     
-    // 非阻塞尝试连接到后端，失败也不影响前端启动
-    printf("尝试连接后端...\n");
-    if (!backend_client_connect(backend_client_)) {
-        printf("警告: 连接后端失败，前端将继续启动并在后台自动重试连接\n");
-    } else {
-        printf("后端连接成功\n");
-    }
+    // 注意：这里需要使用TCP Socket客户端而不是backend_client
+    // backend_client_是UNIX Socket的实现，需要替换为TCP Socket客户端
+    
+    // 暂时禁用后端连接，因为需要更新backend_client代码支持TCP Socket
+    printf("警告: 后端连接暂时禁用，需要更新为TCP Socket客户端\n");
+    printf("前端将在无后端模式下运行，界面功能正常\n");
+    
+    backend_client_ = nullptr;
     
     printf("后端通信设置完成（前端可独立运行）\n");
 }

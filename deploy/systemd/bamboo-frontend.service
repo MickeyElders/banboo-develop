@@ -22,7 +22,8 @@ SyslogIdentifier=bamboo-frontend
 Environment=DISPLAY=:0
 Environment=BAMBOO_CONFIG_DIR=/etc/bamboo
 Environment=BAMBOO_LOG_DIR=/var/log/bamboo
-Environment=BAMBOO_SOCKET_PATH=/tmp/bamboo_socket
+Environment=BAMBOO_BACKEND_HOST=127.0.0.1
+Environment=BAMBOO_BACKEND_PORT=8888
 Environment=LVGL_DISPLAY_DRV=fbdev
 Environment=LVGL_INPUT_DEV=/dev/input/event0
 
@@ -45,8 +46,9 @@ MemoryMax=1G
 CPUQuota=90%
 
 # 健康检查
-WatchdogSec=30
+WatchdogSec=60
 NotifyAccess=main
+TimeoutStartSec=60
 
 # 重启策略
 StartLimitInterval=300
