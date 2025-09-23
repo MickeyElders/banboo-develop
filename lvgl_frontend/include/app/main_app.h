@@ -12,7 +12,7 @@
 
 class EventManager;
 // 前向声明后端客户端类型
-typedef struct backend_client_t backend_client_t;
+struct backend_client_t;
 // 其他类暂时未实现，使用前向声明避免编译错误
 
 class MainApp {
