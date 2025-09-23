@@ -52,7 +52,7 @@ MainApp::~MainApp() {
 }
 
 bool MainApp::initialize() {
-    printf("初始化主应用程序...\n");
+    printf("初始化主应用程序（独立模式）...\n");
     
     try {
         // 创建事件管理器
@@ -62,28 +62,36 @@ bool MainApp::initialize() {
             return false;
         }
         
-        // 初始化GUI界面
+        // 初始化GUI界面（优先级最高，确保界面能显示）
+        printf("初始化GUI界面...\n");
         setup_gui();
         
-        // 初始化触摸输入
+        // 初始化触摸输入（非阻塞）
+        printf("初始化触摸输入...\n");
         setup_touch_input();
         
-        // 初始化后端通信
-        setup_backend_communication();
+        // 非阻塞初始化后端通信（降级方案：失败不影响启动）
+        printf("初始化后端通信（非阻塞模式）...\n");
+        try {
+            setup_backend_communication();
+        } catch (const std::exception& e) {
+            printf("警告: 后端通信初始化失败，前端将在离线模式下运行: %s\n", e.what());
+        }
         
-        // 暂时禁用摄像头初始化，避免EGL错误导致崩溃
-        printf("摄像头初始化已禁用，避免EGL错误\n");
-        // try {
-        //     setup_camera();
-        // } catch (const std::exception& e) {
-        //     printf("摄像头初始化异常，继续运行: %s\n", e.what());
-        // }
+        // 非阻塞初始化摄像头（降级方案：失败不影响启动）
+        printf("初始化摄像头系统（非阻塞模式）...\n");
+        try {
+            setup_camera();
+        } catch (const std::exception& e) {
+            printf("警告: 摄像头初始化失败，前端将在无视频模式下运行: %s\n", e.what());
+        }
         
-        // TODO: 初始化AI检测器
+        // TODO: 初始化AI检测器（非阻塞）
         // setup_ai_detector();
         
         initialized_ = true;
-        printf("主应用程序初始化成功\n");
+        printf("主应用程序初始化成功（独立模式）\n");
+        printf("前端已进入独立运行模式，可脱离后端工作\n");
         return true;
         
     } catch (const std::exception& e) {
@@ -299,56 +307,68 @@ void MainApp::setup_touch_input() {
 }
 
 void MainApp::setup_backend_communication() {
-    printf("设置后端通信（TCP Socket模式，非阻塞）...\n");
+    printf("设置后端通信（非阻塞独立模式）...\n");
     
-    // 创建TCP Socket客户端连接
-    const char* server_host = getenv("BAMBOO_BACKEND_HOST") ? getenv("BAMBOO_BACKEND_HOST") : "127.0.0.1";
-    const char* server_port_str = getenv("BAMBOO_BACKEND_PORT") ? getenv("BAMBOO_BACKEND_PORT") : "8888";
-    int server_port = atoi(server_port_str);
-    
-    printf("连接TCP Socket后端: %s:%d\n", server_host, server_port);
-    
-    // 创建TCP Socket客户端（非阻塞模式）
-    tcp_socket_client_ = std::make_unique<TcpSocketClient>(server_host, server_port);
-    
-    // 设置连接回调
-    tcp_socket_client_->set_connection_callback([this](ConnectionStatus status) {
-        switch (status) {
-            case ConnectionStatus::CONNECTED:
-                printf("前端已连接到后端服务器\n");
-                break;
-            case ConnectionStatus::DISCONNECTED:
-                printf("前端与后端服务器连接断开\n");
-                break;
-            case ConnectionStatus::CONNECTING:
-                printf("正在连接后端服务器...\n");
-                break;
-            case ConnectionStatus::RECONNECTING:
-                printf("正在重新连接后端服务器...\n");
-                break;
-            case ConnectionStatus::CONNECTION_ERROR:
-                printf("后端服务器连接错误\n");
-                break;
+    try {
+        // 创建TCP Socket客户端连接
+        const char* server_host = getenv("BAMBOO_BACKEND_HOST") ? getenv("BAMBOO_BACKEND_HOST") : "127.0.0.1";
+        const char* server_port_str = getenv("BAMBOO_BACKEND_PORT") ? getenv("BAMBOO_BACKEND_PORT") : "8888";
+        int server_port = atoi(server_port_str);
+        
+        printf("尝试连接TCP Socket后端: %s:%d（非阻塞）\n", server_host, server_port);
+        
+        // 创建TCP Socket客户端（非阻塞模式）
+        tcp_socket_client_ = std::make_unique<TcpSocketClient>(server_host, server_port);
+        
+        // 设置连接回调（优雅处理连接状态）
+        tcp_socket_client_->set_connection_callback([this](ConnectionStatus status) {
+            switch (status) {
+                case ConnectionStatus::CONNECTED:
+                    printf("前端已连接到后端服务器\n");
+                    break;
+                case ConnectionStatus::DISCONNECTED:
+                    printf("前端与后端服务器连接断开（继续独立运行）\n");
+                    break;
+                case ConnectionStatus::CONNECTING:
+                    printf("正在连接后端服务器...\n");
+                    break;
+                case ConnectionStatus::RECONNECTING:
+                    printf("正在重新连接后端服务器...\n");
+                    break;
+                case ConnectionStatus::CONNECTION_ERROR:
+                    printf("后端服务器连接错误（前端继续独立运行）\n");
+                    break;
+            }
+        });
+        
+        // 设置消息回调
+        tcp_socket_client_->set_message_callback([this](const CommunicationMessage& message) {
+            printf("收到后端消息\n");
+            // TODO: 解析消息并更新UI
+        });
+        
+        // 启用自动重连（后台重试，不阻塞前端）
+        tcp_socket_client_->enable_auto_reconnect(true);
+        tcp_socket_client_->set_reconnect_interval(5); // 5秒间隔重连
+        
+        // 非阻塞连接启动（失败不影响前端启动）
+        if (!tcp_socket_client_->connect()) {
+            printf("警告: TCP Socket客户端初始连接失败\n");
+            printf("前端将以独立模式启动，后台将继续尝试连接后端\n");
+        } else {
+            printf("TCP Socket客户端初始连接成功\n");
         }
-    });
-    
-    // 设置消息回调
-    tcp_socket_client_->set_message_callback([this](const CommunicationMessage& message) {
-        // 处理从后端接收到的消息
-        printf("收到后端消息\n");
-        // TODO: 解析消息并更新UI
-    });
-    
-    // 非阻塞连接启动
-    if (!tcp_socket_client_->connect()) {
-        printf("警告: TCP Socket客户端连接失败，前端将在无后端模式下运行\n");
+        
+        printf("后端通信模块启动成功（独立模式，支持后台重连）\n");
+        
+    } catch (const std::exception& e) {
+        printf("警告: 后端通信初始化异常: %s\n", e.what());
+        printf("前端将以完全独立模式运行（无后端连接）\n");
         tcp_socket_client_.reset();
-    } else {
-        printf("TCP Socket客户端连接成功\n");
     }
     
     // 为了向后兼容，保持backend_client_为nullptr
     backend_client_ = nullptr;
     
-    printf("后端通信设置完成（TCP Socket模式）\n");
+    printf("后端通信设置完成（前端可独立工作）\n");
 }
