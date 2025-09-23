@@ -19,6 +19,11 @@ endif()
 # 查找依赖包
 find_package(PkgConfig REQUIRED)
 
+# GStreamer - 查找GStreamer库
+pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
+pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
+pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
+
 # OpenCV - 使用Jetson优化版本
 set(OpenCV_DIR /usr/lib/aarch64-linux-gnu/cmake/opencv4)
 find_package(OpenCV 4.8 REQUIRED)
@@ -70,6 +75,9 @@ include_directories(
     ${CUDA_INCLUDE_DIRS}
     ${TENSORRT_ROOT}
     /usr/local/cuda/include
+    ${GSTREAMER_INCLUDE_DIRS}
+    ${GSTREAMER_APP_INCLUDE_DIRS}
+    ${GSTREAMER_VIDEO_INCLUDE_DIRS}
 )
 
 # 源文件
@@ -99,6 +107,7 @@ set(SOURCES
     src/camera/cuda_processor.cpp
     src/camera/camera_manager.cpp
     src/camera/shared_memory_reader.cpp
+    src/camera/gstreamer_receiver.cpp
     
     # 后端通信系统
     src/backend/backend_client.cpp
@@ -130,6 +139,7 @@ set(HEADERS
     include/camera/cuda_processor.h
     include/camera/camera_manager.h
     include/camera/shared_memory_reader.h
+    include/camera/gstreamer_receiver.h
     include/ai/tensorrt_engine.h
     include/ai/yolo_detector.h
     include/ai/detection_processor.h
@@ -199,6 +209,9 @@ target_link_libraries(bamboo_controller_lvgl
     PRIVATE
     lvgl
     ${OpenCV_LIBS}
+    ${GSTREAMER_LIBRARIES}
+    ${GSTREAMER_APP_LIBRARIES}
+    ${GSTREAMER_VIDEO_LIBRARIES}
     pthread
     dl
     m
