@@ -11,6 +11,31 @@
 #include <cstring>
 #include <iostream>
 
+// 包含完整的通信消息定义
+struct CommunicationMessage {
+    enum class MessageType : uint16_t {
+        STATUS_REQUEST = 1,
+        STATUS_RESPONSE = 2,
+        PLC_COMMAND = 3,
+        PLC_RESPONSE = 4,
+        SYSTEM_STATUS = 5,
+        JSON_STRING = 6,
+        HEARTBEAT = 7,
+        ERROR_RESPONSE = 8
+    };
+    
+    MessageType type;
+    uint64_t timestamp;
+    uint32_t data_length;
+    char data[1024];
+    
+    CommunicationMessage() : type(MessageType::STATUS_REQUEST), timestamp(0), data_length(0) {
+        memset(data, 0, sizeof(data));
+    }
+};
+
+using MessageType = CommunicationMessage::MessageType;
+
 TcpSocketClient::TcpSocketClient(const std::string& server_address, uint16_t port)
     : server_address_(server_address), server_port_(port), client_socket_(-1) {
     printf("创建TCP Socket客户端: %s:%d\n", server_address_.c_str(), server_port_);

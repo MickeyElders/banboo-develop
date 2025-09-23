@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sched.h>
+#include <cstdint>
 
 // SystemD支持 - 可选依赖
 #ifdef ENABLE_SYSTEMD
@@ -34,6 +35,7 @@ static inline int sd_watchdog_enabled(int unset_environment, uint64_t *usec) { r
 /* 全局变量 */
 static MainApp* g_app = nullptr;
 static volatile bool g_running = true;
+static pthread_t watchdog_th;
 
 /* SystemD watchdog心跳线程 */
 void* watchdog_thread(void* arg) {
@@ -287,6 +289,14 @@ int main(int argc, char* argv[]) {
     }
     
     printf("应用程序启动成功，按 Ctrl+C 退出\n");
+    
+    /* 启动SystemD watchdog心跳线程 */
+    if (pthread_create(&watchdog_th, nullptr, watchdog_thread, nullptr) != 0) {
+        fprintf(stderr, "警告: 无法创建watchdog线程\n");
+    }
+    
+    /* 通知systemd服务已准备就绪 */
+    sd_notify(0, "READY=1");
     
     /* 创建主循环线程 */
     pthread_t main_thread;
