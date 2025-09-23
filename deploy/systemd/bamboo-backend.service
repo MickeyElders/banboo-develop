@@ -1,0 +1,46 @@
+[Unit]
+Description=Bamboo Cutting System Backend
+Documentation=https://github.com/bamboo-cutting-system
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/bamboo
+ExecStart=/opt/bamboo/bin/bamboo_cut_backend
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bamboo-backend
+
+# 环境变量
+Environment=BAMBOO_CONFIG_DIR=/etc/bamboo
+Environment=BAMBOO_LOG_DIR=/var/log/bamboo
+Environment=BAMBOO_SOCKET_PATH=/tmp/bamboo_socket
+Environment=MODBUS_PLC_IP=192.168.1.100
+Environment=MODBUS_PLC_PORT=502
+
+# 安全设置
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/bamboo /tmp
+PrivateTmp=false
+PrivateDevices=false
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=512M
+CPUQuota=80%
+
+# 健康检查
+WatchdogSec=30
+NotifyAccess=main
+
+[Install]
+WantedBy=multi-user.target

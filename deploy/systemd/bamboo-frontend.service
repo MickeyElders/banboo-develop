@@ -1,0 +1,56 @@
+[Unit]
+Description=Bamboo Cutting System Frontend (LVGL)
+Documentation=https://github.com/bamboo-cutting-system
+After=bamboo-backend.service graphical-session.target
+Wants=bamboo-backend.service
+Requires=bamboo-backend.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/bamboo
+ExecStart=/opt/bamboo/bin/bamboo_controller_lvgl
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bamboo-frontend
+
+# 环境变量
+Environment=DISPLAY=:0
+Environment=BAMBOO_CONFIG_DIR=/etc/bamboo
+Environment=BAMBOO_LOG_DIR=/var/log/bamboo
+Environment=BAMBOO_SOCKET_PATH=/tmp/bamboo_socket
+Environment=LVGL_DISPLAY_DRV=fbdev
+Environment=LVGL_INPUT_DEV=/dev/input/event0
+
+# 图形界面相关
+Environment=XAUTHORITY=/root/.Xauthority
+Environment=XDG_RUNTIME_DIR=/run/user/0
+
+# 安全设置
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/bamboo /tmp /dev/fb0 /dev/input
+PrivateTmp=false
+PrivateDevices=false
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=1G
+CPUQuota=90%
+
+# 健康检查
+WatchdogSec=30
+NotifyAccess=main
+
+# 重启策略
+StartLimitInterval=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=graphical.target
