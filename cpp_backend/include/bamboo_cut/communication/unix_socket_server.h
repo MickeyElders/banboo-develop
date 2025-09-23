@@ -176,6 +176,7 @@ private:
     void handle_status_request(int client_fd, uint32_t sequence);
     void handle_plc_command(const json& command_data, int client_fd, uint32_t sequence);
     void handle_heartbeat(int client_fd);
+    bool handle_json_message(const char* json_data, size_t data_length, int client_fd);
     
     // 客户端管理
     void add_client(int client_fd);
@@ -222,7 +223,7 @@ private:
     // 配置参数
     static constexpr int MAX_CLIENTS = 10;
     static constexpr int UNIX_SOCKET_HEARTBEAT_INTERVAL_MS = 1000;
-    static constexpr int CLIENT_TIMEOUT_MS = 5000;
+    static constexpr int CLIENT_TIMEOUT_MS = 30000;  // 增加到30秒
     static constexpr int POLL_TIMEOUT_MS = 100;
 };
 

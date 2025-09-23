@@ -213,8 +213,6 @@ void UnixSocketServer::server_thread() {
 }
 
 bool UnixSocketServer::handle_client_connection(int client_fd) {
-    CommunicationMessage msg;
-    
     // 使用poll检查是否有数据可读
     struct pollfd pfd;
     pfd.fd = client_fd;
@@ -225,30 +223,58 @@ bool UnixSocketServer::handle_client_connection(int client_fd) {
         return true; // 没有数据，但连接正常
     }
     
-    ssize_t bytes_read = recv(client_fd, &msg, sizeof(msg), 0);
-    if (bytes_read == sizeof(msg)) {
-        // 处理消息
-        if (process_message(msg, client_fd)) {
-            // 更新统计信息
-            {
-                std::lock_guard<std::mutex> lock(stats_mutex_);
-                statistics_.total_messages_received++;
-            }
-            
-            // 更新客户端最后心跳时间
-            {
-                std::lock_guard<std::mutex> lock(clients_mutex_);
-                for (auto& client : clients_) {
-                    if (client.socket_fd == client_fd) {
-                        client.last_heartbeat = get_unix_timestamp();
-                        client.message_count++;
-                        break;
+    // 先尝试读取少量数据来判断消息格式
+    char buffer[4096];
+    ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+        
+        // 检查是否是JSON格式（以 { 开头）
+        if (buffer[0] == '{') {
+            // 处理JSON格式消息
+            if (handle_json_message(buffer, bytes_read, client_fd)) {
+                // 更新统计信息和客户端状态
+                {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    statistics_.total_messages_received++;
+                }
+                
+                {
+                    std::lock_guard<std::mutex> lock(clients_mutex_);
+                    for (auto& client : clients_) {
+                        if (client.socket_fd == client_fd) {
+                            client.last_heartbeat = get_unix_timestamp();
+                            client.message_count++;
+                            break;
+                        }
                     }
                 }
             }
-            
-            return true;
+        } else if (bytes_read == sizeof(CommunicationMessage)) {
+            // 处理二进制格式消息
+            CommunicationMessage* msg = reinterpret_cast<CommunicationMessage*>(buffer);
+            if (process_message(*msg, client_fd)) {
+                // 更新统计信息和客户端状态
+                {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    statistics_.total_messages_received++;
+                }
+                
+                {
+                    std::lock_guard<std::mutex> lock(clients_mutex_);
+                    for (auto& client : clients_) {
+                        if (client.socket_fd == client_fd) {
+                            client.last_heartbeat = get_unix_timestamp();
+                            client.message_count++;
+                            break;
+                        }
+                    }
+                }
+            }
         }
+        
+        return true;
     } else if (bytes_read == 0) {
         // 客户端断开连接
         std::cout << "客户端断开连接: fd=" << client_fd << std::endl;
@@ -263,6 +289,62 @@ bool UnixSocketServer::handle_client_connection(int client_fd) {
     }
     
     return true;
+}
+
+bool UnixSocketServer::handle_json_message(const char* json_data, size_t data_length, int client_fd) {
+    try {
+#ifdef ENABLE_JSON
+        json msg_json = json::parse(std::string(json_data, data_length));
+        
+        std::string msg_type = msg_json.value("type", "unknown");
+        
+        if (msg_type == "heartbeat") {
+            // 处理心跳消息
+            std::cout << "收到前端心跳: fd=" << client_fd << std::endl;
+            
+            // 发送心跳响应
+            CommunicationMessage response;
+            response.type = MessageType::HEARTBEAT;
+            response.sequence = 0;
+            response.timestamp = get_unix_timestamp();
+            response.data_length = 0;
+            
+            send_message(client_fd, response);
+            return true;
+        } else if (msg_type == "status_request") {
+            // 处理状态请求
+            handle_status_request(client_fd, 0);
+            return true;
+        } else if (msg_type == "plc_command") {
+            // 处理PLC命令
+            handle_plc_command(msg_json, client_fd, 0);
+            return true;
+        }
+        
+        // 调用用户回调（如果设置了）
+        if (message_callback_) {
+            CommunicationMessage compat_msg;
+            compat_msg.type = MessageType::STATUS_REQUEST;  // 默认类型
+            compat_msg.sequence = 0;
+            compat_msg.timestamp = get_unix_timestamp();
+            
+            std::string json_str = msg_json.dump();
+            compat_msg.data_length = std::min(json_str.length(), sizeof(compat_msg.data) - 1);
+            strncpy(compat_msg.data, json_str.c_str(), compat_msg.data_length);
+            compat_msg.data[compat_msg.data_length] = '\0';
+            
+            message_callback_(compat_msg, client_fd);
+        }
+        
+        return true;
+#else
+        std::cerr << "JSON支持未启用，无法处理JSON消息" << std::endl;
+        return false;
+#endif
+    } catch (const std::exception& e) {
+        std::cerr << "处理JSON消息异常: " << e.what() << std::endl;
+        return false;
+    }
 }
 
 bool UnixSocketServer::process_message(const CommunicationMessage& msg, int client_fd) {

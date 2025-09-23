@@ -226,12 +226,22 @@ static void* backend_communication_thread(void* arg) {
                 last_heartbeat = now;
             }
         } else {
-            // 尝试重新连接
-            if (backend_client_connect(client)) {
-                printf("重新连接后端成功\n");
-            } else {
-                sleep(2); // 连接失败时等待2秒再重试
+            // 尝试重新连接（降低重试频率）
+            static uint64_t last_reconnect_attempt = 0;
+            uint64_t now = get_timestamp_ms();
+            
+            // 每5秒才尝试一次重连，避免过于频繁
+            if (now - last_reconnect_attempt > 5000) {
+                if (backend_client_connect(client)) {
+                    printf("重新连接后端成功\n");
+                } else {
+                    printf("后端重连失败，等待下次重试\n");
+                }
+                last_reconnect_attempt = now;
             }
+            
+            // 增加休眠时间，减少CPU占用
+            sleep(1);
         }
         
         // 更新系统健康信息
