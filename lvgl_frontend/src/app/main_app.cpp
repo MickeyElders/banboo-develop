@@ -63,12 +63,13 @@ bool MainApp::initialize() {
         // 初始化后端通信
         setup_backend_communication();
         
-        // 初始化摄像头组件（容错处理）
-        try {
-            setup_camera();
-        } catch (const std::exception& e) {
-            printf("摄像头初始化异常，继续运行: %s\n", e.what());
-        }
+        // 暂时禁用摄像头初始化，避免EGL错误导致崩溃
+        printf("摄像头初始化已禁用，避免EGL错误\n");
+        // try {
+        //     setup_camera();
+        // } catch (const std::exception& e) {
+        //     printf("摄像头初始化异常，继续运行: %s\n", e.what());
+        // }
         
         // TODO: 初始化AI检测器
         // setup_ai_detector();

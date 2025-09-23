@@ -772,23 +772,54 @@ private:
     }
     
     void printPerformanceStats() {
-        // 打印检测器性能
-        auto detector_stats = detector_->getPerformanceStats();
-        LOG_INFO("检测器性能: {:.1f} FPS, 平均推理时间: {:.2f}ms", 
-                detector_stats.fps, detector_stats.avg_inference_time_ms);
+        // 安全地打印检测器性能
+        if (detector_ && vision_system_available_) {
+            try {
+                auto detector_stats = detector_->getPerformanceStats();
+                LOG_INFO("检测器性能: {:.1f} FPS, 平均推理时间: {:.2f}ms",
+                        detector_stats.fps, detector_stats.avg_inference_time_ms);
+            } catch (const std::exception& e) {
+                LOG_DEBUG("获取检测器统计信息失败: {}", e.what());
+            }
+        }
         
-        // 打印摄像头性能
-        auto camera_stats = camera_manager_->getPerformanceStats();
-        LOG_INFO("摄像头性能: {:.1f} FPS, 丢帧: {}", 
-                camera_stats.fps, camera_stats.dropped_frames);
+        // 安全地打印摄像头性能
+        if (camera_manager_ && camera_system_available_) {
+            try {
+                auto camera_stats = camera_manager_->getPerformanceStats();
+                LOG_INFO("摄像头性能: {:.1f} FPS, 丢帧: {}",
+                        camera_stats.fps, camera_stats.dropped_frames);
+            } catch (const std::exception& e) {
+                LOG_DEBUG("获取摄像头统计信息失败: {}", e.what());
+            }
+        }
         
-        // 打印Modbus性能
-        auto modbus_stats = modbus_server_->get_statistics();
-        LOG_INFO("Modbus性能: 连接={}, 请求={}, 错误={}, 心跳超时={}", 
-                modbus_server_->is_connected() ? 1 : 0,
-                modbus_stats.total_requests, 
-                modbus_stats.total_errors,
-                modbus_stats.heartbeat_timeouts);
+        // 安全地打印Modbus性能
+        if (modbus_server_) {
+            try {
+                auto modbus_stats = modbus_server_->get_statistics();
+                LOG_INFO("Modbus性能: 连接={}, 请求={}, 错误={}, 心跳超时={}",
+                        modbus_server_->is_connected() ? 1 : 0,
+                        modbus_stats.total_requests,
+                        modbus_stats.total_errors,
+                        modbus_stats.heartbeat_timeouts);
+            } catch (const std::exception& e) {
+                LOG_DEBUG("获取Modbus统计信息失败: {}", e.what());
+            }
+        }
+        
+        // 打印Unix Socket性能
+        if (unix_socket_server_ && unix_socket_available_) {
+            try {
+                auto unix_stats = unix_socket_server_->get_statistics();
+                LOG_INFO("前端通信性能: 连接数={}, 发送消息={}, 接收消息={}",
+                        unix_stats.active_clients,
+                        unix_stats.total_messages_sent,
+                        unix_stats.total_messages_received);
+            } catch (const std::exception& e) {
+                LOG_DEBUG("获取Unix Socket统计信息失败: {}", e.what());
+            }
+        }
     }
 };
 
