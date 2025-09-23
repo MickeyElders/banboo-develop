@@ -11,6 +11,7 @@
 #include "gui/settings_page.h"
 #include "input/touch_driver.h"
 #include "backend/backend_client.h"
+#include "backend/tcp_socket_client.h"
 #include <stdio.h>
 #include <string.h>
 // 其他头文件暂时注释掉，避免不完整类型问题
