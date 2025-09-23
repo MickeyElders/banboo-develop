@@ -274,23 +274,24 @@ void MainApp::setup_touch_input() {
 }
 
 void MainApp::setup_backend_communication() {
-    printf("设置后端通信...\n");
+    printf("设置后端通信（非阻塞模式）...\n");
     
     // 创建后端客户端，使用UNIX Domain Socket路径（与后端保持一致）
     const char* socket_path = "/tmp/bamboo_socket";
     backend_client_ = backend_client_create(socket_path);
     
     if (!backend_client_) {
-        printf("错误: 创建后端客户端失败\n");
+        printf("警告: 创建后端客户端失败，前端将在无后端模式下运行\n");
         return;
     }
     
-    // 尝试连接到后端
+    // 非阻塞尝试连接到后端，失败也不影响前端启动
+    printf("尝试连接后端...\n");
     if (!backend_client_connect(backend_client_)) {
-        printf("警告: 连接后端失败，将在后台自动重试\n");
+        printf("警告: 连接后端失败，前端将继续启动并在后台自动重试连接\n");
     } else {
         printf("后端连接成功\n");
     }
     
-    printf("后端通信设置完成\n");
+    printf("后端通信设置完成（前端可独立运行）\n");
 }

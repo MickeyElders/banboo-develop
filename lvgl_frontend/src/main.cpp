@@ -64,10 +64,10 @@ void* main_loop(void* arg) {
 bool check_system_requirements() {
     printf("检查系统要求...\n");
     
-    // 检查framebuffer设备
+    // 检查framebuffer设备（非阻塞）
     if (access("/dev/fb0", F_OK) != 0) {
-        fprintf(stderr, "错误: 找不到framebuffer设备 /dev/fb0\n");
-        return false;
+        printf("警告: 找不到framebuffer设备 /dev/fb0，可能会影响显示\n");
+        // 不返回false，让系统继续尝试启动
     }
     
     // 检查触摸设备 - 优先检查 event2
@@ -207,11 +207,8 @@ int main(int argc, char* argv[]) {
     /* 打印系统信息 */
     print_system_info();
     
-    /* 检查系统要求 */
-    if (!check_system_requirements()) {
-        fprintf(stderr, "错误: 系统要求检查失败\n");
-        return 1;
-    }
+    /* 检查系统要求（非阻塞模式） */
+    check_system_requirements(); // 只检查不强制退出
     
     /* 设置信号处理 */
     signal(SIGINT, signal_handler);

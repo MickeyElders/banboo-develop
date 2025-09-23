@@ -481,39 +481,39 @@ double get_camera_fps() {
     return g_camera_manager ? camera_manager_get_fps(g_camera_manager) : 0.0;
 }
 
-// 初始化后端系统
+// 初始化后端系统（非阻塞模式）
 void init_backend_system() {
-    printf("初始化后端系统...\n");
+    printf("初始化后端系统（非阻塞模式）...\n");
     
-    // 检查后端进程是否运行
+    // 检查后端进程是否运行（非阻塞）
     if (!backend_client_is_backend_running()) {
-        printf("后端进程未运行，正在启动...\n");
-        if (!backend_client_start_backend_process()) {
-            printf("警告：启动后端进程失败\n");
-        }
+        printf("警告：后端进程未运行，前端将在无后端模式下启动\n");
+        // 不尝试启动后端进程，避免阻塞前端启动
     }
     
     // 创建后端客户端
     g_backend_client = backend_client_create("/tmp/bamboo_socket");
     if (!g_backend_client) {
-        printf("错误：创建后端客户端失败\n");
+        printf("警告：创建后端客户端失败，前端将在离线模式下运行\n");
         return;
     }
     
-    // 连接到后端
+    // 非阻塞连接到后端
+    printf("尝试连接后端（非阻塞）...\n");
     if (!backend_client_connect(g_backend_client)) {
-        printf("警告：连接后端失败\n");
+        printf("警告：连接后端失败，前端将继续运行并在后台重试\n");
     }
     
-    // 启动通信线程
+    // 启动通信线程（即使连接失败也启动，因为线程内有重连逻辑）
     if (!backend_client_start_communication(g_backend_client)) {
-        printf("错误：启动后端通信失败\n");
+        printf("警告：启动后端通信线程失败\n");
         backend_client_destroy(g_backend_client);
         g_backend_client = nullptr;
+        printf("前端将在无后端通信模式下运行\n");
         return;
     }
     
-    printf("后端系统初始化完成\n");
+    printf("后端系统初始化完成（可能处于离线状态，将自动重连）\n");
 }
 
 // 清理后端系统
