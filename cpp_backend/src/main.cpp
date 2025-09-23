@@ -11,6 +11,7 @@
 #include <bamboo_cut/vision/stereo_vision.h>
 #include <bamboo_cut/vision/optimized_detector.h>
 #include <bamboo_cut/communication/modbus_server.h>
+#include <bamboo_cut/communication/unix_socket_server.h>
 
 using namespace bamboo_cut;
 
@@ -60,12 +61,19 @@ public:
             return false;
         }
         
+        // 初始化UNIX Socket服务器（关键模块，用于前端通信）
+        if (!initializeUnixSocketServer()) {
+            LOG_ERROR("❌ UNIX Socket服务器初始化失败，前端将无法连接");
+            return false;
+        }
+        
         // 输出系统状态摘要
         LOG_INFO("🎯 系统初始化完成，模块状态:");
         LOG_INFO("   📹 摄像头系统: {}", camera_system_available_ ? "✅ 可用" : "❌ 不可用");
         LOG_INFO("   🔍 视觉检测: {}", vision_system_available_ ? "✅ 可用" : "❌ 不可用");
         LOG_INFO("   👁️ 立体视觉: {}", stereo_vision_available_ ? "✅ 可用" : "❌ 不可用");
-        LOG_INFO("   🔗 通信系统: ✅ 可用");
+        LOG_INFO("   🔗 Modbus通信: ✅ 可用");
+        LOG_INFO("   📡 前端通信: {}", unix_socket_available_ ? "✅ 可用" : "❌ 不可用");
         
         if (!camera_system_available_ && !vision_system_available_) {
             LOG_WARN("⚠️ 系统运行在模拟模式：无摄像头和视觉检测");
@@ -119,6 +127,11 @@ public:
     void shutdown() {
         LOG_INFO("开始关闭系统...");
         
+        // 停止UNIX Socket服务器
+        if (unix_socket_server_) {
+            unix_socket_server_->stop();
+        }
+        
         // 停止Modbus服务器
         if (modbus_server_) {
             modbus_server_->stop();
@@ -139,12 +152,14 @@ private:
     std::unique_ptr<vision::CameraManager> camera_manager_;
     std::unique_ptr<vision::StereoVision> stereo_vision_;
     std::unique_ptr<communication::ModbusServer> modbus_server_;
+    std::unique_ptr<communication::UnixSocketServer> unix_socket_server_;
     
     // 模块可用性状态
     bool vision_system_available_ = false;
     bool camera_system_available_ = false;
     bool stereo_vision_available_ = false;
     bool communication_system_available_ = false;
+    bool unix_socket_available_ = false;
     
     // 当前帧数据
     vision::FrameInfo current_frame_;
@@ -347,6 +362,38 @@ private:
         return true;
     }
     
+    bool initializeUnixSocketServer() {
+        LOG_INFO("初始化UNIX Socket服务器...");
+        
+        // 创建UNIX Socket服务器配置
+        communication::UnixSocketConfig socket_config;
+        socket_config.socket_path = "/tmp/bamboo_socket";
+        socket_config.max_connections = 5;
+        socket_config.buffer_size = 8192;
+        socket_config.timeout_ms = 1000;
+        
+        unix_socket_server_ = std::make_unique<communication::UnixSocketServer>(socket_config);
+        
+        // 设置数据回调函数
+        unix_socket_server_->set_data_callback([this](const std::string& client_id, const std::string& message) {
+            LOG_INFO("收到前端消息: {}", message);
+            handleFrontendMessage(client_id, message);
+        });
+        
+        // 设置连接回调函数
+        unix_socket_server_->set_connection_callback([](const std::string& client_id, bool connected) {
+            if (connected) {
+                LOG_INFO("前端已连接: {}", client_id);
+            } else {
+                LOG_WARN("前端已断开: {}", client_id);
+            }
+        });
+        
+        unix_socket_available_ = true;
+        LOG_INFO("UNIX Socket服务器初始化完成");
+        return true;
+    }
+    
     void startServices() {
         LOG_INFO("🚀 启动所有可用服务...");
         
@@ -408,8 +455,9 @@ private:
             }
         }
         
-        LOG_INFO("🎯 服务启动完成 - 可用服务数: {}/4",
+        LOG_INFO("🎯 服务启动完成 - 可用服务数: {}/5",
                 (communication_system_available_ ? 1 : 0) +
+                (unix_socket_available_ ? 1 : 0) +
                 (camera_system_available_ ? 1 : 0) +
                 (vision_system_available_ ? 1 : 0) +
                 (stereo_vision_available_ ? 1 : 0));
