@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <thread>
 #include <chrono>
+#include <nlohmann/json.hpp>
 
 #include <bamboo_cut/config.h>
 #include <bamboo_cut/core/logger.h>
@@ -645,6 +646,125 @@ private:
         // - 停止所有电机
         // - 关闭气动系统
         // - 激活安全制动
+    }
+    
+    void handleFrontendMessage(const communication::CommunicationMessage& msg, int client_fd) {
+        LOG_INFO("处理前端消息，类型: {}", static_cast<int>(msg.type));
+        
+        switch (msg.type) {
+            case communication::MessageType::STATUS_REQUEST:
+                // 发送系统状态给前端
+                sendSystemStatusToFrontend(client_fd);
+                break;
+                
+            case communication::MessageType::COMMAND:
+                // 处理前端发送的控制指令
+                handleFrontendCommand(msg, client_fd);
+                break;
+                
+            case communication::MessageType::CONFIG_REQUEST:
+                // 发送配置信息给前端
+                sendConfigToFrontend(client_fd);
+                break;
+                
+            default:
+                LOG_WARN("未知的前端消息类型: {}", static_cast<int>(msg.type));
+                break;
+        }
+    }
+    
+    void sendSystemStatusToFrontend(int client_fd) {
+        if (!unix_socket_server_ || !modbus_server_) {
+            return;
+        }
+        
+        // 构造系统状态消息
+        communication::CommunicationMessage response;
+        response.type = communication::MessageType::STATUS_RESPONSE;
+        
+        // 获取Modbus服务器状态
+        auto modbus_stats = modbus_server_->get_statistics();
+        
+        // 填充状态数据（使用JSON格式）
+        nlohmann::json status_data;
+        status_data["plc_connected"] = modbus_server_->is_connected();
+        status_data["system_status"] = static_cast<int>(modbus_server_->get_system_status());
+        status_data["system_health"] = static_cast<int>(modbus_server_->get_system_health());
+        status_data["camera_available"] = camera_system_available_;
+        status_data["vision_available"] = vision_system_available_;
+        status_data["stereo_available"] = stereo_vision_available_;
+        status_data["total_requests"] = modbus_stats.total_requests;
+        status_data["total_errors"] = modbus_stats.total_errors;
+        status_data["heartbeat_timeouts"] = modbus_stats.heartbeat_timeouts;
+        
+        // 获取坐标数据
+        auto coord_data = modbus_server_->get_coordinate_data();
+        status_data["coordinate_x"] = coord_data.x_coordinate;
+        status_data["selected_blade"] = static_cast<int>(coord_data.selected_blade);
+        status_data["cut_quality"] = static_cast<int>(coord_data.cut_quality);
+        
+        response.data = status_data.dump();
+        
+        // 发送响应
+        unix_socket_server_->send_message(client_fd, response);
+        LOG_DEBUG("已发送系统状态到前端: fd={}", client_fd);
+    }
+    
+    void sendConfigToFrontend(int client_fd) {
+        if (!unix_socket_server_) {
+            return;
+        }
+        
+        communication::CommunicationMessage response;
+        response.type = communication::MessageType::CONFIG_RESPONSE;
+        
+        nlohmann::json config_data;
+        config_data["camera_width"] = 1920;
+        config_data["camera_height"] = 1080;
+        config_data["camera_fps"] = 30;
+        config_data["detection_enabled"] = vision_system_available_;
+        config_data["stereo_enabled"] = stereo_vision_available_;
+        config_data["modbus_port"] = 502;
+        
+        response.data = config_data.dump();
+        unix_socket_server_->send_message(client_fd, response);
+        LOG_DEBUG("已发送配置信息到前端: fd={}", client_fd);
+    }
+    
+    void handleFrontendCommand(const communication::CommunicationMessage& msg, int client_fd) {
+        try {
+            nlohmann::json command_data = nlohmann::json::parse(msg.data);
+            std::string command = command_data["command"];
+            
+            if (command == "start_detection") {
+                LOG_INFO("前端请求启动检测");
+                if (modbus_server_) {
+                    modbus_server_->set_system_status(communication::SystemStatus::RUNNING);
+                }
+            } else if (command == "stop_detection") {
+                LOG_INFO("前端请求停止检测");
+                if (modbus_server_) {
+                    modbus_server_->set_system_status(communication::SystemStatus::PAUSED);
+                }
+            } else if (command == "emergency_stop") {
+                LOG_WARN("前端触发紧急停止");
+                handleEmergencyStop();
+            } else {
+                LOG_WARN("未知的前端指令: {}", command);
+            }
+            
+            // 发送确认响应
+            communication::CommunicationMessage response;
+            response.type = communication::MessageType::COMMAND_RESPONSE;
+            nlohmann::json response_data;
+            response_data["result"] = "ok";
+            response_data["command"] = command;
+            response.data = response_data.dump();
+            unix_socket_server_->send_message(client_fd, response);
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("处理前端指令失败: {}", e.what());
+        }
     }
     
     void printPerformanceStats() {
