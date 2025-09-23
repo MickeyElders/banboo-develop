@@ -389,12 +389,12 @@ void TcpSocketServer::disconnect_all_clients() {
 }
 
 TcpServerStats TcpSocketServer::get_statistics() const {
-    std::lock_guard<std::mutex> lock(stats_mutex_);
+    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(stats_mutex_));
     TcpServerStats stats = stats_;
     
     // 更新活跃客户端数量
     {
-        std::lock_guard<std::mutex> clients_lock(clients_mutex_);
+        std::lock_guard<std::mutex> clients_lock(const_cast<std::mutex&>(clients_mutex_));
         stats.active_clients = clients_.size();
     }
     
@@ -403,7 +403,7 @@ TcpServerStats TcpSocketServer::get_statistics() const {
 
 std::vector<std::string> TcpSocketServer::get_connected_clients() const {
     std::vector<std::string> clients;
-    std::lock_guard<std::mutex> lock(clients_mutex_);
+    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(clients_mutex_));
     
     for (const auto& client : clients_) {
         if (client->is_active) {

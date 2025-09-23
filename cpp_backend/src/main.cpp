@@ -170,9 +170,9 @@ public:
         // 通知systemd服务正在停止
         sd_notify(0, "STOPPING=1");
         
-        // 停止UNIX Socket服务器
-        if (unix_socket_server_) {
-            unix_socket_server_->stop();
+        // 停止TCP Socket服务器
+        if (tcp_socket_server_) {
+            tcp_socket_server_->stop();
         }
         
         // 停止Modbus服务器
@@ -195,14 +195,14 @@ private:
     std::unique_ptr<vision::CameraManager> camera_manager_;
     std::unique_ptr<vision::StereoVision> stereo_vision_;
     std::unique_ptr<communication::ModbusServer> modbus_server_;
-    std::unique_ptr<communication::UnixSocketServer> unix_socket_server_;
+    std::unique_ptr<communication::TcpSocketServer> tcp_socket_server_;
     
     // 模块可用性状态
     bool vision_system_available_ = false;
     bool camera_system_available_ = false;
     bool stereo_vision_available_ = false;
     bool communication_system_available_ = false;
-    bool unix_socket_available_ = false;
+    bool tcp_server_available_ = false;
     
     // 当前帧数据
     vision::FrameInfo current_frame_;
@@ -405,30 +405,30 @@ private:
         return true;
     }
     
-    bool initializeUnixSocketServer() {
-        LOG_INFO("初始化UNIX Socket服务器...");
+    bool initializeTcpSocketServer() {
+        LOG_INFO("初始化TCP Socket服务器...");
         
-        // 创建UNIX Socket服务器，只需要socket路径参数
-        unix_socket_server_ = std::make_unique<communication::UnixSocketServer>("/tmp/bamboo_socket");
+        // 创建TCP Socket服务器，监听127.0.0.1:8888
+        tcp_socket_server_ = std::make_unique<communication::TcpSocketServer>("127.0.0.1", 8888);
         
         // 设置消息回调函数
-        unix_socket_server_->set_message_callback([this](const communication::CommunicationMessage& msg, int client_fd) {
+        tcp_socket_server_->set_message_callback([this](const communication::CommunicationMessage& msg, int client_fd) {
             LOG_INFO("收到前端消息，类型: {}", static_cast<int>(msg.type));
             handleFrontendMessage(msg, client_fd);
         });
         
         // 设置客户端连接回调函数
-        unix_socket_server_->set_client_connected_callback([](int client_fd, const std::string& client_name) {
-            LOG_INFO("前端已连接: {} (fd={})", client_name, client_fd);
+        tcp_socket_server_->set_client_connected_callback([](int client_fd, const std::string& client_info) {
+            LOG_INFO("前端已连接: {} (fd={})", client_info, client_fd);
         });
         
         // 设置客户端断开回调函数
-        unix_socket_server_->set_client_disconnected_callback([](int client_fd) {
+        tcp_socket_server_->set_client_disconnected_callback([](int client_fd) {
             LOG_INFO("前端已断开: fd={}", client_fd);
         });
         
-        unix_socket_available_ = true;
-        LOG_INFO("UNIX Socket服务器初始化完成");
+        tcp_server_available_ = true;
+        LOG_INFO("TCP Socket服务器初始化完成");
         return true;
     }
     
@@ -482,25 +482,25 @@ private:
             }
         }
         
-        // 启动UNIX Socket服务器（必需服务，用于前端通信）
-        LOG_INFO("🔌 检查UNIX Socket服务器状态: {}", unix_socket_server_ ? "存在" : "不存在");
+        // 启动TCP Socket服务器（必需服务，用于前端通信）
+        LOG_INFO("🔌 检查TCP Socket服务器状态: {}", tcp_socket_server_ ? "存在" : "不存在");
         
-        if (unix_socket_server_ && unix_socket_available_) {
-            LOG_INFO("🔌 开始启动UNIX Socket服务器...");
-            bool unix_start_result = unix_socket_server_->start();
-            LOG_INFO("🔌 UNIX Socket启动结果: {}", unix_start_result ? "成功" : "失败");
+        if (tcp_socket_server_ && tcp_server_available_) {
+            LOG_INFO("🔌 开始启动TCP Socket服务器...");
+            bool tcp_start_result = tcp_socket_server_->start();
+            LOG_INFO("🔌 TCP Socket启动结果: {}", tcp_start_result ? "成功" : "失败");
             
-            if (!unix_start_result) {
-                LOG_ERROR("❌ UNIX Socket服务器启动失败，前端无法连接");
-                unix_socket_available_ = false;
+            if (!tcp_start_result) {
+                LOG_ERROR("❌ TCP Socket服务器启动失败，前端无法连接");
+                tcp_server_available_ = false;
             } else {
-                LOG_INFO("✅ UNIX Socket服务器启动成功");
+                LOG_INFO("✅ TCP Socket服务器启动成功");
             }
         } else {
-            if (!unix_socket_server_) {
-                LOG_WARN("⚠️ UNIX Socket服务器对象为空，跳过启动");
-            } else if (!unix_socket_available_) {
-                LOG_WARN("⚠️ UNIX Socket服务器标记为不可用，跳过启动");
+            if (!tcp_socket_server_) {
+                LOG_WARN("⚠️ TCP Socket服务器对象为空，跳过启动");
+            } else if (!tcp_server_available_) {
+                LOG_WARN("⚠️ TCP Socket服务器标记为不可用，跳过启动");
             }
         }
         
@@ -517,7 +517,7 @@ private:
         
         LOG_INFO("🎯 服务启动完成 - 可用服务数: {}/5",
                 (communication_system_available_ ? 1 : 0) +
-                (unix_socket_available_ ? 1 : 0) +
+                (tcp_server_available_ ? 1 : 0) +
                 (camera_system_available_ ? 1 : 0) +
                 (vision_system_available_ ? 1 : 0) +
                 (stereo_vision_available_ ? 1 : 0));
@@ -733,7 +733,7 @@ private:
     }
     
     void sendSystemStatusToFrontend(int client_fd) {
-        if (!unix_socket_server_ || !modbus_server_) {
+        if (!tcp_socket_server_ || !modbus_server_) {
             return;
         }
         
@@ -768,7 +768,7 @@ private:
         response.data_length = json_str.length();
         
         // 发送响应
-        unix_socket_server_->send_message(client_fd, response);
+        tcp_socket_server_->send_message(client_fd, response);
         LOG_DEBUG("已发送系统状态到前端: fd={}", client_fd);
     }
     
@@ -796,7 +796,7 @@ private:
             
             // 发送确认响应
             communication::CommunicationMessage response;
-            response.type = communication::MessageType::PLC_COMMAND_ACK;
+            response.type = communication::MessageType::PLC_RESPONSE;
             nlohmann::json response_data;
             response_data["result"] = "ok";
             response_data["command"] = command;
@@ -806,7 +806,7 @@ private:
             response.data[sizeof(response.data) - 1] = '\0';
             response.data_length = json_str.length();
             
-            unix_socket_server_->send_message(client_fd, response);
+            tcp_socket_server_->send_message(client_fd, response);
             
         } catch (const std::exception& e) {
             LOG_ERROR("处理前端指令失败: {}", e.what());
@@ -850,16 +850,16 @@ private:
             }
         }
         
-        // 打印Unix Socket性能
-        if (unix_socket_server_ && unix_socket_available_) {
+        // 打印TCP Socket性能
+        if (tcp_socket_server_ && tcp_server_available_) {
             try {
-                auto unix_stats = unix_socket_server_->get_statistics();
+                auto tcp_stats = tcp_socket_server_->get_statistics();
                 LOG_INFO("前端通信性能: 连接数={}, 发送消息={}, 接收消息={}",
-                        unix_stats.active_clients,
-                        unix_stats.total_messages_sent,
-                        unix_stats.total_messages_received);
+                        tcp_stats.active_clients,
+                        tcp_stats.total_messages_sent,
+                        tcp_stats.total_messages_received);
             } catch (const std::exception& e) {
-                LOG_DEBUG("获取Unix Socket统计信息失败: {}", e.what());
+                LOG_DEBUG("获取TCP Socket统计信息失败: {}", e.what());
             }
         }
     }
@@ -887,4 +887,4 @@ int main(int argc, char* argv[]) {
         std::cerr << "应用程序异常: " << e.what() << std::endl;
         return -1;
     }
-} 
+}
