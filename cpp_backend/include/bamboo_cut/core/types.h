@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <chrono>
+#include <cstring>
 
 namespace bamboo_cut {
 namespace core {
@@ -111,4 +112,34 @@ template<typename T>
 using WeakPtr = std::weak_ptr<T>;
 
 } // namespace core
-} // namespace bamboo_cut 
+
+// 通信相关类型定义
+namespace communication {
+
+// 消息类型枚举
+enum class MessageType : uint16_t {
+    STATUS_REQUEST = 1,
+    STATUS_RESPONSE = 2,
+    PLC_COMMAND = 3,
+    PLC_RESPONSE = 4,
+    SYSTEM_STATUS = 5,
+    JSON_STRING = 6,
+    HEARTBEAT = 7,
+    ERROR_RESPONSE = 8
+};
+
+// 通信消息结构
+struct CommunicationMessage {
+    MessageType type;
+    uint64_t timestamp;
+    uint32_t data_length;
+    char data[1024];
+    
+    CommunicationMessage() : type(MessageType::STATUS_REQUEST), timestamp(0), data_length(0) {
+        memset(data, 0, sizeof(data));
+    }
+};
+
+} // namespace communication
+
+} // namespace bamboo_cut

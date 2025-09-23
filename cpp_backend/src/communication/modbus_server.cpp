@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 
 // 新增Unix Socket服务器支持
-#include "bamboo_cut/communication/unix_socket_server.h"
 
 namespace bamboo_cut {
 namespace communication {

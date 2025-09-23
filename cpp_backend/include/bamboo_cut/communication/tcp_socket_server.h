@@ -15,12 +15,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <bamboo_cut/core/types.h>
 
 namespace bamboo_cut {
 namespace communication {
 
-// 前向声明
-struct CommunicationMessage;
+// 使用来自 types.h 的定义
+using bamboo_cut::communication::CommunicationMessage;
+using bamboo_cut::communication::MessageType;
 
 // 统计信息结构
 struct TcpServerStats {
