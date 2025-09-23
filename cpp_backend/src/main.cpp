@@ -440,6 +440,28 @@ private:
             }
         }
         
+        // 启动UNIX Socket服务器（必需服务，用于前端通信）
+        LOG_INFO("🔌 检查UNIX Socket服务器状态: {}", unix_socket_server_ ? "存在" : "不存在");
+        
+        if (unix_socket_server_ && unix_socket_available_) {
+            LOG_INFO("🔌 开始启动UNIX Socket服务器...");
+            bool unix_start_result = unix_socket_server_->start();
+            LOG_INFO("🔌 UNIX Socket启动结果: {}", unix_start_result ? "成功" : "失败");
+            
+            if (!unix_start_result) {
+                LOG_ERROR("❌ UNIX Socket服务器启动失败，前端无法连接");
+                unix_socket_available_ = false;
+            } else {
+                LOG_INFO("✅ UNIX Socket服务器启动成功");
+            }
+        } else {
+            if (!unix_socket_server_) {
+                LOG_WARN("⚠️ UNIX Socket服务器对象为空，跳过启动");
+            } else if (!unix_socket_available_) {
+                LOG_WARN("⚠️ UNIX Socket服务器标记为不可用，跳过启动");
+            }
+        }
+        
         // 设置系统状态
         if (modbus_server_) {
             if (camera_system_available_ && vision_system_available_) {
@@ -657,14 +679,9 @@ private:
                 sendSystemStatusToFrontend(client_fd);
                 break;
                 
-            case communication::MessageType::COMMAND:
-                // 处理前端发送的控制指令
+            case communication::MessageType::PLC_COMMAND:
+                // 处理前端发送的PLC命令
                 handleFrontendCommand(msg, client_fd);
-                break;
-                
-            case communication::MessageType::CONFIG_REQUEST:
-                // 发送配置信息给前端
-                sendConfigToFrontend(client_fd);
                 break;
                 
             default:
@@ -689,7 +706,6 @@ private:
         nlohmann::json status_data;
         status_data["plc_connected"] = modbus_server_->is_connected();
         status_data["system_status"] = static_cast<int>(modbus_server_->get_system_status());
-        status_data["system_health"] = static_cast<int>(modbus_server_->get_system_health());
         status_data["camera_available"] = camera_system_available_;
         status_data["vision_available"] = vision_system_available_;
         status_data["stereo_available"] = stereo_vision_available_;
@@ -700,35 +716,18 @@ private:
         // 获取坐标数据
         auto coord_data = modbus_server_->get_coordinate_data();
         status_data["coordinate_x"] = coord_data.x_coordinate;
-        status_data["selected_blade"] = static_cast<int>(coord_data.selected_blade);
-        status_data["cut_quality"] = static_cast<int>(coord_data.cut_quality);
+        status_data["blade_number"] = static_cast<int>(coord_data.blade_number);
+        status_data["cut_quality"] = static_cast<int>(coord_data.quality);
         
-        response.data = status_data.dump();
+        // 转换JSON为字符串，并复制到response.data
+        std::string json_str = status_data.dump();
+        strncpy(response.data, json_str.c_str(), sizeof(response.data) - 1);
+        response.data[sizeof(response.data) - 1] = '\0';
+        response.data_length = json_str.length();
         
         // 发送响应
         unix_socket_server_->send_message(client_fd, response);
         LOG_DEBUG("已发送系统状态到前端: fd={}", client_fd);
-    }
-    
-    void sendConfigToFrontend(int client_fd) {
-        if (!unix_socket_server_) {
-            return;
-        }
-        
-        communication::CommunicationMessage response;
-        response.type = communication::MessageType::CONFIG_RESPONSE;
-        
-        nlohmann::json config_data;
-        config_data["camera_width"] = 1920;
-        config_data["camera_height"] = 1080;
-        config_data["camera_fps"] = 30;
-        config_data["detection_enabled"] = vision_system_available_;
-        config_data["stereo_enabled"] = stereo_vision_available_;
-        config_data["modbus_port"] = 502;
-        
-        response.data = config_data.dump();
-        unix_socket_server_->send_message(client_fd, response);
-        LOG_DEBUG("已发送配置信息到前端: fd={}", client_fd);
     }
     
     void handleFrontendCommand(const communication::CommunicationMessage& msg, int client_fd) {
@@ -755,11 +754,16 @@ private:
             
             // 发送确认响应
             communication::CommunicationMessage response;
-            response.type = communication::MessageType::COMMAND_RESPONSE;
+            response.type = communication::MessageType::PLC_COMMAND_ACK;
             nlohmann::json response_data;
             response_data["result"] = "ok";
             response_data["command"] = command;
-            response.data = response_data.dump();
+            
+            std::string json_str = response_data.dump();
+            strncpy(response.data, json_str.c_str(), sizeof(response.data) - 1);
+            response.data[sizeof(response.data) - 1] = '\0';
+            response.data_length = json_str.length();
+            
             unix_socket_server_->send_message(client_fd, response);
             
         } catch (const std::exception& e) {
