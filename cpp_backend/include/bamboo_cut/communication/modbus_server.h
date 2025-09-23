@@ -17,11 +17,11 @@ extern "C" {
 }
 #endif
 
-// 前向声明Unix Socket服务器
-namespace bamboo_cut { namespace communication {
-    class UnixSocketServer;
-    struct CommunicationMessage;
-} }
+// 通信消息类型包含
+#include <bamboo_cut/core/types.h>
+
+// 使用来自 types.h 的定义
+using bamboo_cut::communication::CommunicationMessage;
 
 namespace bamboo_cut {
 namespace communication {
@@ -158,7 +158,6 @@ class ModbusServer {
 public:
     ModbusServer();
     explicit ModbusServer(const ModbusConfig& config);
-    explicit ModbusServer(const ModbusConfig& config, const std::string& unix_socket_path);
     ~ModbusServer();
 
     // 禁用拷贝构造和赋值
@@ -172,10 +171,6 @@ public:
     bool is_connected() const { return client_connected_.load(); }
     bool is_plc_connected() const;
     
-    // Unix Socket通信控制
-    bool start_unix_socket_server();
-    void stop_unix_socket_server();
-    bool is_unix_socket_running() const;
 
     // 坐标数据管理 (主动推送)
     void set_coordinate_data(const CoordinateData& data);
@@ -300,25 +295,11 @@ private:
     mutable std::mutex stats_mutex_;
     Statistics statistics_;
     
-    // Unix Socket服务器集成
-    std::unique_ptr<UnixSocketServer> unix_socket_server_;
-    std::string unix_socket_path_;
-    bool enable_unix_socket_;
-    
     // PLC连接状态监控
     std::atomic<bool> plc_connection_active_;
     std::chrono::steady_clock::time_point last_plc_communication_;
     std::thread plc_monitor_thread_;
     void plc_connection_monitor_thread();
-    
-    // Unix Socket事件回调处理
-    void on_unix_socket_message(const CommunicationMessage& msg, int client_fd);
-    void on_unix_socket_client_connected(int client_fd, const std::string& client_name);
-    void on_unix_socket_client_disconnected(int client_fd);
-    
-    // 数据同步方法
-    void sync_data_to_unix_socket();
-    void handle_frontend_plc_command(const std::string& command_json);
 };
 
 } // namespace communication
