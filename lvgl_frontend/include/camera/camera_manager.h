@@ -6,7 +6,7 @@
 #ifndef CAMERA_CAMERA_MANAGER_H
 #define CAMERA_CAMERA_MANAGER_H
 
-#include "camera/shared_memory_reader.h"
+#include "camera/gstreamer_receiver.h"
 #include "lvgl.h"
 #include <pthread.h>
 #include <stdbool.h>
@@ -17,7 +17,7 @@ extern "C" {
 
 /* 摄像头管理器结构 */
 typedef struct {
-    shared_memory_reader_t *shared_reader;  // 共享内存读取器
+    gstreamer_receiver_t *gst_receiver;  // GStreamer接收器
     lv_obj_t *video_img;            // LVGL图像对象
     lv_img_dsc_t img_dsc;          // 图像描述符
     uint8_t *img_buffer;           // 图像缓冲区
@@ -28,7 +28,8 @@ typedef struct {
     pthread_mutex_t frame_mutex;   // 帧数据互斥锁
     
     // 配置参数
-    char shared_memory_key[256];   // 共享内存key路径
+    char stream_url[256];          // 视频流URL
+    char stream_format[32];        // 流格式 (H264/JPEG)
     int width;                     // 图像宽度
     int height;                    // 图像高度
     int fps;                       // 帧率
@@ -39,19 +40,20 @@ typedef struct {
     uint64_t last_update_time;     // 上次更新时间
     
     // 连接状态
-    bool connected;                // 共享内存连接状态
+    bool connected;                // 视频流连接状态
     uint64_t connection_retry_time; // 连接重试时间
 } camera_manager_t;
 
 /**
  * 创建摄像头管理器
- * @param shared_memory_key 共享内存key路径，如"/tmp/bamboo_camera_shm"
+ * @param stream_url 视频流URL，如"udp://127.0.0.1:5000"或"http://127.0.0.1:5000/"
+ * @param stream_format 流格式，"H264"或"JPEG"
  * @param width 图像宽度
  * @param height 图像高度
  * @param fps 目标帧率
  * @return 摄像头管理器指针，失败返回NULL
  */
-camera_manager_t* camera_manager_create(const char* shared_memory_key, int width, int height, int fps);
+camera_manager_t* camera_manager_create(const char* stream_url, const char* stream_format, int width, int height, int fps);
 
 /**
  * 销毁摄像头管理器
@@ -114,9 +116,9 @@ double camera_manager_get_fps(camera_manager_t* manager);
 bool camera_manager_is_running(camera_manager_t* manager);
 
 /**
- * 获取共享内存连接状态
+ * 获取视频流连接状态
  * @param manager 摄像头管理器
- * @return 共享内存是否已连接
+ * @return 视频流是否已连接
  */
 bool camera_manager_is_connected(camera_manager_t* manager);
 
@@ -129,11 +131,11 @@ bool camera_manager_is_connected(camera_manager_t* manager);
 void camera_manager_get_stats(camera_manager_t* manager, uint64_t* frame_count, double* avg_fps);
 
 /**
- * 获取共享内存统计
+ * 获取GStreamer统计
  * @param manager 摄像头管理器
- * @param stats 输出共享内存统计信息
+ * @param stats 输出GStreamer统计信息
  */
-void camera_manager_get_shared_memory_stats(camera_manager_t* manager, shared_memory_stats_t* stats);
+void camera_manager_get_gstreamer_stats(camera_manager_t* manager, gstreamer_stats_t* stats);
 
 #ifdef __cplusplus
 }

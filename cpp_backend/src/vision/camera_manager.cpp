@@ -10,28 +10,30 @@
 #include <functional>
 #include <vector>
 #include <cstdlib>
+#include <gst/gst.h>
+#include <gst/app/gstappsrc.h>
 
 namespace bamboo_cut {
 namespace vision {
 
 CameraManager::CameraManager(const CameraConfig& config)
     : config_(config), is_running_(false), frame_callback_(nullptr),
-      shared_memory_enabled_(false) {
+      gst_pipeline_(nullptr), gst_appsrc_(nullptr), stream_enabled_(false) {
     LOG_INFO("创建CameraManager实例");
     
-    // 初始化共享内存（如果启用）
-    if (config_.enable_shared_memory) {
-        shared_memory_manager_ = SharedMemoryFactory::createProducer(
-            config_.shared_memory_key,
-            config_.width,
-            config_.height,
-            3  // BGR 3通道
-        );
-        if (shared_memory_manager_) {
-            shared_memory_enabled_ = true;
-            LOG_INFO("共享内存输出已启用: {}", config_.shared_memory_key);
+    // 初始化GStreamer
+    if (!gst_is_initialized()) {
+        gst_init(nullptr, nullptr);
+        LOG_INFO("GStreamer已初始化");
+    }
+    
+    // 初始化视频流（如果启用）
+    if (config_.enable_stream_output) {
+        if (initializeVideoStream()) {
+            stream_enabled_ = true;
+            LOG_INFO("GStreamer视频流输出已启用: {}:{}", config_.stream_host, config_.stream_port);
         } else {
-            LOG_WARN("共享内存初始化失败，将禁用共享内存输出");
+            LOG_WARN("GStreamer流初始化失败，将禁用流输出");
         }
     }
 }
@@ -323,32 +325,21 @@ bool CameraManager::initializeCamera(int camera_id) {
         if (successful_cap->read(test_frame) && !test_frame.empty()) {
             LOG_INFO("相机 {} 测试帧捕获成功: {}x{}", camera_id, test_frame.cols, test_frame.rows);
             
-            // 检查实际输出尺寸是否与配置不符，如果不符则重新初始化共享内存
-            if (shared_memory_enabled_ && shared_memory_manager_ &&
-                (test_frame.cols != config_.width || test_frame.rows != config_.height)) {
-                
+            // 检查实际输出尺寸是否与配置不符，如果不符则更新配置
+            if (test_frame.cols != config_.width || test_frame.rows != config_.height) {
                 LOG_WARN("检测到摄像头实际输出尺寸 {}x{} 与配置尺寸 {}x{} 不匹配",
                         test_frame.cols, test_frame.rows, config_.width, config_.height);
-                LOG_INFO("重新初始化共享内存以匹配实际尺寸...");
+                LOG_INFO("更新配置以匹配实际尺寸...");
                 
                 // 更新配置为实际尺寸
                 config_.width = test_frame.cols;
                 config_.height = test_frame.rows;
                 
-                // 重新创建共享内存管理器
-                shared_memory_manager_.reset();
-                shared_memory_manager_ = SharedMemoryFactory::createProducer(
-                    config_.shared_memory_key,
-                    config_.width,
-                    config_.height,
-                    3  // BGR 3通道
-                );
-                
-                if (shared_memory_manager_) {
-                    LOG_INFO("共享内存重新初始化成功: {}x{}", config_.width, config_.height);
-                } else {
-                    LOG_ERROR("共享内存重新初始化失败，将禁用共享内存输出");
-                    shared_memory_enabled_ = false;
+                // 如果视频流已启用，需要重新初始化
+                if (stream_enabled_) {
+                    LOG_INFO("重新初始化视频流以匹配新的分辨率");
+                    enableVideoStream(false);
+                    enableVideoStream(true);
                 }
             }
         } else {
@@ -394,15 +385,13 @@ void CameraManager::captureLoop() {
             frame_info.camera_ids = camera_ids;
             frame_info.frame_count = frames.size();
             
-            // 写入共享内存（如果启用）
-            if (shared_memory_enabled_ && shared_memory_manager_ && !frames.empty()) {
+            // 推送到GStreamer视频流（如果启用）
+            if (stream_enabled_ && gst_appsrc_ && !frames.empty()) {
                 try {
                     // 使用第一个摄像头的帧作为主要输出
-                    if (!shared_memory_manager_->writeFrame(frames[0])) {
-                        LOG_WARN("写入共享内存失败");
-                    }
+                    pushFrameToStream(frames[0]);
                 } catch (const std::exception& e) {
-                    LOG_ERROR("共享内存写入异常: {}", e.what());
+                    LOG_ERROR("视频流推送异常: {}", e.what());
                 }
             }
             
@@ -555,43 +544,192 @@ CameraManager::PerformanceStats CameraManager::getPerformanceStats() const {
     return stats;
 }
 
-bool CameraManager::enableSharedMemory(bool enable) {
-    if (enable && !shared_memory_enabled_) {
-        if (!shared_memory_manager_) {
-            shared_memory_manager_ = SharedMemoryFactory::createProducer(
-                config_.shared_memory_key,
-                config_.width,
-                config_.height,
-                3  // BGR 3通道
-            );
-        }
+bool CameraManager::initializeVideoStream() {
+    LOG_INFO("初始化GStreamer视频流...");
+    
+    try {
+        // 构建GStreamer pipeline
+        std::string pipeline = buildStreamPipeline();
+        LOG_INFO("GStreamer流管道: {}", pipeline);
         
-        if (shared_memory_manager_) {
-            shared_memory_enabled_ = true;
-            LOG_INFO("共享内存输出已启用");
-            return true;
-        } else {
-            LOG_ERROR("无法启用共享内存输出");
+        GError* error = nullptr;
+        gst_pipeline_ = gst_parse_launch(pipeline.c_str(), &error);
+        
+        if (error) {
+            LOG_ERROR("创建GStreamer管道失败: {}", error->message);
+            g_error_free(error);
             return false;
         }
-    } else if (!enable && shared_memory_enabled_) {
-        shared_memory_enabled_ = false;
-        shared_memory_manager_.reset();
-        LOG_INFO("共享内存输出已禁用");
+        
+        if (!gst_pipeline_) {
+            LOG_ERROR("GStreamer管道创建失败");
+            return false;
+        }
+        
+        // 获取appsrc元素
+        gst_appsrc_ = gst_bin_get_by_name(GST_BIN(gst_pipeline_), "appsrc");
+        if (!gst_appsrc_) {
+            LOG_ERROR("无法获取appsrc元素");
+            gst_object_unref(gst_pipeline_);
+            gst_pipeline_ = nullptr;
+            return false;
+        }
+        
+        // 配置appsrc属性
+        g_object_set(G_OBJECT(gst_appsrc_),
+                    "caps", gst_caps_new_simple("video/x-raw",
+                                              "format", G_TYPE_STRING, "BGR",
+                                              "width", G_TYPE_INT, config_.width,
+                                              "height", G_TYPE_INT, config_.height,
+                                              "framerate", GST_TYPE_FRACTION, config_.framerate, 1,
+                                              nullptr),
+                    "format", GST_FORMAT_TIME,
+                    "is-live", TRUE,
+                    "do-timestamp", TRUE,
+                    nullptr);
+        
+        // 启动管道
+        GstStateChangeReturn ret = gst_element_set_state(gst_pipeline_, GST_STATE_PLAYING);
+        if (ret == GST_STATE_CHANGE_FAILURE) {
+            LOG_ERROR("启动GStreamer管道失败");
+            gst_object_unref(gst_appsrc_);
+            gst_object_unref(gst_pipeline_);
+            gst_appsrc_ = nullptr;
+            gst_pipeline_ = nullptr;
+            return false;
+        }
+        
+        LOG_INFO("GStreamer视频流初始化成功");
+        return true;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("GStreamer流初始化异常: {}", e.what());
+        return false;
+    }
+}
+
+std::string CameraManager::buildStreamPipeline() {
+    std::stringstream pipeline;
+    
+    // appsrc -> 编码器 -> 网络发送
+    pipeline << "appsrc name=appsrc ! ";
+    
+    // 根据配置选择编码器
+    if (config_.stream_format == "H264") {
+        if (config_.use_hardware_acceleration) {
+            // 硬件H.264编码
+            pipeline << "nvvidconv ! nvv4l2h264enc bitrate=" << config_.stream_bitrate << " ! ";
+            pipeline << "video/x-h264,stream-format=byte-stream ! ";
+        } else {
+            // 软件H.264编码
+            pipeline << "videoconvert ! x264enc bitrate=" << (config_.stream_bitrate / 1000) << " tune=zerolatency ! ";
+            pipeline << "video/x-h264,stream-format=byte-stream ! ";
+        }
+        
+        // RTP打包并发送
+        pipeline << "rtph264pay config-interval=1 pt=96 ! ";
+        pipeline << "udpsink host=" << config_.stream_host << " port=" << config_.stream_port;
+        
+    } else if (config_.stream_format == "JPEG") {
+        // MJPEG流
+        if (config_.use_hardware_acceleration) {
+            pipeline << "nvvidconv ! nvjpegenc ! ";
+        } else {
+            pipeline << "videoconvert ! jpegenc quality=80 ! ";
+        }
+        
+        // 多部分HTTP流
+        pipeline << "multipartmux boundary=\"boundary\" ! ";
+        pipeline << "tcpserversink host=" << config_.stream_host << " port=" << config_.stream_port;
+    }
+    
+    return pipeline.str();
+}
+
+void CameraManager::pushFrameToStream(const cv::Mat& frame) {
+    if (!gst_appsrc_ || frame.empty()) {
+        return;
+    }
+    
+    try {
+        // 创建GStreamer缓冲区
+        size_t size = frame.total() * frame.elemSize();
+        GstBuffer* buffer = gst_buffer_new_allocate(nullptr, size, nullptr);
+        
+        if (!buffer) {
+            LOG_WARN("创建GStreamer缓冲区失败");
+            return;
+        }
+        
+        // 填充数据
+        GstMapInfo map;
+        if (gst_buffer_map(buffer, &map, GST_MAP_WRITE)) {
+            memcpy(map.data, frame.data, size);
+            gst_buffer_unmap(buffer, &map);
+            
+            // 设置时间戳
+            GST_BUFFER_PTS(buffer) = gst_util_uint64_scale(frame_counter_, GST_SECOND, config_.framerate);
+            GST_BUFFER_DTS(buffer) = GST_BUFFER_PTS(buffer);
+            GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(1, GST_SECOND, config_.framerate);
+            
+            // 推送到管道
+            GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(gst_appsrc_), buffer);
+            if (ret != GST_FLOW_OK) {
+                LOG_WARN("推送帧到GStreamer失败: {}", ret);
+            }
+        } else {
+            LOG_WARN("映射GStreamer缓冲区失败");
+            gst_buffer_unref(buffer);
+        }
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("推送帧异常: {}", e.what());
+    }
+}
+
+bool CameraManager::enableVideoStream(bool enable) {
+    if (enable && !stream_enabled_) {
+        if (initializeVideoStream()) {
+            stream_enabled_ = true;
+            LOG_INFO("GStreamer视频流已启用");
+            return true;
+        } else {
+            LOG_ERROR("无法启用GStreamer视频流");
+            return false;
+        }
+    } else if (!enable && stream_enabled_) {
+        stream_enabled_ = false;
+        
+        if (gst_pipeline_) {
+            gst_element_set_state(gst_pipeline_, GST_STATE_NULL);
+            gst_object_unref(gst_pipeline_);
+            gst_pipeline_ = nullptr;
+        }
+        
+        if (gst_appsrc_) {
+            gst_object_unref(gst_appsrc_);
+            gst_appsrc_ = nullptr;
+        }
+        
+        LOG_INFO("GStreamer视频流已禁用");
         return true;
     }
     
-    return shared_memory_enabled_ == enable;
+    return stream_enabled_ == enable;
 }
 
-SharedMemoryStats CameraManager::getSharedMemoryStats() const {
-    if (shared_memory_manager_) {
-        return shared_memory_manager_->getStats();
+std::string CameraManager::getStreamURL() const {
+    if (!stream_enabled_) {
+        return "";
     }
     
-    SharedMemoryStats empty_stats;
-    memset(&empty_stats, 0, sizeof(empty_stats));
-    return empty_stats;
+    if (config_.stream_format == "H264") {
+        return "udp://" + config_.stream_host + ":" + std::to_string(config_.stream_port);
+    } else if (config_.stream_format == "JPEG") {
+        return "http://" + config_.stream_host + ":" + std::to_string(config_.stream_port) + "/";
+    }
+    
+    return "";
 }
 
 } // namespace vision

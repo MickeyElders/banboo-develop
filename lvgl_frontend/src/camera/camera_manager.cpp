@@ -14,24 +14,30 @@ static uint64_t get_timestamp_ms() {
     return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-// 共享内存读取线程函数
-static void* shared_memory_read_thread(void* arg) {
+// GStreamer流读取线程函数
+static void* gstreamer_read_thread(void* arg) {
     camera_manager_t* manager = (camera_manager_t*)arg;
     cv::Mat frame;
     
-    printf("共享内存读取线程启动\n");
+    printf("GStreamer流读取线程启动\n");
     
     while (manager->thread_running) {
         // 如果未连接，尝试连接
         if (!manager->connected) {
-            if (shared_memory_reader_connect(manager->shared_reader)) {
+            if (gstreamer_receiver_connect(manager->gst_receiver)) {
                 manager->connected = true;
-                printf("共享内存连接成功\n");
+                if (gstreamer_receiver_start(manager->gst_receiver)) {
+                    printf("GStreamer流连接并启动成功\n");
+                } else {
+                    printf("GStreamer流启动失败\n");
+                    gstreamer_receiver_disconnect(manager->gst_receiver);
+                    manager->connected = false;
+                }
             } else {
                 // 连接失败，等待重试
                 uint64_t current_time = get_timestamp_ms();
-                if (current_time - manager->connection_retry_time > 2000) { // 2秒重试一次，更频繁
-                    printf("尝试重新连接共享内存...\n");
+                if (current_time - manager->connection_retry_time > 2000) { // 2秒重试一次
+                    printf("尝试重新连接GStreamer流...\n");
                     manager->connection_retry_time = current_time;
                 }
                 usleep(200000); // 200ms，给后端更多时间
@@ -39,8 +45,8 @@ static void* shared_memory_read_thread(void* arg) {
             }
         }
         
-        // 从共享内存读取一帧图像
-        if (shared_memory_reader_read_frame(manager->shared_reader, frame, 100)) {
+        // 从GStreamer流读取一帧图像
+        if (gstreamer_receiver_read_frame(manager->gst_receiver, frame, 100)) {
             pthread_mutex_lock(&manager->frame_mutex);
             
             // 调整图像尺寸到显示区域
@@ -78,20 +84,21 @@ static void* shared_memory_read_thread(void* arg) {
             
         } else {
             // 读取失败，检查连接状态
-            if (!shared_memory_reader_is_connected(manager->shared_reader)) {
+            if (!gstreamer_receiver_is_connected(manager->gst_receiver)) {
                 manager->connected = false;
-                printf("共享内存连接丢失\n");
+                printf("GStreamer流连接丢失\n");
             }
             usleep(10000); // 10ms
         }
     }
     
-    printf("共享内存读取线程退出\n");
+    printf("GStreamer流读取线程退出\n");
     return nullptr;
 }
 
-camera_manager_t* camera_manager_create(const char* shared_memory_key, int width, int height, int fps) {
-    if (!shared_memory_key || width <= 0 || height <= 0 || fps <= 0) {
+camera_manager_t* camera_manager_create(const char* stream_url, const char* stream_format, 
+                                       int width, int height, int fps) {
+    if (!stream_url || !stream_format || width <= 0 || height <= 0 || fps <= 0) {
         printf("错误：摄像头管理器参数无效\n");
         return nullptr;
     }
@@ -103,15 +110,16 @@ camera_manager_t* camera_manager_create(const char* shared_memory_key, int width
     }
     
     // 初始化基本参数
-    strncpy(manager->shared_memory_key, shared_memory_key, sizeof(manager->shared_memory_key) - 1);
+    strncpy(manager->stream_url, stream_url, sizeof(manager->stream_url) - 1);
+    strncpy(manager->stream_format, stream_format, sizeof(manager->stream_format) - 1);
     manager->width = width;
     manager->height = height;
     manager->fps = fps;
     
-    // 创建共享内存读取器
-    manager->shared_reader = shared_memory_reader_create(shared_memory_key);
-    if (!manager->shared_reader) {
-        printf("错误：创建共享内存读取器失败\n");
+    // 创建GStreamer接收器
+    manager->gst_receiver = gstreamer_receiver_create(stream_url, stream_format, width, height, fps);
+    if (!manager->gst_receiver) {
+        printf("错误：创建GStreamer接收器失败\n");
         free(manager);
         return nullptr;
     }
@@ -120,7 +128,7 @@ camera_manager_t* camera_manager_create(const char* shared_memory_key, int width
     manager->img_buffer = (uint8_t*)malloc(width * height * 3);
     if (!manager->img_buffer) {
         printf("错误：分配图像缓冲区失败\n");
-        shared_memory_reader_destroy(manager->shared_reader);
+        gstreamer_receiver_destroy(manager->gst_receiver);
         free(manager);
         return nullptr;
     }
@@ -146,7 +154,8 @@ camera_manager_t* camera_manager_create(const char* shared_memory_key, int width
     manager->connected = false;
     manager->connection_retry_time = 0;
     
-    printf("创建摄像头管理器（共享内存）: %s (%dx%d@%dfps)\n", shared_memory_key, width, height, fps);
+    printf("创建摄像头管理器（GStreamer流）: %s (%s, %dx%d@%dfps)\n", 
+           stream_url, stream_format, width, height, fps);
     return manager;
 }
 
@@ -166,9 +175,9 @@ void camera_manager_destroy(camera_manager_t* manager) {
         free(manager->img_buffer);
     }
     
-    // 销毁共享内存读取器
-    if (manager->shared_reader) {
-        shared_memory_reader_destroy(manager->shared_reader);
+    // 销毁GStreamer接收器
+    if (manager->gst_receiver) {
+        gstreamer_receiver_destroy(manager->gst_receiver);
     }
     
     // 销毁互斥锁
@@ -180,15 +189,15 @@ void camera_manager_destroy(camera_manager_t* manager) {
 bool camera_manager_init(camera_manager_t* manager) {
     if (!manager) return false;
     
-    printf("异步初始化摄像头管理器（共享内存模式）...\n");
+    printf("异步初始化摄像头管理器（GStreamer流模式）...\n");
     
-    // 完全异步模式：不等待共享内存，立即返回成功
-    // 共享内存连接和数据获取将在后台线程中处理
+    // 完全异步模式：不等待GStreamer流，立即返回成功
+    // GStreamer流连接和数据获取将在后台线程中处理
     manager->connected = false;
     manager->connection_retry_time = 0;
     
     printf("摄像头管理器异步初始化完成（无阻塞模式）\n");
-    printf("共享内存连接将在后台线程中自动重试\n");
+    printf("GStreamer流连接将在后台线程中自动重试\n");
     
     return true; // 总是返回成功，不阻塞UI启动
 }
@@ -201,39 +210,40 @@ void camera_manager_deinit(camera_manager_t* manager) {
     // 停止捕获线程
     camera_manager_stop_capture(manager);
     
-    // 断开共享内存连接
-    if (manager->shared_reader) {
-        shared_memory_reader_disconnect(manager->shared_reader);
+    // 断开GStreamer连接
+    if (manager->gst_receiver) {
+        gstreamer_receiver_stop(manager->gst_receiver);
+        gstreamer_receiver_disconnect(manager->gst_receiver);
         manager->connected = false;
     }
 }
 
 bool camera_manager_start_capture(camera_manager_t* manager) {
-    if (!manager || !manager->shared_reader) return false;
+    if (!manager || !manager->gst_receiver) return false;
     
     if (manager->thread_running) {
         printf("警告：摄像头捕获已经在运行\n");
         return true;
     }
     
-    printf("启动共享内存读取...\n");
+    printf("启动GStreamer流读取...\n");
     
     // 启动读取线程
     manager->thread_running = true;
-    if (pthread_create(&manager->capture_thread, nullptr, shared_memory_read_thread, manager) != 0) {
-        printf("错误：创建共享内存读取线程失败: %s\n", strerror(errno));
+    if (pthread_create(&manager->capture_thread, nullptr, gstreamer_read_thread, manager) != 0) {
+        printf("错误：创建GStreamer流读取线程失败: %s\n", strerror(errno));
         manager->thread_running = false;
         return false;
     }
     
-    printf("共享内存读取线程启动成功\n");
+    printf("GStreamer流读取线程启动成功\n");
     return true;
 }
 
 void camera_manager_stop_capture(camera_manager_t* manager) {
     if (!manager || !manager->thread_running) return;
     
-    printf("停止共享内存读取...\n");
+    printf("停止GStreamer流读取...\n");
     
     // 停止读取线程
     manager->thread_running = false;
@@ -241,7 +251,7 @@ void camera_manager_stop_capture(camera_manager_t* manager) {
     // 等待线程退出
     pthread_join(manager->capture_thread, nullptr);
     
-    printf("共享内存读取已停止\n");
+    printf("GStreamer流读取已停止\n");
 }
 
 bool camera_manager_create_video_object(camera_manager_t* manager, lv_obj_t* parent) {
@@ -308,8 +318,8 @@ void camera_manager_get_stats(camera_manager_t* manager, uint64_t* frame_count, 
     pthread_mutex_unlock(&manager->frame_mutex);
 }
 
-void camera_manager_get_shared_memory_stats(camera_manager_t* manager, shared_memory_stats_t* stats) {
-    if (!manager || !manager->shared_reader || !stats) return;
+void camera_manager_get_gstreamer_stats(camera_manager_t* manager, gstreamer_stats_t* stats) {
+    if (!manager || !manager->gst_receiver || !stats) return;
     
-    shared_memory_reader_get_stats(manager->shared_reader, stats);
+    gstreamer_receiver_get_stats(manager->gst_receiver, stats);
 }

@@ -30,10 +30,12 @@ struct CameraConfig {
     int exposure_value = -1;                // 手动曝光值 (-1为自动)
     int gain_value = -1;                    // 手动增益值 (-1为自动)
     
-    // 共享内存配置
-    bool enable_shared_memory = true;       // 启用共享内存输出
-    std::string shared_memory_key = "/tmp/bamboo_camera_shm"; // 共享内存标识
-    size_t shared_memory_buffers = 2;       // 共享内存缓冲区数量
+    // GStreamer流配置
+    bool enable_stream_output = true;       // 启用GStreamer流输出
+    std::string stream_host = "127.0.0.1";  // 流服务器地址
+    int stream_port = 5000;                 // 流端口
+    std::string stream_format = "H264";     // 流编码格式 (H264/JPEG)
+    int stream_bitrate = 2000000;           // 码率 (2Mbps)
 };
 
 struct FrameInfo {
@@ -108,10 +110,10 @@ public:
     // 多摄像头支持
     static std::vector<std::string> listAvailableCameras();
     
-    // 共享内存相关方法
-    bool enableSharedMemory(bool enable = true);
-    bool isSharedMemoryEnabled() const { return shared_memory_enabled_; }
-    SharedMemoryStats getSharedMemoryStats() const;
+    // GStreamer流相关方法
+    bool enableVideoStream(bool enable = true);
+    bool isVideoStreamEnabled() const { return stream_enabled_; }
+    std::string getStreamURL() const;
 
 private:
     CameraConfig config_;
@@ -145,15 +147,19 @@ private:
     uint64_t frame_counter_;
     std::chrono::steady_clock::time_point last_stats_time_;
     
-    // 共享内存相关
-    std::unique_ptr<SharedMemoryManager> shared_memory_manager_;
-    bool shared_memory_enabled_;
+    // GStreamer流相关
+    GstElement* gst_pipeline_;
+    GstElement* gst_appsrc_;
+    bool stream_enabled_;
     
     // 内部方法
     bool initializeGStreamer();
     bool initializeCamera(int camera_id);
+    bool initializeVideoStream();
     std::string buildGStreamerPipeline(int camera_id);
+    std::string buildStreamPipeline();
     void captureLoop();
+    void pushFrameToStream(const cv::Mat& frame);
     
     // GStreamer回调
     static GstFlowReturn onNewSample(GstAppSink* appsink, gpointer user_data);
