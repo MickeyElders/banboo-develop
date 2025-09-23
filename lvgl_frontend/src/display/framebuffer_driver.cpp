@@ -23,12 +23,22 @@ static uint32_t *lvgl_buffer2 = nullptr;
 bool framebuffer_driver_init() {
     printf("初始化 framebuffer_driver\n");
     
-    // 打开framebuffer设备
-    fb_fd = open("/dev/fb0", O_RDWR);
-    if (fb_fd == -1) {
-        printf("错误: 无法打开 /dev/fb0: %s\n", strerror(errno));
-        return false;
+    // 检查framebuffer设备是否存在（非阻塞）
+    if (access("/dev/fb0", F_OK) != 0) {
+        printf("警告: framebuffer设备 /dev/fb0 不存在，尝试替代方案\n");
+        return init_virtual_framebuffer();
     }
+    
+    // 非阻塞方式打开framebuffer设备
+    fb_fd = open("/dev/fb0", O_RDWR | O_NONBLOCK);
+    if (fb_fd == -1) {
+        printf("警告: 无法打开 /dev/fb0: %s，使用虚拟framebuffer\n", strerror(errno));
+        return init_virtual_framebuffer();
+    }
+    
+    // 切换回阻塞模式进行ioctl操作
+    int flags = fcntl(fb_fd, F_GETFL, 0);
+    fcntl(fb_fd, F_SETFL, flags & ~O_NONBLOCK);
     
     // 获取固定屏幕信息
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
@@ -88,6 +98,61 @@ bool framebuffer_driver_init() {
     return true;
 }
 
+// 虚拟framebuffer初始化（用于无显示设备的环境）
+bool init_virtual_framebuffer() {
+    printf("初始化虚拟framebuffer（无显示设备模式）\n");
+    
+    // 设置默认的虚拟屏幕参数
+    memset(&vinfo, 0, sizeof(vinfo));
+    memset(&finfo, 0, sizeof(finfo));
+    
+    vinfo.xres = 1024;          // 默认宽度
+    vinfo.yres = 768;           // 默认高度
+    vinfo.xres_virtual = 1024;
+    vinfo.yres_virtual = 768;
+    vinfo.bits_per_pixel = 32;
+    vinfo.red.offset = 16;
+    vinfo.red.length = 8;
+    vinfo.green.offset = 8;
+    vinfo.green.length = 8;
+    vinfo.blue.offset = 0;
+    vinfo.blue.length = 8;
+    
+    finfo.line_length = vinfo.xres * (vinfo.bits_per_pixel / 8);
+    screensize = vinfo.yres * finfo.line_length;
+    
+    // 分配虚拟framebuffer内存
+    fb_buffer = (char*)malloc(screensize);
+    if (!fb_buffer) {
+        printf("错误: 无法分配虚拟framebuffer内存\n");
+        return false;
+    }
+    memset(fb_buffer, 0, screensize);
+    
+    // 分配LVGL缓冲区
+    size_t buffer_size = vinfo.xres * vinfo.yres * sizeof(uint32_t);
+    lvgl_buffer = (uint32_t*)malloc(buffer_size);
+    lvgl_buffer2 = (uint32_t*)malloc(buffer_size);
+    
+    if (!lvgl_buffer || !lvgl_buffer2) {
+        printf("错误: 无法分配LVGL缓冲区\n");
+        if (fb_buffer) {
+            free(fb_buffer);
+            fb_buffer = nullptr;
+        }
+        return false;
+    }
+    
+    memset(lvgl_buffer, 0, buffer_size);
+    memset(lvgl_buffer2, 0, buffer_size);
+    
+    fb_fd = -1; // 标记为虚拟模式
+    
+    printf("虚拟framebuffer初始化成功 (%dx%d@%d位)\n",
+           vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+    return true;
+}
+
 void framebuffer_driver_deinit() {
     printf("清理 framebuffer_driver\n");
     
@@ -101,8 +166,14 @@ void framebuffer_driver_deinit() {
         lvgl_buffer2 = nullptr;
     }
     
-    if (fb_buffer && fb_buffer != MAP_FAILED) {
-        munmap(fb_buffer, screensize);
+    if (fb_buffer) {
+        if (fb_fd >= 0 && fb_buffer != MAP_FAILED) {
+            // 真实framebuffer，使用munmap
+            munmap(fb_buffer, screensize);
+        } else {
+            // 虚拟framebuffer，使用free
+            free(fb_buffer);
+        }
         fb_buffer = nullptr;
     }
     
