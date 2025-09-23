@@ -684,9 +684,11 @@ start_backend() {
         print_success "C++后端启动成功 (PID: $backend_pid)"
         echo $backend_pid > backend.pid
     else
-        print_error "C++后端启动失败，检查backend.log"
-        cat backend.log | tail -20
-        exit 1
+        print_warn "C++后端可能启动失败，但前端将继续启动"
+        if [[ -f "backend.log" ]]; then
+            print_info "后端日志信息："
+            cat backend.log | tail -10
+        fi
     fi
 }
 
