@@ -72,11 +72,11 @@ public:
             LOG_WARN("⚠️ 视觉系统初始化失败，系统将在无视觉检测模式下运行");
         }
         
-        // 初始化相机管理器（非关键模块，失败时继续运行）
-        camera_system_available_ = initializeCameraSystem();
-        if (!camera_system_available_) {
-            LOG_WARN("⚠️ 相机系统初始化失败，系统将在无摄像头模式下运行");
-        }
+        // 禁用单摄像头系统，避免与立体视觉系统的设备冲突
+        // 单摄像头系统和立体视觉系统都会使用 /dev/video0，导致设备冲突
+        camera_system_available_ = false;
+        LOG_INFO("⚠️ 已禁用单摄像头系统，避免与立体视觉系统设备冲突");
+        // camera_system_available_ = initializeCameraSystem();
         
         // 初始化立体视觉系统（非关键模块，失败时继续运行）
         stereo_vision_available_ = initializeStereoVisionSystem();
