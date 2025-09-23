@@ -111,6 +111,7 @@ set(SOURCES
     
     # 后端通信系统
     src/backend/backend_client.cpp
+    src/backend/tcp_socket_client.cpp
     
     # AI推理系统
     src/ai/tensorrt_engine.cpp

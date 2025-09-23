@@ -21,7 +21,7 @@ static inline int sd_watchdog_enabled(int unset_environment, uint64_t *usec) { r
 #include <bamboo_cut/vision/stereo_vision.h>
 #include <bamboo_cut/vision/optimized_detector.h>
 #include <bamboo_cut/communication/modbus_server.h>
-#include <bamboo_cut/communication/unix_socket_server.h>
+#include <bamboo_cut/communication/tcp_socket_server.h>
 
 using namespace bamboo_cut;
 
@@ -90,9 +90,9 @@ public:
             return false;
         }
         
-        // 初始化UNIX Socket服务器（关键模块，用于前端通信）
-        if (!initializeUnixSocketServer()) {
-            LOG_ERROR("❌ UNIX Socket服务器初始化失败，前端将无法连接");
+        // 初始化TCP Socket服务器（关键模块，用于前端通信）
+        if (!initializeTcpSocketServer()) {
+            LOG_ERROR("❌ TCP Socket服务器初始化失败，前端将无法连接");
             return false;
         }
         
@@ -102,7 +102,7 @@ public:
         LOG_INFO("   🔍 视觉检测: {}", vision_system_available_ ? "✅ 可用" : "❌ 不可用");
         LOG_INFO("   👁️ 立体视觉: {}", stereo_vision_available_ ? "✅ 可用" : "❌ 不可用");
         LOG_INFO("   🔗 Modbus通信: ✅ 可用");
-        LOG_INFO("   📡 前端通信: {}", unix_socket_available_ ? "✅ 可用" : "❌ 不可用");
+        LOG_INFO("   📡 前端通信: {}", tcp_server_available_ ? "✅ 可用" : "❌ 不可用");
         
         if (!camera_system_available_ && !vision_system_available_) {
             LOG_WARN("⚠️ 系统运行在模拟模式：无摄像头和视觉检测");
