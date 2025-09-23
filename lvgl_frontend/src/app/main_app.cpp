@@ -10,6 +10,7 @@
 #include "gui/control_panel.h"
 #include "gui/settings_page.h"
 #include "input/touch_driver.h"
+#include "backend/backend_client.h"
 #include <stdio.h>
 #include <string.h>
 // 其他头文件暂时注释掉，避免不完整类型问题
@@ -22,11 +23,18 @@ MainApp::MainApp(const system_config_t& config)
     , running_(false)
     , initialized_(false)
     , camera_manager_(nullptr)
+    , backend_client_(nullptr)
 {
 }
 
 MainApp::~MainApp() {
     stop();
+    
+    // 清理后端客户端
+    if (backend_client_) {
+        backend_client_destroy(backend_client_);
+        backend_client_ = nullptr;
+    }
     
     // 清理摄像头管理器
     if (camera_manager_) {
@@ -51,6 +59,9 @@ bool MainApp::initialize() {
         
         // 初始化触摸输入
         setup_touch_input();
+        
+        // 初始化后端通信
+        setup_backend_communication();
         
         // 初始化摄像头组件
         setup_camera();
@@ -77,7 +88,12 @@ bool MainApp::start() {
     printf("启动主应用程序...\n");
     running_ = true;
     
-    // TODO: 启动各个组件
+    // 启动后端通信
+    if (backend_client_) {
+        if (!backend_client_start_communication(backend_client_)) {
+            printf("警告: 后端通信启动失败\n");
+        }
+    }
     
     printf("主应用程序启动成功\n");
     return true;
@@ -91,6 +107,11 @@ void MainApp::stop() {
     printf("停止主应用程序...\n");
     running_ = false;
     
+    // 停止后端通信
+    if (backend_client_) {
+        backend_client_stop_communication(backend_client_);
+    }
+    
     // 停止摄像头组件
     if (camera_manager_) {
         camera_manager_stop_capture(camera_manager_);
@@ -99,8 +120,6 @@ void MainApp::stop() {
     
     // 清理触摸驱动
     touch_driver_deinit();
-    
-    // TODO: 停止其他组件
     
     printf("主应用程序已停止\n");
 }
@@ -252,4 +271,26 @@ void MainApp::setup_touch_input() {
     }
     
     printf("LVGL触摸输入设备设置完成\n");
+}
+
+void MainApp::setup_backend_communication() {
+    printf("设置后端通信...\n");
+    
+    // 创建后端客户端，使用UNIX Domain Socket路径
+    const char* socket_path = "/tmp/bamboo_cut_backend.sock";
+    backend_client_ = backend_client_create(socket_path);
+    
+    if (!backend_client_) {
+        printf("错误: 创建后端客户端失败\n");
+        return;
+    }
+    
+    // 尝试连接到后端
+    if (!backend_client_connect(backend_client_)) {
+        printf("警告: 连接后端失败，将在后台自动重试\n");
+    } else {
+        printf("后端连接成功\n");
+    }
+    
+    printf("后端通信设置完成\n");
 }

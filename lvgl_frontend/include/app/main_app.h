@@ -11,6 +11,8 @@
 #include "camera/camera_manager.h"
 
 class EventManager;
+// 前向声明后端客户端类型
+typedef struct backend_client_t backend_client_t;
 // 其他类暂时未实现，使用前向声明避免编译错误
 
 class MainApp {
@@ -33,6 +35,7 @@ private:
     // 核心组件
     std::unique_ptr<EventManager> event_manager_;
     camera_manager_t* camera_manager_;  // C风格的摄像头管理器
+    backend_client_t* backend_client_;  // C风格的后端客户端
     // TODO: 其他组件
     // std::unique_ptr<Yolo_detector> ai_detector_;
     // std::unique_ptr<Video_view> video_renderer_;
@@ -41,6 +44,7 @@ private:
     void setup_camera();
     void setup_ai_detector();
     void setup_touch_input();
+    void setup_backend_communication();
 };
 
 #endif // APP_MAIN_APP_H

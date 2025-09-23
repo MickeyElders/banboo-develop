@@ -4,11 +4,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <sys/un.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <time.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sstream>
 
 // 获取当前时间戳（毫秒）
 static uint64_t get_timestamp_ms() {
@@ -85,42 +87,168 @@ static void read_system_health(system_health_t* health) {
     }
 }
 
+// 简单的JSON解析函数 (替代jsoncpp)
+static bool parse_json_value(const char* json_str, const char* key, char* value, size_t value_size) {
+    char search_pattern[128];
+    snprintf(search_pattern, sizeof(search_pattern), "\"%s\":", key);
+    
+    const char* pos = strstr(json_str, search_pattern);
+    if (!pos) return false;
+    
+    pos += strlen(search_pattern);
+    
+    // 跳过空格
+    while (*pos == ' ' || *pos == '\t') pos++;
+    
+    if (*pos == '"') {
+        // 字符串值
+        pos++; // 跳过开始引号
+        const char* end = strchr(pos, '"');
+        if (!end) return false;
+        
+        size_t len = end - pos;
+        if (len >= value_size) len = value_size - 1;
+        strncpy(value, pos, len);
+        value[len] = '\0';
+    } else {
+        // 数值或布尔值
+        const char* end = pos;
+        while (*end && *end != ',' && *end != '}' && *end != ' ' && *end != '\n') end++;
+        
+        size_t len = end - pos;
+        if (len >= value_size) len = value_size - 1;
+        strncpy(value, pos, len);
+        value[len] = '\0';
+    }
+    
+    return true;
+}
+
+// 发送简单JSON消息到后端
+static bool send_json_message(backend_client_t* client, const char* type, const char* data) {
+    if (!client || client->socket_fd < 0) return false;
+    
+    char message[1024];
+    snprintf(message, sizeof(message), 
+        "{\"type\":\"%s\",\"timestamp\":%lu%s%s}\n", 
+        type, get_timestamp_ms(),
+        data ? "," : "",
+        data ? data : "");
+    
+    ssize_t sent = send(client->socket_fd, message, strlen(message), MSG_NOSIGNAL);
+    if (sent < 0) {
+        printf("发送消息失败: %s\n", strerror(errno));
+        return false;
+    }
+    
+    client->messages_sent++;
+    return true;
+}
+
+// 接收JSON消息从后端
+static bool receive_json_message(backend_client_t* client, char* buffer, size_t buffer_size) {
+    if (!client || client->socket_fd < 0) return false;
+    
+    ssize_t received = recv(client->socket_fd, buffer, buffer_size - 1, MSG_DONTWAIT);
+    
+    if (received <= 0) {
+        if (received < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            printf("接收消息失败: %s\n", strerror(errno));
+            client->backend_status = BACKEND_DISCONNECTED;
+            return false;
+        }
+        return false;
+    }
+    
+    buffer[received] = '\0';
+    client->messages_received++;
+    return true;
+}
+
 // 后端通信线程
 static void* backend_communication_thread(void* arg) {
     backend_client_t* client = (backend_client_t*)arg;
     printf("后端通信线程启动\n");
     
+    char recv_buffer[4096];
+    
     while (client->thread_running) {
-        // 模拟与后端通信
-        pthread_mutex_lock(&client->data_mutex);
-        
-        // 更新系统健康信息
-        read_system_health(&client->system_health);
-        
-        // 模拟坐标数据更新（实际应该从后端获取）
-        static int coord_counter = 0;
-        if (coord_counter++ % 100 == 0) { // 每3秒更新一次坐标
-            client->current_coordinate.coordinate_ready = true;
-            client->current_coordinate.x_coordinate = 2500 + (coord_counter % 1000);
-            client->current_coordinate.blade_number = (coord_counter % 3) + 1;
-            client->current_coordinate.cutting_quality = 0;
-            client->current_coordinate.timestamp = get_timestamp_ms();
+        if (client->backend_status == BACKEND_CONNECTED) {
+            // 尝试接收后端消息
+            if (receive_json_message(client, recv_buffer, sizeof(recv_buffer))) {
+                pthread_mutex_lock(&client->data_mutex);
+                
+                // 解析消息类型
+                char msg_type[64];
+                if (parse_json_value(recv_buffer, "type", msg_type, sizeof(msg_type))) {
+                    if (strcmp(msg_type, "status_update") == 0) {
+                        // 更新系统状态
+                        char value[32];
+                        if (parse_json_value(recv_buffer, "plc_connected", value, sizeof(value))) {
+                            client->plc_status = (strcmp(value, "true") == 0) ? PLC_CONNECTED : PLC_DISCONNECTED;
+                        }
+                        if (parse_json_value(recv_buffer, "system_status", value, sizeof(value))) {
+                            client->system_status = (backend_system_status_t)atoi(value);
+                        }
+                    } else if (strcmp(msg_type, "coordinate_data") == 0) {
+                        // 更新坐标数据
+                        char value[32];
+                        if (parse_json_value(recv_buffer, "coordinate_ready", value, sizeof(value))) {
+                            client->current_coordinate.coordinate_ready = (strcmp(value, "true") == 0);
+                        }
+                        if (parse_json_value(recv_buffer, "x_coordinate", value, sizeof(value))) {
+                            client->current_coordinate.x_coordinate = atoi(value);
+                        }
+                        if (parse_json_value(recv_buffer, "blade_number", value, sizeof(value))) {
+                            client->current_coordinate.blade_number = atoi(value);
+                        }
+                        if (parse_json_value(recv_buffer, "cutting_quality", value, sizeof(value))) {
+                            client->current_coordinate.cutting_quality = atoi(value);
+                        }
+                        if (parse_json_value(recv_buffer, "timestamp", value, sizeof(value))) {
+                            client->current_coordinate.timestamp = strtoull(value, NULL, 10);
+                        }
+                    }
+                }
+                
+                pthread_mutex_unlock(&client->data_mutex);
+            }
+            
+            // 定期发送心跳
+            static uint64_t last_heartbeat = 0;
+            uint64_t now = get_timestamp_ms();
+            if (now - last_heartbeat > 1000) { // 每秒发送心跳
+                send_json_message(client, "heartbeat", NULL);
+                
+                pthread_mutex_lock(&client->data_mutex);
+                client->last_heartbeat_time = now;
+                pthread_mutex_unlock(&client->data_mutex);
+                
+                last_heartbeat = now;
+            }
+        } else {
+            // 尝试重新连接
+            if (backend_client_connect(client)) {
+                printf("重新连接后端成功\n");
+            } else {
+                sleep(2); // 连接失败时等待2秒再重试
+            }
         }
         
-        // 更新心跳
-        client->last_heartbeat_time = get_timestamp_ms();
-        
+        // 更新系统健康信息
+        pthread_mutex_lock(&client->data_mutex);
+        read_system_health(&client->system_health);
         pthread_mutex_unlock(&client->data_mutex);
         
-        usleep(30000); // 30ms更新间隔
+        usleep(100000); // 100ms更新间隔
     }
     
     printf("后端通信线程退出\n");
     return nullptr;
 }
 
-backend_client_t* backend_client_create(const char* host, int port) {
-    if (!host || port <= 0) {
+backend_client_t* backend_client_create(const char* socket_path) {
+    if (!socket_path) {
         printf("错误：后端客户端参数无效\n");
         return nullptr;
     }
@@ -132,8 +260,7 @@ backend_client_t* backend_client_create(const char* host, int port) {
     }
     
     // 初始化基本参数
-    strncpy(client->backend_host, host, sizeof(client->backend_host) - 1);
-    client->backend_port = port;
+    strncpy(client->socket_path, socket_path, sizeof(client->socket_path) - 1);
     client->socket_fd = -1;
     
     // 初始化状态
@@ -154,7 +281,7 @@ backend_client_t* backend_client_create(const char* host, int port) {
     client->messages_received = 0;
     client->last_heartbeat_time = 0;
     
-    printf("创建后端客户端: %s:%d\n", host, port);
+    printf("创建后端客户端: %s\n", socket_path);
     return client;
 }
 
@@ -178,12 +305,45 @@ void backend_client_destroy(backend_client_t* client) {
 bool backend_client_connect(backend_client_t* client) {
     if (!client) return false;
     
-    printf("连接到后端: %s:%d\n", client->backend_host, client->backend_port);
+    printf("连接到后端: %s\n", client->socket_path);
     
-    // 模拟连接（实际应该建立TCP连接）
+    // 如果已经连接，先断开
+    if (client->socket_fd >= 0) {
+        close(client->socket_fd);
+        client->socket_fd = -1;
+    }
+    
+    // 创建UNIX Domain Socket
+    client->socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (client->socket_fd < 0) {
+        printf("错误：创建socket失败: %s\n", strerror(errno));
+        client->backend_status = BACKEND_ERROR;
+        return false;
+    }
+    
+    // 设置socket为非阻塞模式
+    int flags = fcntl(client->socket_fd, F_GETFL, 0);
+    fcntl(client->socket_fd, F_SETFL, flags | O_NONBLOCK);
+    
+    // 连接到后端UNIX Domain Socket
+    struct sockaddr_un server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sun_family = AF_UNIX;
+    strncpy(server_addr.sun_path, client->socket_path, sizeof(server_addr.sun_path) - 1);
+    
+    if (connect(client->socket_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        if (errno != EINPROGRESS) {
+            printf("警告：连接后端失败: %s\n", strerror(errno));
+            close(client->socket_fd);
+            client->socket_fd = -1;
+            client->backend_status = BACKEND_DISCONNECTED;
+            return false;
+        }
+    }
+    
     client->backend_status = BACKEND_CONNECTED;
-    client->plc_status = PLC_CONNECTED; // 模拟PLC也连接
-    client->system_status = BACKEND_SYSTEM_RUNNING;
+    client->plc_status = PLC_DISCONNECTED; // 初始状态，等待后端报告
+    client->system_status = BACKEND_SYSTEM_STOPPED; // 初始状态，等待后端报告
     
     printf("后端连接成功\n");
     return true;
@@ -245,11 +405,11 @@ bool backend_client_send_plc_command(backend_client_t* client, int16_t command) 
     
     printf("发送PLC命令: %d\n", command);
     
-    pthread_mutex_lock(&client->data_mutex);
-    client->messages_sent++;
-    pthread_mutex_unlock(&client->data_mutex);
+    // 构造JSON命令消息
+    char command_data[128];
+    snprintf(command_data, sizeof(command_data), "\"command\":%d", command);
     
-    return true;
+    return send_json_message(client, "plc_command", command_data);
 }
 
 bool backend_client_get_coordinate(backend_client_t* client, cutting_coordinate_t* coordinate) {
