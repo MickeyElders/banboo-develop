@@ -2,14 +2,16 @@
 Description=Bamboo Cutting System Backend
 Documentation=https://github.com/bamboo-cutting-system
 After=network.target
-Wants=network.target
+# 移除强制顺序约束，让服务更独立
+# Wants=network.target
 
 [Service]
-Type=notify
+Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/bamboo
 ExecStart=/opt/bamboo/bin/bamboo_cut_backend
+ExecStartPost=/bin/bash -c 'echo "等待Modbus TCP服务器启动..."; while ! ss -tln | grep -q ":502 "; do sleep 0.5; done; echo "Modbus TCP服务器已就绪(端口502)"'
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=10
@@ -38,9 +40,9 @@ LimitNPROC=4096
 MemoryMax=512M
 CPUQuota=80%
 
-# 健康检查 - 增加超时时间
-WatchdogSec=60
-NotifyAccess=main
+# 超时设置 - 增加启动和停止超时时间
+TimeoutStartSec=120
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target

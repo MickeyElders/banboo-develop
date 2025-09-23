@@ -1,12 +1,14 @@
 [Unit]
 Description=Bamboo Cutting System Frontend (LVGL)
 Documentation=https://github.com/bamboo-cutting-system
-After=bamboo-backend.service graphical-session.target
-Wants=bamboo-backend.service
-Requires=bamboo-backend.service
+After=graphical-session.target
+# 移除所有后端依赖，前端完全独立启动
+# After=bamboo-backend.service
+# Wants=bamboo-backend.service
+# Requires=bamboo-backend.service
 
 [Service]
-Type=notify
+Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/bamboo
@@ -45,10 +47,9 @@ LimitNPROC=4096
 MemoryMax=1G
 CPUQuota=90%
 
-# 健康检查
-WatchdogSec=60
-NotifyAccess=main
-TimeoutStartSec=60
+# 超时设置 - 增加图形界面启动时间
+TimeoutStartSec=180
+TimeoutStopSec=30
 
 # 重启策略
 StartLimitInterval=300
