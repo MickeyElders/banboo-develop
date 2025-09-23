@@ -335,7 +335,7 @@ void MainApp::setup_backend_communication() {
     // 设置消息回调
     tcp_socket_client_->set_message_callback([this](const CommunicationMessage& message) {
         // 处理从后端接收到的消息
-        printf("收到后端消息，类型: %d\n", static_cast<int>(message.type));
+        printf("收到后端消息\n");
         // TODO: 解析消息并更新UI
     });
     
