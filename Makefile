@@ -168,8 +168,8 @@ start:
 
 stop:
 	$(call log_info,停止服务...)
-	@sudo systemctl stop $(FRONTEND_SERVICE)
-	@sudo systemctl stop $(BACKEND_SERVICE)
+	@sudo systemctl stop $(FRONTEND_SERVICE) 2>/dev/null || true
+	@sudo systemctl stop $(BACKEND_SERVICE) 2>/dev/null || true
 	$(call log_success,服务停止完成)
 
 restart:
@@ -209,7 +209,7 @@ deploy: all install-service start
 	@echo "  make stop        - 停止服务"
 
 # 代码修改后快速重新部署
-redeploy: stop all install start
+redeploy: stop all install-service start
 	$(call log_success,重新部署完成！)
 	@echo ""
 	$(call log_info,检查服务状态:)

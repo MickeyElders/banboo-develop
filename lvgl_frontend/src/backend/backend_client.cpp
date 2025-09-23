@@ -243,7 +243,7 @@ static void* backend_communication_thread(void* arg) {
     }
     
     printf("后端通信线程退出\n");
-    return nullptr;
+    return NULL;
 }
 
 struct backend_client_t* backend_client_create(const char* socket_path) {
@@ -255,7 +255,7 @@ struct backend_client_t* backend_client_create(const char* socket_path) {
     struct backend_client_t* client = (struct backend_client_t*)calloc(1, sizeof(struct backend_client_t));
     if (!client) {
         printf("错误：分配后端客户端内存失败\n");
-        return nullptr;
+        return NULL;
     }
     
     // 初始化基本参数
@@ -272,7 +272,7 @@ struct backend_client_t* backend_client_create(const char* socket_path) {
     memset(&client->system_health, 0, sizeof(client->system_health));
     
     // 初始化线程同步
-    pthread_mutex_init(&client->data_mutex, nullptr);
+    pthread_mutex_init(&client->data_mutex, NULL);
     client->thread_running = false;
     
     // 初始化统计信息
@@ -374,7 +374,7 @@ bool backend_client_start_communication(struct backend_client_t* client) {
     printf("启动后端通信线程\n");
     
     client->thread_running = true;
-    if (pthread_create(&client->communication_thread, nullptr, backend_communication_thread, client) != 0) {
+    if (pthread_create(&client->communication_thread, NULL, backend_communication_thread, client) != 0) {
         printf("错误：创建通信线程失败: %s\n", strerror(errno));
         client->thread_running = false;
         return false;
@@ -392,7 +392,7 @@ void backend_client_stop_communication(struct backend_client_t* client) {
     client->thread_running = false;
     
     // 等待线程退出
-    pthread_join(client->communication_thread, nullptr);
+    pthread_join(client->communication_thread, NULL);
     
     printf("后端通信线程已停止\n");
 }
@@ -462,7 +462,7 @@ bool backend_client_start_backend_process(void) {
     pid_t pid = fork();
     if (pid == 0) {
         // 子进程：启动后端
-        execl("../cpp_backend/build/bamboo_cut_backend", "bamboo_cut_backend", (char*)nullptr);
+        execl("../cpp_backend/build/bamboo_cut_backend", "bamboo_cut_backend", (char*)NULL);
         printf("错误：启动后端进程失败\n");
         exit(1);
     } else if (pid > 0) {
