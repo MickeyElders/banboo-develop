@@ -450,7 +450,7 @@ bool UnixSocketServer::broadcast_message(const CommunicationMessage& msg) {
     return success;
 }
 
-bool UnixSocketServer::send_status_update(const SystemStatusData& status) {
+bool UnixSocketServer::send_status_update(const UnixSocketStatusData& status) {
 #ifdef ENABLE_JSON
     CommunicationMessage msg;
     msg.type = MessageType::STATUS_RESPONSE;
