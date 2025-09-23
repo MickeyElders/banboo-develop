@@ -5,6 +5,7 @@
 #include "app/main_app.h"
 #include "app/event_manager.h"
 #include "common/utils.h"
+#include "common/types.h"
 #include "gui/status_bar.h"
 #include "gui/video_view.h"
 #include "gui/control_panel.h"
