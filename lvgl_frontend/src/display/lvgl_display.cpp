@@ -386,8 +386,10 @@ void init_camera_system() {
     while (retry_count < max_retries) {
         printf("摄像头初始化尝试 %d/%d\n", retry_count + 1, max_retries);
         
-        // 创建摄像头管理器（640x480分辨率适合嵌入式显示）
-        g_camera_manager = camera_manager_create(camera_device, 640, 480, 30);
+        // 创建摄像头管理器（GStreamer流模式）
+        const char* stream_url = "udp://127.0.0.1:5000";  // 默认流URL
+        const char* stream_format = "H264";               // 默认流格式
+        g_camera_manager = camera_manager_create(stream_url, stream_format, 640, 480, 30);
         if (!g_camera_manager) {
             printf("错误：创建摄像头管理器失败\n");
             break;

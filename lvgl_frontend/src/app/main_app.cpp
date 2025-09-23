@@ -186,9 +186,13 @@ void MainApp::setup_camera() {
     printf("摄像头配置: 源分辨率 %dx%d, 显示分辨率 %dx%d\n",
            camera_config.width, camera_config.height, display_width, display_height);
     
-    // 创建摄像头管理器，使用显示分辨率作为缓冲区大小
+    // 创建摄像头管理器，使用GStreamer流参数
+    std::string stream_url = "udp://127.0.0.1:5000";  // 默认流URL
+    std::string stream_format = "H264";               // 默认流格式
+    
     camera_manager_ = camera_manager_create(
-        camera_config.shared_memory_key,
+        stream_url.c_str(),
+        stream_format.c_str(),
         display_width,
         display_height,
         camera_config.fps
