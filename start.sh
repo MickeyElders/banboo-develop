@@ -787,19 +787,32 @@ start_frontend() {
     print_info "按 Ctrl+C 退出应用程序"
     echo
     
-    # 启动前端应用程序
+    # 启动前端应用程序（非阻塞模式，支持错误处理）
     if [[ -n "$config_file" ]]; then
         if [[ "$debug_mode_param" == "true" ]]; then
-            exec "./$binary_path" -c "$config_file" -f --debug
+            "./$binary_path" -c "$config_file" -f --debug
         else
-            exec "./$binary_path" -c "$config_file" -f
+            "./$binary_path" -c "$config_file" -f
         fi
     else
         if [[ "$debug_mode_param" == "true" ]]; then
-            exec "./$binary_path" -f --debug
+            "./$binary_path" -f --debug
         else
-            exec "./$binary_path" -f
+            "./$binary_path" -f
         fi
+    fi
+    
+    # 检查前端启动结果
+    local frontend_exit_code=$?
+    if [[ $frontend_exit_code -eq 0 ]]; then
+        print_success "前端应用程序正常退出"
+    else
+        print_error "前端应用程序异常退出，退出码: $frontend_exit_code"
+        print_info "请检查错误信息，可能的原因："
+        print_info "1. 显示设备(/dev/fb0)访问权限"
+        print_info "2. 触摸设备(/dev/input/event*)权限"
+        print_info "3. 后端通信连接问题"
+        print_info "4. LVGL依赖库问题"
     fi
 }
 
