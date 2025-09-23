@@ -30,6 +30,12 @@ MainApp::MainApp(const system_config_t& config)
 MainApp::~MainApp() {
     stop();
     
+    // 清理TCP Socket客户端
+    if (tcp_socket_client_) {
+        tcp_socket_client_->stop();
+        tcp_socket_client_.reset();
+    }
+    
     // 清理后端客户端
     if (backend_client_) {
         backend_client_destroy(backend_client_);
@@ -93,7 +99,14 @@ bool MainApp::start() {
     printf("启动主应用程序...\n");
     running_ = true;
     
-    // 启动后端通信
+    // 启动TCP Socket客户端
+    if (tcp_socket_client_) {
+        if (!tcp_socket_client_->start()) {
+            printf("警告: TCP Socket客户端启动失败\n");
+        }
+    }
+    
+    // 启动后端通信（向后兼容）
     if (backend_client_) {
         if (!backend_client_start_communication(backend_client_)) {
             printf("警告: 后端通信启动失败\n");
@@ -112,7 +125,12 @@ void MainApp::stop() {
     printf("停止主应用程序...\n");
     running_ = false;
     
-    // 停止后端通信
+    // 停止TCP Socket客户端
+    if (tcp_socket_client_) {
+        tcp_socket_client_->stop();
+    }
+    
+    // 停止后端通信（向后兼容）
     if (backend_client_) {
         backend_client_stop_communication(backend_client_);
     }
@@ -281,21 +299,42 @@ void MainApp::setup_touch_input() {
 void MainApp::setup_backend_communication() {
     printf("设置后端通信（TCP Socket模式，非阻塞）...\n");
     
-    // 创建后端客户端，使用TCP Socket连接（与后端保持一致）
+    // 创建TCP Socket客户端连接
     const char* server_host = getenv("BAMBOO_BACKEND_HOST") ? getenv("BAMBOO_BACKEND_HOST") : "127.0.0.1";
     const char* server_port_str = getenv("BAMBOO_BACKEND_PORT") ? getenv("BAMBOO_BACKEND_PORT") : "8888";
     int server_port = atoi(server_port_str);
     
     printf("连接TCP Socket后端: %s:%d\n", server_host, server_port);
     
-    // 注意：这里需要使用TCP Socket客户端而不是backend_client
-    // backend_client_是UNIX Socket的实现，需要替换为TCP Socket客户端
+    // 创建TCP Socket客户端（非阻塞模式）
+    tcp_socket_client_ = std::make_unique<TcpSocketClient>(server_host, server_port);
     
-    // 暂时禁用后端连接，因为需要更新backend_client代码支持TCP Socket
-    printf("警告: 后端连接暂时禁用，需要更新为TCP Socket客户端\n");
-    printf("前端将在无后端模式下运行，界面功能正常\n");
+    // 设置连接回调
+    tcp_socket_client_->setConnectionCallback([this](bool connected) {
+        if (connected) {
+            printf("前端已连接到后端服务器\n");
+        } else {
+            printf("前端与后端服务器连接断开\n");
+        }
+    });
     
+    // 设置消息回调
+    tcp_socket_client_->setMessageCallback([this](const std::string& message) {
+        // 处理从后端接收到的消息
+        printf("收到后端消息: %s\n", message.c_str());
+        // TODO: 解析消息并更新UI
+    });
+    
+    // 非阻塞连接启动
+    if (!tcp_socket_client_->start()) {
+        printf("警告: TCP Socket客户端启动失败，前端将在无后端模式下运行\n");
+        tcp_socket_client_.reset();
+    } else {
+        printf("TCP Socket客户端启动成功\n");
+    }
+    
+    // 为了向后兼容，保持backend_client_为nullptr
     backend_client_ = nullptr;
     
-    printf("后端通信设置完成（前端可独立运行）\n");
+    printf("后端通信设置完成（TCP Socket模式）\n");
 }

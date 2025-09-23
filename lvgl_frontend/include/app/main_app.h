@@ -11,6 +11,7 @@
 #include "camera/camera_manager.h"
 
 class EventManager;
+class TcpSocketClient;
 // 前向声明后端客户端类型
 struct backend_client_t;
 // 其他类暂时未实现，使用前向声明避免编译错误
@@ -35,7 +36,8 @@ private:
     // 核心组件
     std::unique_ptr<EventManager> event_manager_;
     camera_manager_t* camera_manager_;  // C风格的摄像头管理器
-    backend_client_t* backend_client_;  // C风格的后端客户端
+    backend_client_t* backend_client_;  // C风格的后端客户端（向后兼容）
+    std::unique_ptr<TcpSocketClient> tcp_socket_client_; // TCP Socket客户端
     // TODO: 其他组件
     // std::unique_ptr<Yolo_detector> ai_detector_;
     // std::unique_ptr<Video_view> video_renderer_;
