@@ -124,7 +124,7 @@ static bool parse_json_value(const char* json_str, const char* key, char* value,
 }
 
 // 发送简单JSON消息到后端
-static bool send_json_message(backend_client_t* client, const char* type, const char* data) {
+static bool send_json_message(struct backend_client_t* client, const char* type, const char* data) {
     if (!client || client->socket_fd < 0) return false;
     
     char message[1024];
@@ -145,7 +145,7 @@ static bool send_json_message(backend_client_t* client, const char* type, const 
 }
 
 // 接收JSON消息从后端
-static bool receive_json_message(backend_client_t* client, char* buffer, size_t buffer_size) {
+static bool receive_json_message(struct backend_client_t* client, char* buffer, size_t buffer_size) {
     if (!client || client->socket_fd < 0) return false;
     
     ssize_t received = recv(client->socket_fd, buffer, buffer_size - 1, MSG_DONTWAIT);
@@ -166,7 +166,7 @@ static bool receive_json_message(backend_client_t* client, char* buffer, size_t 
 
 // 后端通信线程
 static void* backend_communication_thread(void* arg) {
-    backend_client_t* client = (backend_client_t*)arg;
+    struct backend_client_t* client = (struct backend_client_t*)arg;
     printf("后端通信线程启动\n");
     
     char recv_buffer[4096];
@@ -246,13 +246,13 @@ static void* backend_communication_thread(void* arg) {
     return nullptr;
 }
 
-backend_client_t* backend_client_create(const char* socket_path) {
+struct backend_client_t* backend_client_create(const char* socket_path) {
     if (!socket_path) {
         printf("错误：后端客户端参数无效\n");
         return nullptr;
     }
     
-    backend_client_t* client = (backend_client_t*)calloc(1, sizeof(backend_client_t));
+    struct backend_client_t* client = (struct backend_client_t*)calloc(1, sizeof(struct backend_client_t));
     if (!client) {
         printf("错误：分配后端客户端内存失败\n");
         return nullptr;
@@ -284,7 +284,7 @@ backend_client_t* backend_client_create(const char* socket_path) {
     return client;
 }
 
-void backend_client_destroy(backend_client_t* client) {
+void backend_client_destroy(struct backend_client_t* client) {
     if (!client) return;
     
     printf("销毁后端客户端\n");
@@ -301,7 +301,7 @@ void backend_client_destroy(backend_client_t* client) {
     free(client);
 }
 
-bool backend_client_connect(backend_client_t* client) {
+bool backend_client_connect(struct backend_client_t* client) {
     if (!client) return false;
     
     printf("连接到后端: %s\n", client->socket_path);
@@ -348,7 +348,7 @@ bool backend_client_connect(backend_client_t* client) {
     return true;
 }
 
-void backend_client_disconnect(backend_client_t* client) {
+void backend_client_disconnect(struct backend_client_t* client) {
     if (!client) return;
     
     printf("断开后端连接\n");
@@ -363,7 +363,7 @@ void backend_client_disconnect(backend_client_t* client) {
     client->system_status = BACKEND_SYSTEM_STOPPED;
 }
 
-bool backend_client_start_communication(backend_client_t* client) {
+bool backend_client_start_communication(struct backend_client_t* client) {
     if (!client) return false;
     
     if (client->thread_running) {
@@ -384,7 +384,7 @@ bool backend_client_start_communication(backend_client_t* client) {
     return true;
 }
 
-void backend_client_stop_communication(backend_client_t* client) {
+void backend_client_stop_communication(struct backend_client_t* client) {
     if (!client || !client->thread_running) return;
     
     printf("停止后端通信线程\n");
@@ -397,7 +397,7 @@ void backend_client_stop_communication(backend_client_t* client) {
     printf("后端通信线程已停止\n");
 }
 
-bool backend_client_send_plc_command(backend_client_t* client, int16_t command) {
+bool backend_client_send_plc_command(struct backend_client_t* client, int16_t command) {
     if (!client || client->backend_status != BACKEND_CONNECTED) {
         return false;
     }
@@ -411,7 +411,7 @@ bool backend_client_send_plc_command(backend_client_t* client, int16_t command) 
     return send_json_message(client, "plc_command", command_data);
 }
 
-bool backend_client_get_coordinate(backend_client_t* client, cutting_coordinate_t* coordinate) {
+bool backend_client_get_coordinate(struct backend_client_t* client, cutting_coordinate_t* coordinate) {
     if (!client || !coordinate) return false;
     
     pthread_mutex_lock(&client->data_mutex);
@@ -421,7 +421,7 @@ bool backend_client_get_coordinate(backend_client_t* client, cutting_coordinate_
     return true;
 }
 
-bool backend_client_get_system_health(backend_client_t* client, system_health_t* health) {
+bool backend_client_get_system_health(struct backend_client_t* client, system_health_t* health) {
     if (!client || !health) return false;
     
     pthread_mutex_lock(&client->data_mutex);
@@ -431,15 +431,15 @@ bool backend_client_get_system_health(backend_client_t* client, system_health_t*
     return true;
 }
 
-backend_status_t backend_client_get_backend_status(backend_client_t* client) {
+backend_status_t backend_client_get_backend_status(struct backend_client_t* client) {
     return client ? client->backend_status : BACKEND_DISCONNECTED;
 }
 
-plc_status_t backend_client_get_plc_status(backend_client_t* client) {
+plc_status_t backend_client_get_plc_status(struct backend_client_t* client) {
     return client ? client->plc_status : PLC_DISCONNECTED;
 }
 
-backend_system_status_t backend_client_get_system_status(backend_client_t* client) {
+backend_system_status_t backend_client_get_system_status(struct backend_client_t* client) {
     return client ? client->system_status : BACKEND_SYSTEM_STOPPED;
 }
 
