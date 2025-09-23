@@ -24,6 +24,9 @@ uint32_t* get_lvgl_buffer2();
 // 显示刷新函数
 void framebuffer_flush(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, const uint32_t* color_map);
 
+// 虚拟framebuffer初始化
+bool init_virtual_framebuffer();
+
 #ifdef __cplusplus
 }
 #endif
