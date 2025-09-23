@@ -2,7 +2,7 @@
 # 版本: 2.0.0
 # 支持: C++后端(libmodbus+UNIX Socket) + LVGL前端 + systemd服务
 
-.PHONY: all clean build-backend build-frontend install install-service uninstall start stop restart status logs help check-deps
+.PHONY: all clean build-backend build-frontend install install-service uninstall start stop restart status logs logs-follow help check-deps deploy redeploy
 
 # 项目配置
 PROJECT_NAME = bamboo-cutting-system
@@ -49,6 +49,10 @@ all: build-backend build-frontend
 help:
 	@echo "智能切竹机控制系统 - 构建和部署系统"
 	@echo ""
+	@echo "快速部署命令:"
+	@echo "  deploy           - 首次完整部署(构建+安装+启动服务)"
+	@echo "  redeploy         - 代码修改后快速重新部署"
+	@echo ""
 	@echo "构建目标:"
 	@echo "  all              - 构建后端和前端"
 	@echo "  build-backend    - 构建C++后端(libmodbus+UNIX Socket)"
@@ -66,6 +70,7 @@ help:
 	@echo "  restart          - 重启服务"
 	@echo "  status           - 查看服务状态"
 	@echo "  logs             - 查看服务日志"
+	@echo "  logs-follow      - 实时查看服务日志"
 	@echo ""
 	@echo "  help             - 显示此帮助信息"
 	@echo ""
@@ -187,6 +192,25 @@ logs:
 	@echo ""
 	@echo "=== 前端服务日志 ==="
 	@sudo journalctl -u $(FRONTEND_SERVICE) --no-pager -n 20 || true
-	@echo ""
-	@echo "=== 实时日志 (Ctrl+C退出) ==="
+
+logs-follow:
+	$(call log_info,实时查看服务日志 (Ctrl+C退出)...)
 	@sudo journalctl -u $(BACKEND_SERVICE) -u $(FRONTEND_SERVICE) -f
+
+# 首次完整部署
+deploy: all install-service start
+	$(call log_success,首次部署完成！)
+	@echo ""
+	$(call log_info,服务管理命令:)
+	@echo "  make status      - 查看服务状态"
+	@echo "  make logs        - 查看服务日志"
+	@echo "  make logs-follow - 实时查看日志"
+	@echo "  make restart     - 重启服务"
+	@echo "  make stop        - 停止服务"
+
+# 代码修改后快速重新部署
+redeploy: stop all install start
+	$(call log_success,重新部署完成！)
+	@echo ""
+	$(call log_info,检查服务状态:)
+	@make status
