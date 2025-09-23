@@ -35,8 +35,9 @@ static lv_obj_t *g_detection_data_label = nullptr;
 
 // 显示刷新回调函数
 void lvgl_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
-    printf("LVGL刷新显示区域: (%d,%d) -> (%d,%d)\n",
-           area->x1, area->y1, area->x2, area->y2);
+    // 移除调试打印，避免日志洪水
+    // printf("LVGL刷新显示区域: (%d,%d) -> (%d,%d)\n",
+    //        area->x1, area->y1, area->x2, area->y2);
     
     // 获取framebuffer信息
     struct fb_var_screeninfo *vinfo = get_fb_vinfo();
@@ -525,8 +526,16 @@ void deinit_backend_system() {
     }
 }
 
-// 更新系统状态显示（安全版本）
+// 更新系统状态显示（安全版本，带频率限制）
 void update_system_status_display() {
+    // 频率限制：每500ms更新一次状态，避免过度刷新
+    static uint32_t last_update_time = 0;
+    uint32_t current_time = lv_tick_get();
+    if (current_time - last_update_time < 500) {
+        return; // 未到更新时间，直接返回
+    }
+    last_update_time = current_time;
+    
     // 安全检查：如果后端客户端不存在，直接返回，不进行任何操作
     if (!g_backend_client) {
         // 静默返回，避免在初始化期间产生错误

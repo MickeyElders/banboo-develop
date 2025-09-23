@@ -137,12 +137,12 @@ void Control_panel::create_modbus_section() {
     lv_table_set_cell_value(modbus_table_, 0, 1, "Description");
     lv_table_set_cell_value(modbus_table_, 0, 2, "Value");
     
-    // Set data rows - 根据PLC.md文档扩展显示
+    // Set data rows - Extended display according to PLC.md
     const char* register_addrs[] = {"40001", "40002", "40003", "40004-05", "40006", "40007-08", "40009", "40010", "40011", "40014", "40015-16", "40017", "40018", "40019"};
-    const char* register_descs[] = {"系统状态", "PLC命令", "坐标就绪", "X坐标", "切割质量", "心跳", "刀片号", "系统健康", "废料检测", "导轨方向", "剩余长度", "覆盖率", "检测状态", "处理模式"};
+    const char* register_descs[] = {"System Status", "PLC Command", "Coord Ready", "X Coordinate", "Cut Quality", "Heartbeat", "Blade Number", "System Health", "Waste Detection", "Rail Direction", "Remaining Length", "Coverage", "Detection Status", "Process Mode"};
     const char* register_values[] = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"};
     
-    // 创建更大的表格来显示所有寄存器
+    // Create larger table to display all registers
     lv_table_set_row_cnt(modbus_table_, 15); // 1 header + 14 data rows
     
     for(int i = 0; i < 14; i++) {
@@ -160,7 +160,7 @@ void Control_panel::create_modbus_section() {
         }
     }
     
-    // Set table style - 设置整个表格和单元格的背景色
+    // Set table style - Configure table and cell background colors
     lv_obj_set_style_bg_color(modbus_table_, lv_color_hex(0x1A237E), 0);  // Deep blue background for table
     lv_obj_set_style_bg_color(modbus_table_, lv_color_hex(0x1A237E), LV_PART_ITEMS);  // Deep blue background for cells
     lv_obj_set_style_text_color(modbus_table_, lv_color_hex(0xFFFFFF), 0);  // White text for table
@@ -531,7 +531,7 @@ void Control_panel::create_comm_section() {
     }
 }
 
-// 更新方法实现
+// Update method implementation
 void Control_panel::update_modbus_registers(const char* reg_values[]) {
     if(!modbus_table_ || !reg_values) return;
     

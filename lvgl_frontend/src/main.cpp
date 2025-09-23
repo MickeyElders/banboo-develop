@@ -37,6 +37,8 @@ void signal_handler(int sig) {
 void* main_loop(void* arg) {
     printf("LVGL主循环线程启动\n");
     
+    uint32_t loop_count = 0;
+    
     while (g_running) {
         /* 处理LVGL任务 */
         lv_timer_handler();
@@ -46,17 +48,19 @@ void* main_loop(void* arg) {
             g_app->process_events();
         }
         
-        /* 更新摄像头显示 */
+        /* 更新摄像头显示 - 每次循环都更新以保证流畅 */
         update_camera_display();
         
-        /* 更新系统状态显示 */
+        /* 更新系统状态显示 - 现在有频率限制，可以安全调用 */
         update_system_status_display();
         
-        /* 控制帧率 - 30fps */
-        usleep(33333); // 约33.33ms，适合摄像头帧率
+        /* 控制帧率 - 60fps，但其他更新有自己的频率限制 */
+        usleep(16667); // 约16.67ms，60fps，确保UI响应流畅
+        
+        loop_count++;
     }
     
-    printf("LVGL主循环线程退出\n");
+    printf("LVGL主循环线程退出 (处理了 %u 次循环)\n", loop_count);
     return nullptr;
 }
 
