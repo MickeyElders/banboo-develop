@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <iomanip>
+#include <atomic>
 #include <opencv2/opencv.hpp>
 
 #ifdef ENABLE_OPENCV_CONTRIB
@@ -130,50 +131,91 @@ bool StereoVision::open_cameras() {
     bool left_opened = false;
     bool right_opened = false;
     
-    // 尝试打开左相机
-    std::cout << "📷 尝试打开左相机: " << sync_config_.left_device << std::endl;
-    left_camera_.open(sync_config_.left_device);
-    if (left_camera_.isOpened()) {
-        // 配置左相机参数
-        left_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
-        left_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
-        left_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
-        left_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+    // 尝试打开左相机（带超时检测）
+    std::cout << "📷 尝试打开左相机: " << sync_config_.left_device << " (5秒超时)" << std::endl;
+    auto start_time = std::chrono::steady_clock::now();
+    
+    try {
+        // 在独立线程中打开相机，避免主线程阻塞
+        std::atomic<bool> camera_opened{false};
+        std::atomic<bool> timeout_occurred{false};
         
-        // 验证设置是否生效
-        double actual_width = left_camera_.get(cv::CAP_PROP_FRAME_WIDTH);
-        double actual_height = left_camera_.get(cv::CAP_PROP_FRAME_HEIGHT);
-        double actual_fps = left_camera_.get(cv::CAP_PROP_FPS);
+        std::thread camera_thread([&]() {
+            left_camera_.open(sync_config_.left_device);
+            camera_opened.store(true);
+        });
         
-        std::cout << "✅ 左相机打开成功: " << sync_config_.left_device
-                  << " @ " << actual_width << "x" << actual_height
-                  << " (" << actual_fps << "fps)" << std::endl;
-        left_opened = true;
-    } else {
-        std::cout << "❌ 无法打开左相机: " << sync_config_.left_device << std::endl;
+        // 等待5秒或相机打开成功
+        auto timeout_time = start_time + std::chrono::seconds(5);
+        while (!camera_opened.load() && std::chrono::steady_clock::now() < timeout_time) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        if (!camera_opened.load()) {
+            std::cout << "⏰ 左相机打开超时，跳过" << std::endl;
+            timeout_occurred.store(true);
+            camera_thread.detach(); // 超时后分离线程，让它在后台自然结束
+        } else {
+            camera_thread.join();
+            
+            if (left_camera_.isOpened()) {
+                // 配置左相机参数
+                left_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
+                left_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
+                left_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
+                left_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+                
+                std::cout << "✅ 左相机打开成功: " << sync_config_.left_device << std::endl;
+                left_opened = true;
+            } else {
+                std::cout << "❌ 左相机打开失败: " << sync_config_.left_device << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cout << "❌ 左相机打开异常: " << e.what() << std::endl;
     }
     
-    // 尝试打开右相机
-    std::cout << "📷 尝试打开右相机: " << sync_config_.right_device << std::endl;
-    right_camera_.open(sync_config_.right_device);
-    if (right_camera_.isOpened()) {
-        // 配置右相机参数
-        right_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
-        right_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
-        right_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
-        right_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+    // 尝试打开右相机（带超时检测）
+    std::cout << "📷 尝试打开右相机: " << sync_config_.right_device << " (5秒超时)" << std::endl;
+    start_time = std::chrono::steady_clock::now();
+    
+    try {
+        std::atomic<bool> camera_opened{false};
+        std::atomic<bool> timeout_occurred{false};
         
-        // 验证设置是否生效
-        double actual_width = right_camera_.get(cv::CAP_PROP_FRAME_WIDTH);
-        double actual_height = right_camera_.get(cv::CAP_PROP_FRAME_HEIGHT);
-        double actual_fps = right_camera_.get(cv::CAP_PROP_FPS);
+        std::thread camera_thread([&]() {
+            right_camera_.open(sync_config_.right_device);
+            camera_opened.store(true);
+        });
         
-        std::cout << "✅ 右相机打开成功: " << sync_config_.right_device
-                  << " @ " << actual_width << "x" << actual_height
-                  << " (" << actual_fps << "fps)" << std::endl;
-        right_opened = true;
-    } else {
-        std::cout << "❌ 无法打开右相机: " << sync_config_.right_device << std::endl;
+        // 等待5秒或相机打开成功
+        auto timeout_time = start_time + std::chrono::seconds(5);
+        while (!camera_opened.load() && std::chrono::steady_clock::now() < timeout_time) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        if (!camera_opened.load()) {
+            std::cout << "⏰ 右相机打开超时，跳过" << std::endl;
+            timeout_occurred.store(true);
+            camera_thread.detach(); // 超时后分离线程
+        } else {
+            camera_thread.join();
+            
+            if (right_camera_.isOpened()) {
+                // 配置右相机参数
+                right_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
+                right_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
+                right_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
+                right_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+                
+                std::cout << "✅ 右相机打开成功: " << sync_config_.right_device << std::endl;
+                right_opened = true;
+            } else {
+                std::cout << "❌ 右相机打开失败: " << sync_config_.right_device << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cout << "❌ 右相机打开异常: " << e.what() << std::endl;
     }
     
     // 硬件调试模式：即使摄像头不可用也继续运行
