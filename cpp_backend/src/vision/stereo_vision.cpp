@@ -807,7 +807,8 @@ bool StereoVision::initialize_video_stream() {
         gst_init(nullptr, nullptr);
     }
     
-    if (!build_stream_pipeline()) {
+    std::string pipeline_desc = build_stream_pipeline();
+    if (pipeline_desc.empty()) {
         std::cerr << "构建GStreamer管道失败" << std::endl;
         return false;
     }
@@ -826,12 +827,12 @@ bool StereoVision::initialize_video_stream() {
     return true;
 }
 
-bool StereoVision::build_stream_pipeline() {
+std::string StereoVision::build_stream_pipeline() {
     // 创建管道元素
     gst_pipeline_ = gst_pipeline_new("stereo-video-pipeline");
     if (!gst_pipeline_) {
         std::cerr << "创建GStreamer管道失败" << std::endl;
-        return false;
+        return ""; // 返回空字符串表示失败
     }
     
     // 创建appsrc
@@ -852,7 +853,7 @@ bool StereoVision::build_stream_pipeline() {
     
     if (!videoconvert || !videoscale || !capsfilter || !x264enc || !h264parse || !rtph264pay || !udpsink) {
         std::cerr << "创建GStreamer元素失败" << std::endl;
-        return false;
+        return "";
     }
     
     // 配置appsrc
@@ -897,11 +898,11 @@ bool StereoVision::build_stream_pipeline() {
     if (!gst_element_link_many(gst_appsrc_, videoconvert, videoscale, capsfilter,
                                x264enc, h264parse, rtph264pay, udpsink, NULL)) {
         std::cerr << "连接GStreamer元素失败" << std::endl;
-        return false;
+        return "";
     }
     
     std::cout << "GStreamer管道构建成功: BGR -> H.264 -> RTP -> UDP:5000" << std::endl;
-    return true;
+    return "stereo-video-pipeline"; // 返回管道名称
 }
 
 void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
@@ -977,7 +978,7 @@ cv::Mat StereoVision::create_display_frame(const cv::Mat& left, const cv::Mat& r
     return display_frame;
 }
 
-void StereoVision::enable_video_stream(bool enable) {
+bool StereoVision::enable_video_stream(bool enable) {
     if (stream_enabled_ != enable) {
         stream_enabled_ = enable;
         if (enable && !gst_pipeline_) {
@@ -985,6 +986,7 @@ void StereoVision::enable_video_stream(bool enable) {
         }
         std::cout << "立体视觉流输出: " << (enable ? "已启用" : "已禁用") << std::endl;
     }
+    return true;
 }
 
 void StereoVision::set_display_mode(DisplayMode mode) {
