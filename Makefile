@@ -175,27 +175,33 @@ build-python: install-python-deps
 install-python-deps:
 	$(call log_info,安装Python依赖...)
 	@if [ ! -f "requirements.txt" ]; then \
-		$(call log_error,requirements.txt文件不存在); \
+		echo "$(RED)[ERROR]$(NC) requirements.txt文件不存在"; \
 		exit 1; \
+	fi
+	
+	# 检查并安装python3-venv
+	@if ! dpkg -l | grep -q python3-venv; then \
+		echo "$(YELLOW)[WARNING]$(NC) python3-venv未安装，正在安装..."; \
+		sudo apt update && sudo apt install -y python3-venv; \
 	fi
 	
 	# 创建虚拟环境
 	@if [ ! -d "venv" ]; then \
-		$(call log_info,创建Python虚拟环境...); \
+		echo "$(BLUE)[INFO]$(NC) 创建Python虚拟环境..."; \
 		python3 -m venv venv; \
 	fi
 	
 	# 激活虚拟环境并安装依赖
-	@$(call log_info,安装Python包...)
+	@echo "$(BLUE)[INFO]$(NC) 安装Python包..."
 	@./venv/bin/pip install --upgrade pip
 	@./venv/bin/pip install -r requirements.txt
 	
 	# 验证关键包安装
-	@$(call log_info,验证Python LVGL安装...)
+	@echo "$(BLUE)[INFO]$(NC) 验证Python LVGL安装..."
 	@./venv/bin/python -c "import lvgl; print('LVGL version:', lvgl.__version__)" || \
-		$(call log_warning,LVGL包验证失败)
+		echo "$(YELLOW)[WARNING]$(NC) LVGL包验证失败"
 	@./venv/bin/python -c "import cv2; print('OpenCV version:', cv2.__version__)" || \
-		$(call log_warning,OpenCV包验证失败)
+		echo "$(YELLOW)[WARNING]$(NC) OpenCV包验证失败"
 	
 	$(call log_success,Python依赖安装完成)
 
