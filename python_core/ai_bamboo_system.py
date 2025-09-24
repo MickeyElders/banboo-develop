@@ -985,6 +985,18 @@ def main():
     try:
         print("正在启动AI竹子识别系统 - GTK4界面...")
         
+        # 检查是否有显示连接
+        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+            print("警告：没有检测到显示连接，启动无头模式...")
+            from .headless_mode import run_headless_mode
+            return run_headless_mode()
+        
+        # 检查GTK4是否可以初始化
+        if not Gtk.init_check():
+            print("警告：GTK4无法初始化，切换到无头模式...")
+            from .headless_mode import run_headless_mode
+            return run_headless_mode()
+        
         # 创建并运行应用程序
         app = BambooSystemUI()
         
@@ -996,9 +1008,14 @@ def main():
         return 1
     except Exception as e:
         print(f"系统错误: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+        print("尝试切换到无头模式...")
+        try:
+            from .headless_mode import run_headless_mode
+            return run_headless_mode()
+        except:
+            import traceback
+            traceback.print_exc()
+            return 1
 
 
 if __name__ == "__main__":
