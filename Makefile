@@ -54,7 +54,7 @@ define log_error
 endef
 
 define log_highlight
-	@echo "$(CYAN)[PYTHON-LVGL]$(NC) $1"
+	@echo "$(CYAN)[PYTHON-GTK4]$(NC) $1"
 endef
 
 define log_ai
@@ -66,7 +66,7 @@ all: build-cpp build-python
 
 help:
 	@echo "$(CYAN)===============================================$(NC)"
-	@echo "$(CYAN)    竹子识别系统 Python LVGL 构建系统$(NC)"
+	@echo "$(CYAN)    竹子识别系统 Python GTK4 构建系统$(NC)"
 	@echo "$(CYAN)===============================================$(NC)"
 	@echo ""
 	@echo "$(GREEN)快速部署命令:$(NC)"
@@ -78,7 +78,7 @@ help:
 	@echo "$(GREEN)构建目标:$(NC)"
 	@echo "  all              - 构建完整系统(C++推理+Python环境)"
 	@echo "  build-cpp        - 构建C++推理核心"
-	@echo "  build-python     - 准备Python LVGL环境"
+	@echo "  build-python     - 准备Python GTK4环境"
 	@echo "  install-python-deps - 安装Python依赖"
 	@echo "  clean            - 清理构建文件"
 	@echo ""
@@ -88,9 +88,9 @@ help:
 	@echo "  uninstall        - 从系统卸载"
 	@echo ""
 	@echo "$(GREEN)服务管理:$(NC)"
-	@echo "  start            - 启动Python LVGL服务"
-	@echo "  stop             - 停止Python LVGL服务"
-	@echo "  restart          - 重启Python LVGL服务"
+	@echo "  start            - 启动Python GTK4服务"
+	@echo "  stop             - 停止Python GTK4服务"
+	@echo "  restart          - 重启Python GTK4服务"
 	@echo "  status           - 查看服务状态"
 	@echo "  logs             - 查看服务日志"
 	@echo "  logs-follow      - 实时查看服务日志"
@@ -174,7 +174,7 @@ build-python: install-python-deps
 	$(call log_success,Python GTK4环境准备完成)
 
 # 安装Python依赖
-install-python-deps: install-lvgl-python
+install-python-deps: install-gtk4-python
 	$(call log_info,安装Python依赖...)
 	@if [ ! -f "requirements.txt" ]; then \
 		echo "$(RED)[ERROR]$(NC) requirements.txt文件不存在"; \
