@@ -2,6 +2,7 @@
 #include "display/framebuffer_driver.h"
 #include "camera/camera_manager.h"
 #include "backend/backend_client.h"
+#include "gui/video_view.h"
 #include "lvgl.h"
 #include <stdio.h>
 #include <string.h>
@@ -123,16 +124,16 @@ bool lvgl_display_init() {
         return false;
     }
     
-    // 创建测试界面
-    create_test_ui();
+    // 不再创建测试界面，因为 MainApp 中已经创建了完整的GUI界面
+    // create_test_ui();
     
-    // 初始化摄像头
+    // 初始化摄像头系统（与MainApp的视频组件集成）
     init_camera_system();
     
-    // 初始化后端系统
+    // 初始化后端系统（与MainApp的后端通信集成）
     init_backend_system();
     
-    printf("LVGL显示驱动初始化成功\n");
+    printf("LVGL显示驱动初始化成功（与MainApp GUI集成）\n");
     return true;
 }
 
@@ -465,10 +466,37 @@ void deinit_camera_system() {
     }
 }
 
-// 更新摄像头显示
+// 声明外部变量
+extern Video_view* g_video_view_component;
+
+// 更新摄像头显示（桥接摄像头数据到video_view组件）
 void update_camera_display() {
     if (g_camera_manager && camera_manager_is_running(g_camera_manager)) {
+        // 传统的LVGL图像更新（如果video_img存在）
         camera_manager_update_display(g_camera_manager);
+        
+        // 如果有视频视图组件，将帧数据传递给它
+        if (g_video_view_component) {
+            // 这里需要从camera_manager获取最新的帧数据
+            // 然后调用video_view的update_camera_frame方法
+            
+            // 获取摄像头管理器的图像缓冲区
+            pthread_mutex_lock(&g_camera_manager->frame_mutex);
+            
+            if (g_camera_manager->img_buffer) {
+                // 创建frame_info_t结构
+                frame_info_t frame_info;
+                frame_info.width = g_camera_manager->width;
+                frame_info.height = g_camera_manager->height;
+                frame_info.data = g_camera_manager->img_buffer;
+                frame_info.data_size = g_camera_manager->width * g_camera_manager->height * 3;
+                
+                // 调用video_view的更新方法
+                g_video_view_component->update_camera_frame(frame_info);
+            }
+            
+            pthread_mutex_unlock(&g_camera_manager->frame_mutex);
+        }
     }
 }
 

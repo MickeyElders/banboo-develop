@@ -13,12 +13,16 @@
 #include "input/touch_driver.h"
 #include "backend/backend_client.h"
 #include "backend/tcp_socket_client.h"
+#include "display/lvgl_display.h"
 #include <stdio.h>
 #include <string.h>
 // 其他头文件暂时注释掉，避免不完整类型问题
 // #include "app/config_manager.h"
 // #include "camera/camera_manager.h"
 // #include "ai/yolo_detector.h"
+
+// 全局变量：视频视图组件引用（供外部访问）
+Video_view* g_video_view_component = nullptr;
 
 MainApp::MainApp(const system_config_t& config)
     : config_(config)
@@ -192,6 +196,9 @@ void MainApp::setup_gui() {
         return;
     }
     
+    // 保存视频视图组件的全局引用，用于摄像头数据桥接
+    g_video_view_component = &video_view;
+    
     if (!control_panel.initialize()) {
         printf("错误: 控制面板初始化失败\n");
         return;
@@ -226,47 +233,23 @@ void MainApp::setup_gui() {
 }
 
 void MainApp::setup_camera() {
-    printf("设置异步摄像头管理器（完全非阻塞模式）...\n");
+    printf("设置摄像头系统（与LVGL显示驱动整合）...\n");
     
-    // 使用配置中的显示分辨率创建摄像头管理器
-    const camera_config_t& camera_config = config_.camera;
+    // 重要：不在这里创建摄像头管理器，因为 lvgl_display.cpp 中已经创建了
+    // 这样避免重复创建导致的资源冲突和性能问题
+    // 摄像头管理器由 lvgl_display.cpp 的 init_camera_system() 函数负责创建和管理
     
-    // 如果显示分辨率没有配置，使用摄像头原始分辨率
-    int display_width = camera_config.display_width > 0 ? camera_config.display_width : camera_config.width;
-    int display_height = camera_config.display_height > 0 ? camera_config.display_height : camera_config.height;
+    printf("摄像头系统将由LVGL显示驱动管理，避免重复创建\n");
+    printf("视频流将通过 update_camera_display() 函数自动更新到GUI\n");
     
-    printf("摄像头配置: 源分辨率 %dx%d, 显示分辨率 %dx%d\n",
-           camera_config.width, camera_config.height, display_width, display_height);
+    // 摄像头管理器将在 lvgl_display_init() 中初始化，这样确保：
+    // 1. 避免重复的摄像头管理器实例
+    // 2. 确保摄像头与LVGL显示正确集成
+    // 3. 提高系统性能和稳定性
     
-    // 创建摄像头管理器，使用GStreamer流参数
-    std::string stream_url = "udp://127.0.0.1:5000";  // 默认流URL
-    std::string stream_format = "H264";               // 默认流格式
+    camera_manager_ = nullptr; // 确保不创建重复实例
     
-    camera_manager_ = camera_manager_create(
-        stream_url.c_str(),
-        stream_format.c_str(),
-        display_width,
-        display_height,
-        camera_config.fps
-    );
-    
-    if (!camera_manager_) {
-        printf("警告: 创建摄像头管理器失败，界面将在无摄像头模式下运行\n");
-        return;
-    }
-    
-    // 完全异步初始化：不等待任何结果，立即启动后台线程
-    printf("启动完全异步摄像头管理器...\n");
-    printf("UI将立即渲染，摄像头数据将在后台异步获取\n");
-    
-    // 直接初始化（无阻塞）
-    camera_manager_init(camera_manager_);
-    
-    // 直接启动捕获线程（无阻塞）
-    camera_manager_start_capture(camera_manager_);
-    
-    printf("异步摄像头管理器启动完成 - UI渲染不受影响\n");
-    printf("摄像头状态: 后台连接中，有数据时自动显示，无数据时显示黑屏\n");
+    printf("摄像头系统设置完成（委托给LVGL显示驱动管理）\n");
 }
 
 void MainApp::setup_ai_detector() {

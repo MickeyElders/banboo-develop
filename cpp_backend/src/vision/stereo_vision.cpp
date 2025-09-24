@@ -1206,16 +1206,17 @@ void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
         push_successes++;
         frame_counter_++;
         
-        // 每30帧输出一次详细状态
-        if (frame_counter_ % 30 == 0) {
+        // 降低日志级别，减少控制台输出
+        if (frame_counter_ % 300 == 0) {  // 从每30帧改为每300帧，减少输出频率
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_debug_time);
-            double fps = 30.0 * 1000.0 / elapsed.count();
+            double fps = 300.0 * 1000.0 / elapsed.count();
             
-            std::cout << "立体视觉流: 发送帧 #" << frame_counter_
-                     << ", 数据大小: " << size << " 字节"
-                     << ", FPS: " << std::fixed << std::setprecision(1) << fps
-                     << ", 成功/失败: " << push_successes << "/" << push_failures << std::endl;
+            // 使用LOG_DEBUG替代std::cout，只在DEBUG级别显示
+            // std::cout << "立体视觉流: 发送帧 #" << frame_counter_
+            //          << ", 数据大小: " << size << " 字节"
+            //          << ", FPS: " << std::fixed << std::setprecision(1) << fps
+            //          << ", 成功/失败: " << push_successes << "/" << push_failures << std::endl;
             
             last_debug_time = now;
         }

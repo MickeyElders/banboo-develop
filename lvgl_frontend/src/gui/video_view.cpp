@@ -217,8 +217,75 @@ void Video_view::create_coordinate_display() {
 }
 
 void Video_view::update_camera_frame(const frame_info_t& frame) {
-    // TODO: Implement camera frame display update
-    // Here you can convert OpenCV Mat to LVGL image and display
+    // 实现摄像头帧显示更新
+    if (!camera_canvas_) {
+        return;
+    }
+    
+    // 检查帧数据是否有效
+    if (frame.width <= 0 || frame.height <= 0 || !frame.data) {
+        return;
+    }
+    
+    // 创建或更新视频图像对象
+    static lv_obj_t* video_img = nullptr;
+    static lv_img_dsc_t img_dsc;
+    static uint8_t* img_buffer = nullptr;
+    static int last_width = 0, last_height = 0;
+    
+    // 如果尺寸改变，重新分配缓冲区
+    if (frame.width != last_width || frame.height != last_height) {
+        if (img_buffer) {
+            free(img_buffer);
+        }
+        img_buffer = (uint8_t*)malloc(frame.width * frame.height * 3);
+        if (!img_buffer) {
+            printf("错误：分配视频帧缓冲区失败\n");
+            return;
+        }
+        
+        last_width = frame.width;
+        last_height = frame.height;
+        
+        // 更新图像描述符
+        img_dsc.header.always_zero = 0;
+        img_dsc.header.w = frame.width;
+        img_dsc.header.h = frame.height;
+        img_dsc.data_size = frame.width * frame.height * 3;
+        img_dsc.header.cf = LV_IMG_CF_TRUE_COLOR;
+        img_dsc.data = img_buffer;
+        
+        // 重新创建图像对象
+        if (video_img) {
+            lv_obj_del(video_img);
+        }
+        
+        video_img = lv_img_create(camera_canvas_);
+        lv_img_set_src(video_img, &img_dsc);
+        lv_obj_set_size(video_img, frame.width, frame.height);
+        lv_obj_center(video_img);
+        
+        printf("视频显示对象创建：%dx%d\n", frame.width, frame.height);
+    }
+    
+    // 复制帧数据到LVGL缓冲区（转换BGR到RGB格式）
+    if (img_buffer && frame.data) {
+        const uint8_t* src = (const uint8_t*)frame.data;
+        uint8_t* dst = img_buffer;
+        
+        for (int i = 0; i < frame.width * frame.height; i++) {
+            // BGR到RGB转换
+            dst[i * 3 + 0] = src[i * 3 + 2]; // R
+            dst[i * 3 + 1] = src[i * 3 + 1]; // G
+            dst[i * 3 + 2] = src[i * 3 + 0]; // B
+        }
+        
+        // 通知LVGL图像已更新
+        if (video_img) {
+            lv_img_cache_invalidate_src(&img_dsc);
+            lv_obj_invalidate(video_img);
+        }
+    }
 }
 
 void Video_view::update_detection_info(float fps, float inference_time) {

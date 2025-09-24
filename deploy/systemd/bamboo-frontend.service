@@ -16,8 +16,8 @@ ExecStart=/opt/bamboo/bin/bamboo_controller_lvgl
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
+StandardOutput=file:/var/log/bamboo/frontend.log
+StandardError=file:/var/log/bamboo/frontend-error.log
 SyslogIdentifier=bamboo-frontend
 
 # 环境变量
@@ -28,6 +28,7 @@ Environment=BAMBOO_BACKEND_HOST=127.0.0.1
 Environment=BAMBOO_BACKEND_PORT=8888
 Environment=LVGL_DISPLAY_DRV=fbdev
 Environment=LVGL_INPUT_DEV=/dev/input/event0
+Environment=BAMBOO_LOG_LEVEL=WARN
 
 # 图形界面相关
 Environment=XAUTHORITY=/root/.Xauthority
@@ -41,11 +42,11 @@ ReadWritePaths=/var/log/bamboo /tmp /dev/fb0 /dev/input
 PrivateTmp=false
 PrivateDevices=false
 
-# 资源限制
+# 资源限制 - 移除限制以提高性能
 LimitNOFILE=65536
 LimitNPROC=4096
-MemoryMax=1G
-CPUQuota=90%
+# MemoryMax=1G     # 移除内存限制
+# CPUQuota=90%     # 移除CPU限制
 
 # 超时设置 - 增加图形界面启动时间
 TimeoutStartSec=180
