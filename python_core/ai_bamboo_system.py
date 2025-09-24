@@ -20,25 +20,27 @@ def check_display_available():
     """检查显示是否可用"""
     return bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
 
-# 只在有显示时导入GTK4
-if check_display_available():
-    try:
+# 智能GTK4环境检测
+GTK4_AVAILABLE = False
+try:
+    # 只在可能的显示环境中尝试导入GTK4
+    if check_display_available():
         import gi
         gi.require_version('Gtk', '4.0')
         gi.require_version('Adw', '1')
         from gi.repository import Gtk, Gdk, GLib, cairo, GdkPixbuf, Adw
         
         # 测试GTK4是否可以初始化
-        if not Gtk.init_check():
-            raise ImportError("GTK4 initialization failed")
-            
-        GTK4_AVAILABLE = True
-    except (ImportError, RuntimeError) as e:
-        print(f"GTK4不可用: {e}")
-        GTK4_AVAILABLE = False
-else:
+        if Gtk.init_check():
+            GTK4_AVAILABLE = True
+            print("GTK4环境检测成功")
+        else:
+            print("GTK4无法初始化，将使用无头模式")
+    else:
+        print("没有检测到显示连接，将使用无头模式")
+except (ImportError, RuntimeError) as e:
+    print(f"GTK4不可用: {e}，将使用无头模式")
     GTK4_AVAILABLE = False
-    print("没有检测到显示连接，将使用无头模式")
 
 class BambooSystemUI:
     def __init__(self):
@@ -998,11 +1000,11 @@ class BambooSystemUI:
     
     def run(self):
         """运行GTK4应用程序"""
-        if self.initialize_gtk4():
-            return self.app.run(sys.argv)
-        else:
-            print("GTK4应用已经初始化")
-            return self.app.run(sys.argv)
+        if not hasattr(self, 'app') or self.app is None:
+            self.app = Adw.Application(application_id="com.bamboo.recognition")
+            self.app.connect("activate", self.on_activate)
+            self.start_update_threads()
+        return self.app.run(sys.argv)
 
 
 def main():
@@ -1013,14 +1015,14 @@ def main():
         # 检查是否有显示连接
         if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
             print("警告：没有检测到显示连接，启动无头模式...")
-            from .headless_mode import run_headless_mode
-            return run_headless_mode()
+            import headless_mode
+            return headless_mode.run_headless_mode()
         
         # 检查GTK4是否可以初始化
         if not Gtk.init_check():
             print("警告：GTK4无法初始化，切换到无头模式...")
-            from .headless_mode import run_headless_mode
-            return run_headless_mode()
+            import headless_mode
+            return headless_mode.run_headless_mode()
         
         # 创建并运行应用程序
         app = BambooSystemUI()
@@ -1035,8 +1037,8 @@ def main():
         print(f"系统错误: {e}")
         print("尝试切换到无头模式...")
         try:
-            from .headless_mode import run_headless_mode
-            return run_headless_mode()
+            import headless_mode
+            return headless_mode.run_headless_mode()
         except:
             import traceback
             traceback.print_exc()
