@@ -101,18 +101,50 @@ void StereoVision::shutdown() {
     
     std::cout << "关闭立体视觉系统..." << std::endl;
     
+    // 首先禁用流输出
+    stream_enabled_ = false;
+    
+    // 设置初始化标志为false，停止所有处理循环
     initialized_.store(false);
     
-    // 停止GStreamer管道
+    // 强制停止GStreamer管道并等待
     if (gst_pipeline_) {
-        gst_element_set_state(gst_pipeline_, GST_STATE_NULL);
+        std::cout << "停止GStreamer管道..." << std::endl;
+        
+        // 发送EOS事件
+        gst_element_send_event(gst_pipeline_, gst_event_new_eos());
+        
+        // 等待EOS处理完成
+        GstBus* bus = gst_element_get_bus(gst_pipeline_);
+        if (bus) {
+            GstMessage* msg = gst_bus_timed_pop_filtered(bus, 2 * GST_SECOND, GST_MESSAGE_EOS);
+            if (msg) {
+                gst_message_unref(msg);
+            }
+            gst_object_unref(bus);
+        }
+        
+        // 强制设置为NULL状态
+        GstStateChangeReturn ret = gst_element_set_state(gst_pipeline_, GST_STATE_NULL);
+        if (ret == GST_STATE_CHANGE_FAILURE) {
+            std::cout << "警告：GStreamer管道停止失败" << std::endl;
+        }
+        
+        // 等待状态变化完成
+        gst_element_get_state(gst_pipeline_, nullptr, nullptr, GST_SECOND);
+        
+        // 清理对象引用
         gst_object_unref(gst_pipeline_);
         gst_pipeline_ = nullptr;
         gst_appsrc_ = nullptr;
+        
+        std::cout << "GStreamer管道已停止" << std::endl;
     }
     
+    // 关闭摄像头
     close_cameras();
     
+    // 清理OpenCV对象
     if (stereo_matcher_) {
         stereo_matcher_.release();
     }
@@ -121,6 +153,9 @@ void StereoVision::shutdown() {
         wls_filter_.release();
     }
 #endif
+    
+    // 等待一小段时间确保所有资源释放
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     std::cout << "立体视觉系统已关闭" << std::endl;
 }
@@ -1206,10 +1241,8 @@ void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
         push_successes++;
         frame_counter_++;
         
-        // 完全移除调试输出，避免前端界面干扰
-        if (frame_counter_ % 300 == 0) {
-            last_debug_time = std::chrono::steady_clock::now();
-        }
+        // 完全移除所有调试输出和统计信息，避免前端界面干扰
+        // 移除了所有FPS统计、帧计数和数据大小显示
     }
 }
 

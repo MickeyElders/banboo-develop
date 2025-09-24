@@ -48,31 +48,48 @@ void TcpSocketServer::stop() {
         return;
     }
 
+    LOG_INFO("开始停止TCP Socket服务器...");
     running_ = false;
 
-    // 关闭服务器socket
+    // 断开所有客户端连接
+    disconnect_all_clients();
+
+    // 关闭服务器socket，这将导致accept()调用返回
     if (server_socket_ != -1) {
+        shutdown(server_socket_, SHUT_RDWR);  // 优雅关闭
         close(server_socket_);
         server_socket_ = -1;
     }
 
-    // 断开所有客户端
-    disconnect_all_clients();
-
-    // 等待accept线程结束
+    // 等待accept线程结束（带超时）
     if (accept_thread_.joinable()) {
-        accept_thread_.join();
+        // 使用条件变量或超时机制避免无限等待
+        auto start_time = std::chrono::steady_clock::now();
+        while (accept_thread_.joinable()) {
+            accept_thread_.join();
+            auto elapsed = std::chrono::steady_clock::now() - start_time;
+            if (elapsed > std::chrono::seconds(2)) {
+                LOG_WARN("Accept线程等待超时，强制结束");
+                break;
+            }
+        }
     }
 
-    // 等待所有客户端处理线程结束
+    // 等待所有客户端处理线程结束（带超时）
+    auto thread_start_time = std::chrono::steady_clock::now();
     for (auto& thread : client_threads_) {
         if (thread.joinable()) {
             thread.join();
+            auto elapsed = std::chrono::steady_clock::now() - thread_start_time;
+            if (elapsed > std::chrono::seconds(3)) {
+                LOG_WARN("客户端线程等待超时，继续下一个");
+                break;
+            }
         }
     }
     client_threads_.clear();
 
-    LOG_INFO("TCP Socket服务器已停止");
+    LOG_INFO("TCP Socket服务器已完全停止");
 }
 
 bool TcpSocketServer::create_server_socket() {
@@ -205,15 +222,51 @@ void TcpSocketServer::handle_client(std::shared_ptr<ClientConnection> client) {
 }
 
 bool TcpSocketServer::receive_message(int client_fd, CommunicationMessage& message) {
-    // 首先尝试接收固定大小的消息头
-    if (!receive_raw_data(client_fd, &message, sizeof(message))) {
+    // 清零消息结构体，避免垃圾数据
+    memset(&message, 0, sizeof(message));
+    
+    // 首先尝试接收消息头（type, timestamp, data_length）
+    struct MessageHeader {
+        MessageType type;
+        uint64_t timestamp;
+        uint32_t data_length;
+    } header;
+    
+    if (!receive_raw_data(client_fd, &header, sizeof(header))) {
         return false;
+    }
+    
+    // 验证消息类型是否有效
+    uint16_t type_value = static_cast<uint16_t>(header.type);
+    if (type_value < 1 || type_value > 8) {
+        LOG_WARN("收到无效消息类型: {} (原始值: {})", type_value, type_value);
+        return false;
+    }
+    
+    // 验证数据长度是否合理
+    if (header.data_length > sizeof(message.data)) {
+        LOG_WARN("数据长度过大: {} > {}", header.data_length, sizeof(message.data));
+        return false;
+    }
+    
+    // 复制验证过的头部信息
+    message.type = header.type;
+    message.timestamp = header.timestamp;
+    message.data_length = header.data_length;
+    
+    // 如果有数据，接收数据部分
+    if (header.data_length > 0) {
+        if (!receive_raw_data(client_fd, message.data, header.data_length)) {
+            LOG_WARN("接收消息数据失败");
+            return false;
+        }
+        // 确保数据以null结尾
+        message.data[header.data_length] = '\0';
     }
 
     // 检查是否是JSON字符串格式（兼容性处理）
-    if (message.type == MessageType::JSON_STRING) {
-        // 处理JSON字符串消息
-        std::string json_str(message.data, std::min(static_cast<size_t>(message.data_length), sizeof(message.data) - 1));
+    if (message.type == MessageType::JSON_STRING && header.data_length > 0) {
+        std::string json_str(message.data, header.data_length);
         return handle_json_message(json_str, client_fd);
     }
 

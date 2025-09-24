@@ -51,6 +51,12 @@ void watchdog_thread() {
 void signalHandler(int signal) {
     LOG_INFO("接收到信号 {}, 开始关闭系统...", signal);
     g_shutdown_requested = true;
+    
+    // 立即通知systemd正在停止
+    sd_notify(0, "STOPPING=1");
+    
+    // 设置5秒超时，避免无限等待
+    alarm(5);
 }
 
 class BambooCutApplication {
@@ -196,22 +202,41 @@ public:
         // 通知systemd服务正在停止
         sd_notify(0, "STOPPING=1");
         
+        // 设置关闭标志，停止主循环
+        g_shutdown_requested = true;
+        
+        // 优雅关闭立体视觉系统（最重要）
+        if (stereo_vision_) {
+            LOG_INFO("关闭立体视觉系统...");
+            stereo_vision_->shutdown();
+            stereo_vision_.reset();
+        }
+        
         // 停止TCP Socket服务器
         if (tcp_socket_server_) {
+            LOG_INFO("关闭TCP Socket服务器...");
             tcp_socket_server_->stop();
+            tcp_socket_server_.reset();
         }
         
         // 停止Modbus服务器
         if (modbus_server_) {
+            LOG_INFO("关闭Modbus服务器...");
             modbus_server_->stop();
+            modbus_server_.reset();
         }
         
-        // 停止摄像头
+        // 停止摄像头（如果有）
         if (camera_manager_) {
+            LOG_INFO("关闭摄像头管理器...");
             camera_manager_->stopCapture();
+            camera_manager_.reset();
         }
         
-        LOG_INFO("系统已关闭");
+        // 等待一小段时间确保所有线程退出
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        
+        LOG_INFO("系统关闭完成");
     }
 
 private:
