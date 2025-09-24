@@ -11,19 +11,19 @@
 #include <cstring>
 #include <iostream>
 
-// 包含完整的通信消息定义
+// 包含完整的通信消息定义 - 与后端保持一致
+enum class MessageType : uint16_t {
+    STATUS_REQUEST = 1,
+    STATUS_RESPONSE = 2,
+    PLC_COMMAND = 3,
+    PLC_RESPONSE = 4,
+    SYSTEM_STATUS = 5,
+    JSON_STRING = 6,
+    HEARTBEAT = 7,
+    ERROR_RESPONSE = 8
+};
+
 struct CommunicationMessage {
-    enum class MessageType : uint16_t {
-        STATUS_REQUEST = 1,
-        STATUS_RESPONSE = 2,
-        PLC_COMMAND = 3,
-        PLC_RESPONSE = 4,
-        SYSTEM_STATUS = 5,
-        JSON_STRING = 6,
-        HEARTBEAT = 7,
-        ERROR_RESPONSE = 8
-    };
-    
     MessageType type;
     uint64_t timestamp;
     uint32_t data_length;
@@ -33,8 +33,6 @@ struct CommunicationMessage {
         memset(data, 0, sizeof(data));
     }
 };
-
-using MessageType = CommunicationMessage::MessageType;
 
 TcpSocketClient::TcpSocketClient(const std::string& server_address, uint16_t port)
     : server_address_(server_address), server_port_(port), client_socket_(-1) {

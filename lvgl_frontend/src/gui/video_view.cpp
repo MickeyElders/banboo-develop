@@ -271,7 +271,7 @@ void Video_view::update_camera_frame(const frame_info_t& frame) {
         lv_obj_set_size(video_img, frame.width, frame.height);
         lv_obj_center(video_img);
         
-        printf("视频显示对象创建：%dx%d\n", frame.width, frame.height);
+        // 移除调试输出：printf("视频显示对象创建：%dx%d\n", frame.width, frame.height);
     }
     
     // 复制帧数据到LVGL缓冲区（转换BGR到RGB格式）

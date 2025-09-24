@@ -43,9 +43,7 @@ static lv_obj_t *g_detection_data_label = nullptr;
 
 // 显示刷新回调函数
 void lvgl_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
-    // 移除调试打印，避免日志洪水
-    // printf("LVGL刷新显示区域: (%d,%d) -> (%d,%d)\n",
-    //        area->x1, area->y1, area->x2, area->y2);
+    // 调试输出已移除
     
     // 获取framebuffer信息
     struct fb_var_screeninfo *vinfo = get_fb_vinfo();
