@@ -342,6 +342,10 @@ uninstall:
 
 start:
 	$(call log_info,启动Python LVGL服务...)
+	@if ! sudo systemctl list-unit-files | grep -q "$(PYTHON_LVGL_SERVICE)"; then \
+		$(call log_warning,Python LVGL服务未安装，正在自动安装...); \
+		$(MAKE) install-service; \
+	fi
 	@sudo systemctl start $(PYTHON_LVGL_SERVICE)
 	@sleep 3
 	$(call log_success,Python LVGL服务启动完成)
