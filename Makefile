@@ -228,18 +228,19 @@ install-lvgl-python:
 	
 	# 检查系统依赖
 	@sudo apt update || true
-	@sudo apt install -y build-essential cmake python3-dev libsdl2-dev || true
+	@sudo apt install -y build-essential cmake python3-dev libsdl2-dev libffi-dev pkg-config || true
 	
 	# 创建临时构建目录
 	@rm -rf lvgl_build_temp
 	@mkdir -p lvgl_build_temp
 	@cd lvgl_build_temp && \
-		git clone --depth 1 https://github.com/lvgl/lv_binding_micropython.git && \
-		cd lv_binding_micropython && \
+		git clone --depth 1 https://github.com/lvgl/lv_binding_python.git && \
+		cd lv_binding_python && \
 		git submodule update --init --recursive
 	
 	# 编译LVGL Python绑定
-	@cd lvgl_build_temp/lv_binding_micropython && \
+	@echo "$(BLUE)[INFO]$(NC) 编译LVGL Python绑定，这可能需要几分钟..."
+	@cd lvgl_build_temp/lv_binding_python && \
 		$(shell pwd)/venv/bin/python setup.py build_ext --inplace && \
 		$(shell pwd)/venv/bin/pip install -e .
 	
