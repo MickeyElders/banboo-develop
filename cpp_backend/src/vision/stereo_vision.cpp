@@ -810,7 +810,7 @@ bool StereoVision::initialize_video_stream() {
     std::string pipeline_desc = build_stream_pipeline();
     if (pipeline_desc.empty()) {
         std::cerr << "构建GStreamer管道失败" << std::endl;
-        return false;
+        return "";
     }
     
     // 启动管道
@@ -820,7 +820,7 @@ bool StereoVision::initialize_video_stream() {
         gst_object_unref(gst_pipeline_);
         gst_pipeline_ = nullptr;
         gst_appsrc_ = nullptr;
-        return false;
+        return "";
     }
     
     std::cout << "立体视觉GStreamer流输出初始化完成" << std::endl;
@@ -839,7 +839,7 @@ std::string StereoVision::build_stream_pipeline() {
     gst_appsrc_ = gst_element_factory_make("appsrc", "stereo-source");
     if (!gst_appsrc_) {
         std::cerr << "创建appsrc失败" << std::endl;
-        return false;
+        return "";
     }
     
     // 创建其他元素
