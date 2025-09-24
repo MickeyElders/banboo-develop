@@ -999,12 +999,21 @@ std::string StereoVision::build_stream_pipeline() {
     GstElement* parser = nullptr;
     GstElement* payloader = nullptr;
     
+    // 如果编码器检测失败，使用基础的x264软件编码器（总是可用的）
+    if (!encoder) {
+        std::cout << "⚠️ 硬件编码器不可用，回退到软件编码器" << std::endl;
+        encoder = gst_element_factory_make("x264enc", "encoder");
+        used_encoder = "x264enc (fallback)";
+    }
+    
+    // 创建解析器和负载器
+    parser = gst_element_factory_make("h264parse", "parser");
+    payloader = gst_element_factory_make("rtph264pay", "payload");
+    
     if (encoder) {
-        parser = gst_element_factory_make("h264parse", "parser");
-        payloader = gst_element_factory_make("rtph264pay", "payload");
         std::cout << "✅ 使用编码器: " << used_encoder << std::endl;
     } else {
-        std::cerr << "❌ 无法找到任何可用的H.264编码器" << std::endl;
+        std::cerr << "❌ 连软件编码器也不可用，这不应该发生" << std::endl;
         if (gst_pipeline_) { gst_object_unref(gst_pipeline_); gst_pipeline_ = nullptr; }
         return "";
     }
