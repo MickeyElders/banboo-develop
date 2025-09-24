@@ -11,12 +11,19 @@ WorkingDirectory=/opt/bamboo-cut
 Environment="PYTHONPATH=/opt/bamboo-cut"
 Environment="PATH=/opt/bamboo-cut/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="VIRTUAL_ENV=/opt/bamboo-cut/venv"
+
+# 修复权限问题 - 使用root的运行目录
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="HOME=/root"
 Environment="USER=root"
 
-# 智能环境变量 - 支持多种显示后端
-Environment="GDK_BACKEND=wayland,x11"
+# 禁用dconf以避免权限问题
+Environment="DCONF_PROFILE="
+Environment="GSETTINGS_BACKEND=memory"
+
+# GTK4环境变量 - 无头模式友好
+Environment="GDK_BACKEND=broadway,wayland,x11"
+Environment="BROADWAY_DISPLAY=:1"
 Environment="WAYLAND_DISPLAY=wayland-0"
 Environment="DISPLAY=:0"
 Environment="XDG_SESSION_TYPE=wayland"

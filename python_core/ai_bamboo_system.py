@@ -22,6 +22,8 @@ def check_display_available():
 
 # 智能GTK4环境检测
 GTK4_AVAILABLE = False
+GTK4_CAN_CREATE_WINDOW = False
+
 try:
     # 只在可能的显示环境中尝试导入GTK4
     if check_display_available():
@@ -33,7 +35,16 @@ try:
         # 测试GTK4是否可以初始化
         if Gtk.init_check():
             GTK4_AVAILABLE = True
-            print("GTK4环境检测成功")
+            print("GTK4基础初始化成功")
+            
+            # 进一步测试是否可以创建窗口
+            try:
+                test_app = Adw.Application()
+                GTK4_CAN_CREATE_WINDOW = True
+                print("GTK4窗口创建测试通过")
+            except Exception as e:
+                print(f"GTK4窗口创建测试失败: {e}")
+                GTK4_CAN_CREATE_WINDOW = False
         else:
             print("GTK4无法初始化，将使用无头模式")
     else:
@@ -133,11 +144,21 @@ class BambooSystemUI:
     
     def on_activate(self, app):
         """GTK4应用激活回调"""
-        # 创建主窗口
-        self.window = Adw.ApplicationWindow(application=app)
-        self.window.set_title("AI Bamboo Recognition System v2.1 - GTK4")
-        self.window.set_default_size(1280, 800)
-        self.window.connect("destroy", self.on_window_destroy)
+        try:
+            # 创建主窗口
+            self.window = Adw.ApplicationWindow(application=app)
+            self.window.set_title("AI Bamboo Recognition System v2.1 - GTK4")
+            self.window.set_default_size(1280, 800)
+            self.window.connect("destroy", self.on_window_destroy)
+        except RuntimeError as e:
+            print(f"GTK4窗口创建失败: {e}")
+            print("切换到无头模式...")
+            app.quit()
+            # 启动无头模式
+            import headless_mode
+            import threading
+            threading.Thread(target=headless_mode.run_headless_mode, daemon=True).start()
+            return
         
         # 设置CSS样式
         self.setup_css_styling()
@@ -1012,15 +1033,15 @@ def main():
     try:
         print("正在启动AI竹子识别系统 - GTK4界面...")
         
-        # 检查是否有显示连接
-        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
-            print("警告：没有检测到显示连接，启动无头模式...")
+        # 检查GTK4是否可用且能创建窗口
+        if not GTK4_AVAILABLE or not GTK4_CAN_CREATE_WINDOW:
+            print("GTK4不可用或无法创建窗口，启动无头模式...")
             import headless_mode
             return headless_mode.run_headless_mode()
         
-        # 检查GTK4是否可以初始化
-        if not Gtk.init_check():
-            print("警告：GTK4无法初始化，切换到无头模式...")
+        # 检查是否有显示连接
+        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+            print("警告：没有检测到显示连接，启动无头模式...")
             import headless_mode
             return headless_mode.run_headless_mode()
         
