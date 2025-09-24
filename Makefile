@@ -332,13 +332,13 @@ install: build-cpp build-python
 install-service: install
 	$(call log_info,安装systemd Python GTK4服务...)
 	
-	# 停止并删除旧服务
+	# 停止并删除旧服务(包括LVGL遗留服务)
 	@sudo systemctl stop bamboo-backend.service bamboo-frontend.service bamboo-integrated.service bamboo-python-lvgl.service 2>/dev/null || true
 	@sudo systemctl disable bamboo-backend.service bamboo-frontend.service bamboo-integrated.service bamboo-python-lvgl.service 2>/dev/null || true
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-backend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-frontend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-integrated.service
-	@sudo rm -f $(SYSTEMD_DIR)/bamboo-python-lvgl.service
+	@sudo rm -f $(SYSTEMD_DIR)/bamboo-python-lvgl.service  # 清理旧的LVGL服务
 	
 	# 获取当前用户和UID
 	@CURRENT_USER=$$(whoami); \
@@ -364,7 +364,7 @@ backup:
 	if [ -f "$(SYSTEMD_DIR)/bamboo-backend.service" ]; then sudo cp $(SYSTEMD_DIR)/bamboo-backend.service $$BACKUP_DIR/; fi && \
 	if [ -f "$(SYSTEMD_DIR)/bamboo-frontend.service" ]; then sudo cp $(SYSTEMD_DIR)/bamboo-frontend.service $$BACKUP_DIR/; fi && \
 	if [ -f "$(SYSTEMD_DIR)/bamboo-integrated.service" ]; then sudo cp $(SYSTEMD_DIR)/bamboo-integrated.service $$BACKUP_DIR/; fi && \
-	if [ -f "$(SYSTEMD_DIR)/$(PYTHON_LVGL_SERVICE)" ]; then sudo cp $(SYSTEMD_DIR)/$(PYTHON_LVGL_SERVICE) $$BACKUP_DIR/; fi && \
+	if [ -f "$(SYSTEMD_DIR)/$(PYTHON_GTK4_SERVICE)" ]; then sudo cp $(SYSTEMD_DIR)/$(PYTHON_GTK4_SERVICE) $$BACKUP_DIR/; fi && \
 	sudo chown -R $(shell whoami):$(shell whoami) $$BACKUP_DIR && \
 	echo "$$BACKUP_DIR" > .last_backup
 	$(call log_success,备份完成: $(shell cat .last_backup 2>/dev/null || echo "unknown"))
@@ -421,16 +421,16 @@ status:
 	@ps aux | grep ai_bamboo_system | head -5 || true
 
 logs:
-	@echo "$(CYAN)=== Python LVGL服务日志 (最近50行) ===$(NC)"
-	@sudo journalctl -u $(PYTHON_LVGL_SERVICE) --no-pager -n 50 || true
+	@echo "$(CYAN)=== Python GTK4服务日志 (最近50行) ===$(NC)"
+	@sudo journalctl -u $(PYTHON_GTK4_SERVICE) --no-pager -n 50 || true
 
 logs-follow:
-	$(call log_info,实时查看Python LVGL服务日志 (Ctrl+C退出)...)
-	@sudo journalctl -u $(PYTHON_LVGL_SERVICE) -f
+	$(call log_info,实时查看Python GTK4服务日志 (Ctrl+C退出)...)
+	@sudo journalctl -u $(PYTHON_GTK4_SERVICE) -f
 
 # 开发模式运行
 dev-run: build-cpp install-python-deps
-	$(call log_highlight,开发模式运行Python LVGL系统...)
+	$(call log_highlight,开发模式运行Python GTK4系统...)
 	@export PYTHONPATH=$(shell pwd):$(shell pwd)/python_core && \
 	export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$(shell pwd)/$(CPP_BUILD_DIR) && \
 	./venv/bin/python python_core/ai_bamboo_system.py
