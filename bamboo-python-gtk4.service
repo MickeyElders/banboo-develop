@@ -17,15 +17,18 @@ Environment="PYTHONPATH=/opt/bamboo-cut:/opt/bamboo-cut/python_core:/usr/lib/pyt
 Environment="LD_LIBRARY_PATH=/usr/local/cuda/lib64:/opt/bamboo-cut/lib:/usr/lib/aarch64-linux-gnu"
 Environment="PATH=/opt/bamboo-cut/venv/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# GTK4/PyGObject环境变量 - 无头模式优化
+# GTK4/Cage环境变量 - 单应用全屏compositor
 Environment="GI_TYPELIB_PATH=/usr/lib/aarch64-linux-gnu/girepository-1.0:/usr/lib/girepository-1.0"
-Environment="GDK_BACKEND=broadway"
-Environment="BROADWAY_DISPLAY=:5"
+Environment="WAYLAND_DISPLAY=wayland-0"
+Environment="XDG_RUNTIME_DIR=/run/user/UID_PLACEHOLDER"
+Environment="WLR_BACKENDS=headless"
+Environment="WLR_RENDERER=gles2"
 Environment="GTK_THEME=Adwaita:dark"
 Environment="NO_AT_BRIDGE=1"
 
 WorkingDirectory=/opt/bamboo-cut
-ExecStart=/opt/bamboo-cut/venv/bin/python python_core/ai_bamboo_system.py
+ExecStartPre=/bin/bash -c 'mkdir -p /run/user/UID_PLACEHOLDER && chown USER_PLACEHOLDER:USER_PLACEHOLDER /run/user/UID_PLACEHOLDER'
+ExecStart=/bin/bash -c 'cage -- /opt/bamboo-cut/venv/bin/python python_core/ai_bamboo_system.py'
 Restart=always
 RestartSec=5
 StandardOutput=journal
