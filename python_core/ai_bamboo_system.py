@@ -119,26 +119,41 @@ class BambooSystemUI:
             {'id': 5, 'name': 'Execute Cut', 'plc_cmd': 3}
         ]
         
-        # Create UI
-        self.create_ui()
+        # Create UI based on backend
+        if self.backend in ["LVGL", "PYGAME"]:
+            self.create_ui()
+        else:
+            self.create_console_ui()
         
         # Start update threads
         self.start_update_threads()
     
     def create_ui(self):
         """Create the main UI"""
-        # Create main screen
-        self.scr = lv.obj()
-        lv.scr_load(self.scr)
-        
-        # Set background color
-        self.scr.set_style_bg_color(self.colors['bg_main'], 0)
-        
-        # Create main layout
-        self.create_header()
-        self.create_camera_panel()
-        self.create_control_panel()
-        self.create_footer()
+        if self.backend == "LVGL":
+            # Create main screen
+            self.scr = lv.obj()
+            lv.scr_load(self.scr)
+            
+            # Set background color
+            self.scr.set_style_bg_color(self.colors['bg_main'], 0)
+            
+            # Create main layout
+            self.create_header()
+            self.create_camera_panel()
+            self.create_control_panel()
+            self.create_footer()
+        elif self.backend == "PYGAME":
+            # Pygame UI setup
+            self.clock = pygame.time.Clock()
+            self.font = pygame.font.Font(None, 24)
+            self.title_font = pygame.font.Font(None, 32)
+    
+    def create_console_ui(self):
+        """Create console-based UI"""
+        print("=== AI Bamboo Recognition Cutting System ===")
+        print("Running in console mode - no graphics backend available")
+        print("System Status: Initializing...")
     
     def create_header(self):
         """Create header panel"""
@@ -941,25 +956,63 @@ class BambooSystemUI:
 def main():
     """Main application entry point"""
     try:
-        # Initialize display driver (this would be specific to your setup)
-        # For simulation, you might use SDL or other drivers
-        
         # Create and run the application
         app = BambooSystemUI()
         
-        # Main loop
-        while True:
-            lv.timer_handler()
-            time.sleep(0.001)
-            
+        print(f"Starting AI Bamboo System with {GRAPHICS_BACKEND} backend...")
+        
+        # Main loop based on backend
+        if GRAPHICS_BACKEND == "LVGL":
+            # LVGL main loop
+            while True:
+                lv.timer_handler()
+                time.sleep(0.001)
+        elif GRAPHICS_BACKEND == "PYGAME":
+            # Pygame main loop
+            running = True
+            while running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                
+                app.screen.fill(app.colors['bg_main'])
+                
+                # Simple text display for pygame mode
+                title_text = app.title_font.render("AI Bamboo Recognition System", True, app.colors['text_primary'])
+                app.screen.blit(title_text, (10, 10))
+                
+                status_text = app.font.render(f"System Running: {app.system_state['is_running']}", True, app.colors['text_secondary'])
+                app.screen.blit(status_text, (10, 50))
+                
+                coord_text = app.font.render(f"X Coordinate: {app.system_state['x_coordinate']:.1f}mm", True, app.colors['accent'])
+                app.screen.blit(coord_text, (10, 80))
+                
+                pygame.display.flip()
+                app.clock.tick(60)
+                
+            pygame.quit()
+        else:
+            # Console mode main loop
+            print("Running in console mode...")
+            while True:
+                # Print system status every 5 seconds
+                print(f"System Status: {'Running' if app.system_state['is_running'] else 'Stopped'}")
+                print(f"X Coordinate: {app.system_state['x_coordinate']:.1f}mm")
+                print(f"Heartbeat: {app.system_state['heartbeat_counter']}")
+                print("-" * 50)
+                time.sleep(5.0)
+                
     except KeyboardInterrupt:
-        print("Application terminated by user")
+        print("\nApplication terminated by user")
     except Exception as e:
         print(f"Application error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         # Cleanup
-        if hasattr(app, 'running'):
+        if 'app' in locals() and hasattr(app, 'running'):
             app.running = False
+        print("Application cleanup completed")
 
 
 if __name__ == "__main__":
