@@ -215,24 +215,26 @@ install-python-deps: install-lvgl-python
 	@./venv/bin/python -c "import pybind11; print('pybind11 version:', pybind11.__version__)" || \
 		echo "$(YELLOW)[WARNING]$(NC) pybind11包验证失败"
 	
-	# 验证图形库安装
+	# 验证LVGL安装
+	@echo "$(BLUE)[INFO]$(NC) 验证LVGL Python绑定安装..."
 	@if ./venv/bin/python -c "import lvgl as lv; print('LVGL version:', lv.version_info())" 2>/dev/null; then \
 		$(call log_success,LVGL Python绑定验证成功); \
-	elif ./venv/bin/python -c "import pygame; print('Pygame version:', pygame.version.ver)" 2>/dev/null; then \
-		$(call log_success,Pygame图形库验证成功，将作为图形后端); \
 	else \
-		$(call log_warning,图形库验证失败，系统将以基础模式运行); \
+		$(call log_error,LVGL Python绑定验证失败，请检查安装过程); \
+		echo "$(RED)[ERROR]$(NC) LVGL模块无法导入，系统无法正常运行"; \
+		echo "$(YELLOW)[提示]$(NC) 请尝试运行: make clean && make redeploy"; \
+		exit 1; \
 	fi
 	
 	$(call log_success,Python依赖安装完成)
 
-# 安装LVGL Python绑定
+# 编译安装LVGL Python绑定
 install-lvgl-python:
-	$(call log_highlight,安装LVGL Python绑定...)
+	$(call log_highlight,编译安装LVGL Python绑定...)
 	
 	# 检查系统依赖
 	@sudo apt update || true
-	@sudo apt install -y build-essential cmake python3-dev libsdl2-dev libffi-dev pkg-config || true
+	@sudo apt install -y build-essential cmake python3-dev libsdl2-dev libffi-dev pkg-config git || true
 	
 	# 确保虚拟环境存在
 	@if [ ! -d "venv" ]; then \
@@ -240,22 +242,43 @@ install-lvgl-python:
 		python3 -m venv venv; \
 	fi
 	
-	# 尝试多种LVGL Python安装方法
-	@echo "$(BLUE)[INFO]$(NC) 尝试安装LVGL Python包..."
-	@./venv/bin/pip install --upgrade pip setuptools wheel || true
+	# 升级构建工具
+	@echo "$(BLUE)[INFO]$(NC) 升级Python构建工具..."
+	@./venv/bin/pip install --upgrade pip setuptools wheel cython
 	
-	# 方法1: 尝试从PyPI安装预编译包
-	@if ./venv/bin/pip install lvgl 2>/dev/null; then \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL从PyPI安装成功"; \
-	elif ./venv/bin/pip install lv-python 2>/dev/null; then \
-		echo "$(GREEN)[SUCCESS]$(NC) lv-python包安装成功"; \
+	# 方法1: 尝试官方LVGL Python包
+	@echo "$(BLUE)[INFO]$(NC) 尝试安装官方LVGL Python包..."
+	@if ./venv/bin/pip install lvgl==8.3.* 2>/dev/null; then \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL官方包安装成功"; \
 	else \
-		echo "$(YELLOW)[WARNING]$(NC) PyPI包安装失败，尝试简化安装"; \
-		./venv/bin/pip install pygame || true; \
-		echo "$(YELLOW)[INFO]$(NC) 将使用pygame作为图形后端"; \
+		echo "$(YELLOW)[WARNING]$(NC) 官方包失败，尝试从源码编译..."; \
+		$(MAKE) build-lvgl-from-source; \
 	fi
 	
 	$(call log_success,LVGL Python绑定安装完成)
+
+# 从源码编译LVGL Python绑定
+build-lvgl-from-source:
+	@echo "$(BLUE)[INFO]$(NC) 从源码编译LVGL Python绑定，这可能需要几分钟..."
+	
+	# 创建临时构建目录
+	@rm -rf lvgl_build_temp
+	@mkdir -p lvgl_build_temp
+	
+	# 下载官方Python绑定源码
+	@cd lvgl_build_temp && \
+		git clone https://github.com/lvgl/lv_binding_python.git --depth 1 && \
+		cd lv_binding_python && \
+		git submodule update --init --recursive
+	
+	# 使用pip安装从源码
+	@cd lvgl_build_temp/lv_binding_python && \
+		../../venv/bin/pip install .
+	
+	# 清理临时文件
+	@rm -rf lvgl_build_temp
+	
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译完成"
 
 clean:
 	$(call log_info,清理构建文件...)
