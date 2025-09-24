@@ -124,8 +124,8 @@ check-ai-config:
 		$(call log_warning,AI优化配置文件不存在: $(AI_CONFIG)); \
 	else \
 		$(call log_success,AI优化配置文件存在: $(AI_CONFIG)); \
-		@echo "$(MAGENTA)启用的AI优化技术:$(NC)"; \
-		@grep -E "enable: true" $(AI_CONFIG) | sed 's/^/  /' || true; \
+		echo "$(MAGENTA)启用的AI优化技术:$(NC)"; \
+		grep -E "enable: true" $(AI_CONFIG) | sed 's/^/  /' || true; \
 	fi
 
 # 构建C++推理核心(包含AI优化)
