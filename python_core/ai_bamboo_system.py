@@ -1,9 +1,25 @@
 # ai_bamboo_system.py
-import lvgl as lv
 import time
 import threading
 import random
 import math
+import sys
+import os
+
+# Try to import graphics libraries with fallback
+GRAPHICS_BACKEND = None
+try:
+    import lvgl as lv
+    GRAPHICS_BACKEND = "LVGL"
+    print("Using LVGL graphics backend")
+except ImportError:
+    try:
+        import pygame
+        GRAPHICS_BACKEND = "PYGAME"
+        print("Using Pygame graphics backend")
+    except ImportError:
+        GRAPHICS_BACKEND = "CONSOLE"
+        print("No graphics backend available, using console mode")
 
 class BambooSystemUI:
     def __init__(self):
