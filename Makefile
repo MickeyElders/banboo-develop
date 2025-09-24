@@ -187,10 +187,10 @@ install-python-deps: install-gtk4-python
 		sudo apt update && sudo apt install -y python3-venv; \
 	fi
 	
-	# 创建虚拟环境
+	# 创建虚拟环境(使用系统包)
 	@if [ ! -d "venv" ]; then \
-		echo "$(BLUE)[INFO]$(NC) 创建Python虚拟环境..."; \
-		python3 -m venv venv; \
+		echo "$(BLUE)[INFO]$(NC) 创建Python虚拟环境(访问系统GTK4包)..."; \
+		python3 -m venv venv --system-site-packages; \
 	fi
 	
 	# 验证虚拟环境创建成功
