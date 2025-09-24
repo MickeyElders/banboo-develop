@@ -5,10 +5,8 @@ AI Bamboo Recognition System - GTK4界面
 基于GTK4的现代化工业级竹子识别切割系统界面
 """
 
-import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
-from gi.repository import Gtk, Gdk, GLib, cairo, GdkPixbuf, Adw
+import sys
+import os
 import time
 import threading
 import random
@@ -16,8 +14,31 @@ import math
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
-import sys
-import os
+
+# 检查是否需要GTK4
+def check_display_available():
+    """检查显示是否可用"""
+    return bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
+
+# 只在有显示时导入GTK4
+if check_display_available():
+    try:
+        import gi
+        gi.require_version('Gtk', '4.0')
+        gi.require_version('Adw', '1')
+        from gi.repository import Gtk, Gdk, GLib, cairo, GdkPixbuf, Adw
+        
+        # 测试GTK4是否可以初始化
+        if not Gtk.init_check():
+            raise ImportError("GTK4 initialization failed")
+            
+        GTK4_AVAILABLE = True
+    except (ImportError, RuntimeError) as e:
+        print(f"GTK4不可用: {e}")
+        GTK4_AVAILABLE = False
+else:
+    GTK4_AVAILABLE = False
+    print("没有检测到显示连接，将使用无头模式")
 
 class BambooSystemUI:
     def __init__(self):

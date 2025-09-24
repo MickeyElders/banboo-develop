@@ -466,11 +466,11 @@ performance-test:
 	fi
 
 # 首次完整部署
-deploy: backup build-cpp build-python install-service start
+deploy: backup build-cpp build-python fix-gtk4-auto install-service start
 	$(call log_success,$(CYAN)Python GTK4系统首次部署完成！$(NC))
 	@echo ""
 	$(call log_highlight,架构信息:)
-	@echo "  ✓ Python GTK4现代化前端界面"
+	@echo "  ✓ Python GTK4/无头模式自适应界面"
 	@echo "  ✓ C++高性能推理后端"
 	@echo "  ✓ AI优化技术集成"
 	@echo "  ✓ 混合架构设计"
@@ -478,7 +478,7 @@ deploy: backup build-cpp build-python install-service start
 	@echo ""
 	$(call log_ai,AI优化技术:)
 	@echo "  ✓ NAM注意力机制"
-	@echo "  ✓ GhostConv卷积优化" 
+	@echo "  ✓ GhostConv卷积优化"
 	@echo "  ✓ VoV-GSCSP颈部压缩"
 	@echo "  ✓ Wise-IoU损失函数"
 	@echo "  ✓ SAHI切片推理"
