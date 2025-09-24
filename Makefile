@@ -172,7 +172,7 @@ build-python: install-python-deps
 	$(call log_success,Python LVGL环境准备完成)
 
 # 安装Python依赖
-install-python-deps:
+install-python-deps: install-lvgl-python
 	$(call log_info,安装Python依赖...)
 	@if [ ! -f "requirements.txt" ]; then \
 		echo "$(RED)[ERROR]$(NC) requirements.txt文件不存在"; \
@@ -214,9 +214,39 @@ install-python-deps:
 		echo "$(YELLOW)[WARNING]$(NC) NumPy包验证失败"
 	@./venv/bin/python -c "import pybind11; print('pybind11 version:', pybind11.__version__)" || \
 		echo "$(YELLOW)[WARNING]$(NC) pybind11包验证失败"
-	@echo "$(YELLOW)[INFO]$(NC) LVGL需要从源码编译，将在运行时处理"
+	
+	# 验证LVGL安装
+	@./venv/bin/python -c "import lvgl as lv; print('LVGL version:', lv.version_info())" && \
+		$(call log_success,LVGL Python绑定验证成功) || \
+		($(call log_error,LVGL Python绑定验证失败) && exit 1)
 	
 	$(call log_success,Python依赖安装完成)
+
+# 编译安装LVGL Python绑定
+install-lvgl-python:
+	$(call log_highlight,编译安装LVGL Python绑定...)
+	
+	# 检查系统依赖
+	@sudo apt update || true
+	@sudo apt install -y build-essential cmake python3-dev libsdl2-dev || true
+	
+	# 创建临时构建目录
+	@rm -rf lvgl_build_temp
+	@mkdir -p lvgl_build_temp
+	@cd lvgl_build_temp && \
+		git clone --depth 1 https://github.com/lvgl/lv_binding_micropython.git && \
+		cd lv_binding_micropython && \
+		git submodule update --init --recursive
+	
+	# 编译LVGL Python绑定
+	@cd lvgl_build_temp/lv_binding_micropython && \
+		$(shell pwd)/venv/bin/python setup.py build_ext --inplace && \
+		$(shell pwd)/venv/bin/pip install -e .
+	
+	# 清理临时文件
+	@rm -rf lvgl_build_temp
+	
+	$(call log_success,LVGL Python绑定编译安装完成)
 
 clean:
 	$(call log_info,清理构建文件...)
