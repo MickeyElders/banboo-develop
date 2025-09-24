@@ -5,10 +5,10 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=jetson
-Group=jetson
+User=USER_PLACEHOLDER
+Group=USER_PLACEHOLDER
 WorkingDirectory=/opt/bamboo-cut
-ExecStart=/opt/bamboo-cut/venv/bin/python python_core/ai_bamboo_system.py
+ExecStart=/opt/bamboo-cut/bin/bamboo-python-lvgl
 Restart=always
 RestartSec=5
 KillMode=mixed
@@ -18,7 +18,7 @@ TimeoutStopSec=30
 Environment="PYTHONPATH=/opt/bamboo-cut:/opt/bamboo-cut/python_core"
 Environment="LD_LIBRARY_PATH=/usr/local/cuda/lib64:/opt/bamboo-cut/lib"
 Environment="DISPLAY=:0"
-Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="XDG_RUNTIME_DIR=/run/user/UID_PLACEHOLDER"
 
 # 系统资源限制
 LimitNOFILE=65536

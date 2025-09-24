@@ -288,10 +288,17 @@ install-service: install
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-frontend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-integrated.service
 	
-	# 安装新的Python LVGL服务
-	@sudo cp $(PYTHON_LVGL_SERVICE) $(SYSTEMD_DIR)/
-	@sudo systemctl daemon-reload
-	@sudo systemctl enable $(PYTHON_LVGL_SERVICE)
+	# 获取当前用户和UID
+	@CURRENT_USER=$$(whoami); \
+	CURRENT_UID=$$(id -u); \
+	echo "$(BLUE)[INFO]$(NC) 配置服务用户: $$CURRENT_USER (UID: $$CURRENT_UID)"; \
+	\
+	sed "s/USER_PLACEHOLDER/$$CURRENT_USER/g; s/UID_PLACEHOLDER/$$CURRENT_UID/g" $(PYTHON_LVGL_SERVICE) > /tmp/$(PYTHON_LVGL_SERVICE); \
+	\
+	sudo cp /tmp/$(PYTHON_LVGL_SERVICE) $(SYSTEMD_DIR)/; \
+	rm -f /tmp/$(PYTHON_LVGL_SERVICE); \
+	sudo systemctl daemon-reload; \
+	sudo systemctl enable $(PYTHON_LVGL_SERVICE)
 	
 	$(call log_success,Python LVGL systemd服务安装完成)
 	$(call log_highlight,旧的C++服务已清理，新的Python LVGL服务已安装)
