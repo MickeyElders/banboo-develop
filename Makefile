@@ -217,113 +217,57 @@ install-python-deps: install-gtk4-python
 	@./venv/bin/python -c "import pybind11; print('pybind11 version:', pybind11.__version__)" || \
 		echo "$(YELLOW)[WARNING]$(NC) pybind11包验证失败"
 	
-	# 验证图形库安装
-	@echo "$(BLUE)[INFO]$(NC) 验证图形库安装..."
-	@GRAPHICS_OK=false; \
+	# 验证GTK4图形库安装
+	@echo "$(BLUE)[INFO]$(NC) 验证GTK4图形库安装..."
+	@GTK4_OK=false; \
 	\
-	if ./venv/bin/python -c "import lvgl as lv; print('LVGL version:', lv.version_info())" 2>/dev/null; then \
-		$(call log_success,LVGL Python绑定验证成功); \
-		GRAPHICS_OK=true; \
-	elif ./venv/bin/python -c "import lv_python; print('lv_python导入成功')" 2>/dev/null; then \
-		$(call log_success,lv_python包验证成功); \
-		GRAPHICS_OK=true; \
+	if ./venv/bin/python -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK4 + Adwaita验证成功')" 2>/dev/null; then \
+		$(call log_success,GTK4 Python绑定验证成功); \
+		GTK4_OK=true; \
+	elif ./venv/bin/python -c "import gi; gi.require_version('Gtk', '4.0'); from gi.repository import Gtk; print('GTK4基础库验证成功')" 2>/dev/null; then \
+		$(call log_success,GTK4基础库验证成功，但缺少Adwaita); \
+		GTK4_OK=true; \
 	elif ./venv/bin/python -c "import pygame; print('Pygame version:', pygame.version.ver)" 2>/dev/null; then \
-		$(call log_success,Pygame图形库验证成功，将作为图形后端); \
-		GRAPHICS_OK=true; \
+		$(call log_warning,GTK4不可用，使用Pygame作为后备图形库); \
+		GTK4_OK=true; \
 	fi; \
 	\
-	if [ "$$GRAPHICS_OK" = "false" ]; then \
-		$(call log_warning,无可用图形库，系统将以基础模式运行); \
-		echo "$(YELLOW)[提示]$(NC) 可尝试运行: make clean && make redeploy"; \
+	if [ "$$GTK4_OK" = "false" ]; then \
+		$(call log_warning,无可用图形库，请安装GTK4系统依赖); \
+		echo "$(YELLOW)[提示]$(NC) 运行: sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1"; \
 	fi
-	
+
 	$(call log_success,Python依赖安装完成)
 
-# 编译安装LVGL Python绑定
-install-lvgl-python:
-	$(call log_highlight,编译安装LVGL Python绑定...)
+# 安装GTK4 Python绑定
+install-gtk4-python:
+	$(call log_highlight,安装GTK4 Python绑定...)
 	
 	# 检查系统依赖
+	@echo "$(BLUE)[INFO]$(NC) 检查GTK4系统依赖..."
 	@sudo apt update || true
-	@sudo apt install -y build-essential cmake python3-dev libsdl2-dev libffi-dev pkg-config git || true
+	@sudo apt install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-dev libadwaita-1-dev || true
 	
 	# 确保虚拟环境存在
 	@if [ ! -d "venv" ]; then \
 		echo "$(BLUE)[INFO]$(NC) 创建Python虚拟环境..."; \
-		python3 -m venv venv; \
+		python3 -m venv venv --system-site-packages; \
 	fi
 	
 	# 升级构建工具
 	@echo "$(BLUE)[INFO]$(NC) 升级Python构建工具..."
-	@./venv/bin/pip install --upgrade pip setuptools wheel cython
+	@./venv/bin/pip install --upgrade pip setuptools wheel
 	
-	# 尝试多种LVGL Python安装方法
-	@echo "$(BLUE)[INFO]$(NC) 尝试安装LVGL Python包..."
-	@LVGL_INSTALLED=false; \
-	\
-	echo "$(BLUE)[INFO]$(NC) 方法1: 尝试官方LVGL包..."; \
-	if ./venv/bin/pip install lvgl 2>/dev/null; then \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL官方包安装成功"; \
-		LVGL_INSTALLED=true; \
-	fi; \
-	\
-	if [ "$$LVGL_INSTALLED" = "false" ]; then \
-		echo "$(BLUE)[INFO]$(NC) 方法2: 从源码编译lv_binding_micropython..."; \
-		$(MAKE) build-lvgl-from-micropython-binding; \
-		if ./venv/bin/python -c "import lvgl" 2>/dev/null; then \
-			echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译安装成功"; \
-			LVGL_INSTALLED=true; \
-		fi; \
-	fi; \
-	\
-	if [ "$$LVGL_INSTALLED" = "false" ]; then \
-		echo "$(BLUE)[INFO]$(NC) 方法3: 尝试其他LVGL包..."; \
-		if ./venv/bin/pip install lv_python 2>/dev/null || ./venv/bin/pip install micropython-lvgl 2>/dev/null; then \
-			echo "$(GREEN)[SUCCESS]$(NC) 替代LVGL包安装成功"; \
-			LVGL_INSTALLED=true; \
-		fi; \
-	fi; \
-	\
-	if [ "$$LVGL_INSTALLED" = "false" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) 无法安装LVGL包，将安装基础图形库"; \
-		./venv/bin/pip install pygame pillow || true; \
+	# 验证GTK4安装
+	@echo "$(BLUE)[INFO]$(NC) 验证GTK4 Python绑定..."
+	@if ./venv/bin/python -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK4 + Adwaita可用')" 2>/dev/null; then \
+		echo "$(GREEN)[SUCCESS]$(NC) GTK4 + Adwaita安装成功"; \
+	else \
+		echo "$(YELLOW)[WARNING]$(NC) GTK4绑定安装失败，请手动安装系统依赖"; \
+		echo "$(YELLOW)[INFO]$(NC) 运行: sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1"; \
 	fi
 	
-	$(call log_success,LVGL Python绑定安装完成)
-
-# 从lv_binding_micropython源码编译LVGL Python绑定
-build-lvgl-from-micropython-binding:
-	@echo "$(BLUE)[INFO]$(NC) 从lv_binding_micropython源码编译LVGL，这可能需要几分钟..."
-	
-	# 创建临时构建目录
-	@rm -rf lvgl_build_temp
-	@mkdir -p lvgl_build_temp
-	
-	# 下载lv_binding_micropython源码
-	@cd lvgl_build_temp && \
-		git clone https://github.com/lvgl/lv_binding_micropython.git --depth 1 && \
-		cd lv_binding_micropython && \
-		git submodule update --init --recursive
-	
-	# 正确的编译方法
-	@cd lvgl_build_temp/lv_binding_micropython && \
-		echo "$(BLUE)[INFO]$(NC) 配置编译环境..." && \
-		if [ -f "gen/gen_mpy.py" ]; then \
-			echo "$(BLUE)[INFO]$(NC) 使用gen_mpy.py生成Python绑定..." && \
-			../../venv/bin/python gen/gen_mpy.py -E pycparser lvgl/lvgl.h && \
-			echo "$(BLUE)[INFO]$(NC) 创建setup.py..." && \
-			printf 'from setuptools import setup, Extension\nimport pybind11\n\next = Extension(\n    "lvgl",\n    sources=["lib/lv_bindings/lvgl.c"],\n    include_dirs=[\n        "lvgl",\n        "lvgl/src",\n        pybind11.get_cmake_dir() + "/../include"\n    ],\n    define_macros=[("LV_CONF_INCLUDE_SIMPLE", "1")]\n)\n\nsetup(\n    name="lvgl",\n    ext_modules=[ext],\n    zip_safe=False,\n)\n' > setup.py && \
-			../../venv/bin/pip install . && \
-			echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译完成"; \
-		else \
-			echo "$(YELLOW)[WARNING]$(NC) 未找到gen_mpy.py，尝试直接编译..." && \
-			../../venv/bin/pip install . 2>/dev/null || echo "$(YELLOW)[WARNING]$(NC) 直接编译失败"; \
-		fi
-	
-	# 清理临时文件
-	@rm -rf lvgl_build_temp
-	
-	@echo "$(GREEN)[SUCCESS]$(NC) LVGL编译过程完成"
+	$(call log_success,GTK4 Python绑定检查完成)
 
 clean:
 	$(call log_info,清理构建文件...)
