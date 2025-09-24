@@ -72,11 +72,11 @@ public:
             LOG_WARN("⚠️ 视觉系统初始化失败，系统将在无视觉检测模式下运行");
         }
         
-        // 禁用单摄像头系统，避免与立体视觉系统的设备冲突
-        // 单摄像头系统和立体视觉系统都会使用 /dev/video0，导致设备冲突
-        camera_system_available_ = false;
-        LOG_INFO("⚠️ 已禁用单摄像头系统，避免与立体视觉系统设备冲突");
-        // camera_system_available_ = initializeCameraSystem();
+        // 初始化摄像头系统（用于视频流输出，使用不同的设备避免冲突）
+        camera_system_available_ = initializeCameraSystemForStreaming();
+        if (!camera_system_available_) {
+            LOG_WARN("⚠️ 摄像头流系统初始化失败，前端将无法获取视频画面");
+        }
         
         // 初始化立体视觉系统（非关键模块，失败时继续运行）
         stereo_vision_available_ = initializeStereoVisionSystem();
@@ -325,6 +325,64 @@ private:
         return true;
     }
     
+    bool initializeCameraSystemForStreaming() {
+        LOG_INFO("初始化专用于视频流的摄像头系统...");
+        
+        vision::CameraConfig camera_config;
+        // 使用video2设备避免与立体视觉系统冲突
+        camera_config.device_id = "/dev/video2";
+        camera_config.width = 1280;  // 使用较低分辨率以减少冲突
+        camera_config.height = 720;
+        camera_config.framerate = 30;
+        
+        // 启用GStreamer流输出
+        camera_config.enable_stream_output = true;
+        camera_config.stream_host = "127.0.0.1";
+        camera_config.stream_port = 5000;
+        camera_config.stream_format = "H264";
+        camera_config.stream_bitrate = 1500000;  // 降低码率
+        
+#ifdef TARGET_ARCH_AARCH64
+        camera_config.use_hardware_acceleration = true;
+        LOG_INFO("使用Jetson硬件加速pipeline（流模式）");
+#else
+        camera_config.use_hardware_acceleration = false;
+        LOG_INFO("使用通用摄像头pipeline（流模式）");
+#endif
+        
+        camera_manager_ = std::make_unique<vision::CameraManager>(camera_config);
+        
+        if (!camera_manager_->initialize()) {
+            LOG_WARN("video2设备初始化失败，尝试video1设备...");
+            
+            // 如果video2失败，尝试video1
+            camera_config.device_id = "/dev/video1";
+            camera_manager_ = std::make_unique<vision::CameraManager>(camera_config);
+            
+            if (!camera_manager_->initialize()) {
+                LOG_WARN("video1设备初始化失败，尝试video0设备（可能与立体视觉冲突）...");
+                
+                // 最后尝试video0
+                camera_config.device_id = "/dev/video0";
+                camera_manager_ = std::make_unique<vision::CameraManager>(camera_config);
+                
+                if (!camera_manager_->initialize()) {
+                    LOG_ERROR("所有摄像头设备初始化失败");
+                    return false;
+                }
+            }
+        }
+        
+        // 不设置帧回调，专注于视频流输出
+        LOG_INFO("专用视频流摄像头系统初始化完成");
+        auto camera_info = camera_manager_->getCameraInfo();
+        LOG_INFO("视频流摄像头信息: {} @ {}x{}", camera_info.card_name,
+                camera_info.current_width, camera_info.current_height);
+        LOG_INFO("视频流URL: {}", camera_manager_->getStreamURL());
+        
+        return true;
+    }
+    
     bool initializeStereoVisionSystem() {
         LOG_INFO("初始化立体视觉系统...");
         
@@ -468,6 +526,22 @@ private:
             LOG_INFO("📹 开始启动摄像头服务...");
             if (camera_manager_->startCapture()) {
                 LOG_INFO("✅ 摄像头服务启动成功");
+                
+                // 添加详细的视频流状态日志
+                if (camera_manager_->isVideoStreamEnabled()) {
+                    std::string stream_url = camera_manager_->getStreamURL();
+                    LOG_INFO("🎥 GStreamer视频流已启用");
+                    LOG_INFO("📡 视频流URL: {}", stream_url);
+                    LOG_INFO("🔗 前端应连接到: {}", stream_url);
+                    LOG_INFO("📺 视频格式: H264, 分辨率: 1280x720, 帧率: 30fps");
+                    LOG_INFO("💡 视频流诊断信息:");
+                    LOG_INFO("   - 后端正在发送视频帧到UDP端口5000");
+                    LOG_INFO("   - 前端应能接收到实时视频画面");
+                    LOG_INFO("   - 如果前端看不到画面，请检查网络连接");
+                } else {
+                    LOG_WARN("⚠️ GStreamer视频流未启用");
+                    LOG_WARN("💡 原因可能：GStreamer组件初始化失败");
+                }
             } else {
                 LOG_WARN("⚠️ 摄像头服务启动失败，切换到模拟模式");
                 camera_system_available_ = false;
@@ -475,10 +549,15 @@ private:
         } else {
             if (!camera_manager_) {
                 LOG_WARN("⚠️ 摄像头管理器未初始化，跳过启动");
+                LOG_WARN("💡 提示：前端将看不到视频画面");
+                LOG_WARN("💡 原因：摄像头设备初始化失败");
             } else if (!camera_system_available_) {
                 LOG_WARN("⚠️ 摄像头系统标记为不可用，跳过启动");
+                LOG_WARN("💡 提示：前端将看不到视频画面");
+                LOG_WARN("💡 原因：所有摄像头设备(/dev/video0, /dev/video1, /dev/video2)不可用");
             } else {
                 LOG_WARN("⚠️ 摄像头系统不可用，跳过启动");
+                LOG_WARN("💡 提示：前端将看不到视频画面");
             }
         }
         
