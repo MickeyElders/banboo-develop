@@ -768,7 +768,7 @@ std::string CameraManager::getStreamURL() const {
 
 } // namespace vision
 } // namespace bamboo_cut
-bamboo_cut::vision::FrameInfo CameraManager::getCurrentFrame() {
+bamboo_cut::vision::FrameInfo bamboo_cut::vision::CameraManager::getCurrentFrame() {
     bamboo_cut::vision::FrameInfo frame_info;
     
     if (!is_running_ || cameras_.empty()) {
