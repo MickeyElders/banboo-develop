@@ -404,11 +404,14 @@ private:
         // 初始化并启用GStreamer视频流输出
         if (stereo_vision_->initialize_video_stream()) {
             LOG_INFO("✅ GStreamer视频流初始化成功");
-            stereo_vision_->enable_video_stream(true);
+            // 确保视频流被启用
+            bool stream_enabled = stereo_vision_->enable_video_stream(true);
             stereo_vision_->set_display_mode(vision::DisplayMode::SIDE_BY_SIDE);  // 默认并排显示
-            LOG_INFO("✅ 立体视觉流输出已启用");
+            LOG_INFO("✅ 立体视觉流输出已启用: {}", stream_enabled ? "成功" : "失败");
         } else {
             LOG_WARN("⚠️ GStreamer视频流初始化失败");
+            // 即使初始化失败，也要尝试启用流以便错误诊断
+            stereo_vision_->enable_video_stream(true);
         }
         
         LOG_INFO("立体视觉系统（含流输出）初始化完成");

@@ -1255,11 +1255,17 @@ bool StereoVision::enable_video_stream(bool enable) {
     if (stream_enabled_ != enable) {
         stream_enabled_ = enable;
         if (enable && !gst_pipeline_) {
-            initialize_video_stream();
+            if (!initialize_video_stream()) {
+                std::cerr << "⚠️ 视频流初始化失败，但仍将启用流标志用于调试" << std::endl;
+                // 即使初始化失败，也启用流标志，这样可以看到详细的错误信息
+                stream_enabled_ = true;
+            }
         }
-        std::cout << "立体视觉流输出: " << (enable ? "已启用" : "已禁用") << std::endl;
+        std::cout << "🎥 立体视觉流输出: " << (stream_enabled_ ? "已启用" : "已禁用") << std::endl;
+        std::cout << "📺 GStreamer管道状态: " << (gst_pipeline_ ? "已创建" : "未创建") << std::endl;
+        std::cout << "📡 AppSrc状态: " << (gst_appsrc_ ? "已创建" : "未创建") << std::endl;
     }
-    return true;
+    return stream_enabled_;
 }
 
 void StereoVision::set_display_mode(DisplayMode mode) {

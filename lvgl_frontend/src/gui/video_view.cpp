@@ -99,9 +99,9 @@ void Video_view::create_camera_title() {
     lv_label_set_text(title_label_, LV_SYMBOL_VIDEO " Live Detection View");
     lv_obj_set_style_text_color(title_label_, lv_color_hex(0xFF6B35), 0);
     
-    // Create detection info label
+    // Create detection info label - disabled to remove FPS display
     detection_info_ = lv_label_create(camera_title_);
-    lv_label_set_text(detection_info_, "Rail Range: 0-1000.0mm | Precision: 0.1mm | FPS: 28.5");
+    lv_label_set_text(detection_info_, "Rail Range: 0-1000.0mm | Precision: 0.1mm");
     lv_obj_set_style_text_color(detection_info_, lv_color_hex(0xB0B0B0), 0);
 }
 
@@ -114,23 +114,23 @@ void Video_view::create_camera_canvas() {
     lv_obj_set_style_pad_all(camera_canvas_, 0, LV_PART_MAIN); // No inner padding
     lv_obj_add_style(camera_canvas_, &style_canvas_, 0);
     
-    // Create video view hint text (centered)
+    // Create video view hint text (centered) - simplified without debug info
     lv_obj_t* video_label = lv_label_create(camera_canvas_);
-    lv_label_set_text(video_label, "Bamboo Detection View\nYOLOv8 Inference\nInference Time: 15.3ms");
+    lv_label_set_text(video_label, "Bamboo Detection View\nAI Vision Processing");
     lv_obj_set_style_text_color(video_label, lv_color_hex(0xB0B0B0), 0);
     lv_obj_set_style_text_align(video_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(video_label);
     
-    // Create resolution info in top-left corner
-    lv_obj_t* resolution_label = lv_label_create(camera_canvas_);
-    lv_label_set_text(resolution_label, "1280 x 720");
-    lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xFF6B35), 0);
-    lv_obj_set_style_text_font(resolution_label, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_bg_color(resolution_label, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(resolution_label, 128, 0);
-    lv_obj_set_style_pad_all(resolution_label, 5, 0);
-    lv_obj_set_style_radius(resolution_label, 3, 0);
-    lv_obj_set_pos(resolution_label, 10, 10);  // Position in top-left corner
+    // Resolution info disabled to clean up display
+    // lv_obj_t* resolution_label = lv_label_create(camera_canvas_);
+    // lv_label_set_text(resolution_label, "1280 x 720");
+    // lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xFF6B35), 0);
+    // lv_obj_set_style_text_font(resolution_label, &lv_font_montserrat_14, 0);
+    // lv_obj_set_style_bg_color(resolution_label, lv_color_hex(0x000000), 0);
+    // lv_obj_set_style_bg_opa(resolution_label, 128, 0);
+    // lv_obj_set_style_pad_all(resolution_label, 5, 0);
+    // lv_obj_set_style_radius(resolution_label, 3, 0);
+    // lv_obj_set_pos(resolution_label, 10, 10);  // Position in top-left corner
     
     // Create rail indicator - corresponds to rail-indicator in HTML
     rail_indicator_ = lv_obj_create(camera_canvas_);
@@ -222,10 +222,10 @@ void Video_view::update_camera_frame(const frame_info_t& frame) {
 }
 
 void Video_view::update_detection_info(float fps, float inference_time) {
+    // FPS display disabled to clean up interface
     if (detection_info_) {
-        char buffer[128];
-        snprintf(buffer, sizeof(buffer), "Rail Range: 0-1000.0mm | Precision: 0.1mm | FPS: %.1f", fps);
-        lv_label_set_text(detection_info_, buffer);
+        // Static text without changing FPS numbers
+        lv_label_set_text(detection_info_, "Rail Range: 0-1000.0mm | Precision: 0.1mm");
     }
 }
 
