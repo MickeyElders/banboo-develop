@@ -306,32 +306,11 @@ build-lvgl-from-micropython-binding:
 	# 正确的编译方法
 	@cd lvgl_build_temp/lv_binding_micropython && \
 		echo "$(BLUE)[INFO]$(NC) 配置编译环境..." && \
-		\
 		if [ -f "gen/gen_mpy.py" ]; then \
 			echo "$(BLUE)[INFO]$(NC) 使用gen_mpy.py生成Python绑定..." && \
 			../../venv/bin/python gen/gen_mpy.py -E pycparser lvgl/lvgl.h && \
 			echo "$(BLUE)[INFO]$(NC) 创建setup.py..." && \
-			cat > setup.py << 'EOF' && \
-from setuptools import setup, Extension
-import pybind11
-
-ext = Extension(
-    'lvgl',
-    sources=['lib/lv_bindings/lvgl.c'],
-    include_dirs=[
-        'lvgl',
-        'lvgl/src',
-        pybind11.get_cmake_dir() + '/../include'
-    ],
-    define_macros=[('LV_CONF_INCLUDE_SIMPLE', '1')]
-)
-
-setup(
-    name='lvgl',
-    ext_modules=[ext],
-    zip_safe=False,
-)
-EOF
+			printf 'from setuptools import setup, Extension\nimport pybind11\n\next = Extension(\n    "lvgl",\n    sources=["lib/lv_bindings/lvgl.c"],\n    include_dirs=[\n        "lvgl",\n        "lvgl/src",\n        pybind11.get_cmake_dir() + "/../include"\n    ],\n    define_macros=[("LV_CONF_INCLUDE_SIMPLE", "1")]\n)\n\nsetup(\n    name="lvgl",\n    ext_modules=[ext],\n    zip_safe=False,\n)\n' > setup.py && \
 			../../venv/bin/pip install . && \
 			echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译完成"; \
 		else \
