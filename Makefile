@@ -207,11 +207,14 @@ install-python-deps:
 	@./venv/bin/pip install -r requirements.txt
 	
 	# 验证关键包安装
-	@echo "$(BLUE)[INFO]$(NC) 验证Python LVGL安装..."
-	@./venv/bin/python -c "import lvgl; print('LVGL version:', lvgl.__version__)" || \
-		echo "$(YELLOW)[WARNING]$(NC) LVGL包验证失败"
+	@echo "$(BLUE)[INFO]$(NC) 验证Python包安装..."
 	@./venv/bin/python -c "import cv2; print('OpenCV version:', cv2.__version__)" || \
 		echo "$(YELLOW)[WARNING]$(NC) OpenCV包验证失败"
+	@./venv/bin/python -c "import numpy; print('NumPy version:', numpy.__version__)" || \
+		echo "$(YELLOW)[WARNING]$(NC) NumPy包验证失败"
+	@./venv/bin/python -c "import pybind11; print('pybind11 version:', pybind11.__version__)" || \
+		echo "$(YELLOW)[WARNING]$(NC) pybind11包验证失败"
+	@echo "$(YELLOW)[INFO]$(NC) LVGL需要从源码编译，将在运行时处理"
 	
 	$(call log_success,Python依赖安装完成)
 
