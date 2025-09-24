@@ -768,3 +768,25 @@ std::string CameraManager::getStreamURL() const {
 
 } // namespace vision
 } // namespace bamboo_cut
+FrameInfo CameraManager::getCurrentFrame() {
+    FrameInfo frame_info;
+    
+    if (!is_running_ || cameras_.empty()) {
+        return frame_info; // 返回无效的frame_info
+    }
+    
+    // 尝试从第一个可用的摄像头获取帧
+    for (const auto& [camera_id, cap] : cameras_) {
+        cv::Mat frame;
+        if (cap->read(frame) && !frame.empty()) {
+            frame_info.image = frame.clone();
+            frame_info.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            frame_info.valid = true;
+            frame_info.frame_id = ++frame_counter_;
+            break; // 获取到第一个有效帧就退出
+        }
+    }
+    
+    return frame_info;
+}
