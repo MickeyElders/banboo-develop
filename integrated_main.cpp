@@ -62,8 +62,7 @@ public:
     };
     
     struct DetectionData {
-        std::vector<cv::Point2f> points;
-        std::vector<float> confidences;
+        std::vector<bamboo_cut::vision::DetectionPoint> points;
         float processing_time_ms;
         bool has_detection;
         
@@ -121,7 +120,6 @@ public:
     void updateDetection(const bamboo_cut::vision::DetectionResult& result) {
         std::lock_guard<std::mutex> lock(detection_mutex_);
         latest_detection_.points = result.points;
-        latest_detection_.confidences = result.confidences;
         latest_detection_.processing_time_ms = result.processing_time_ms;
         latest_detection_.has_detection = result.success && !result.points.empty();
         new_detection_available_ = true;
@@ -157,11 +155,11 @@ public:
         return latest_stats_;
     }
     
-    bool hasNewVideo() const {
+    bool hasNewVideo() {
         return new_video_available_.exchange(false);
     }
     
-    bool hasNewDetection() const {
+    bool hasNewDetection() {
         return new_detection_available_.exchange(false);
     }
 
