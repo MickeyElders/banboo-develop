@@ -115,9 +115,18 @@ bool CameraManager::initialize() {
         }
         
         // 尝试多种方法初始化相机
-        std::vector<int> camera_ids_to_try = {camera_id};
+        // 优先使用/dev/video0以匹配前端配置
+        std::vector<int> camera_ids_to_try;
         if (camera_id == 0) {
-            camera_ids_to_try = {0, 1, 2}; // 尝试video0, video1, video2
+            camera_ids_to_try = {0, 1, 2}; // 优先video0, 然后video1, video2
+        } else {
+            // 即使指定了其他设备，也优先尝试video0
+            camera_ids_to_try = {0, camera_id, 1, 2};
+            // 去重
+            camera_ids_to_try.erase(
+                std::unique(camera_ids_to_try.begin(), camera_ids_to_try.end()),
+                camera_ids_to_try.end()
+            );
         }
         
         LOG_INFO("📹 开始相机初始化，候选ID列表: [{}]",
@@ -575,17 +584,20 @@ bool CameraManager::initializeVideoStream() {
             return false;
         }
         
-        // 配置appsrc属性
+        // 配置appsrc属性，匹配前端期望参数
+        // 注意：这里使用实际摄像头参数，缩放在管道中处理
         g_object_set(G_OBJECT(gst_appsrc_),
                     "caps", gst_caps_new_simple("video/x-raw",
                                               "format", G_TYPE_STRING, "BGR",
                                               "width", G_TYPE_INT, config_.width,
                                               "height", G_TYPE_INT, config_.height,
-                                              "framerate", GST_TYPE_FRACTION, config_.framerate, 1,
+                                              "framerate", GST_TYPE_FRACTION, 30, 1,  // 强制30fps输出
                                               nullptr),
                     "format", GST_FORMAT_TIME,
                     "is-live", TRUE,
                     "do-timestamp", TRUE,
+                    "max-buffers", 2,  // 限制缓冲区以减少延迟
+                    "block", FALSE,    // 非阻塞模式
                     nullptr);
         
         // 启动管道
@@ -611,31 +623,51 @@ bool CameraManager::initializeVideoStream() {
 std::string CameraManager::buildStreamPipeline() {
     std::stringstream pipeline;
     
-    // appsrc -> 编码器 -> 网络发送
+    // appsrc -> 可选缩放 -> 编码器 -> 网络发送
     pipeline << "appsrc name=appsrc ! ";
+    
+    // 如果输入分辨率与目标不匹配，添加缩放
+    // 前端期望640x480@30fps，确保输出匹配
+    int target_width = 640;
+    int target_height = 480;
+    int target_fps = 30;
+    
+    // 添加视频转换和缩放（如果需要）
+    if (config_.width != target_width || config_.height != target_height) {
+        LOG_INFO("添加视频缩放：{}x{} -> {}x{}", config_.width, config_.height, target_width, target_height);
+        pipeline << "videoconvert ! videoscale ! ";
+        pipeline << "video/x-raw,width=" << target_width << ",height=" << target_height;
+        pipeline << ",framerate=" << target_fps << "/1 ! ";
+    } else {
+        // 确保帧率匹配
+        pipeline << "video/x-raw,framerate=" << target_fps << "/1 ! ";
+    }
     
     // 根据配置选择编码器
     if (config_.stream_format == "H264") {
         if (config_.use_hardware_acceleration) {
-            // 硬件H.264编码
-            pipeline << "nvvidconv ! nvv4l2h264enc bitrate=" << config_.stream_bitrate << " ! ";
-            pipeline << "video/x-h264,stream-format=byte-stream ! ";
+            // 硬件H.264编码，优化参数以匹配前端
+            pipeline << "nvvidconv ! nvv4l2h264enc bitrate=" << config_.stream_bitrate
+                     << " preset-level=1 insert-sps-pps=true ! ";
+            pipeline << "video/x-h264,stream-format=byte-stream,alignment=au ! ";
         } else {
-            // 软件H.264编码
-            pipeline << "videoconvert ! x264enc bitrate=" << (config_.stream_bitrate / 1000) << " tune=zerolatency ! ";
-            pipeline << "video/x-h264,stream-format=byte-stream ! ";
+            // 软件H.264编码，优化延迟和兼容性
+            pipeline << "videoconvert ! x264enc bitrate=" << (config_.stream_bitrate / 1000)
+                     << " tune=zerolatency speed-preset=ultrafast key-int-max=30 ! ";
+            pipeline << "video/x-h264,stream-format=byte-stream,alignment=au ! ";
         }
         
-        // RTP打包并发送
-        pipeline << "rtph264pay config-interval=1 pt=96 ! ";
-        pipeline << "udpsink host=" << config_.stream_host << " port=" << config_.stream_port;
+        // RTP打包并发送，匹配前端接收参数
+        pipeline << "rtph264pay config-interval=1 pt=96 mtu=1400 ! ";
+        pipeline << "udpsink host=" << config_.stream_host << " port=" << config_.stream_port
+                 << " sync=false async=false";
         
     } else if (config_.stream_format == "JPEG") {
         // MJPEG流
         if (config_.use_hardware_acceleration) {
-            pipeline << "nvvidconv ! nvjpegenc ! ";
+            pipeline << "nvvidconv ! nvjpegenc quality=85 ! ";
         } else {
-            pipeline << "videoconvert ! jpegenc quality=80 ! ";
+            pipeline << "videoconvert ! jpegenc quality=85 ! ";
         }
         
         // 多部分HTTP流
@@ -643,6 +675,7 @@ std::string CameraManager::buildStreamPipeline() {
         pipeline << "tcpserversink host=" << config_.stream_host << " port=" << config_.stream_port;
     }
     
+    LOG_INFO("优化的流管道: {}", pipeline.str());
     return pipeline.str();
 }
 
@@ -667,10 +700,11 @@ void CameraManager::pushFrameToStream(const cv::Mat& frame) {
             memcpy(map.data, frame.data, size);
             gst_buffer_unmap(buffer, &map);
             
-            // 设置时间戳
-            GST_BUFFER_PTS(buffer) = gst_util_uint64_scale(frame_counter_, GST_SECOND, config_.framerate);
+            // 设置时间戳，使用30fps固定帧率
+            GST_BUFFER_PTS(buffer) = gst_util_uint64_scale(frame_counter_, GST_SECOND, 30);
             GST_BUFFER_DTS(buffer) = GST_BUFFER_PTS(buffer);
-            GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(1, GST_SECOND, config_.framerate);
+            GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(1, GST_SECOND, 30);
+            frame_counter_++;  // 递增帧计数器
             
             // 推送到管道
             GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(gst_appsrc_), buffer);

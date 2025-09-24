@@ -72,16 +72,14 @@ public:
             LOG_WARN("⚠️ 视觉系统初始化失败，系统将在无视觉检测模式下运行");
         }
         
-        // 初始化摄像头系统（用于视频流输出，使用不同的设备避免冲突）
-        camera_system_available_ = initializeCameraSystemForStreaming();
-        if (!camera_system_available_) {
-            LOG_WARN("⚠️ 摄像头流系统初始化失败，前端将无法获取视频画面");
-        }
+        // 完全禁用单摄像头系统，只使用立体视觉系统避免设备冲突
+        LOG_INFO("🚫 单摄像头系统已禁用，使用立体视觉系统代替");
+        camera_system_available_ = false;
         
-        // 初始化立体视觉系统（非关键模块，失败时继续运行）
-        stereo_vision_available_ = initializeStereoVisionSystem();
+        // 初始化立体视觉系统（关键模块，用于视觉检测和视频流输出）
+        stereo_vision_available_ = initializeStereoVisionSystemWithStreaming();
         if (!stereo_vision_available_) {
-            LOG_WARN("⚠️ 立体视觉系统初始化失败，系统将在2D模式下运行");
+            LOG_WARN("⚠️ 立体视觉系统初始化失败，前端将无法获取视频画面");
         }
         
         // 初始化通信系统（关键模块，失败时系统无法运行）
@@ -98,13 +96,12 @@ public:
         
         // 输出系统状态摘要
         LOG_INFO("🎯 系统初始化完成，模块状态:");
-        LOG_INFO("   📹 摄像头系统: {}", camera_system_available_ ? "✅ 可用" : "❌ 不可用");
         LOG_INFO("   🔍 视觉检测: {}", vision_system_available_ ? "✅ 可用" : "❌ 不可用");
-        LOG_INFO("   👁️ 立体视觉: {}", stereo_vision_available_ ? "✅ 可用" : "❌ 不可用");
+        LOG_INFO("   👁️ 立体视觉(含流): {}", stereo_vision_available_ ? "✅ 可用" : "❌ 不可用");
         LOG_INFO("   🔗 Modbus通信: ✅ 可用");
         LOG_INFO("   📡 前端通信: {}", tcp_server_available_ ? "✅ 可用" : "❌ 不可用");
         
-        if (!camera_system_available_ && !vision_system_available_) {
+        if (!stereo_vision_available_ && !vision_system_available_) {
             LOG_WARN("⚠️ 系统运行在模拟模式：无摄像头和视觉检测");
             LOG_WARN("⚠️ 可以接收PLC指令但无法进行实际检测");
         }
@@ -325,74 +322,16 @@ private:
         return true;
     }
     
-    bool initializeCameraSystemForStreaming() {
-        LOG_INFO("初始化专用于视频流的摄像头系统...");
-        
-        vision::CameraConfig camera_config;
-        // 使用video2设备避免与立体视觉系统冲突
-        camera_config.device_id = "/dev/video2";
-        camera_config.width = 1280;  // 使用较低分辨率以减少冲突
-        camera_config.height = 720;
-        camera_config.framerate = 30;
-        
-        // 启用GStreamer流输出
-        camera_config.enable_stream_output = true;
-        camera_config.stream_host = "127.0.0.1";
-        camera_config.stream_port = 5000;
-        camera_config.stream_format = "H264";
-        camera_config.stream_bitrate = 1500000;  // 降低码率
-        
-#ifdef TARGET_ARCH_AARCH64
-        camera_config.use_hardware_acceleration = true;
-        LOG_INFO("使用Jetson硬件加速pipeline（流模式）");
-#else
-        camera_config.use_hardware_acceleration = false;
-        LOG_INFO("使用通用摄像头pipeline（流模式）");
-#endif
-        
-        camera_manager_ = std::make_unique<vision::CameraManager>(camera_config);
-        
-        if (!camera_manager_->initialize()) {
-            LOG_WARN("video2设备初始化失败，尝试video1设备...");
-            
-            // 如果video2失败，尝试video1
-            camera_config.device_id = "/dev/video1";
-            camera_manager_ = std::make_unique<vision::CameraManager>(camera_config);
-            
-            if (!camera_manager_->initialize()) {
-                LOG_WARN("video1设备初始化失败，尝试video0设备（可能与立体视觉冲突）...");
-                
-                // 最后尝试video0
-                camera_config.device_id = "/dev/video0";
-                camera_manager_ = std::make_unique<vision::CameraManager>(camera_config);
-                
-                if (!camera_manager_->initialize()) {
-                    LOG_ERROR("所有摄像头设备初始化失败");
-                    return false;
-                }
-            }
-        }
-        
-        // 不设置帧回调，专注于视频流输出
-        LOG_INFO("专用视频流摄像头系统初始化完成");
-        auto camera_info = camera_manager_->getCameraInfo();
-        LOG_INFO("视频流摄像头信息: {} @ {}x{}", camera_info.card_name,
-                camera_info.current_width, camera_info.current_height);
-        LOG_INFO("视频流URL: {}", camera_manager_->getStreamURL());
-        
-        return true;
-    }
-    
-    bool initializeStereoVisionSystem() {
-        LOG_INFO("初始化立体视觉系统...");
+    bool initializeStereoVisionSystemWithStreaming() {
+        LOG_INFO("初始化带流输出的立体视觉系统...");
         
         // 配置双摄像头参数
         vision::CameraSyncConfig stereo_config;
         stereo_config.left_device = "/dev/video0";   // 左摄像头
-        stereo_config.right_device = "/dev/video1";  // 右摄像头 - 修复：从video2改为video1
-        stereo_config.width = 1280;                  // 降低分辨率以提高处理速度
-        stereo_config.height = 720;
-        stereo_config.fps = 30;
+        stereo_config.right_device = "/dev/video1";  // 右摄像头
+        stereo_config.width = 640;                   // 匹配前端期望分辨率
+        stereo_config.height = 480;                  // 匹配前端期望分辨率
+        stereo_config.fps = 30;                      // 匹配前端期望帧率
         stereo_config.hardware_sync = false;         // 软件同步
         stereo_config.sync_tolerance_ms = 10;        // 10ms同步容差
         
@@ -414,7 +353,12 @@ private:
             LOG_INFO("使用单目模式，深度信息不可用");
         }
         
-        LOG_INFO("立体视觉系统初始化完成");
+        LOG_INFO("立体视觉系统（含流输出）初始化完成");
+        LOG_INFO("📺 视频流信息:");
+        LOG_INFO("   格式: H264, UDP端口: 5000");
+        LOG_INFO("   分辨率: 640x480 @ 30fps");
+        LOG_INFO("   支持显示模式: 并排显示 | 融合显示");
+        
         return true;
     }
     
@@ -516,49 +460,25 @@ private:
         LOG_INFO("📋 Modbus启动后的状态检查...");
         LOG_INFO("   communication_system_available_: {}", communication_system_available_ ? "是" : "否");
         
-        // 详细调试摄像头系统状态
-        LOG_INFO("🔍 检查摄像头系统状态:");
-        LOG_INFO("   camera_manager_存在: {}", camera_manager_ ? "是" : "否");
-        LOG_INFO("   camera_system_available_: {}", camera_system_available_ ? "是" : "否");
+        // 检查立体视觉系统状态（现在是唯一的视频源）
+        LOG_INFO("🔍 检查立体视觉系统状态:");
+        LOG_INFO("   stereo_vision_存在: {}", stereo_vision_ ? "是" : "否");
+        LOG_INFO("   stereo_vision_available_: {}", stereo_vision_available_ ? "是" : "否");
         
-        // 启动摄像头捕获（可选服务）
-        if (camera_manager_ && camera_system_available_) {
-            LOG_INFO("📹 开始启动摄像头服务...");
-            if (camera_manager_->startCapture()) {
-                LOG_INFO("✅ 摄像头服务启动成功");
-                
-                // 添加详细的视频流状态日志
-                if (camera_manager_->isVideoStreamEnabled()) {
-                    std::string stream_url = camera_manager_->getStreamURL();
-                    LOG_INFO("🎥 GStreamer视频流已启用");
-                    LOG_INFO("📡 视频流URL: {}", stream_url);
-                    LOG_INFO("🔗 前端应连接到: {}", stream_url);
-                    LOG_INFO("📺 视频格式: H264, 分辨率: 1280x720, 帧率: 30fps");
-                    LOG_INFO("💡 视频流诊断信息:");
-                    LOG_INFO("   - 后端正在发送视频帧到UDP端口5000");
-                    LOG_INFO("   - 前端应能接收到实时视频画面");
-                    LOG_INFO("   - 如果前端看不到画面，请检查网络连接");
-                } else {
-                    LOG_WARN("⚠️ GStreamer视频流未启用");
-                    LOG_WARN("💡 原因可能：GStreamer组件初始化失败");
-                }
-            } else {
-                LOG_WARN("⚠️ 摄像头服务启动失败，切换到模拟模式");
-                camera_system_available_ = false;
-            }
+        // 立体视觉系统已经在初始化时启动，这里只需要确认状态
+        if (stereo_vision_ && stereo_vision_available_) {
+            LOG_INFO("✅ 立体视觉系统运行正常");
+            LOG_INFO("🎥 立体视觉流输出已启用");
+            LOG_INFO("📡 视频流URL: udp://127.0.0.1:5000");
+            LOG_INFO("📺 视频格式: H264, 分辨率: 640x480, 帧率: 30fps");
+            LOG_INFO("💡 支持显示模式:");
+            LOG_INFO("   - 并排显示：显示左右摄像头画面");
+            LOG_INFO("   - 融合显示：显示处理后的单一画面");
+            LOG_INFO("   - 前端可通过按钮切换显示模式");
         } else {
-            if (!camera_manager_) {
-                LOG_WARN("⚠️ 摄像头管理器未初始化，跳过启动");
-                LOG_WARN("💡 提示：前端将看不到视频画面");
-                LOG_WARN("💡 原因：摄像头设备初始化失败");
-            } else if (!camera_system_available_) {
-                LOG_WARN("⚠️ 摄像头系统标记为不可用，跳过启动");
-                LOG_WARN("💡 提示：前端将看不到视频画面");
-                LOG_WARN("💡 原因：所有摄像头设备(/dev/video0, /dev/video1, /dev/video2)不可用");
-            } else {
-                LOG_WARN("⚠️ 摄像头系统不可用，跳过启动");
-                LOG_WARN("💡 提示：前端将看不到视频画面");
-            }
+            LOG_WARN("⚠️ 立体视觉系统不可用");
+            LOG_WARN("💡 提示：前端将看不到视频画面");
+            LOG_WARN("💡 原因：双摄像头设备(/dev/video0, /dev/video1)不可用");
         }
         
         // 启动TCP Socket服务器（必需服务，用于前端通信）
@@ -583,28 +503,30 @@ private:
             }
         }
         
-        // 设置系统状态
+        // 设置系统状态（基于立体视觉系统）
         if (modbus_server_) {
-            if (camera_system_available_ && vision_system_available_) {
+            if (stereo_vision_available_ && vision_system_available_) {
                 modbus_server_->set_system_status(communication::SystemStatus::RUNNING);
-                LOG_INFO("✅ 系统状态：完全运行模式");
+                LOG_INFO("✅ 系统状态：完全运行模式（立体视觉+AI检测）");
+            } else if (stereo_vision_available_) {
+                modbus_server_->set_system_status(communication::SystemStatus::RUNNING);
+                LOG_INFO("✅ 系统状态：立体视觉模式（无AI检测）");
             } else {
                 modbus_server_->set_system_status(communication::SystemStatus::MAINTENANCE);
-                LOG_WARN("⚠️ 系统状态：有限运行模式（部分功能不可用）");
+                LOG_WARN("⚠️ 系统状态：有限运行模式（无视觉系统）");
             }
         }
         
-        LOG_INFO("🎯 服务启动完成 - 可用服务数: {}/5",
+        LOG_INFO("🎯 服务启动完成 - 可用服务数: {}/4",
                 (communication_system_available_ ? 1 : 0) +
                 (tcp_server_available_ ? 1 : 0) +
-                (camera_system_available_ ? 1 : 0) +
                 (vision_system_available_ ? 1 : 0) +
                 (stereo_vision_available_ ? 1 : 0));
     }
     
     void processVision() {
-        // 检查是否有可用的视觉系统
-        if (!vision_system_available_ && !camera_system_available_ && !stereo_vision_available_) {
+        // 检查是否有可用的视觉系统（只依赖立体视觉系统）
+        if (!vision_system_available_ && !stereo_vision_available_) {
             // 在模拟模式下，定期发送模拟数据用于测试
             static auto last_simulation_time = std::chrono::steady_clock::now();
             auto now = std::chrono::steady_clock::now();
@@ -619,16 +541,17 @@ private:
             return;
         }
         
-        // 立体视觉处理
+        // 优先使用立体视觉处理（主要视觉系统）
         if (stereo_vision_available_ && stereo_vision_ && stereo_vision_->is_initialized()) {
             if (processStereovision()) {
                 return; // 立体视觉处理成功，直接返回
             }
         }
         
-        // 传统2D视觉处理备选方案
-        if (vision_system_available_ && camera_system_available_) {
-            process2DVision();
+        // 2D视觉检测作为补充（如果立体视觉无法处理）
+        if (vision_system_available_ && detector_) {
+            // 在没有单摄像头系统的情况下，使用立体视觉的左摄像头进行2D检测
+            processStereovisionAs2D();
         }
     }
     
@@ -686,25 +609,25 @@ private:
         return false;
     }
     
-    void process2DVision() {
+    void processStereovisionAs2D() {
         if (!detector_ || !detector_->is_initialized()) {
             LOG_DEBUG("传统检测器不可用");
             return;
         }
         
-        // 从摄像头获取当前帧
-        std::lock_guard<std::mutex> lock(frame_mutex_);
-        if (current_frame_.frames.empty()) {
-            LOG_DEBUG("没有可用的摄像头帧");
+        // 从立体视觉系统获取左摄像头帧进行2D检测
+        vision::StereoFrame stereo_frame;
+        if (!stereo_vision_->capture_stereo_frame(stereo_frame) || !stereo_frame.valid) {
+            LOG_DEBUG("无法从立体视觉系统获取帧");
             return;
         }
         
-        auto result = detector_->detect(current_frame_.frames[0]);
+        auto result = detector_->detect(stereo_frame.left_image);
         if (result.success && !result.points.empty()) {
             auto best_point = result.points[0];
             
             // 确定使用的刀片
-            communication::BladeNumber blade = (best_point.x < current_frame_.frames[0].cols / 2) ?
+            communication::BladeNumber blade = (best_point.x < stereo_frame.left_image.cols / 2) ?
                 communication::BladeNumber::BLADE_1 : communication::BladeNumber::BLADE_2;
             
             // 创建坐标数据
@@ -720,7 +643,7 @@ private:
                 modbus_server_->set_coordinate_data(coord_data);
             }
             
-            LOG_DEBUG("✅ 2D检测: X={:.1f}px ({:.1f}mm), 刀片={}, 耗时: {:.2f}ms",
+            LOG_DEBUG("✅ 2D检测(立体左摄): X={:.1f}px ({:.1f}mm), 刀片={}, 耗时: {:.2f}ms",
                      best_point.x, best_point.x * pixel_to_mm,
                      static_cast<int>(blade), result.processing_time_ms);
         }

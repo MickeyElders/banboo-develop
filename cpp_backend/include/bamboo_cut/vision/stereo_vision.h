@@ -11,6 +11,11 @@
 #else
     #define HAS_WLS_FILTER 0
 #endif
+
+// GStreamer支持
+#include <gst/gst.h>
+#include <gst/app/gstappsrc.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -98,6 +103,20 @@ struct CameraSyncConfig {
     int fps{30};                             // 帧率
     bool hardware_sync{false};               // 硬件同步
     int sync_tolerance_ms{5};                // 同步容差(毫秒)
+    
+    // GStreamer流输出配置
+    bool enable_stream_output{true};         // 启用视频流输出
+    std::string stream_host{"127.0.0.1"};   // 流服务器地址
+    int stream_port{5000};                   // 流端口
+    std::string stream_format{"H264"};       // 流编码格式
+    int stream_bitrate{1000000};             // 码率 (1Mbps for 640x480)
+    bool use_hardware_acceleration{true};    // 使用硬件加速
+};
+
+// 视频显示模式枚举
+enum class DisplayMode {
+    SIDE_BY_SIDE = 0,    // 并排显示（调试模式）
+    FUSED = 1            // 融合显示（生产模式）
 };
 
 // 立体帧数据
@@ -176,6 +195,15 @@ public:
     StereoMatchingConfig get_stereo_matching_config() const;
     StereoCalibrationParams get_calibration_params() const;
     
+    // GStreamer流输出控制
+    bool enable_video_stream(bool enable = true);
+    bool is_video_stream_enabled() const { return stream_enabled_; }
+    std::string get_stream_url() const;
+    
+    // 显示模式控制
+    void set_display_mode(DisplayMode mode);
+    DisplayMode get_display_mode() const { return display_mode_; }
+    
     // 状态和统计
     bool is_calibrated() const { return calibration_params_.is_calibrated; }
     double get_baseline_mm() const { return calibration_params_.baseline; }
@@ -248,6 +276,19 @@ private:
     // 线程同步
     std::chrono::steady_clock::time_point last_left_timestamp_;
     std::chrono::steady_clock::time_point last_right_timestamp_;
+    
+    // GStreamer流输出相关
+    GstElement* gst_pipeline_{nullptr};
+    GstElement* gst_appsrc_{nullptr};
+    bool stream_enabled_{false};
+    DisplayMode display_mode_{DisplayMode::SIDE_BY_SIDE};
+    uint64_t frame_counter_{0};
+    
+    // 流输出辅助方法
+    bool initialize_video_stream();
+    std::string build_stream_pipeline();
+    void push_frame_to_stream(const cv::Mat& frame);
+    cv::Mat create_display_frame(const cv::Mat& left, const cv::Mat& right);
 };
 
 // 工具函数
