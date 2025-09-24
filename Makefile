@@ -244,30 +244,41 @@ install-gtk4-python:
 	$(call log_highlight,安装GTK4 Python绑定...)
 	
 	# 检查系统依赖
-	@echo "$(BLUE)[INFO]$(NC) 检查GTK4系统依赖..."
+	@echo "$(BLUE)[INFO]$(NC) 安装GTK4完整系统依赖..."
 	@sudo apt update || true
-	@sudo apt install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-dev libadwaita-1-dev || true
 	
-	# 确保虚拟环境存在
+	# 安装GTK4核心和开发依赖
+	@sudo apt install -y \
+		python3-gi python3-gi-dev python3-gi-cairo \
+		gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-glib-2.0 \
+		libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev \
+		pkg-config build-essential meson ninja-build \
+		libglib2.0-dev libgobject-introspection-1.0-dev || true
+		
+	# 确保gi-docgen可用(Adwaita文档生成)
+	@sudo apt install -y gi-docgen || true
+	
+	# 确保虚拟环境使用系统包
 	@if [ ! -d "venv" ]; then \
-		echo "$(BLUE)[INFO]$(NC) 创建Python虚拟环境..."; \
+		echo "$(BLUE)[INFO]$(NC) 创建Python虚拟环境(使用系统包)..."; \
 		python3 -m venv venv --system-site-packages; \
 	fi
 	
-	# 升级构建工具
-	@echo "$(BLUE)[INFO]$(NC) 升级Python构建工具..."
-	@./venv/bin/pip install --upgrade pip setuptools wheel
-	
 	# 验证GTK4安装
 	@echo "$(BLUE)[INFO]$(NC) 验证GTK4 Python绑定..."
-	@if ./venv/bin/python -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK4 + Adwaita可用')" 2>/dev/null; then \
+	@if ./venv/bin/python -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK4 + Adwaita验证成功: Gtk', Gtk.get_major_version(), '.', Gtk.get_minor_version())" 2>/dev/null; then \
 		echo "$(GREEN)[SUCCESS]$(NC) GTK4 + Adwaita安装成功"; \
 	else \
-		echo "$(YELLOW)[WARNING]$(NC) GTK4绑定安装失败，请手动安装系统依赖"; \
-		echo "$(YELLOW)[INFO]$(NC) 运行: sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1"; \
+		echo "$(YELLOW)[WARNING]$(NC) GTK4绑定验证失败，尝试安装额外依赖..."; \
+		sudo apt install -y python3-dev libffi-dev libcairo2-dev || true; \
+		if ./venv/bin/python -c "import gi; gi.require_version('Gtk', '4.0'); from gi.repository import Gtk; print('GTK4基础库可用')" 2>/dev/null; then \
+			echo "$(GREEN)[SUCCESS]$(NC) GTK4基础库安装成功"; \
+		else \
+			echo "$(RED)[ERROR]$(NC) GTK4安装失败，请检查系统依赖"; \
+		fi; \
 	fi
 	
-	$(call log_success,GTK4 Python绑定检查完成)
+	$(call log_success,GTK4 Python绑定安装完成)
 
 clean:
 	$(call log_info,清理构建文件...)
