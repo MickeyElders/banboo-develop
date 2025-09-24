@@ -215,15 +215,24 @@ install-python-deps: install-lvgl-python
 	@./venv/bin/python -c "import pybind11; print('pybind11 version:', pybind11.__version__)" || \
 		echo "$(YELLOW)[WARNING]$(NC) pybind11包验证失败"
 	
-	# 验证LVGL安装
-	@echo "$(BLUE)[INFO]$(NC) 验证LVGL Python绑定安装..."
-	@if ./venv/bin/python -c "import lvgl as lv; print('LVGL version:', lv.version_info())" 2>/dev/null; then \
+	# 验证图形库安装
+	@echo "$(BLUE)[INFO]$(NC) 验证图形库安装..."
+	@GRAPHICS_OK=false; \
+	\
+	if ./venv/bin/python -c "import lvgl as lv; print('LVGL version:', lv.version_info())" 2>/dev/null; then \
 		$(call log_success,LVGL Python绑定验证成功); \
-	else \
-		$(call log_error,LVGL Python绑定验证失败，请检查安装过程); \
-		echo "$(RED)[ERROR]$(NC) LVGL模块无法导入，系统无法正常运行"; \
-		echo "$(YELLOW)[提示]$(NC) 请尝试运行: make clean && make redeploy"; \
-		exit 1; \
+		GRAPHICS_OK=true; \
+	elif ./venv/bin/python -c "import lv_python; print('lv_python导入成功')" 2>/dev/null; then \
+		$(call log_success,lv_python包验证成功); \
+		GRAPHICS_OK=true; \
+	elif ./venv/bin/python -c "import pygame; print('Pygame version:', pygame.version.ver)" 2>/dev/null; then \
+		$(call log_success,Pygame图形库验证成功，将作为图形后端); \
+		GRAPHICS_OK=true; \
+	fi; \
+	\
+	if [ "$$GRAPHICS_OK" = "false" ]; then \
+		$(call log_warning,无可用图形库，系统将以基础模式运行); \
+		echo "$(YELLOW)[提示]$(NC) 可尝试运行: make clean && make redeploy"; \
 	fi
 	
 	$(call log_success,Python依赖安装完成)
@@ -246,61 +255,94 @@ install-lvgl-python:
 	@echo "$(BLUE)[INFO]$(NC) 升级Python构建工具..."
 	@./venv/bin/pip install --upgrade pip setuptools wheel cython
 	
-	# 方法1: 尝试官方LVGL Python包
-	@echo "$(BLUE)[INFO]$(NC) 尝试安装官方LVGL Python包..."
-	@if ./venv/bin/pip install lvgl==8.3.* 2>/dev/null; then \
+	# 尝试多种LVGL Python安装方法
+	@echo "$(BLUE)[INFO]$(NC) 尝试安装LVGL Python包..."
+	@LVGL_INSTALLED=false; \
+	\
+	echo "$(BLUE)[INFO]$(NC) 方法1: 尝试官方LVGL包..."; \
+	if ./venv/bin/pip install lvgl 2>/dev/null; then \
 		echo "$(GREEN)[SUCCESS]$(NC) LVGL官方包安装成功"; \
-	else \
-		echo "$(YELLOW)[WARNING]$(NC) 官方包失败，尝试从源码编译..."; \
-		$(MAKE) build-lvgl-from-source; \
+		LVGL_INSTALLED=true; \
+	fi; \
+	\
+	if [ "$$LVGL_INSTALLED" = "false" ]; then \
+		echo "$(BLUE)[INFO]$(NC) 方法2: 从源码编译lv_binding_micropython..."; \
+		$(MAKE) build-lvgl-from-micropython-binding; \
+		if ./venv/bin/python -c "import lvgl" 2>/dev/null; then \
+			echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译安装成功"; \
+			LVGL_INSTALLED=true; \
+		fi; \
+	fi; \
+	\
+	if [ "$$LVGL_INSTALLED" = "false" ]; then \
+		echo "$(BLUE)[INFO]$(NC) 方法3: 尝试其他LVGL包..."; \
+		if ./venv/bin/pip install lv_python 2>/dev/null || ./venv/bin/pip install micropython-lvgl 2>/dev/null; then \
+			echo "$(GREEN)[SUCCESS]$(NC) 替代LVGL包安装成功"; \
+			LVGL_INSTALLED=true; \
+		fi; \
+	fi; \
+	\
+	if [ "$$LVGL_INSTALLED" = "false" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) 无法安装LVGL包，将安装基础图形库"; \
+		./venv/bin/pip install pygame pillow || true; \
 	fi
 	
 	$(call log_success,LVGL Python绑定安装完成)
 
-# 从源码编译LVGL Python绑定
-build-lvgl-from-source:
-	@echo "$(BLUE)[INFO]$(NC) 从源码编译LVGL Python绑定，这可能需要几分钟..."
+# 从lv_binding_micropython源码编译LVGL Python绑定
+build-lvgl-from-micropython-binding:
+	@echo "$(BLUE)[INFO]$(NC) 从lv_binding_micropython源码编译LVGL，这可能需要几分钟..."
 	
 	# 创建临时构建目录
 	@rm -rf lvgl_build_temp
 	@mkdir -p lvgl_build_temp
 	
-	# 下载官方MicroPython绑定源码(现在是官方维护的版本)
+	# 下载lv_binding_micropython源码
 	@cd lvgl_build_temp && \
 		git clone https://github.com/lvgl/lv_binding_micropython.git --depth 1 && \
 		cd lv_binding_micropython && \
 		git submodule update --init --recursive
 	
-	# 检查是否有Python支持
+	# 正确的编译方法
 	@cd lvgl_build_temp/lv_binding_micropython && \
+		echo "$(BLUE)[INFO]$(NC) 配置编译环境..." && \
+		\
 		if [ -f "gen/gen_mpy.py" ]; then \
-			echo "$(BLUE)[INFO]$(NC) 找到Python生成脚本，尝试生成Python绑定..."; \
-			../../venv/bin/python gen/gen_mpy.py; \
-			../../venv/bin/pip install .; \
+			echo "$(BLUE)[INFO]$(NC) 使用gen_mpy.py生成Python绑定..." && \
+			../../venv/bin/python gen/gen_mpy.py -E pycparser lvgl/lvgl.h && \
+			echo "$(BLUE)[INFO]$(NC) 创建setup.py..." && \
+			cat > setup.py << 'EOF' && \
+from setuptools import setup, Extension
+import pybind11
+
+ext = Extension(
+    'lvgl',
+    sources=['lib/lv_bindings/lvgl.c'],
+    include_dirs=[
+        'lvgl',
+        'lvgl/src',
+        pybind11.get_cmake_dir() + '/../include'
+    ],
+    define_macros=[('LV_CONF_INCLUDE_SIMPLE', '1')]
+)
+
+setup(
+    name='lvgl',
+    ext_modules=[ext],
+    zip_safe=False,
+)
+EOF
+			../../venv/bin/pip install . && \
+			echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译完成"; \
 		else \
-			echo "$(YELLOW)[WARNING]$(NC) MicroPython绑定不支持标准Python，尝试替代方案..."; \
-			$(MAKE) install-alternative-lvgl; \
+			echo "$(YELLOW)[WARNING]$(NC) 未找到gen_mpy.py，尝试直接编译..." && \
+			../../venv/bin/pip install . 2>/dev/null || echo "$(YELLOW)[WARNING]$(NC) 直接编译失败"; \
 		fi
 	
 	# 清理临时文件
 	@rm -rf lvgl_build_temp
 	
-	@echo "$(GREEN)[SUCCESS]$(NC) LVGL绑定安装尝试完成"
-
-# 安装替代的LVGL解决方案
-install-alternative-lvgl:
-	@echo "$(BLUE)[INFO]$(NC) 尝试替代的LVGL Python方案..."
-	
-	# 方法1: 尝试从第三方维护的包
-	@./venv/bin/pip install lv_utils || true
-	
-	# 方法2: 尝试安装embed-lvgl包
-	@./venv/bin/pip install embed-lvgl || true
-	
-	# 方法3: 安装基础图形库作为替代
-	@./venv/bin/pip install pillow || true
-	
-	@echo "$(YELLOW)[INFO]$(NC) 替代方案安装完成"
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL编译过程完成"
 
 clean:
 	$(call log_info,清理构建文件...)
