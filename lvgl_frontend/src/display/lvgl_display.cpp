@@ -12,6 +12,13 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 
+// 获取当前时间戳（毫秒）
+static uint64_t get_timestamp_ms() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
 // LVGL显示驱动变量
 static lv_disp_drv_t disp_drv;
 static lv_disp_t *disp;
@@ -488,8 +495,17 @@ void update_camera_display() {
                 frame_info_t frame_info;
                 frame_info.width = g_camera_manager->width;
                 frame_info.height = g_camera_manager->height;
-                frame_info.data = g_camera_manager->img_buffer;
-                frame_info.data_size = g_camera_manager->width * g_camera_manager->height * 3;
+                frame_info.valid = true;
+                frame_info.timestamp = get_timestamp_ms();
+                frame_info.frame_id = 0;
+                
+#ifdef __cplusplus
+                // 创建cv::Mat从图像缓冲区
+                cv::Mat img(g_camera_manager->height, g_camera_manager->width, CV_8UC3, g_camera_manager->img_buffer);
+                frame_info.image = img.clone(); // 复制数据避免指针问题
+#else
+                frame_info.image_data = g_camera_manager->img_buffer;
+#endif
                 
                 // 调用video_view的更新方法
                 g_video_view_component->update_camera_frame(frame_info);

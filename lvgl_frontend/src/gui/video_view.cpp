@@ -223,7 +223,13 @@ void Video_view::update_camera_frame(const frame_info_t& frame) {
     }
     
     // 检查帧数据是否有效
-    if (frame.width <= 0 || frame.height <= 0 || !frame.data) {
+    if (frame.width <= 0 || frame.height <= 0 || !frame.valid) {
+        return;
+    }
+    
+#ifdef __cplusplus
+    // C++模式下使用cv::Mat
+    if (frame.image.empty()) {
         return;
     }
     
@@ -269,16 +275,24 @@ void Video_view::update_camera_frame(const frame_info_t& frame) {
     }
     
     // 复制帧数据到LVGL缓冲区（转换BGR到RGB格式）
-    if (img_buffer && frame.data) {
-        const uint8_t* src = (const uint8_t*)frame.data;
-        uint8_t* dst = img_buffer;
-        
-        for (int i = 0; i < frame.width * frame.height; i++) {
-            // BGR到RGB转换
-            dst[i * 3 + 0] = src[i * 3 + 2]; // R
-            dst[i * 3 + 1] = src[i * 3 + 1]; // G
-            dst[i * 3 + 2] = src[i * 3 + 0]; // B
+    if (img_buffer && !frame.image.empty()) {
+        cv::Mat rgb_frame;
+        // 确保是3通道BGR图像
+        if (frame.image.channels() == 3) {
+            // 从BGR转换到RGB
+            cv::cvtColor(frame.image, rgb_frame, cv::COLOR_BGR2RGB);
+        } else {
+            // 如果是其他格式，直接使用
+            rgb_frame = frame.image.clone();
         }
+        
+        // 调整尺寸
+        if (rgb_frame.cols != frame.width || rgb_frame.rows != frame.height) {
+            cv::resize(rgb_frame, rgb_frame, cv::Size(frame.width, frame.height));
+        }
+        
+        // 复制数据到LVGL缓冲区
+        memcpy(img_buffer, rgb_frame.data, frame.width * frame.height * 3);
         
         // 通知LVGL图像已更新
         if (video_img) {
@@ -286,6 +300,13 @@ void Video_view::update_camera_frame(const frame_info_t& frame) {
             lv_obj_invalidate(video_img);
         }
     }
+#else
+    // C模式下使用image_data指针
+    if (!frame.image_data) {
+        return;
+    }
+    // TODO: 实现C语言版本的帧处理
+#endif
 }
 
 void Video_view::update_detection_info(float fps, float inference_time) {
