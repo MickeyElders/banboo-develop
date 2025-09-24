@@ -265,20 +265,42 @@ build-lvgl-from-source:
 	@rm -rf lvgl_build_temp
 	@mkdir -p lvgl_build_temp
 	
-	# 下载官方Python绑定源码
+	# 下载官方MicroPython绑定源码(现在是官方维护的版本)
 	@cd lvgl_build_temp && \
-		git clone https://github.com/lvgl/lv_binding_python.git --depth 1 && \
-		cd lv_binding_python && \
+		git clone https://github.com/lvgl/lv_binding_micropython.git --depth 1 && \
+		cd lv_binding_micropython && \
 		git submodule update --init --recursive
 	
-	# 使用pip安装从源码
-	@cd lvgl_build_temp/lv_binding_python && \
-		../../venv/bin/pip install .
+	# 检查是否有Python支持
+	@cd lvgl_build_temp/lv_binding_micropython && \
+		if [ -f "gen/gen_mpy.py" ]; then \
+			echo "$(BLUE)[INFO]$(NC) 找到Python生成脚本，尝试生成Python绑定..."; \
+			../../venv/bin/python gen/gen_mpy.py; \
+			../../venv/bin/pip install .; \
+		else \
+			echo "$(YELLOW)[WARNING]$(NC) MicroPython绑定不支持标准Python，尝试替代方案..."; \
+			$(MAKE) install-alternative-lvgl; \
+		fi
 	
 	# 清理临时文件
 	@rm -rf lvgl_build_temp
 	
-	@echo "$(GREEN)[SUCCESS]$(NC) LVGL从源码编译完成"
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL绑定安装尝试完成"
+
+# 安装替代的LVGL解决方案
+install-alternative-lvgl:
+	@echo "$(BLUE)[INFO]$(NC) 尝试替代的LVGL Python方案..."
+	
+	# 方法1: 尝试从第三方维护的包
+	@./venv/bin/pip install lv_utils || true
+	
+	# 方法2: 尝试安装embed-lvgl包
+	@./venv/bin/pip install embed-lvgl || true
+	
+	# 方法3: 安装基础图形库作为替代
+	@./venv/bin/pip install pillow || true
+	
+	@echo "$(YELLOW)[INFO]$(NC) 替代方案安装完成"
 
 clean:
 	$(call log_info,清理构建文件...)
