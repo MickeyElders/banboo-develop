@@ -1,13 +1,13 @@
-# 竹子识别系统 Python LVGL 架构构建文件
-# 版本: 4.0.0 (Python LVGL Architecture)
-# Python LVGL前端 + C++推理后端的混合架构
+# 竹子识别系统 Python GTK3 架构构建文件
+# 版本: 5.0.0 (Python GTK3 Architecture)
+# Python GTK3前端 + C++推理后端的混合架构
 
 .PHONY: all clean build-cpp build-python install-python-deps install install-service uninstall start stop restart status logs logs-follow help check-deps deploy redeploy backup dev-run test-cpp
 
 # 项目配置
-PROJECT_NAME = bamboo-cutting-python-lvgl
+PROJECT_NAME = bamboo-cutting-python-gtk3
 SOURCE_DIR = .
-BUILD_DIR = build_python_lvgl
+BUILD_DIR = build_python_gtk3
 CPP_BUILD_DIR = cpp_inference
 BUILD_TYPE ?= Release
 INSTALL_PREFIX = /opt/bamboo-cut
@@ -21,8 +21,8 @@ PYTHON_VENV = $(INSTALL_PREFIX)/venv
 PYTHON_BIN = $(PYTHON_VENV)/bin/python
 PIP_BIN = $(PYTHON_VENV)/bin/pip
 
-# 服务配置 - Python LVGL服务
-PYTHON_LVGL_SERVICE = bamboo-python-lvgl.service
+# 服务配置 - Python GTK3服务
+PYTHON_GTK3_SERVICE = bamboo-python-gtk3.service
 
 # AI优化配置文件
 AI_CONFIG = config/ai_optimization.yaml

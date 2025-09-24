@@ -1,58 +1,45 @@
-# ai_bamboo_system.py
-import lvgl as lv
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+AI Bamboo Recognition System - GTK3界面
+基于GTK3的工业级竹子识别切割系统界面
+"""
+
+import gi
+gi.require_version('', '3.0')
+from gi.repository import Gtk, Gdk, GLib, cairo, GdkPixbuf
 import time
 import threading
 import random
 import math
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw
+import sys
+import os
 
 class BambooSystemUI:
     def __init__(self):
-        # Initialize graphics backend
-        self.backend = GRAPHICS_BACKEND
+        """初始化GTK3界面系统"""
         
-        if self.backend == "LVGL":
-            lv.init()
-            # LVGL Colors
-            self.colors = {
-                'bg_main': lv.color_hex(0x1E1E1E),
-                'bg_panel': lv.color_hex(0x2D2D2D),
-                'accent': lv.color_hex(0xFF6B35),
-                'success': lv.color_hex(0x4CAF50),
-                'warning': lv.color_hex(0xFFC107),
-                'error': lv.color_hex(0xF44336),
-                'text_primary': lv.color_hex(0xFFFFFF),
-                'text_secondary': lv.color_hex(0xB0B0B0),
-                'border': lv.color_hex(0x404040),
-                'modbus_blue': lv.color_hex(0x2196F3),
-                'emergency': lv.color_hex(0xFF1744),
-                'power': lv.color_hex(0x9C27B0),
-                'jetson_green': lv.color_hex(0x76B900)
-            }
-        elif self.backend == "PYGAME":
-            pygame.init()
-            # Pygame Colors (RGB tuples)
-            self.colors = {
-                'bg_main': (30, 30, 30),
-                'bg_panel': (45, 45, 45),
-                'accent': (255, 107, 53),
-                'success': (76, 175, 80),
-                'warning': (255, 193, 7),
-                'error': (244, 67, 54),
-                'text_primary': (255, 255, 255),
-                'text_secondary': (176, 176, 176),
-                'border': (64, 64, 64),
-                'modbus_blue': (33, 150, 243),
-                'emergency': (255, 23, 68),
-                'power': (156, 39, 176),
-                'jetson_green': (118, 185, 0)
-            }
-            self.screen = pygame.display.set_mode((1280, 720))
-            pygame.display.set_caption("AI Bamboo Recognition System")
-        else:
-            # Console mode - no colors
-            self.colors = {}
+        # GTK3主题色彩配置
+        self.colors = {
+            'bg_main': '#1E1E1E',
+            'bg_panel': '#2D2D2D', 
+            'accent': '#FF6B35',
+            'success': '#4CAF50',
+            'warning': '#FFC107',
+            'error': '#F44336',
+            'text_primary': '#FFFFFF',
+            'text_secondary': '#B0B0B0',
+            'border': '#404040',
+            'modbus_blue': '#2196F3',
+            'emergency': '#FF1744',
+            'power': '#9C27B0',
+            'jetson_green': '#76B900'
+        }
         
-        # System state
+        # 系统状态数据
         self.system_state = {
             'is_running': False,
             'current_step': 1,
@@ -64,7 +51,7 @@ class BambooSystemUI:
             'coordinate_ready': 0
         }
         
-        # Jetson data
+        # Jetson Orin NX性能数据
         self.jetson_data = {
             'cpu': {'usage': 45, 'freq': 1500, 'temp': 52},
             'gpu': {'usage': 32, 'freq': 624, 'temp': 49},
@@ -76,7 +63,7 @@ class BambooSystemUI:
             'storage': {'used': 45, 'total': 128}
         }
         
-        # AI model data
+        # AI推理模型数据
         self.ai_data = {
             'inference_time': 15.3,
             'detection_fps': 28.5,
@@ -85,7 +72,7 @@ class BambooSystemUI:
             'accuracy': 94.2
         }
         
-        # Status mappings
+        # 状态映射表
         self.status_maps = {
             'system_status': ['Stopped', 'Running', 'Error', 'Paused', 'Emergency', 'Maintenance'],
             'plc_command': ['None', 'Feed Detection', 'Cut Prepare', 'Cut Complete', 'Start Feed', 'Pause', 'Emergency', 'Resume'],
@@ -94,7 +81,7 @@ class BambooSystemUI:
             'health_status': ['Normal', 'Warning', 'Error', 'Critical']
         }
         
-        # Workflow steps
+        # 工作流程步骤
         self.workflow_steps = [
             {'id': 1, 'name': 'Feed Detection', 'plc_cmd': 1},
             {'id': 2, 'name': 'Vision Recognition', 'plc_cmd': 0},
@@ -103,233 +90,337 @@ class BambooSystemUI:
             {'id': 5, 'name': 'Execute Cut', 'plc_cmd': 3}
         ]
         
-        # Create UI
-        self.create_ui()
+        # 界面组件引用
+        self.widgets = {}
+        self.progress_bars = {}
+        self.register_values = {}
+        self.workflow_buttons = []
+        self.blade_buttons = []
         
-        # Start update threads
+        # 控制标志
+        self.running = True
+        
+        # 创建GTK3界面
+        self.create_gtk_ui()
+        
+        # 启动后台更新线程
         self.start_update_threads()
     
-    def create_ui(self):
-        """Create the main UI"""
-        # Create main screen
-        self.scr = lv.obj()
-        lv.scr_load(self.scr)
+    def create_gtk_ui(self):
+        """创建GTK3主界面"""
+        # 创建主窗口
+        self.window = Gtk.Window()
+        self.window.set_title("AI Bamboo Recognition System v2.1 - GTK3")
+        self.window.set_default_size(1280, 800)
+        self.window.set_position(Gtk.WindowPosition.CENTER)
+        self.window.connect("destroy", self.on_window_destroy)
         
-        # Set background color
-        self.scr.set_style_bg_color(self.colors['bg_main'], 0)
+        # 设置CSS样式
+        self.setup_css_styling()
         
-        # Create main layout
-        self.create_header()
-        self.create_camera_panel()
-        self.create_control_panel()
-        self.create_footer()
+        # 创建主容器
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.window.add(main_box)
+        
+        # 创建头部面板
+        header_frame = self.create_header_panel()
+        main_box.pack_start(header_frame, False, False, 0)
+        
+        # 创建中间内容区域
+        content_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        content_box.set_margin_left(10)
+        content_box.set_margin_right(10)
+        content_box.set_margin_top(10)
+        content_box.set_margin_bottom(10)
+        main_box.pack_start(content_box, True, True, 0)
+        
+        # 创建摄像头面板
+        camera_frame = self.create_camera_panel()
+        content_box.pack_start(camera_frame, True, True, 0)
+        
+        # 创建控制面板
+        control_frame = self.create_control_panel()
+        content_box.pack_start(control_frame, False, False, 0)
+        
+        # 创建底部控制栏
+        footer_frame = self.create_footer_panel()
+        main_box.pack_start(footer_frame, False, False, 0)
+        
+        # 显示窗口
+        self.window.show_all()
     
-    def create_header(self):
-        """Create header panel"""
-        # Header container
-        self.header = lv.obj(self.scr)
-        self.header.set_size(lv.pct(100), 60)
-        self.header.align(lv.ALIGN.TOP_MID, 0, 0)
-        self.header.set_style_bg_color(self.colors['bg_panel'], 0)
-        self.header.set_style_border_color(self.colors['border'], 0)
-        self.header.set_style_border_width(2, 0)
+    def setup_css_styling(self):
+        """设置GTK3 CSS样式"""
+        css_provider = Gtk.CssProvider()
+        css_data = f"""
+        .main-window {{
+            background-color: {self.colors['bg_main']};
+            color: {self.colors['text_primary']};
+        }}
         
-        # System title
-        self.title_label = lv.label(self.header)
-        self.title_label.set_text("AI Bamboo Recognition Cutting System v2.1")
-        self.title_label.align(lv.ALIGN.LEFT_MID, 20, 0)
-        self.title_label.set_style_text_color(self.colors['text_primary'], 0)
+        .header-panel {{
+            background-color: {self.colors['bg_panel']};
+            border: 2px solid {self.colors['border']};
+            padding: 10px;
+        }}
         
-        # Workflow status
-        self.create_workflow_status()
+        .control-panel {{
+            background-color: {self.colors['bg_panel']};
+            border: 2px solid {self.colors['border']};
+            border-radius: 8px;
+            padding: 10px;
+        }}
         
-        # Heartbeat monitor
-        self.create_heartbeat_monitor()
+        .camera-panel {{
+            background-color: {self.colors['bg_panel']};
+            border: 2px solid {self.colors['border']};
+            border-radius: 8px;
+            padding: 10px;
+        }}
+        
+        .section-title {{
+            color: {self.colors['accent']};
+            font-weight: bold;
+            font-size: 14px;
+        }}
+        
+        .value-label {{
+            color: {self.colors['text_primary']};
+            font-weight: bold;
+        }}
+        
+        .secondary-label {{
+            color: {self.colors['text_secondary']};
+        }}
+        
+        .success-button {{
+            background-color: {self.colors['success']};
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+        }}
+        
+        .warning-button {{
+            background-color: {self.colors['warning']};
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+        }}
+        
+        .error-button {{
+            background-color: {self.colors['error']};
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+        }}
+        
+        .emergency-button {{
+            background-color: {self.colors['emergency']};
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+        }}
+        
+        .workflow-button {{
+            background-color: {self.colors['bg_main']};
+            border: 1px solid {self.colors['border']};
+            border-radius: 15px;
+            padding: 5px 10px;
+        }}
+        
+        .workflow-active {{
+            background-color: {self.colors['accent']};
+            color: white;
+        }}
+        
+        .workflow-completed {{
+            background-color: {self.colors['success']};
+            color: white;
+        }}
+        """
+        
+        css_provider.load_from_data(css_data.encode())
+        screen = Gdk.Screen.get_default()
+        style_context = Gtk.StyleContext()
+        style_context.add_provider_for_screen(screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
     
-    def create_workflow_status(self):
-        """Create workflow status indicators"""
-        self.workflow_container = lv.obj(self.header)
-        self.workflow_container.set_size(400, 40)
-        self.workflow_container.align(lv.ALIGN.CENTER, 0, 0)
-        self.workflow_container.set_style_bg_opa(0, 0)
-        self.workflow_container.set_style_border_opa(0, 0)
-        self.workflow_container.set_flex_flow(lv.FLEX_FLOW.ROW)
-        self.workflow_container.set_flex_align(lv.FLEX_ALIGN.SPACE_EVENLY, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
+    def create_header_panel(self):
+        """创建头部面板"""
+        frame = Gtk.Frame()
+        frame.get_style_context().add_class("header-panel")
         
-        self.workflow_steps_ui = []
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        header_box.set_margin_top(10)
+        header_box.set_margin_bottom(10)
+        header_box.set_margin_left(15)
+        header_box.set_margin_right(15)
+        frame.add(header_box)
+        
+        # 系统标题
+        title_label = Gtk.Label("AI Bamboo Recognition Cutting System v2.1")
+        title_label.get_style_context().add_class("section-title")
+        header_box.pack_start(title_label, False, False, 0)
+        
+        # 工作流程状态指示器
+        workflow_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        header_box.set_center_widget(workflow_box)
+        
         for step in self.workflow_steps:
-            step_btn = lv.btn(self.workflow_container)
-            step_btn.set_size(70, 30)
-            step_btn.set_style_bg_color(self.colors['bg_main'], 0)
-            step_btn.set_style_border_color(self.colors['border'], 0)
-            step_btn.set_style_radius(15, 0)
-            
-            step_label = lv.label(step_btn)
-            step_label.set_text(step['name'][:8])  # Truncate for space
-            step_label.center()
-            step_label.set_style_text_font(lv.font_default(), 0)
-            
-            self.workflow_steps_ui.append({'btn': step_btn, 'label': step_label})
-    
-    def create_heartbeat_monitor(self):
-        """Create heartbeat monitor"""
-        self.heartbeat_container = lv.obj(self.header)
-        self.heartbeat_container.set_size(200, 40)
-        self.heartbeat_container.align(lv.ALIGN.RIGHT_MID, -20, 0)
-        self.heartbeat_container.set_style_bg_opa(0, 0)
-        self.heartbeat_container.set_style_border_opa(0, 0)
+            btn = Gtk.Button(label=step['name'][:8])
+            btn.get_style_context().add_class("workflow-button")
+            btn.set_size_request(70, 30)
+            workflow_box.pack_start(btn, False, False, 0)
+            self.workflow_buttons.append(btn)
         
-        # Heartbeat indicator
-        self.heartbeat_led = lv.led(self.heartbeat_container)
-        self.heartbeat_led.set_size(8, 8)
-        self.heartbeat_led.align(lv.ALIGN.LEFT_MID, 0, -10)
-        self.heartbeat_led.set_color(self.colors['success'])
-        self.heartbeat_led.on()
+        # 心跳监控
+        heartbeat_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        header_box.pack_end(heartbeat_box, False, False, 0)
         
-        # Heartbeat counter
-        self.heartbeat_label = lv.label(self.heartbeat_container)
-        self.heartbeat_label.set_text(f"Heartbeat: {self.system_state['heartbeat_counter']}")
-        self.heartbeat_label.align(lv.ALIGN.LEFT_MID, 15, -10)
-        self.heartbeat_label.set_style_text_color(self.colors['success'], 0)
+        self.widgets['heartbeat_label'] = Gtk.Label(f"Heartbeat: {self.system_state['heartbeat_counter']}")
+        self.widgets['heartbeat_label'].get_style_context().add_class("value-label")
+        heartbeat_box.pack_start(self.widgets['heartbeat_label'], False, False, 0)
         
-        # Response time
-        self.response_label = lv.label(self.heartbeat_container)
-        self.response_label.set_text("Response: 12ms")
-        self.response_label.align(lv.ALIGN.LEFT_MID, 15, 10)
-        self.response_label.set_style_text_color(self.colors['success'], 0)
+        self.widgets['response_label'] = Gtk.Label("Response: 12ms")
+        self.widgets['response_label'].get_style_context().add_class("secondary-label")
+        heartbeat_box.pack_start(self.widgets['response_label'], False, False, 0)
+        
+        return frame
     
     def create_camera_panel(self):
-        """Create camera panel"""
-        self.camera_panel = lv.obj(self.scr)
-        self.camera_panel.set_size(lv.pct(70), 400)
-        self.camera_panel.align(lv.ALIGN.TOP_LEFT, 10, 70)
-        self.camera_panel.set_style_bg_color(self.colors['bg_panel'], 0)
-        self.camera_panel.set_style_border_color(self.colors['border'], 0)
-        self.camera_panel.set_style_border_width(2, 0)
-        self.camera_panel.set_style_radius(8, 0)
+        """创建摄像头面板"""
+        frame = Gtk.Frame()
+        frame.get_style_context().add_class("camera-panel")
+        frame.set_size_request(800, 400)
         
-        # Camera title
-        self.camera_title = lv.label(self.camera_panel)
-        self.camera_title.set_text("Real-time Detection View")
-        self.camera_title.align(lv.ALIGN.TOP_LEFT, 15, 15)
-        self.camera_title.set_style_text_color(self.colors['accent'], 0)
+        camera_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        camera_box.set_margin_top(10)
+        camera_box.set_margin_bottom(10)
+        camera_box.set_margin_left(15)
+        camera_box.set_margin_right(15)
+        frame.add(camera_box)
         
-        # Detection info
-        self.detection_info = lv.label(self.camera_panel)
-        self.detection_info.set_text("Rail Range: 0-1000.0mm | Precision: 0.1mm | FPS: 28.5")
-        self.detection_info.align(lv.ALIGN.TOP_RIGHT, -15, 15)
-        self.detection_info.set_style_text_color(self.colors['text_secondary'], 0)
+        # 摄像头标题和信息
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        camera_box.pack_start(header_box, False, False, 0)
         
-        # Camera canvas
-        self.camera_canvas = lv.obj(self.camera_panel)
-        self.camera_canvas.set_size(lv.pct(90), 250)
-        self.camera_canvas.align(lv.ALIGN.TOP_MID, 0, 45)
-        self.camera_canvas.set_style_bg_color(lv.color_hex(0x000000), 0)
-        self.camera_canvas.set_style_border_color(self.colors['border'], 0)
+        title_label = Gtk.Label("Real-time Detection View")
+        title_label.get_style_context().add_class("section-title")
+        header_box.pack_start(title_label, False, False, 0)
         
-        # Placeholder text
-        self.camera_placeholder = lv.label(self.camera_canvas)
-        self.camera_placeholder.set_text("Bamboo Detection View\n1280 x 720 | YOLOv8 Inference\nInference Time: 15.3ms")
-        self.camera_placeholder.center()
-        self.camera_placeholder.set_style_text_color(self.colors['text_secondary'], 0)
-        self.camera_placeholder.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
+        info_label = Gtk.Label("Rail Range: 0-1000.0mm | Precision: 0.1mm | FPS: 28.5")
+        info_label.get_style_context().add_class("secondary-label")
+        header_box.pack_end(info_label, False, False, 0)
         
-        # Rail indicator
-        self.create_rail_indicator()
+        # 摄像头画布
+        self.widgets['camera_canvas'] = Gtk.DrawingArea()
+        self.widgets['camera_canvas'].set_size_request(750, 250)
+        self.widgets['camera_canvas'].connect("draw", self.on_camera_draw)
+        camera_box.pack_start(self.widgets['camera_canvas'], True, True, 0)
         
-        # Coordinate display
-        self.create_coordinate_display()
-    
-    def create_rail_indicator(self):
-        """Create rail position indicator"""
-        self.rail_indicator = lv.obj(self.camera_canvas)
-        self.rail_indicator.set_size(lv.pct(80), 30)
-        self.rail_indicator.align(lv.ALIGN.BOTTOM_MID, 0, -10)
-        self.rail_indicator.set_style_bg_color(self.colors['modbus_blue'], lv.OPA._30)
-        self.rail_indicator.set_style_border_color(self.colors['modbus_blue'], 0)
+        # 坐标显示面板
+        coord_frame = Gtk.Frame()
+        coord_frame.set_size_request(-1, 60)
+        coord_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        coord_box.set_margin_top(10)
+        coord_box.set_margin_bottom(10)
+        coord_box.set_margin_left(15)
+        coord_box.set_margin_right(15)
+        coord_frame.add(coord_box)
         
-        self.rail_label = lv.label(self.rail_indicator)
-        self.rail_label.set_text("X-axis Rail (0-1000.0mm)")
-        self.rail_label.center()
-        self.rail_label.set_style_text_color(self.colors['modbus_blue'], 0)
+        # X坐标显示
+        x_coord_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        coord_box.pack_start(x_coord_box, False, False, 20)
         
-        # Cutting position indicator
-        self.cutting_position = lv.obj(self.rail_indicator)
-        self.cutting_position.set_size(2, 30)
-        self.cutting_position.align(lv.ALIGN.LEFT_MID, 50, 0)  # Will be updated
-        self.cutting_position.set_style_bg_color(self.colors['error'], 0)
-    
-    def create_coordinate_display(self):
-        """Create coordinate display"""
-        self.coord_panel = lv.obj(self.camera_panel)
-        self.coord_panel.set_size(lv.pct(90), 60)
-        self.coord_panel.align(lv.ALIGN.BOTTOM_MID, 0, -15)
-        self.coord_panel.set_style_bg_color(lv.color_hex(0x1A1A1A), 0)
-        self.coord_panel.set_style_border_color(self.colors['accent'], 0)
+        x_label = Gtk.Label("X Coordinate")
+        x_label.get_style_context().add_class("secondary-label")
+        x_coord_box.pack_start(x_label, False, False, 0)
         
-        # X coordinate
-        self.x_coord_label = lv.label(self.coord_panel)
-        self.x_coord_label.set_text("X Coordinate")
-        self.x_coord_label.align(lv.ALIGN.LEFT_MID, 20, -15)
-        self.x_coord_label.set_style_text_color(self.colors['text_secondary'], 0)
+        self.widgets['x_coord_value'] = Gtk.Label("245.8mm")
+        self.widgets['x_coord_value'].get_style_context().add_class("value-label")
+        x_coord_box.pack_start(self.widgets['x_coord_value'], False, False, 0)
         
-        self.x_coord_value = lv.label(self.coord_panel)
-        self.x_coord_value.set_text("245.8mm")
-        self.x_coord_value.align(lv.ALIGN.LEFT_MID, 20, 5)
-        self.x_coord_value.set_style_text_color(self.colors['accent'], 0)
+        # 切割质量显示
+        quality_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        coord_box.pack_start(quality_box, False, False, 20)
         
-        # Cut quality
-        self.quality_label = lv.label(self.coord_panel)
-        self.quality_label.set_text("Cut Quality")
-        self.quality_label.align(lv.ALIGN.CENTER, 0, -15)
-        self.quality_label.set_style_text_color(self.colors['text_secondary'], 0)
+        quality_label = Gtk.Label("Cut Quality")
+        quality_label.get_style_context().add_class("secondary-label")
+        quality_box.pack_start(quality_label, False, False, 0)
         
-        self.quality_value = lv.label(self.coord_panel)
-        self.quality_value.set_text("Normal")
-        self.quality_value.align(lv.ALIGN.CENTER, 0, 5)
-        self.quality_value.set_style_text_color(self.colors['success'], 0)
+        self.widgets['quality_value'] = Gtk.Label("Normal")
+        self.widgets['quality_value'].get_style_context().add_class("value-label")
+        quality_box.pack_start(self.widgets['quality_value'], False, False, 0)
         
-        # Blade selection
-        self.blade_label = lv.label(self.coord_panel)
-        self.blade_label.set_text("Blade Selection")
-        self.blade_label.align(lv.ALIGN.RIGHT_MID, -20, -15)
-        self.blade_label.set_style_text_color(self.colors['text_secondary'], 0)
+        # 刀具选择显示
+        blade_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        coord_box.pack_end(blade_box, False, False, 20)
         
-        self.blade_value = lv.label(self.coord_panel)
-        self.blade_value.set_text("Dual Blade")
-        self.blade_value.align(lv.ALIGN.RIGHT_MID, -20, 5)
-        self.blade_value.set_style_text_color(self.colors['accent'], 0)
+        blade_label = Gtk.Label("Blade Selection")
+        blade_label.get_style_context().add_class("secondary-label")
+        blade_box.pack_start(blade_label, False, False, 0)
+        
+        self.widgets['blade_value'] = Gtk.Label("Dual Blade")
+        self.widgets['blade_value'].get_style_context().add_class("value-label")
+        blade_box.pack_start(self.widgets['blade_value'], False, False, 0)
+        
+        camera_box.pack_start(coord_frame, False, False, 0)
+        
+        return frame
     
     def create_control_panel(self):
-        """Create control panel"""
-        self.control_panel = lv.obj(self.scr)
-        self.control_panel.set_size(380, 400)
-        self.control_panel.align(lv.ALIGN.TOP_RIGHT, -10, 70)
-        self.control_panel.set_style_bg_color(self.colors['bg_panel'], 0)
-        self.control_panel.set_style_border_color(self.colors['border'], 0)
-        self.control_panel.set_style_border_width(2, 0)
-        self.control_panel.set_style_radius(8, 0)
+        """创建控制面板"""
+        frame = Gtk.Frame()
+        frame.get_style_context().add_class("control-panel")
+        frame.set_size_request(380, 600)
         
-        # Create scrollable container
-        self.scroll_container = lv.obj(self.control_panel)
-        self.scroll_container.set_size(lv.pct(95), lv.pct(95))
-        self.scroll_container.align(lv.ALIGN.TOP_MID, 0, 5)
-        self.scroll_container.set_style_bg_opa(0, 0)
-        self.scroll_container.set_style_border_opa(0, 0)
-        self.scroll_container.set_scroll_dir(lv.DIR.VER)
+        # 创建滚动窗口
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        frame.add(scrolled)
         
-        # Create sections
-        self.create_modbus_section()
-        self.create_plc_section()
-        self.create_jetson_section()
-        self.create_ai_section()
-        self.create_communication_section()
+        control_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        control_box.set_margin_top(10)
+        control_box.set_margin_bottom(10)
+        control_box.set_margin_left(10)
+        control_box.set_margin_right(10)
+        scrolled.add(control_box)
+        
+        # Modbus寄存器部分
+        modbus_section = self.create_modbus_section()
+        control_box.pack_start(modbus_section, False, False, 0)
+        
+        # PLC通信部分
+        plc_section = self.create_plc_section()
+        control_box.pack_start(plc_section, False, False, 0)
+        
+        # Jetson系统信息部分
+        jetson_section = self.create_jetson_section()
+        control_box.pack_start(jetson_section, False, False, 0)
+        
+        # AI模型状态部分
+        ai_section = self.create_ai_section()
+        control_box.pack_start(ai_section, False, False, 0)
+        
+        return frame
     
     def create_modbus_section(self):
-        """Create Modbus registers section"""
-        section = self.create_section("Modbus Registers", self.colors['modbus_blue'])
+        """创建Modbus寄存器部分"""
+        frame = Gtk.Frame()
+        frame.set_label("Modbus Registers")
         
-        # Create table-like structure
+        grid = Gtk.Grid()
+        grid.set_margin_top(10)
+        grid.set_margin_bottom(10)
+        grid.set_margin_left(10)
+        grid.set_margin_right(10)
+        grid.set_row_spacing(5)
+        grid.set_column_spacing(10)
+        frame.add(grid)
+        
         registers = [
             ("40001", "System Status", "reg_40001"),
             ("40002", "PLC Command", "reg_40002"),
@@ -341,36 +432,42 @@ class BambooSystemUI:
             ("40010", "Health Status", "reg_40010")
         ]
         
-        self.register_values = {}
-        y_offset = 30
-        
-        for addr, desc, key in registers:
-            # Address
-            addr_label = lv.label(section)
-            addr_label.set_text(addr)
-            addr_label.align(lv.ALIGN.TOP_LEFT, 10, y_offset)
-            addr_label.set_style_text_color(self.colors['modbus_blue'], 0)
+        for i, (addr, desc, key) in enumerate(registers):
+            # 地址
+            addr_label = Gtk.Label(addr)
+            addr_label.get_style_context().add_class("value-label")
+            addr_label.set_xalign(0)
+            grid.attach(addr_label, 0, i, 1, 1)
             
-            # Description
-            desc_label = lv.label(section)
-            desc_label.set_text(desc)
-            desc_label.align(lv.ALIGN.TOP_LEFT, 80, y_offset)
-            desc_label.set_style_text_color(self.colors['text_secondary'], 0)
+            # 描述
+            desc_label = Gtk.Label(desc)
+            desc_label.get_style_context().add_class("secondary-label")
+            desc_label.set_xalign(0)
+            grid.attach(desc_label, 1, i, 1, 1)
             
-            # Value
-            value_label = lv.label(section)
-            value_label.set_text("0")
-            value_label.align(lv.ALIGN.TOP_RIGHT, -10, y_offset)
-            value_label.set_style_text_color(self.colors['accent'], 0)
+            # 值
+            value_label = Gtk.Label("0")
+            value_label.get_style_context().add_class("value-label")
+            value_label.set_xalign(1)
+            grid.attach(value_label, 2, i, 1, 1)
             
             self.register_values[key] = value_label
-            y_offset += 20
+        
+        return frame
     
     def create_plc_section(self):
-        """Create PLC communication section"""
-        section = self.create_section("PLC Communication", self.colors['success'])
+        """创建PLC通信部分"""
+        frame = Gtk.Frame()
+        frame.set_label("PLC Communication")
         
-        # Status items
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        vbox.set_margin_top(10)
+        vbox.set_margin_bottom(10)
+        vbox.set_margin_left(10)
+        vbox.set_margin_right(10)
+        frame.add(vbox)
+        
+        # PLC状态信息
         status_items = [
             ("Connection:", "Connected"),
             ("PLC Address:", "192.168.1.100"),
@@ -378,140 +475,133 @@ class BambooSystemUI:
             ("Total Cuts:", "1,247")
         ]
         
-        y_offset = 30
-        for label, value in status_items:
-            label_obj = lv.label(section)
-            label_obj.set_text(label)
-            label_obj.align(lv.ALIGN.TOP_LEFT, 10, y_offset)
-            label_obj.set_style_text_color(self.colors['text_secondary'], 0)
+        for label_text, value_text in status_items:
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            vbox.pack_start(hbox, False, False, 0)
             
-            value_obj = lv.label(section)
-            value_obj.set_text(value)
-            value_obj.align(lv.ALIGN.TOP_RIGHT, -10, y_offset)
-            value_obj.set_style_text_color(self.colors['text_primary'], 0)
+            label = Gtk.Label(label_text)
+            label.get_style_context().add_class("secondary-label")
+            label.set_xalign(0)
+            hbox.pack_start(label, False, False, 0)
             
-            y_offset += 20
+            value = Gtk.Label(value_text)
+            value.get_style_context().add_class("value-label")
+            value.set_xalign(1)
+            hbox.pack_end(value, False, False, 0)
         
-        # Blade selector
-        self.create_blade_selector(section, y_offset + 10)
-    
-    def create_blade_selector(self, parent, y_offset):
-        """Create blade selector buttons"""
-        blade_container = lv.obj(parent)
-        blade_container.set_size(lv.pct(90), 30)
-        blade_container.align(lv.ALIGN.TOP_MID, 0, y_offset)
-        blade_container.set_style_bg_opa(0, 0)
-        blade_container.set_style_border_opa(0, 0)
-        blade_container.set_flex_flow(lv.FLEX_FLOW.ROW)
-        blade_container.set_flex_align(lv.FLEX_ALIGN.SPACE_EVENLY, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
+        # 刀具选择按钮
+        blade_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        blade_box.set_margin_top(10)
+        vbox.pack_start(blade_box, False, False, 0)
         
-        self.blade_buttons = []
         blade_names = ["Blade 1", "Blade 2", "Dual Blade"]
-        
         for i, name in enumerate(blade_names):
-            btn = lv.btn(blade_container)
-            btn.set_size(70, 25)
-            btn.set_style_bg_color(self.colors['bg_main'], 0)
-            btn.set_style_border_color(self.colors['border'], 0)
-            
-            label = lv.label(btn)
-            label.set_text(name)
-            label.center()
-            
-            # Set active state for blade 3 (dual blade)
-            if i == 2:  # Dual blade
-                btn.set_style_bg_color(self.colors['accent'], 0)
-            
-            btn.add_event_cb(lambda e, idx=i: self.on_blade_select(idx), lv.EVENT.CLICKED, None)
+            btn = Gtk.Button(label=name)
+            btn.connect("clicked", self.on_blade_select, i)
+            blade_box.pack_start(btn, True, True, 0)
             self.blade_buttons.append(btn)
+            
+            # 设置双刀为默认选择
+            if i == 2:
+                btn.get_style_context().add_class("success-button")
+        
+        return frame
     
     def create_jetson_section(self):
-        """Create Jetson system section"""
-        section = self.create_section("Jetson Orin NX 16GB", self.colors['jetson_green'], height=200)
+        """创建Jetson系统信息部分"""
+        frame = Gtk.Frame()
+        frame.set_label("Jetson Orin NX 16GB")
         
-        # Performance mode indicator
-        mode_label = lv.label(section)
-        mode_label.set_text("15W")
-        mode_label.align(lv.ALIGN.TOP_RIGHT, -10, 5)
-        mode_label.set_style_text_color(self.colors['accent'], 0)
-        mode_label.set_style_bg_color(self.colors['accent'], 0)
-        mode_label.set_style_bg_opa(255, 0)
-        mode_label.set_style_radius(3, 0)
-        mode_label.set_style_pad_all(3, 0)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        vbox.set_margin_top(10)
+        vbox.set_margin_bottom(10)
+        vbox.set_margin_left(10)
+        vbox.set_margin_right(10)
+        frame.add(vbox)
         
-        # Progress bars
-        self.create_progress_bar(section, "CPU (6-core ARM Cortex-A78AE)", 30, "cpu")
-        self.create_progress_bar(section, "GPU (1024-core NVIDIA Ampere)", 60, "gpu")
-        self.create_progress_bar(section, "Memory (LPDDR5)", 90, "memory")
+        # 性能模式标识
+        mode_label = Gtk.Label("15W")
+        mode_label.get_style_context().add_class("value-label")
+        mode_label.set_xalign(1)
+        vbox.pack_start(mode_label, False, False, 0)
         
-        # System info grid
-        self.create_jetson_info_grid(section, 120)
-        
-        # Version info
-        version_label = lv.label(section)
-        version_label.set_text("JetPack 6.0 | CUDA 12.2 | TensorRT 8.6.1\nPython 3.10.12 | PyTorch 2.1.0")
-        version_label.align(lv.ALIGN.BOTTOM_LEFT, 10, -5)
-        version_label.set_style_text_color(self.colors['text_secondary'], 0)
-    
-    def create_progress_bar(self, parent, title, y_offset, key):
-        """Create progress bar with label"""
-        # Title and percentage
-        title_label = lv.label(parent)
-        title_label.set_text(title)
-        title_label.align(lv.ALIGN.TOP_LEFT, 10, y_offset)
-        title_label.set_style_text_color(self.colors['text_secondary'], 0)
-        
-        percent_label = lv.label(parent)
-        percent_label.set_text("45%")
-        percent_label.align(lv.ALIGN.TOP_RIGHT, -10, y_offset)
-        percent_label.set_style_text_color(self.colors['text_primary'], 0)
-        
-        # Progress bar
-        progress = lv.bar(parent)
-        progress.set_size(lv.pct(85), 6)
-        progress.align(lv.ALIGN.TOP_LEFT, 10, y_offset + 15)
-        progress.set_value(45, lv.ANIM.OFF)
-        
-        # Store references for updates
-        if not hasattr(self, 'progress_bars'):
-            self.progress_bars = {}
-        self.progress_bars[key] = {'bar': progress, 'label': percent_label}
-    
-    def create_jetson_info_grid(self, parent, y_offset):
-        """Create Jetson system info grid"""
-        info_items = [
-            ("CPU Freq:", "1.5GHz"),
-            ("GPU Freq:", "624MHz"),
-            ("EMC Freq:", "2133MHz"),
-            ("CPU Temp:", "52°C"),
-            ("GPU Temp:", "49°C"),
-            ("Thermal:", "45°C"),
-            ("Fan Speed:", "2150RPM"),
-            ("Power:", "8.2W"),
-            ("Voltage:", "5.1V")
+        # 进度条
+        progress_items = [
+            ("CPU (6-core ARM Cortex-A78AE)", "cpu"),
+            ("GPU (1024-core NVIDIA Ampere)", "gpu"),
+            ("Memory (LPDDR5)", "memory")
         ]
         
-        x_positions = [10, 130, 250]
-        y_pos = y_offset
+        for title, key in progress_items:
+            # 标题和百分比
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            vbox.pack_start(hbox, False, False, 0)
+            
+            title_label = Gtk.Label(title)
+            title_label.get_style_context().add_class("secondary-label")
+            title_label.set_xalign(0)
+            hbox.pack_start(title_label, False, False, 0)
+            
+            percent_label = Gtk.Label("45%")
+            percent_label.get_style_context().add_class("value-label")
+            percent_label.set_xalign(1)
+            hbox.pack_end(percent_label, False, False, 0)
+            
+            # 进度条
+            progress = Gtk.ProgressBar()
+            progress.set_fraction(0.45)
+            vbox.pack_start(progress, False, False, 0)
+            
+            self.progress_bars[key] = {'bar': progress, 'label': percent_label}
         
-        for i, (label, value) in enumerate(info_items):
-            x_pos = x_positions[i % 3]
-            if i > 0 and i % 3 == 0:
-                y_pos += 15
+        # 系统信息网格
+        grid = Gtk.Grid()
+        grid.set_row_spacing(5)
+        grid.set_column_spacing(15)
+        grid.set_margin_top(10)
+        vbox.pack_start(grid, False, False, 0)
+        
+        info_items = [
+            ("CPU Freq:", "1.5GHz"), ("GPU Freq:", "624MHz"), ("EMC Freq:", "2133MHz"),
+            ("CPU Temp:", "52°C"), ("GPU Temp:", "49°C"), ("Thermal:", "45°C"),
+            ("Fan Speed:", "2150RPM"), ("Power:", "8.2W"), ("Voltage:", "5.1V")
+        ]
+        
+        for i, (label_text, value_text) in enumerate(info_items):
+            row = i // 3
+            col = (i % 3) * 2
             
-            label_obj = lv.label(parent)
-            label_obj.set_text(label)
-            label_obj.align(lv.ALIGN.TOP_LEFT, x_pos, y_pos)
-            label_obj.set_style_text_color(self.colors['text_secondary'], 0)
+            label = Gtk.Label(label_text)
+            label.get_style_context().add_class("secondary-label")
+            label.set_xalign(0)
+            grid.attach(label, col, row, 1, 1)
             
-            value_obj = lv.label(parent)
-            value_obj.set_text(value)
-            value_obj.align(lv.ALIGN.TOP_LEFT, x_pos + 50, y_pos)
-            value_obj.set_style_text_color(self.colors['text_primary'], 0)
+            value = Gtk.Label(value_text)
+            value.get_style_context().add_class("value-label")
+            value.set_xalign(0)
+            grid.attach(value, col + 1, row, 1, 1)
+        
+        # 版本信息
+        version_label = Gtk.Label("JetPack 6.0 | CUDA 12.2 | TensorRT 8.6.1\nPython 3.10.12 | PyTorch 2.1.0")
+        version_label.get_style_context().add_class("secondary-label")
+        version_label.set_line_wrap(True)
+        vbox.pack_start(version_label, False, False, 0)
+        
+        return frame
     
     def create_ai_section(self):
-        """Create AI model section"""
-        section = self.create_section("AI Model Status", self.colors['accent'])
+        """创建AI模型状态部分"""
+        frame = Gtk.Frame()
+        frame.set_label("AI Model Status")
+        
+        grid = Gtk.Grid()
+        grid.set_margin_top(10)
+        grid.set_margin_bottom(10)
+        grid.set_margin_left(10)
+        grid.set_margin_right(10)
+        grid.set_row_spacing(5)
+        grid.set_column_spacing(10)
+        frame.add(grid)
         
         ai_items = [
             ("Model Version:", "YOLOv8n"),
@@ -522,264 +612,221 @@ class BambooSystemUI:
             ("Today Detections:", "89")
         ]
         
-        y_offset = 30
-        for label, value in ai_items:
-            label_obj = lv.label(section)
-            label_obj.set_text(label)
-            label_obj.align(lv.ALIGN.TOP_LEFT, 10, y_offset)
-            label_obj.set_style_text_color(self.colors['text_secondary'], 0)
+        for i, (label_text, value_text) in enumerate(ai_items):
+            label = Gtk.Label(label_text)
+            label.get_style_context().add_class("secondary-label")
+            label.set_xalign(0)
+            grid.attach(label, 0, i, 1, 1)
             
-            value_obj = lv.label(section)
-            value_obj.set_text(value)
-            value_obj.align(lv.ALIGN.TOP_RIGHT, -10, y_offset)
-            value_obj.set_style_text_color(self.colors['text_primary'], 0)
-            
-            y_offset += 18
-    
-    def create_communication_section(self):
-        """Create communication statistics section"""
-        section = self.create_section("Communication Stats", self.colors['text_secondary'])
+            value = Gtk.Label(value_text)
+            value.get_style_context().add_class("value-label")
+            value.set_xalign(1)
+            grid.attach(value, 1, i, 1, 1)
         
-        comm_items = [
-            ("Connection Time:", "2h 15m"),
-            ("Data Packets:", "15,432"),
-            ("Error Rate:", "0.02%"),
-            ("Throughput:", "1.2KB/s")
+        return frame
+    
+    def create_footer_panel(self):
+        """创建底部控制面板"""
+        frame = Gtk.Frame()
+        frame.get_style_context().add_class("header-panel")
+        
+        footer_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        footer_box.set_margin_top(10)
+        footer_box.set_margin_bottom(10)
+        footer_box.set_margin_left(15)
+        footer_box.set_margin_right(15)
+        frame.add(footer_box)
+        
+        # 控制按钮
+        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        footer_box.pack_start(control_box, False, False, 0)
+        
+        self.widgets['start_btn'] = Gtk.Button(label="START")
+        self.widgets['start_btn'].get_style_context().add_class("success-button")
+        self.widgets['start_btn'].connect("clicked", self.on_start_clicked)
+        control_box.pack_start(self.widgets['start_btn'], False, False, 0)
+        
+        self.widgets['pause_btn'] = Gtk.Button(label="PAUSE")
+        self.widgets['pause_btn'].get_style_context().add_class("warning-button")
+        self.widgets['pause_btn'].connect("clicked", self.on_pause_clicked)
+        control_box.pack_start(self.widgets['pause_btn'], False, False, 0)
+        
+        self.widgets['stop_btn'] = Gtk.Button(label="STOP")
+        self.widgets['stop_btn'].get_style_context().add_class("error-button")
+        self.widgets['stop_btn'].connect("clicked", self.on_stop_clicked)
+        control_box.pack_start(self.widgets['stop_btn'], False, False, 0)
+        
+        # 状态信息
+        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        footer_box.set_center_widget(status_box)
+        
+        self.widgets['process_label'] = Gtk.Label("Current Process: Feed Detection")
+        self.widgets['process_label'].get_style_context().add_class("secondary-label")
+        status_box.pack_start(self.widgets['process_label'], False, False, 0)
+        
+        self.widgets['stats_label'] = Gtk.Label("Last Cut: 14:25:33 | Today: 89 cuts | Efficiency: 94.2%")
+        self.widgets['stats_label'].get_style_context().add_class("secondary-label")
+        status_box.pack_start(self.widgets['stats_label'], False, False, 0)
+        
+        # 紧急按钮
+        emergency_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        footer_box.pack_end(emergency_box, False, False, 0)
+        
+        self.widgets['emergency_btn'] = Gtk.Button(label="EMERGENCY")
+        self.widgets['emergency_btn'].get_style_context().add_class("emergency-button")
+        self.widgets['emergency_btn'].connect("clicked", self.on_emergency_clicked)
+        emergency_box.pack_start(self.widgets['emergency_btn'], False, False, 0)
+        
+        self.widgets['power_btn'] = Gtk.Button(label="POWER")
+        self.widgets['power_btn'].set_size_request(80, -1)
+        self.widgets['power_btn'].connect("clicked", self.on_power_clicked)
+        emergency_box.pack_start(self.widgets['power_btn'], False, False, 0)
+        
+        return frame
+    
+    def on_camera_draw(self, widget, cr):
+        """摄像头画布绘制回调"""
+        allocation = widget.get_allocation()
+        width = allocation.width
+        height = allocation.height
+        
+        # 绘制黑色背景
+        cr.set_source_rgb(0, 0, 0)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+        
+        # 绘制网格线
+        cr.set_source_rgba(0.3, 0.3, 0.3, 0.5)
+        cr.set_line_width(1)
+        
+        # 垂直网格线
+        for i in range(1, 10):
+            x = width * i / 10
+            cr.move_to(x, 0)
+            cr.line_to(x, height)
+            cr.stroke()
+        
+        # 水平网格线
+        for i in range(1, 6):
+            y = height * i / 6
+            cr.move_to(0, y)
+            cr.line_to(width, y)
+            cr.stroke()
+        
+        # 绘制文本信息
+        cr.set_source_rgb(0.7, 0.7, 0.7)
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(14)
+        
+        text_lines = [
+            "Bamboo Detection View",
+            "1280 x 720 | YOLOv8 Inference", 
+            f"Inference Time: {self.ai_data['inference_time']:.1f}ms"
         ]
         
-        y_offset = 30
-        for label, value in comm_items:
-            label_obj = lv.label(section)
-            label_obj.set_text(label)
-            label_obj.align(lv.ALIGN.TOP_LEFT, 10, y_offset)
-            label_obj.set_style_text_color(self.colors['text_secondary'], 0)
+        for i, line in enumerate(text_lines):
+            text_extents = cr.text_extents(line)
+            x = (width - text_extents.width) / 2
+            y = height / 2 - 20 + i * 20
+            cr.move_to(x, y)
+            cr.show_text(line)
+        
+        # 绘制切割位置指示器
+        if hasattr(self, 'system_state'):
+            position_percent = self.system_state['x_coordinate'] / 1000.0
+            indicator_x = width * 0.1 + (width * 0.8) * position_percent
             
-            value_obj = lv.label(section)
-            value_obj.set_text(value)
-            value_obj.align(lv.ALIGN.TOP_RIGHT, -10, y_offset)
-            value_obj.set_style_text_color(self.colors['text_primary'], 0)
-            
-            y_offset += 18
-    
-    def create_section(self, title, color, height=120):
-        """Create a section container"""
-        section = lv.obj(self.scroll_container)
-        section.set_size(lv.pct(95), height)
-        section.set_style_bg_color(lv.color_hex(0x1A1A1A), 0)
-        section.set_style_border_color(color, 0)
-        section.set_style_border_width(1, 0)
-        section.set_style_radius(5, 0)
-        section.set_style_pad_all(8, 0)
-        
-        # Section title
-        title_label = lv.label(section)
-        title_label.set_text(title)
-        title_label.align(lv.ALIGN.TOP_LEFT, 5, 5)
-        title_label.set_style_text_color(color, 0)
-        
-        return section
-    
-    def create_footer(self):
-        """Create footer with control buttons"""
-        self.footer = lv.obj(self.scr)
-        self.footer.set_size(lv.pct(100), 80)
-        self.footer.align(lv.ALIGN.BOTTOM_MID, 0, 0)
-        self.footer.set_style_bg_color(self.colors['bg_panel'], 0)
-        self.footer.set_style_border_color(self.colors['border'], 0)
-        self.footer.set_style_border_width(2, 0)
-        
-        # Control buttons
-        self.create_control_buttons()
-        
-        # Status info
-        self.create_status_info()
-        
-        # Emergency buttons
-        self.create_emergency_buttons()
-    
-    def create_control_buttons(self):
-        """Create main control buttons"""
-        btn_container = lv.obj(self.footer)
-        btn_container.set_size(400, 60)
-        btn_container.align(lv.ALIGN.LEFT_MID, 20, 0)
-        btn_container.set_style_bg_opa(0, 0)
-        btn_container.set_style_border_opa(0, 0)
-        btn_container.set_flex_flow(lv.FLEX_FLOW.ROW)
-        btn_container.set_flex_align(lv.FLEX_ALIGN.SPACE_EVENLY, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
-        
-        # Start button
-        self.start_btn = lv.btn(btn_container)
-        self.start_btn.set_size(100, 40)
-        self.start_btn.set_style_bg_color(self.colors['success'], 0)
-        self.start_btn.add_event_cb(self.on_start_clicked, lv.EVENT.CLICKED, None)
-        
-        start_label = lv.label(self.start_btn)
-        start_label.set_text("START")
-        start_label.center()
-        
-        # Pause button
-        self.pause_btn = lv.btn(btn_container)
-        self.pause_btn.set_size(100, 40)
-        self.pause_btn.set_style_bg_color(self.colors['warning'], lv.STATE.DEFAULT)
-        self.pause_btn.add_event_cb(self.on_pause_clicked, lv.EVENT.CLICKED, None)
-        
-        pause_label = lv.label(self.pause_btn)
-        pause_label.set_text("PAUSE")
-        pause_label.center()
-        
-        # Stop button
-        self.stop_btn = lv.btn(btn_container)
-        self.stop_btn.set_size(100, 40)
-        self.stop_btn.set_style_bg_color(self.colors['error'], lv.STATE.DEFAULT)
-        self.stop_btn.add_event_cb(self.on_stop_clicked, lv.EVENT.CLICKED, None)
-        
-        stop_label = lv.label(self.stop_btn)
-        stop_label.set_text("STOP")
-        stop_label.center()
-    
-    def create_status_info(self):
-        """Create status information display"""
-        info_container = lv.obj(self.footer)
-        info_container.set_size(300, 60)
-        info_container.align(lv.ALIGN.CENTER, 0, 0)
-        info_container.set_style_bg_opa(0, 0)
-        info_container.set_style_border_opa(0, 0)
-        
-        # Current process
-        self.process_label = lv.label(info_container)
-        self.process_label.set_text("Current Process: Feed Detection")
-        self.process_label.align(lv.ALIGN.TOP_MID, 0, 10)
-        self.process_label.set_style_text_color(self.colors['text_secondary'], 0)
-        
-        # Statistics
-        self.stats_label = lv.label(info_container)
-        self.stats_label.set_text("Last Cut: 14:25:33 | Today: 89 cuts | Efficiency: 94.2%")
-        self.stats_label.align(lv.ALIGN.BOTTOM_MID, 0, -10)
-        self.stats_label.set_style_text_color(self.colors['text_secondary'], 0)
-    
-    def create_emergency_buttons(self):
-        """Create emergency and power buttons"""
-        emergency_container = lv.obj(self.footer)
-        emergency_container.set_size(250, 60)
-        emergency_container.align(lv.ALIGN.RIGHT_MID, -20, 0)
-        emergency_container.set_style_bg_opa(0, 0)
-        emergency_container.set_style_border_opa(0, 0)
-        emergency_container.set_flex_flow(lv.FLEX_FLOW.ROW)
-        emergency_container.set_flex_align(lv.FLEX_ALIGN.SPACE_EVENLY, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
-        
-        # Emergency stop
-        self.emergency_btn = lv.btn(emergency_container)
-        self.emergency_btn.set_size(110, 40)
-        self.emergency_btn.set_style_bg_color(self.colors['emergency'], 0)
-        self.emergency_btn.add_event_cb(self.on_emergency_clicked, lv.EVENT.CLICKED, None)
-        
-        emergency_label = lv.label(self.emergency_btn)
-        emergency_label.set_text("EMERGENCY")
-        emergency_label.center()
-        
-        # Power button
-        self.power_btn = lv.btn(emergency_container)
-        self.power_btn.set_size(100, 40)
-        self.power_btn.set_style_bg_color(self.colors['power'], 0)
-        self.power_btn.add_event_cb(self.on_power_clicked, lv.EVENT.CLICKED, None)
-        
-        power_label = lv.label(self.power_btn)
-        power_label.set_text("POWER")
-        power_label.center()
+            cr.set_source_rgb(1.0, 0.2, 0.2)  # 红色指示线
+            cr.set_line_width(3)
+            cr.move_to(indicator_x, height - 40)
+            cr.line_to(indicator_x, height - 10)
+            cr.stroke()
     
     def start_update_threads(self):
-        """Start background update threads"""
-        self.running = True
-        
-        # Heartbeat update thread (50Hz)
+        """启动后台更新线程"""
+        # 心跳更新线程 (50Hz)
         heartbeat_thread = threading.Thread(target=self.heartbeat_update_loop)
         heartbeat_thread.daemon = True
         heartbeat_thread.start()
         
-        # System info update thread (2s interval)
+        # 系统信息更新线程 (2s间隔)
         system_thread = threading.Thread(target=self.system_update_loop)
         system_thread.daemon = True
         system_thread.start()
         
-        # Workflow simulation thread
+        # 工作流程模拟线程
         workflow_thread = threading.Thread(target=self.workflow_simulation_loop)
         workflow_thread.daemon = True
         workflow_thread.start()
     
     def heartbeat_update_loop(self):
-        """Update heartbeat counter at 50Hz"""
+        """心跳更新循环"""
         while self.running:
             self.system_state['heartbeat_counter'] += 1
             if self.system_state['heartbeat_counter'] > 4294967295:
                 self.system_state['heartbeat_counter'] = 0
             
-            # Update UI in main thread
-            lv.timer_handler()
+            GLib.idle_add(self.update_heartbeat_ui)
             time.sleep(0.02)  # 50Hz
     
     def system_update_loop(self):
-        """Update system information every 2 seconds"""
+        """系统信息更新循环"""
         while self.running:
             self.update_system_data()
+            GLib.idle_add(self.update_system_ui)
             time.sleep(2.0)
     
     def workflow_simulation_loop(self):
-        """Simulate workflow when system is running"""
+        """工作流程模拟循环"""
         while self.running:
             if self.system_state['is_running']:
                 self.simulate_workflow_step()
             time.sleep(1.0)
     
     def update_system_data(self):
-        """Update system data with random variations"""
-        # Update Jetson data
+        """更新系统数据"""
+        # 更新Jetson数据
         self.jetson_data['cpu']['usage'] = 40 + random.random() * 20
         self.jetson_data['gpu']['usage'] = 25 + random.random() * 25
         self.jetson_data['cpu']['temp'] = 45 + random.random() * 15
         self.jetson_data['gpu']['temp'] = 40 + random.random() * 20
         
-        # Update AI data
+        # 更新AI数据
         self.ai_data['inference_time'] = 12 + random.random() * 8
         self.ai_data['detection_fps'] = 25 + random.random() * 8
-        
-        # Update UI
-        self.update_ui_elements()
     
-    def update_ui_elements(self):
-        """Update UI elements with current data"""
-        # Update heartbeat
-        self.heartbeat_label.set_text(f"Heartbeat: {self.system_state['heartbeat_counter']}")
+    def update_heartbeat_ui(self):
+        """更新心跳UI"""
+        self.widgets['heartbeat_label'].set_text(f"Heartbeat: {self.system_state['heartbeat_counter']}")
+        self.widgets['camera_canvas'].queue_draw()  # 重绘摄像头画布
+        return False
+    
+    def update_system_ui(self):
+        """更新系统UI"""
+        # 更新进度条
+        cpu_usage = int(self.jetson_data['cpu']['usage'])
+        gpu_usage = int(self.jetson_data['gpu']['usage'])
+        memory_usage = int(self.jetson_data['memory']['used'] / self.jetson_data['memory']['total'] * 100)
         
-        # Update progress bars
-        if hasattr(self, 'progress_bars'):
-            cpu_usage = int(self.jetson_data['cpu']['usage'])
-            gpu_usage = int(self.jetson_data['gpu']['usage'])
-            memory_usage = int(self.jetson_data['memory']['used'] / self.jetson_data['memory']['total'] * 100)
-            
-            self.progress_bars['cpu']['bar'].set_value(cpu_usage, lv.ANIM.OFF)
-            self.progress_bars['cpu']['label'].set_text(f"{cpu_usage}%")
-            
-            self.progress_bars['gpu']['bar'].set_value(gpu_usage, lv.ANIM.OFF)
-            self.progress_bars['gpu']['label'].set_text(f"{gpu_usage}%")
-            
-            self.progress_bars['memory']['bar'].set_value(memory_usage, lv.ANIM.OFF)
-            self.progress_bars['memory']['label'].set_text(f"{memory_usage}%")
+        self.progress_bars['cpu']['bar'].set_fraction(cpu_usage / 100.0)
+        self.progress_bars['cpu']['label'].set_text(f"{cpu_usage}%")
         
-        # Update coordinate display
-        self.x_coord_value.set_text(f"{self.system_state['x_coordinate']:.1f}mm")
+        self.progress_bars['gpu']['bar'].set_fraction(gpu_usage / 100.0)
+        self.progress_bars['gpu']['label'].set_text(f"{gpu_usage}%")
         
-        # Update cutting position indicator
-        if hasattr(self, 'cutting_position'):
-            position_percent = self.system_state['x_coordinate'] / 1000.0
-            rail_width = self.rail_indicator.get_width()
-            new_x = int(position_percent * rail_width * 0.8)  # 80% of rail width
-            self.cutting_position.align(lv.ALIGN.LEFT_MID, new_x, 0)
+        self.progress_bars['memory']['bar'].set_fraction(memory_usage / 100.0)
+        self.progress_bars['memory']['label'].set_text(f"{memory_usage}%")
         
-        # Update Modbus registers
+        # 更新坐标显示
+        self.widgets['x_coord_value'].set_text(f"{self.system_state['x_coordinate']:.1f}mm")
+        
+        # 更新Modbus寄存器
         self.update_modbus_registers()
+        
+        return False
     
     def update_modbus_registers(self):
-        """Update Modbus register values"""
+        """更新Modbus寄存器值"""
         if hasattr(self, 'register_values'):
             self.register_values['reg_40001'].set_text(str(1 if self.system_state['is_running'] else 0))
             self.register_values['reg_40002'].set_text(str(self.system_state['plc_command']))
@@ -788,26 +835,27 @@ class BambooSystemUI:
             self.register_values['reg_40006'].set_text(str(self.system_state['cut_quality']))
             self.register_values['reg_40007'].set_text(str(self.system_state['heartbeat_counter']))
             self.register_values['reg_40009'].set_text(str(self.system_state['blade_selection']))
-            self.register_values['reg_40010'].set_text("0")  # Health status normal
+            self.register_values['reg_40010'].set_text("0")  # 健康状态正常
     
     def update_workflow_status(self, step):
-        """Update workflow step indicators"""
-        for i, step_ui in enumerate(self.workflow_steps_ui):
+        """更新工作流程状态"""
+        for i, btn in enumerate(self.workflow_buttons):
+            btn.get_style_context().remove_class("workflow-active")
+            btn.get_style_context().remove_class("workflow-completed")
+            btn.get_style_context().add_class("workflow-button")
+            
             if i < step - 1:
-                # Completed
-                step_ui['btn'].set_style_bg_color(self.colors['success'], 0)
+                # 已完成
+                btn.get_style_context().add_class("workflow-completed")
             elif i == step - 1:
-                # Active
-                step_ui['btn'].set_style_bg_color(self.colors['accent'], 0)
-            else:
-                # Inactive
-                step_ui['btn'].set_style_bg_color(self.colors['bg_main'], 0)
+                # 当前活动
+                btn.get_style_context().add_class("workflow-active")
         
         self.system_state['current_step'] = step
-        self.process_label.set_text(f"Current Process: {self.workflow_steps[step-1]['name']}")
+        GLib.idle_add(self.widgets['process_label'].set_text, f"Current Process: {self.workflow_steps[step-1]['name']}")
     
     def simulate_workflow_step(self):
-        """Simulate workflow progression"""
+        """模拟工作流程步骤"""
         if not self.system_state['is_running']:
             return
         
@@ -820,7 +868,7 @@ class BambooSystemUI:
                 self.update_workflow_status(2)
         elif current_step == 2:  # Vision Recognition
             self.system_state['plc_command'] = 0
-            # Simulate bamboo detection
+            # 模拟竹子检测
             self.system_state['x_coordinate'] = 200 + random.random() * 600
             self.system_state['coordinate_ready'] = 1
             time.sleep(2)
@@ -839,111 +887,110 @@ class BambooSystemUI:
             self.system_state['plc_command'] = 3
             time.sleep(3)
             if self.system_state['is_running']:
-                # Complete cycle, restart
+                # 完成循环，重新开始
                 self.system_state['coordinate_ready'] = 0
                 self.ai_data['today_detections'] += 1
                 self.ai_data['total_detections'] += 1
                 self.update_workflow_status(1)
     
-    # Event handlers
-    def on_start_clicked(self, e):
-        """Handle start button click"""
+    # 事件处理器
+    def on_start_clicked(self, button):
+        """启动按钮点击处理"""
         self.system_state['is_running'] = True
         self.update_workflow_status(1)
         
-        # Update button appearance
-        start_label = self.start_btn.get_child(0)
-        start_label.set_text("RUNNING")
-        self.start_btn.set_style_bg_color(self.colors['warning'], 0)
+        # 更新按钮外观
+        button.set_label("RUNNING")
+        button.get_style_context().remove_class("success-button")
+        button.get_style_context().add_class("warning-button")
     
-    def on_pause_clicked(self, e):
-        """Handle pause button click"""
+    def on_pause_clicked(self, button):
+        """暂停按钮点击处理"""
         if self.system_state['is_running']:
             self.system_state['is_running'] = False
-            self.system_state['plc_command'] = 5  # Pause command
+            self.system_state['plc_command'] = 5  # 暂停命令
             
-            # Update button appearance
-            start_label = self.start_btn.get_child(0)
-            start_label.set_text("RESUME")
-            self.start_btn.set_style_bg_color(self.colors['success'], 0)
+            # 更新启动按钮外观
+            self.widgets['start_btn'].set_label("RESUME")
+            self.widgets['start_btn'].get_style_context().remove_class("warning-button")
+            self.widgets['start_btn'].get_style_context().add_class("success-button")
     
-    def on_stop_clicked(self, e):
-        """Handle stop button click"""
+    def on_stop_clicked(self, button):
+        """停止按钮点击处理"""
         self.system_state['is_running'] = False
         self.system_state['plc_command'] = 0
         self.system_state['coordinate_ready'] = 0
         self.update_workflow_status(1)
         
-        # Update button appearance
-        start_label = self.start_btn.get_child(0)
-        start_label.set_text("START")
-        self.start_btn.set_style_bg_color(self.colors['success'], 0)
-        
-        # Reset all workflow steps
-        for step_ui in self.workflow_steps_ui:
-            step_ui['btn'].set_style_bg_color(self.colors['bg_main'], 0)
+        # 更新启动按钮外观
+        self.widgets['start_btn'].set_label("START")
+        self.widgets['start_btn'].get_style_context().remove_class("warning-button")
+        self.widgets['start_btn'].get_style_context().add_class("success-button")
     
-    def on_emergency_clicked(self, e):
-        """Handle emergency stop"""
+    def on_emergency_clicked(self, button):
+        """紧急停止按钮点击处理"""
         self.system_state['is_running'] = False
-        self.system_state['plc_command'] = 6  # Emergency stop
+        self.system_state['plc_command'] = 6  # 紧急停止
         
-        # Make all workflow steps red
-        for step_ui in self.workflow_steps_ui:
-            step_ui['btn'].set_style_bg_color(self.colors['emergency'], 0)
+        # 将所有工作流程步骤标记为紧急状态
+        for btn in self.workflow_buttons:
+            btn.get_style_context().remove_class("workflow-active")
+            btn.get_style_context().remove_class("workflow-completed")
+            btn.get_style_context().remove_class("workflow-button")
+            btn.get_style_context().add_class("emergency-button")
         
-        self.process_label.set_text("Current Process: EMERGENCY STOP")
+        GLib.idle_add(self.widgets['process_label'].set_text, "Current Process: EMERGENCY STOP")
         
-        # Update start button
-        start_label = self.start_btn.get_child(0)
-        start_label.set_text("RECOVER")
-        self.start_btn.set_style_bg_color(self.colors['warning'], 0)
+        # 更新启动按钮
+        self.widgets['start_btn'].set_label("RECOVER")
+        self.widgets['start_btn'].get_style_context().remove_class("success-button")
+        self.widgets['start_btn'].get_style_context().add_class("warning-button")
     
-    def on_power_clicked(self, e):
-        """Handle power button click"""
-        # In a real system, this would initiate shutdown
+    def on_power_clicked(self, button):
+        """电源按钮点击处理"""
+        # 在真实系统中，这里会启动关机流程
         pass
     
-    def on_blade_select(self, blade_idx):
-        """Handle blade selection"""
-        # Update button states
+    def on_blade_select(self, button, blade_idx):
+        """刀具选择处理"""
+        # 更新按钮状态
         for i, btn in enumerate(self.blade_buttons):
+            btn.get_style_context().remove_class("success-button")
             if i == blade_idx:
-                btn.set_style_bg_color(self.colors['accent'], 0)
-            else:
-                btn.set_style_bg_color(self.colors['bg_main'], 0)
+                btn.get_style_context().add_class("success-button")
         
-        # Update system state
+        # 更新系统状态
         self.system_state['blade_selection'] = blade_idx + 1
         
-        # Update display
+        # 更新显示
         blade_names = ["Blade 1", "Blade 2", "Dual Blade"]
-        self.blade_value.set_text(blade_names[blade_idx])
+        self.widgets['blade_value'].set_text(blade_names[blade_idx])
+    
+    def on_window_destroy(self, widget):
+        """窗口销毁处理"""
+        self.running = False
+        Gtk.main_quit()
 
 
-# Main application entry point
 def main():
-    """Main application entry point"""
+    """主程序入口"""
     try:
-        # Initialize display driver (this would be specific to your setup)
-        # For simulation, you might use SDL or other drivers
+        print("正在启动AI竹子识别系统 - GTK3界面...")
         
-        # Create and run the application
+        # 创建并运行应用程序
         app = BambooSystemUI()
         
-        # Main loop
-        while True:
-            lv.timer_handler()
-            time.sleep(0.001)
-            
+        print("GTK3界面初始化完成，正在启动主循环...")
+        Gtk.main()
+        
     except KeyboardInterrupt:
-        print("Application terminated by user")
+        print("\n用户中断，系统退出")
     except Exception as e:
-        print(f"Application error: {e}")
+        print(f"系统错误: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        # Cleanup
-        if hasattr(app, 'running'):
-            app.running = False
+        print("AI竹子识别系统已停止")
 
 
 if __name__ == "__main__":
