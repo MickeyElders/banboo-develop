@@ -204,6 +204,11 @@ public:
     void set_display_mode(DisplayMode mode);
     DisplayMode get_display_mode() const { return display_mode_; }
     
+    // GStreamer流输出管理
+    bool initialize_video_stream();
+    void push_frame_to_stream(const cv::Mat& frame);
+    cv::Mat create_display_frame(const cv::Mat& left, const cv::Mat& right);
+    
     // 状态和统计
     bool is_calibrated() const { return calibration_params_.is_calibrated; }
     double get_baseline_mm() const { return calibration_params_.baseline; }
@@ -285,10 +290,7 @@ private:
     uint64_t frame_counter_{0};
     
     // 流输出辅助方法
-    bool initialize_video_stream();
     std::string build_stream_pipeline();
-    void push_frame_to_stream(const cv::Mat& frame);
-    cv::Mat create_display_frame(const cv::Mat& left, const cv::Mat& right);
 };
 
 // 工具函数
