@@ -1,5 +1,52 @@
 # display_driver.py
 import lvgl as lv
+import os
+import glob
+
+def find_touch_device():
+    """
+    自动搜索触摸输入设备
+    """
+    touch_devices = []
+    
+    # 搜索触摸设备的常见路径
+    touch_paths = [
+        '/dev/input/event*',
+        '/dev/input/touchscreen*',
+        '/dev/input/touch*'
+    ]
+    
+    for pattern in touch_paths:
+        devices = glob.glob(pattern)
+        touch_devices.extend(devices)
+    
+    # 去重并过滤有效设备
+    valid_devices = []
+    for device in set(touch_devices):
+        if os.path.exists(device) and os.access(device, os.R_OK):
+            try:
+                # 尝试读取设备信息确认是触摸设备
+                with open(device, 'rb') as f:
+                    # 简单验证设备可读
+                    pass
+                valid_devices.append(device)
+                print(f"发现触摸设备: {device}")
+            except (IOError, OSError):
+                continue
+    
+    # 优先选择event设备
+    for device in valid_devices:
+        if 'event' in device:
+            print(f"选择触摸设备: {device}")
+            return device
+    
+    # 如果没有event设备，返回第一个有效设备
+    if valid_devices:
+        print(f"选择触摸设备: {valid_devices[0]}")
+        return valid_devices[0]
+    else:
+        print("未检测到触摸设备")
+        return None
 
 def init():
     """Initialize display driver for Jetson"""

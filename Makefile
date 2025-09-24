@@ -272,7 +272,7 @@ install: build-cpp build-python
 	
 	# 设置权限
 	@sudo chmod +x $(INSTALL_PREFIX)/bin/*
-	@sudo chown -R jetson:jetson $(INSTALL_PREFIX)
+	@sudo chown -R $(shell whoami):$(shell whoami) $(INSTALL_PREFIX) || true
 	@sudo chmod 755 $(LOG_DIR)
 	@sudo chmod 755 $(CONFIG_DIR)
 	
