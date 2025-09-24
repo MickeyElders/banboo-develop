@@ -278,6 +278,40 @@ install-gtk4-python:
 		fi; \
 	fi
 	
+
+# 安装Cage compositor
+install-cage:
+	$(call log_info,安装Cage Wayland compositor...)
+	@echo "$(BLUE)[INFO]$(NC) 安装Cage和相关依赖..."
+	@sudo apt update || true
+	@sudo apt install -y cage wlroots-dev libwayland-dev || true
+	
+	# 验证Cage安装
+	@if which cage >/dev/null 2>&1; then \
+		echo "$(GREEN)[SUCCESS]$(NC) Cage compositor安装成功"; \
+		cage --version 2>/dev/null || echo "Cage可用"; \
+	else \
+		echo "$(YELLOW)[WARNING]$(NC) 从包管理器安装失败，尝试从源码编译..."; \
+		$(MAKE) build-cage-from-source; \
+	fi
+
+# 从源码编译Cage (备选方案)
+build-cage-from-source:
+	$(call log_warning,从源码编译Cage compositor...)
+	@sudo apt install -y git build-essential meson ninja-build \
+		libwayland-dev libwlroots-dev libxkbcommon-dev \
+		pkg-config || true
+	@cd /tmp && \
+		rm -rf cage && \
+		git clone https://github.com/Hjdskes/cage.git && \
+		cd cage && \
+		meson build --prefix=/usr/local && \
+		ninja -C build && \
+		sudo ninja -C build install && \
+		echo "$(GREEN)[SUCCESS]$(NC) Cage源码编译安装完成" || \
+		echo "$(RED)[ERROR]$(NC) Cage源码编译失败"
+	@sudo ldconfig || true
+
 	$(call log_success,GTK4 Python绑定安装完成)
 
 clean:
