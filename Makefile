@@ -279,7 +279,7 @@ clean:
 	$(call log_success,清理完成)
 
 install: build-cpp build-python
-	$(call log_info,安装Python LVGL系统...)
+	$(call log_info,安装Python GTK4系统...)
 	@sudo mkdir -p $(INSTALL_PREFIX)/bin
 	@sudo mkdir -p $(INSTALL_PREFIX)/lib
 	@sudo mkdir -p $(INSTALL_PREFIX)/python_core
@@ -315,11 +315,11 @@ install: build-cpp build-python
 	fi
 	
 	# 创建执行脚本
-	@echo '#!/bin/bash' | sudo tee $(INSTALL_PREFIX)/bin/bamboo-python-lvgl > /dev/null
-	@echo 'cd $(INSTALL_PREFIX)' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-lvgl > /dev/null
-	@echo 'export PYTHONPATH=$(INSTALL_PREFIX):$(INSTALL_PREFIX)/python_core' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-lvgl > /dev/null
-	@echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$(INSTALL_PREFIX)/lib' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-lvgl > /dev/null
-	@echo 'exec $(INSTALL_PREFIX)/venv/bin/python python_core/ai_bamboo_system.py "$$@"' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-lvgl > /dev/null
+	@echo '#!/bin/bash' | sudo tee $(INSTALL_PREFIX)/bin/bamboo-python-gtk4 > /dev/null
+	@echo 'cd $(INSTALL_PREFIX)' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-gtk4 > /dev/null
+	@echo 'export PYTHONPATH=$(INSTALL_PREFIX):$(INSTALL_PREFIX)/python_core' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-gtk4 > /dev/null
+	@echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$(INSTALL_PREFIX)/lib' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-gtk4 > /dev/null
+	@echo 'exec $(INSTALL_PREFIX)/venv/bin/python python_core/ai_bamboo_system.py "$$@"' | sudo tee -a $(INSTALL_PREFIX)/bin/bamboo-python-gtk4 > /dev/null
 	
 	# 设置权限
 	@sudo chmod +x $(INSTALL_PREFIX)/bin/*
@@ -327,7 +327,7 @@ install: build-cpp build-python
 	@sudo chmod 755 $(LOG_DIR)
 	@sudo chmod 755 $(CONFIG_DIR)
 	
-	$(call log_success,Python LVGL系统安装完成)
+	$(call log_success,Python GTK4系统安装完成)
 
 install-service: install
 	$(call log_info,安装systemd Python GTK4服务...)
@@ -370,16 +370,16 @@ backup:
 	$(call log_success,备份完成: $(shell cat .last_backup 2>/dev/null || echo "unknown"))
 
 uninstall:
-	$(call log_info,停止并卸载Python LVGL服务...)
-	
+	$(call log_info,停止并卸载Python GTK4服务...)
+
 	# 停止所有相关服务
-	@sudo systemctl stop $(PYTHON_LVGL_SERVICE) 2>/dev/null || true
+	@sudo systemctl stop $(PYTHON_GTK4_SERVICE) 2>/dev/null || true
 	@sudo systemctl stop bamboo-backend.service bamboo-frontend.service bamboo-integrated.service 2>/dev/null || true
-	
+
 	# 禁用并删除服务文件
-	@sudo systemctl disable $(PYTHON_LVGL_SERVICE) 2>/dev/null || true
+	@sudo systemctl disable $(PYTHON_GTK4_SERVICE) 2>/dev/null || true
 	@sudo systemctl disable bamboo-backend.service bamboo-frontend.service bamboo-integrated.service 2>/dev/null || true
-	@sudo rm -f $(SYSTEMD_DIR)/$(PYTHON_LVGL_SERVICE)
+	@sudo rm -f $(SYSTEMD_DIR)/$(PYTHON_GTK4_SERVICE)
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-backend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-frontend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-integrated.service
@@ -390,32 +390,32 @@ uninstall:
 	@sudo rm -rf $(CONFIG_DIR)
 	@sudo rm -rf $(LOG_DIR)
 	
-	$(call log_success,Python LVGL系统卸载完成)
+	$(call log_success,Python GTK4系统卸载完成)
 
 start:
-	$(call log_info,启动Python LVGL服务...)
-	@if ! sudo systemctl list-unit-files | grep -q "$(PYTHON_LVGL_SERVICE)"; then \
-		$(call log_warning,Python LVGL服务未安装，正在自动安装...); \
+	$(call log_info,启动Python GTK4服务...)
+	@if ! sudo systemctl list-unit-files | grep -q "$(PYTHON_GTK4_SERVICE)"; then \
+		$(call log_warning,Python GTK4服务未安装，正在自动安装...); \
 		$(MAKE) install-service; \
 	fi
-	@sudo systemctl start $(PYTHON_LVGL_SERVICE)
+	@sudo systemctl start $(PYTHON_GTK4_SERVICE)
 	@sleep 3
-	$(call log_success,Python LVGL服务启动完成)
+	$(call log_success,Python GTK4服务启动完成)
 
 stop:
-	$(call log_info,停止Python LVGL服务...)
-	@sudo systemctl stop $(PYTHON_LVGL_SERVICE) 2>/dev/null || true
-	$(call log_success,Python LVGL服务停止完成)
+	$(call log_info,停止Python GTK4服务...)
+	@sudo systemctl stop $(PYTHON_GTK4_SERVICE) 2>/dev/null || true
+	$(call log_success,Python GTK4服务停止完成)
 
 restart:
-	$(call log_info,重启Python LVGL服务...)
-	@sudo systemctl restart $(PYTHON_LVGL_SERVICE)
+	$(call log_info,重启Python GTK4服务...)
+	@sudo systemctl restart $(PYTHON_GTK4_SERVICE)
 	@sleep 3
-	$(call log_success,Python LVGL服务重启完成)
+	$(call log_success,Python GTK4服务重启完成)
 
 status:
-	@echo "$(CYAN)=== Python LVGL服务状态 ===$(NC)"
-	@sudo systemctl status $(PYTHON_LVGL_SERVICE) --no-pager || true
+	@echo "$(CYAN)=== Python GTK4服务状态 ===$(NC)"
+	@sudo systemctl status $(PYTHON_GTK4_SERVICE) --no-pager || true
 	@echo ""
 	@echo "$(CYAN)=== 系统资源使用 ===$(NC)"
 	@ps aux | grep ai_bamboo_system | head -5 || true
@@ -447,19 +447,19 @@ test-cpp: build-cpp
 # 性能测试
 performance-test:
 	$(call log_info,启动性能测试...)
-	@if sudo systemctl is-active --quiet $(PYTHON_LVGL_SERVICE); then \
-		echo "$(GREEN)Python LVGL服务运行中$(NC) - 监控性能指标"; \
-		sudo journalctl -u $(PYTHON_LVGL_SERVICE) -f --since "1 minute ago" | grep -E "(fps|延迟|CPU|内存|AI|推理)" || true; \
+	@if sudo systemctl is-active --quiet $(PYTHON_GTK4_SERVICE); then \
+		echo "$(GREEN)Python GTK4服务运行中$(NC) - 监控性能指标"; \
+		sudo journalctl -u $(PYTHON_GTK4_SERVICE) -f --since "1 minute ago" | grep -E "(fps|延迟|CPU|内存|AI|推理)" || true; \
 	else \
 		$(call log_error,服务未运行，请先执行 make start); \
 	fi
 
 # 首次完整部署
 deploy: backup build-cpp build-python install-service start
-	$(call log_success,$(CYAN)Python LVGL系统首次部署完成！$(NC))
+	$(call log_success,$(CYAN)Python GTK4系统首次部署完成！$(NC))
 	@echo ""
 	$(call log_highlight,架构信息:)
-	@echo "  ✓ Python LVGL前端界面"
+	@echo "  ✓ Python GTK4现代化前端界面"
 	@echo "  ✓ C++高性能推理后端"
 	@echo "  ✓ AI优化技术集成"
 	@echo "  ✓ 混合架构设计"
@@ -483,7 +483,7 @@ deploy: backup build-cpp build-python install-service start
 
 # 代码修改后快速重新部署
 redeploy: stop build-cpp build-python install start
-	$(call log_success,$(CYAN)Python LVGL系统重新部署完成！$(NC))
+	$(call log_success,$(CYAN)Python GTK4系统重新部署完成！$(NC))
 	@echo ""
 	$(call log_info,检查服务状态:)
 	@make status
