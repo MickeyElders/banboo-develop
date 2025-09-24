@@ -998,7 +998,11 @@ class BambooSystemUI:
     
     def run(self):
         """运行GTK4应用程序"""
-        return self.app.run(sys.argv)
+        if self.initialize_gtk4():
+            return self.app.run(sys.argv)
+        else:
+            print("GTK4应用已经初始化")
+            return self.app.run(sys.argv)
 
 
 def main():
