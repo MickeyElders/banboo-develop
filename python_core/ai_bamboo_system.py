@@ -23,25 +23,50 @@ except ImportError:
 
 class BambooSystemUI:
     def __init__(self):
-        # Initialize LVGL
-        lv.init()
+        # Initialize graphics backend
+        self.backend = GRAPHICS_BACKEND
         
-        # Colors
-        self.colors = {
-            'bg_main': lv.color_hex(0x1E1E1E),
-            'bg_panel': lv.color_hex(0x2D2D2D),
-            'accent': lv.color_hex(0xFF6B35),
-            'success': lv.color_hex(0x4CAF50),
-            'warning': lv.color_hex(0xFFC107),
-            'error': lv.color_hex(0xF44336),
-            'text_primary': lv.color_hex(0xFFFFFF),
-            'text_secondary': lv.color_hex(0xB0B0B0),
-            'border': lv.color_hex(0x404040),
-            'modbus_blue': lv.color_hex(0x2196F3),
-            'emergency': lv.color_hex(0xFF1744),
-            'power': lv.color_hex(0x9C27B0),
-            'jetson_green': lv.color_hex(0x76B900)
-        }
+        if self.backend == "LVGL":
+            lv.init()
+            # LVGL Colors
+            self.colors = {
+                'bg_main': lv.color_hex(0x1E1E1E),
+                'bg_panel': lv.color_hex(0x2D2D2D),
+                'accent': lv.color_hex(0xFF6B35),
+                'success': lv.color_hex(0x4CAF50),
+                'warning': lv.color_hex(0xFFC107),
+                'error': lv.color_hex(0xF44336),
+                'text_primary': lv.color_hex(0xFFFFFF),
+                'text_secondary': lv.color_hex(0xB0B0B0),
+                'border': lv.color_hex(0x404040),
+                'modbus_blue': lv.color_hex(0x2196F3),
+                'emergency': lv.color_hex(0xFF1744),
+                'power': lv.color_hex(0x9C27B0),
+                'jetson_green': lv.color_hex(0x76B900)
+            }
+        elif self.backend == "PYGAME":
+            pygame.init()
+            # Pygame Colors (RGB tuples)
+            self.colors = {
+                'bg_main': (30, 30, 30),
+                'bg_panel': (45, 45, 45),
+                'accent': (255, 107, 53),
+                'success': (76, 175, 80),
+                'warning': (255, 193, 7),
+                'error': (244, 67, 54),
+                'text_primary': (255, 255, 255),
+                'text_secondary': (176, 176, 176),
+                'border': (64, 64, 64),
+                'modbus_blue': (33, 150, 243),
+                'emergency': (255, 23, 68),
+                'power': (156, 39, 176),
+                'jetson_green': (118, 185, 0)
+            }
+            self.screen = pygame.display.set_mode((1280, 720))
+            pygame.display.set_caption("AI Bamboo Recognition System")
+        else:
+            # Console mode - no colors
+            self.colors = {}
         
         # System state
         self.system_state = {
