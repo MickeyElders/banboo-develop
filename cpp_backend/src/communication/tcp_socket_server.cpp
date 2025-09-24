@@ -225,21 +225,31 @@ bool TcpSocketServer::receive_message(int client_fd, CommunicationMessage& messa
     // 清零消息结构体，避免垃圾数据
     memset(&message, 0, sizeof(message));
     
-    // 首先尝试接收消息头（type, timestamp, data_length）
+    // 尝试接收可靠消息头（带魔数和校验和）
+    ReliableMessageHeader reliable_header;
+    if (receive_raw_data(client_fd, &reliable_header, sizeof(reliable_header))) {
+        // 验证可靠消息头
+        if (ReliableMessageValidator::validate_header(reliable_header)) {
+            return receive_reliable_message(client_fd, reliable_header, message);
+        } else {
+            LOG_WARN("收到无效的可靠消息头，尝试传统格式");
+        }
+    }
+    
+    // 降级到传统消息格式（兼容性处理）
     struct MessageHeader {
         MessageType type;
         uint64_t timestamp;
         uint32_t data_length;
     } header;
     
-    if (!receive_raw_data(client_fd, &header, sizeof(header))) {
-        return false;
-    }
+    // 重置socket位置，重新读取
+    memcpy(&header, &reliable_header, std::min(sizeof(header), sizeof(reliable_header)));
     
-    // 验证消息类型是否有效
-    uint16_t type_value = static_cast<uint16_t>(header.type);
-    if (type_value < 1 || type_value > 8) {
-        LOG_WARN("收到无效消息类型: {} (原始值: {})", type_value, type_value);
+    // 验证消息类型是否有效（扩展范围检查）
+    uint32_t type_value = static_cast<uint32_t>(header.type);
+    if (!ReliableMessageValidator::validate_message_type(type_value)) {
+        LOG_WARN("收到无效消息类型: {} (原始值: 0x{:x})", type_value, type_value);
         return false;
     }
     
@@ -270,6 +280,44 @@ bool TcpSocketServer::receive_message(int client_fd, CommunicationMessage& messa
         return handle_json_message(json_str, client_fd);
     }
 
+    return true;
+}
+
+bool TcpSocketServer::receive_reliable_message(int client_fd, const ReliableMessageHeader& header, CommunicationMessage& message) {
+    LOG_DEBUG("接收可靠消息: type={}, length={}", header.type, header.length);
+    
+    // 验证数据长度
+    if (header.length > sizeof(message.data)) {
+        LOG_WARN("可靠消息数据长度过大: {} > {}", header.length, sizeof(message.data));
+        return false;
+    }
+    
+    // 设置消息基本信息
+    message.type = static_cast<MessageType>(header.type);
+    message.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    message.data_length = header.length;
+    
+    // 接收数据（如果有）
+    if (header.length > 0) {
+        if (!receive_raw_data(client_fd, message.data, header.length)) {
+            LOG_WARN("接收可靠消息数据失败");
+            return false;
+        }
+        
+        // 验证校验和
+        uint32_t calculated_checksum = ReliableMessageValidator::calculate_checksum(message.data, header.length);
+        if (calculated_checksum != header.checksum) {
+            LOG_WARN("可靠消息校验失败: calculated=0x{:x}, expected=0x{:x}",
+                    calculated_checksum, header.checksum);
+            return false;
+        }
+        
+        // 确保数据以null结尾
+        message.data[header.length] = '\0';
+    }
+    
+    LOG_DEBUG("可靠消息接收成功");
     return true;
 }
 

@@ -27,6 +27,7 @@ using namespace bamboo_cut;
 
 // 全局变量用于信号处理
 std::atomic<bool> g_shutdown_requested{false};
+std::chrono::steady_clock::time_point g_shutdown_start_time;
 
 // SystemD watchdog心跳线程
 void watchdog_thread() {
@@ -51,12 +52,20 @@ void watchdog_thread() {
 void signalHandler(int signal) {
     LOG_INFO("接收到信号 {}, 开始关闭系统...", signal);
     g_shutdown_requested = true;
+    g_shutdown_start_time = std::chrono::steady_clock::now();
     
     // 立即通知systemd正在停止
     sd_notify(0, "STOPPING=1");
     
-    // 设置5秒超时，避免无限等待
-    alarm(5);
+    // 设置4秒超时，避免无限等待（留1秒给systemd）
+    alarm(4);
+}
+
+// 检查是否需要强制退出
+bool should_force_exit() {
+    if (!g_shutdown_requested) return false;
+    auto elapsed = std::chrono::steady_clock::now() - g_shutdown_start_time;
+    return elapsed > std::chrono::seconds(3); // 3秒后强制退出
 }
 
 class BambooCutApplication {
@@ -174,6 +183,12 @@ public:
             if (now - last_stats_time >= stats_interval) {
                 printPerformanceStats();
                 last_stats_time = now;
+            }
+            
+            // 检查强制退出条件
+            if (should_force_exit()) {
+                LOG_WARN("强制退出主循环：超时3秒");
+                break;
             }
             
             // 动态休眠时间，避免占用过多CPU

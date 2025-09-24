@@ -24,6 +24,37 @@ namespace communication {
 using bamboo_cut::communication::CommunicationMessage;
 using bamboo_cut::communication::MessageType;
 
+// 可靠消息协议定义（基于稳定方案）
+#define MSG_MAGIC 0xBABECAFE
+
+struct ReliableMessageHeader {
+    uint32_t magic = MSG_MAGIC;
+    uint32_t type;
+    uint32_t length;
+    uint32_t checksum;
+};
+
+class ReliableMessageValidator {
+public:
+    static uint32_t calculate_checksum(const void* data, size_t len) {
+        const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        uint32_t sum = 0;
+        for (size_t i = 0; i < len; i++) {
+            sum += bytes[i];
+        }
+        return sum;
+    }
+    
+    static bool validate_message_type(uint32_t type) {
+        // 验证消息类型是否在有效范围内 (1-8)
+        return type >= 1 && type <= 8;
+    }
+    
+    static bool validate_header(const ReliableMessageHeader& header) {
+        return header.magic == MSG_MAGIC && validate_message_type(header.type);
+    }
+};
+
 // 统计信息结构
 struct TcpServerStats {
     uint64_t total_connections = 0;
@@ -119,6 +150,7 @@ private:
     
     // 消息处理
     bool receive_message(int client_fd, CommunicationMessage& message);
+    bool receive_reliable_message(int client_fd, const ReliableMessageHeader& header, CommunicationMessage& message);
     bool send_raw_data(int client_fd, const void* data, size_t size);
     bool receive_raw_data(int client_fd, void* data, size_t size);
 
