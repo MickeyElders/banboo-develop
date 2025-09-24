@@ -108,7 +108,7 @@ prepare-lvgl:
 	fi
 	$(call log_success,LVGL准备完成)
 
-build-integrated: check-deps prepare-lvgl
+build-integrated: check-deps check-cmake prepare-lvgl
 	$(call log_highlight,构建一体化竹子识别系统...)
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && \
