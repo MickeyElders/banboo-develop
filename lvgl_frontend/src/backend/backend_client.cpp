@@ -4,7 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <sys/un.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
@@ -256,8 +257,8 @@ static void* backend_communication_thread(void* arg) {
     return NULL;
 }
 
-struct backend_client_t* backend_client_create(const char* socket_path) {
-    if (!socket_path) {
+struct backend_client_t* backend_client_create(const char* host, int port) {
+    if (!host || port <= 0) {
         printf("错误：后端客户端参数无效\n");
         return nullptr;
     }
@@ -269,7 +270,8 @@ struct backend_client_t* backend_client_create(const char* socket_path) {
     }
     
     // 初始化基本参数
-    strncpy(client->socket_path, socket_path, sizeof(client->socket_path) - 1);
+    strncpy(client->host, host, sizeof(client->host) - 1);
+    client->port = port;
     client->socket_fd = -1;
     
     // 初始化状态
@@ -290,7 +292,7 @@ struct backend_client_t* backend_client_create(const char* socket_path) {
     client->messages_received = 0;
     client->last_heartbeat_time = 0;
     
-    printf("创建后端客户端: %s\n", socket_path);
+    printf("创建后端客户端: %s:%d\n", host, port);
     return client;
 }
 
@@ -314,7 +316,7 @@ void backend_client_destroy(struct backend_client_t* client) {
 bool backend_client_connect(struct backend_client_t* client) {
     if (!client) return false;
     
-    printf("连接到后端: %s\n", client->socket_path);
+    printf("连接到后端: %s:%d\n", client->host, client->port);
     
     // 如果已经连接，先断开
     if (client->socket_fd >= 0) {
@@ -322,10 +324,10 @@ bool backend_client_connect(struct backend_client_t* client) {
         client->socket_fd = -1;
     }
     
-    // 创建UNIX Domain Socket
-    client->socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    // 创建TCP Socket
+    client->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (client->socket_fd < 0) {
-        printf("错误：创建socket失败: %s\n", strerror(errno));
+        printf("错误：创建TCP socket失败: %s\n", strerror(errno));
         client->backend_status = BACKEND_ERROR;
         return false;
     }
@@ -334,15 +336,16 @@ bool backend_client_connect(struct backend_client_t* client) {
     int flags = fcntl(client->socket_fd, F_GETFL, 0);
     fcntl(client->socket_fd, F_SETFL, flags | O_NONBLOCK);
     
-    // 连接到后端UNIX Domain Socket
-    struct sockaddr_un server_addr;
+    // 连接到后端TCP Socket
+    struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sun_family = AF_UNIX;
-    strncpy(server_addr.sun_path, client->socket_path, sizeof(server_addr.sun_path) - 1);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(client->port);
+    server_addr.sin_addr.s_addr = inet_addr(client->host);
     
     if (connect(client->socket_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         if (errno != EINPROGRESS) {
-            printf("警告：连接后端失败: %s\n", strerror(errno));
+            printf("警告：连接后端失败 (地址: %s:%d): %s\n", client->host, client->port, strerror(errno));
             close(client->socket_fd);
             client->socket_fd = -1;
             client->backend_status = BACKEND_DISCONNECTED;

@@ -342,15 +342,44 @@ private:
             return false;
         }
         
-        // 尝试加载标定文件
-        std::string calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
-        if (stereo_vision_->load_calibration(calibration_file)) {
-            LOG_INFO("加载立体标定文件成功: {}", calibration_file);
-            auto params = stereo_vision_->get_calibration_params();
-            LOG_INFO("基线距离: {:.2f}mm", params.baseline);
-        } else {
-            LOG_WARN("未找到标定文件，需要进行标定: {}", calibration_file);
+        // 尝试加载标定文件（优先检查项目本地文件）
+        std::vector<std::string> calibration_paths = {
+            "./config/stereo_calibration.xml",                    // 项目本地配置
+            "../config/stereo_calibration.xml",                  // 相对路径配置
+            "/opt/bamboo-cut/config/stereo_calibration.xml"      // 系统配置路径
+        };
+        
+        bool calibration_loaded = false;
+        std::string used_calibration_file;
+        
+        for (const auto& calibration_file : calibration_paths) {
+            if (stereo_vision_->load_calibration(calibration_file)) {
+                LOG_INFO("加载立体标定文件成功: {}", calibration_file);
+                auto params = stereo_vision_->get_calibration_params();
+                LOG_INFO("基线距离: {:.2f}mm", params.baseline);
+                calibration_loaded = true;
+                used_calibration_file = calibration_file;
+                break;
+            }
+        }
+        
+        if (!calibration_loaded) {
+            LOG_WARN("未找到标定文件，尝试的路径:");
+            for (const auto& path : calibration_paths) {
+                LOG_WARN("  - {}", path);
+            }
             LOG_INFO("使用单目模式，深度信息不可用");
+            LOG_INFO("💡 提示: 将项目根目录的 config/stereo_calibration.xml 复制到系统配置目录");
+        }
+        
+        // 初始化并启用GStreamer视频流输出
+        if (stereo_vision_->initialize_video_stream()) {
+            LOG_INFO("✅ GStreamer视频流初始化成功");
+            stereo_vision_->enable_video_stream(true);
+            stereo_vision_->set_display_mode(vision::DisplayMode::SIDE_BY_SIDE);  // 默认并排显示
+            LOG_INFO("✅ 立体视觉流输出已启用");
+        } else {
+            LOG_WARN("⚠️ GStreamer视频流初始化失败");
         }
         
         LOG_INFO("立体视觉系统（含流输出）初始化完成");
@@ -568,6 +597,16 @@ private:
             return false;
         }
         
+        // 创建显示帧并推送到视频流
+        cv::Mat display_frame = stereo_vision_->create_display_frame(
+            stereo_frame.left_image,
+            stereo_frame.right_image
+        );
+        
+        if (!display_frame.empty()) {
+            stereo_vision_->push_frame_to_stream(display_frame);
+        }
+        
         // 3D模式 - 使用深度信息过滤检测点
         if (stereo_vision_->is_calibrated() && !stereo_frame.disparity.empty()) {
             auto valid_points = stereo_vision_->detect_bamboo_with_depth(
@@ -604,6 +643,14 @@ private:
                              best_point_3d.x, best_point_3d.y, best_point_3d.z, static_cast<int>(blade));
                     return true;
                 }
+            }
+        } else {
+            // 无标定模式 - 直接使用左摄像头帧进行基本的视觉处理
+            // 即使没有深度信息，也要确保视频流正常工作
+            static int frame_count = 0;
+            frame_count++;
+            if (frame_count % 300 == 0) {  // 每10秒输出一次日志（30fps * 10s = 300帧）
+                LOG_INFO("立体视觉流: 无标定模式运行，已处理 {} 帧", frame_count);
             }
         }
         return false;
@@ -792,6 +839,31 @@ private:
             } else if (command == "emergency_stop") {
                 LOG_WARN("前端触发紧急停止");
                 handleEmergencyStop();
+            } else if (command == "set_display_mode") {
+                // 处理显示模式切换
+                if (stereo_vision_ && stereo_vision_available_) {
+                    std::string mode = command_data.value("mode", "side_by_side");
+                    if (mode == "side_by_side") {
+                        stereo_vision_->set_display_mode(vision::DisplayMode::SIDE_BY_SIDE);
+                        LOG_INFO("前端切换显示模式: 并排显示");
+                    } else if (mode == "fused") {
+                        stereo_vision_->set_display_mode(vision::DisplayMode::FUSED);
+                        LOG_INFO("前端切换显示模式: 融合显示");
+                    } else {
+                        LOG_WARN("未知的显示模式: {}", mode);
+                    }
+                } else {
+                    LOG_WARN("立体视觉系统不可用，无法切换显示模式");
+                }
+            } else if (command == "toggle_video_stream") {
+                // 处理视频流开关
+                if (stereo_vision_ && stereo_vision_available_) {
+                    bool enable = command_data.value("enable", true);
+                    stereo_vision_->enable_video_stream(enable);
+                    LOG_INFO("前端切换视频流: {}", enable ? "启用" : "禁用");
+                } else {
+                    LOG_WARN("立体视觉系统不可用，无法切换视频流");
+                }
             } else {
                 LOG_WARN("未知的前端指令: {}", command);
             }

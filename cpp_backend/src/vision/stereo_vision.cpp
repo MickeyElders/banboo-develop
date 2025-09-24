@@ -14,6 +14,11 @@ namespace vision {
 
 StereoVision::StereoVision(const CameraSyncConfig& sync_config)
     : sync_config_(sync_config)
+    , stream_enabled_(false)
+    , display_mode_(DisplayMode::SIDE_BY_SIDE)
+    , frame_counter_(0)
+    , gst_pipeline_(nullptr)
+    , gst_appsrc_(nullptr)
 {
     // 初始化统计信息
     statistics_.last_capture_time = std::chrono::steady_clock::now();
@@ -95,6 +100,15 @@ void StereoVision::shutdown() {
     std::cout << "关闭立体视觉系统..." << std::endl;
     
     initialized_.store(false);
+    
+    // 停止GStreamer管道
+    if (gst_pipeline_) {
+        gst_element_set_state(gst_pipeline_, GST_STATE_NULL);
+        gst_object_unref(gst_pipeline_);
+        gst_pipeline_ = nullptr;
+        gst_appsrc_ = nullptr;
+    }
+    
     close_cameras();
     
     if (stereo_matcher_) {
@@ -782,6 +796,204 @@ std::string evaluate_calibration_quality(const StereoCalibrationParams& params) 
 }
 
 } // namespace stereo_utils
+
+// GStreamer流输出功能实现
+
+bool StereoVision::initialize_video_stream() {
+    std::cout << "初始化立体视觉GStreamer流输出..." << std::endl;
+    
+    // 初始化GStreamer
+    if (!gst_is_initialized()) {
+        gst_init(nullptr, nullptr);
+    }
+    
+    if (!build_stream_pipeline()) {
+        std::cerr << "构建GStreamer管道失败" << std::endl;
+        return false;
+    }
+    
+    // 启动管道
+    GstStateChangeReturn ret = gst_element_set_state(gst_pipeline_, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        std::cerr << "启动GStreamer管道失败" << std::endl;
+        gst_object_unref(gst_pipeline_);
+        gst_pipeline_ = nullptr;
+        gst_appsrc_ = nullptr;
+        return false;
+    }
+    
+    std::cout << "立体视觉GStreamer流输出初始化完成" << std::endl;
+    return true;
+}
+
+bool StereoVision::build_stream_pipeline() {
+    // 创建管道元素
+    gst_pipeline_ = gst_pipeline_new("stereo-video-pipeline");
+    if (!gst_pipeline_) {
+        std::cerr << "创建GStreamer管道失败" << std::endl;
+        return false;
+    }
+    
+    // 创建appsrc
+    gst_appsrc_ = gst_element_factory_make("appsrc", "stereo-source");
+    if (!gst_appsrc_) {
+        std::cerr << "创建appsrc失败" << std::endl;
+        return false;
+    }
+    
+    // 创建其他元素
+    GstElement* videoconvert = gst_element_factory_make("videoconvert", "convert");
+    GstElement* videoscale = gst_element_factory_make("videoscale", "scale");
+    GstElement* capsfilter = gst_element_factory_make("capsfilter", "caps");
+    GstElement* x264enc = gst_element_factory_make("x264enc", "encoder");
+    GstElement* h264parse = gst_element_factory_make("h264parse", "parser");
+    GstElement* rtph264pay = gst_element_factory_make("rtph264pay", "payload");
+    GstElement* udpsink = gst_element_factory_make("udpsink", "sink");
+    
+    if (!videoconvert || !videoscale || !capsfilter || !x264enc || !h264parse || !rtph264pay || !udpsink) {
+        std::cerr << "创建GStreamer元素失败" << std::endl;
+        return false;
+    }
+    
+    // 配置appsrc
+    g_object_set(G_OBJECT(gst_appsrc_),
+        "caps", gst_caps_from_string("video/x-raw,format=BGR,width=640,height=480,framerate=30/1"),
+        "format", GST_FORMAT_TIME,
+        "is-live", TRUE,
+        "do-timestamp", TRUE,
+        NULL);
+    
+    // 配置缩放和格式转换
+    GstCaps* scale_caps = gst_caps_from_string("video/x-raw,width=640,height=480,framerate=30/1");
+    g_object_set(G_OBJECT(capsfilter), "caps", scale_caps, NULL);
+    gst_caps_unref(scale_caps);
+    
+    // 配置H.264编码器
+    g_object_set(G_OBJECT(x264enc),
+        "tune", 4,  // zerolatency
+        "bitrate", 2000,  // 2Mbps
+        "speed-preset", 6,  // ultrafast
+        "key-int-max", 30,  // GOP size
+        NULL);
+    
+    // 配置RTP负载
+    g_object_set(G_OBJECT(rtph264pay),
+        "pt", 96,
+        "config-interval", 1,
+        NULL);
+    
+    // 配置UDP输出
+    g_object_set(G_OBJECT(udpsink),
+        "host", "127.0.0.1",
+        "port", 5000,
+        NULL);
+    
+    // 添加所有元素到管道
+    gst_bin_add_many(GST_BIN(gst_pipeline_),
+        gst_appsrc_, videoconvert, videoscale, capsfilter,
+        x264enc, h264parse, rtph264pay, udpsink, NULL);
+    
+    // 连接元素
+    if (!gst_element_link_many(gst_appsrc_, videoconvert, videoscale, capsfilter,
+                               x264enc, h264parse, rtph264pay, udpsink, NULL)) {
+        std::cerr << "连接GStreamer元素失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "GStreamer管道构建成功: BGR -> H.264 -> RTP -> UDP:5000" << std::endl;
+    return true;
+}
+
+void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
+    if (!gst_appsrc_ || !stream_enabled_ || frame.empty()) {
+        return;
+    }
+    
+    // 确保帧格式正确 (640x480 BGR)
+    cv::Mat output_frame;
+    if (frame.size() != cv::Size(640, 480)) {
+        cv::resize(frame, output_frame, cv::Size(640, 480));
+    } else {
+        output_frame = frame;
+    }
+    
+    // 确保是BGR格式
+    if (output_frame.channels() != 3) {
+        cv::cvtColor(output_frame, output_frame, cv::COLOR_GRAY2BGR);
+    }
+    
+    // 创建GStreamer缓冲区
+    gsize size = output_frame.total() * output_frame.elemSize();
+    GstBuffer* buffer = gst_buffer_new_allocate(NULL, size, NULL);
+    
+    // 复制数据到缓冲区
+    GstMapInfo map;
+    gst_buffer_map(buffer, &map, GST_MAP_WRITE);
+    memcpy(map.data, output_frame.data, size);
+    gst_buffer_unmap(buffer, &map);
+    
+    // 设置时间戳
+    GST_BUFFER_PTS(buffer) = frame_counter_ * GST_SECOND / 30;  // 30fps
+    GST_BUFFER_DURATION(buffer) = GST_SECOND / 30;
+    
+    // 推送到appsrc
+    GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(gst_appsrc_), buffer);
+    if (ret != GST_FLOW_OK) {
+        std::cerr << "推送视频帧到流失败: " << ret << std::endl;
+    } else {
+        frame_counter_++;
+        if (frame_counter_ % 30 == 0) {
+            std::cout << "立体视觉流: 发送了 " << frame_counter_ << " 帧" << std::endl;
+        }
+    }
+}
+
+cv::Mat StereoVision::create_display_frame(const cv::Mat& left, const cv::Mat& right) {
+    cv::Mat display_frame;
+    
+    if (left.empty()) {
+        return display_frame;
+    }
+    
+    switch (display_mode_) {
+        case DisplayMode::SIDE_BY_SIDE:
+            // 并排显示模式
+            if (!right.empty() && left.size() == right.size()) {
+                cv::hconcat(left, right, display_frame);
+                // 缩放到640x480 (左右各320x480)
+                cv::resize(display_frame, display_frame, cv::Size(640, 480));
+            } else {
+                // 只有左摄像头，缩放到640x480
+                cv::resize(left, display_frame, cv::Size(640, 480));
+            }
+            break;
+            
+        case DisplayMode::FUSED:
+            // 融合显示模式，只显示左摄像头
+            cv::resize(left, display_frame, cv::Size(640, 480));
+            break;
+    }
+    
+    return display_frame;
+}
+
+void StereoVision::enable_video_stream(bool enable) {
+    if (stream_enabled_ != enable) {
+        stream_enabled_ = enable;
+        if (enable && !gst_pipeline_) {
+            initialize_video_stream();
+        }
+        std::cout << "立体视觉流输出: " << (enable ? "已启用" : "已禁用") << std::endl;
+    }
+}
+
+void StereoVision::set_display_mode(DisplayMode mode) {
+    if (display_mode_ != mode) {
+        display_mode_ = mode;
+        std::string mode_str = (mode == DisplayMode::SIDE_BY_SIDE) ? "并排显示" : "融合显示";
+        std::cout << "立体视觉显示模式: " << mode_str << std::endl;
+    }
+}
 
 } // namespace vision
 } // namespace bamboo_cut

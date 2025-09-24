@@ -493,7 +493,7 @@ void init_backend_system() {
     }
     
     // 创建后端客户端
-    g_backend_client = backend_client_create("/tmp/bamboo_socket");
+    g_backend_client = backend_client_create("127.0.0.1", 8888);
     if (!g_backend_client) {
         printf("警告：创建后端客户端失败，前端将在离线模式下运行\n");
         return;

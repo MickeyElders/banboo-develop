@@ -64,7 +64,8 @@ typedef struct {
 /* 后端客户端结构 */
 struct backend_client_t {
     // 连接信息
-    char socket_path[256];      // UNIX Domain Socket路径
+    char host[64];              // TCP服务器地址
+    int port;                   // TCP服务器端口
     int socket_fd;              // Socket文件描述符
     
     // 状态信息
@@ -89,10 +90,11 @@ struct backend_client_t {
 
 /**
  * 创建后端客户端
- * @param socket_path UNIX Domain Socket路径
+ * @param host TCP服务器地址
+ * @param port TCP服务器端口
  * @return 客户端指针，失败返回NULL
  */
-struct backend_client_t* backend_client_create(const char* socket_path);
+struct backend_client_t* backend_client_create(const char* host, int port);
 
 /**
  * 销毁后端客户端
