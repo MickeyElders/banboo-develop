@@ -21,8 +21,8 @@ PYTHON_VENV = $(INSTALL_PREFIX)/venv
 PYTHON_BIN = $(PYTHON_VENV)/bin/python
 PIP_BIN = $(PYTHON_VENV)/bin/pip
 
-# 服务配置 - Python GTK3服务
-PYTHON_GTK3_SERVICE = bamboo-python-gtk3.service
+# 服务配置 - Python GTK4服务
+PYTHON_GTK4_SERVICE = bamboo-python-gtk4.service
 
 # AI优化配置文件
 AI_CONFIG = config/ai_optimization.yaml
@@ -105,7 +105,7 @@ help:
 	@echo "  JOBS=N                   并行任务数 (默认: CPU核心数)"
 
 check-deps:
-	$(call log_info,检查Python LVGL系统依赖...)
+	$(call log_info,检查Python GTK4系统依赖...)
 	@which cmake >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) cmake未安装" && exit 1)
 	@which gcc >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) gcc未安装" && exit 1)
 	@which g++ >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) g++未安装" && exit 1)
@@ -114,8 +114,10 @@ check-deps:
 	@pkg-config --exists opencv4 || pkg-config --exists opencv || (echo "$(RED)[ERROR]$(NC) OpenCV未安装" && exit 1)
 	@pkg-config --exists libmodbus || echo "$(YELLOW)[WARNING]$(NC) libmodbus未安装，将禁用PLC通信功能"
 	@pkg-config --exists gstreamer-1.0 || echo "$(YELLOW)[WARNING]$(NC) GStreamer未安装，将禁用高级视频功能"
+	@pkg-config --exists gtk4 || echo "$(YELLOW)[WARNING]$(NC) GTK4开发包未安装，请运行: sudo apt install libgtk-4-dev"
+	@python3 -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1')" 2>/dev/null || echo "$(YELLOW)[WARNING]$(NC) GTK4 Python绑定未安装"
 	@python3 -c "import pybind11" 2>/dev/null || echo "$(YELLOW)[WARNING]$(NC) pybind11未安装，将从requirements.txt安装"
-	$(call log_success,依赖检查完成)
+	$(call log_success,GTK4依赖检查完成)
 
 # 检查AI优化配置
 check-ai-config:
@@ -156,12 +158,12 @@ build-cpp: check-deps check-ai-config check-cmake
 
 # 准备Python环境
 build-python: install-python-deps
-	$(call log_highlight,准备Python LVGL环境...)
+	$(call log_highlight,准备Python GTK4环境...)
 	@mkdir -p $(BUILD_DIR)
 	
-	# 检查Python LVGL文件
+	# 检查Python GTK4文件
 	@if [ ! -f "python_core/ai_bamboo_system.py" ]; then \
-		$(call log_error,Python LVGL主文件不存在: python_core/ai_bamboo_system.py); \
+		$(call log_error,Python GTK4主文件不存在: python_core/ai_bamboo_system.py); \
 		exit 1; \
 	fi
 	@if [ ! -f "python_core/display_driver.py" ]; then \
@@ -169,7 +171,7 @@ build-python: install-python-deps
 		exit 1; \
 	fi
 	
-	$(call log_success,Python LVGL环境准备完成)
+	$(call log_success,Python GTK4环境准备完成)
 
 # 安装Python依赖
 install-python-deps: install-lvgl-python
@@ -384,29 +386,30 @@ install: build-cpp build-python
 	$(call log_success,Python LVGL系统安装完成)
 
 install-service: install
-	$(call log_info,安装systemd Python LVGL服务...)
+	$(call log_info,安装systemd Python GTK4服务...)
 	
 	# 停止并删除旧服务
-	@sudo systemctl stop bamboo-backend.service bamboo-frontend.service bamboo-integrated.service 2>/dev/null || true
-	@sudo systemctl disable bamboo-backend.service bamboo-frontend.service bamboo-integrated.service 2>/dev/null || true
+	@sudo systemctl stop bamboo-backend.service bamboo-frontend.service bamboo-integrated.service bamboo-python-lvgl.service 2>/dev/null || true
+	@sudo systemctl disable bamboo-backend.service bamboo-frontend.service bamboo-integrated.service bamboo-python-lvgl.service 2>/dev/null || true
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-backend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-frontend.service
 	@sudo rm -f $(SYSTEMD_DIR)/bamboo-integrated.service
+	@sudo rm -f $(SYSTEMD_DIR)/bamboo-python-lvgl.service
 	
 	# 获取当前用户和UID
 	@CURRENT_USER=$$(whoami); \
 	CURRENT_UID=$$(id -u); \
 	echo "$(BLUE)[INFO]$(NC) 配置服务用户: $$CURRENT_USER (UID: $$CURRENT_UID)"; \
 	\
-	sed "s/USER_PLACEHOLDER/$$CURRENT_USER/g; s/UID_PLACEHOLDER/$$CURRENT_UID/g" $(PYTHON_LVGL_SERVICE) > /tmp/$(PYTHON_LVGL_SERVICE); \
+	sed "s/USER_PLACEHOLDER/$$CURRENT_USER/g; s/UID_PLACEHOLDER/$$CURRENT_UID/g" $(PYTHON_GTK4_SERVICE) > /tmp/$(PYTHON_GTK4_SERVICE); \
 	\
-	sudo cp /tmp/$(PYTHON_LVGL_SERVICE) $(SYSTEMD_DIR)/; \
-	rm -f /tmp/$(PYTHON_LVGL_SERVICE); \
+	sudo cp /tmp/$(PYTHON_GTK4_SERVICE) $(SYSTEMD_DIR)/; \
+	rm -f /tmp/$(PYTHON_GTK4_SERVICE); \
 	sudo systemctl daemon-reload; \
-	sudo systemctl enable $(PYTHON_LVGL_SERVICE)
+	sudo systemctl enable $(PYTHON_GTK4_SERVICE)
 	
-	$(call log_success,Python LVGL systemd服务安装完成)
-	$(call log_highlight,旧的C++服务已清理，新的Python LVGL服务已安装)
+	$(call log_success,Python GTK4 systemd服务安装完成)
+	$(call log_highlight,旧服务已清理，新的Python GTK4服务已安装)
 
 backup:
 	$(call log_info,创建系统备份...)

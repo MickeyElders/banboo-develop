@@ -1,0 +1,53 @@
+[Unit]
+Description=Bamboo Python GTK4 Detection System
+Documentation=https://github.com/bamboo-cutting/ai-recognition
+After=network.target graphical-session.target
+Wants=graphical-session.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=USER_PLACEHOLDER
+Group=USER_PLACEHOLDER
+Environment="HOME=/home/USER_PLACEHOLDER"
+Environment="XDG_RUNTIME_DIR=/run/user/UID_PLACEHOLDER"
+Environment="DISPLAY=:0"
+Environment="WAYLAND_DISPLAY=wayland-0"
+Environment="PYTHONPATH=/opt/bamboo-cut:/opt/bamboo-cut/python_core"
+Environment="LD_LIBRARY_PATH=/usr/local/cuda/lib64:/opt/bamboo-cut/lib"
+Environment="PATH=/opt/bamboo-cut/venv/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# GTK4/Wayland环境变量
+Environment="GDK_BACKEND=wayland,x11"
+Environment="QT_QPA_PLATFORM=wayland;xcb"
+Environment="MOZ_ENABLE_WAYLAND=1"
+Environment="GTK_THEME=Adwaita:dark"
+
+WorkingDirectory=/opt/bamboo-cut
+ExecStart=/opt/bamboo-cut/venv/bin/python python_core/ai_bamboo_system.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/opt/bamboo-cut /var/log/bamboo /etc/bamboo /tmp
+
+# 资源限制
+MemoryHigh=2G
+MemoryMax=4G
+CPUQuota=200%
+IOWeight=100
+
+# 服务依赖和故障恢复
+StartLimitInterval=300
+StartLimitBurst=5
+WatchdogSec=60
+
+[Install]
+WantedBy=graphical.target
+Also=graphical-session.target
