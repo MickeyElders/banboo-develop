@@ -977,7 +977,17 @@ std::string StereoVision::build_stream_pipeline() {
     GstElement* udpsink = gst_element_factory_make("udpsink", "sink");
     
     if (!videoconvert || !videoscale || !capsfilter || !x264enc || !h264parse || !rtph264pay || !udpsink) {
-        std::cerr << "创建GStreamer元素失败" << std::endl;
+        std::cerr << "❌ 创建GStreamer元素失败:" << std::endl;
+        std::cerr << "   videoconvert: " << (videoconvert ? "✅" : "❌") << std::endl;
+        std::cerr << "   videoscale: " << (videoscale ? "✅" : "❌") << std::endl;
+        std::cerr << "   capsfilter: " << (capsfilter ? "✅" : "❌") << std::endl;
+        std::cerr << "   x264enc: " << (x264enc ? "✅" : "❌") << std::endl;
+        std::cerr << "   h264parse: " << (h264parse ? "✅" : "❌") << std::endl;
+        std::cerr << "   rtph264pay: " << (rtph264pay ? "✅" : "❌") << std::endl;
+        std::cerr << "   udpsink: " << (udpsink ? "✅" : "❌") << std::endl;
+        
+        // 清理已创建的元素
+        if (gst_pipeline_) { gst_object_unref(gst_pipeline_); gst_pipeline_ = nullptr; }
         return "";
     }
     
