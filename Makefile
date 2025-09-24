@@ -500,7 +500,7 @@ performance-test:
 	fi
 
 # 首次完整部署
-deploy: backup build-cpp build-python fix-gtk4-auto install-service start
+deploy: backup build-cpp build-python install-cage install-service start
 	$(call log_success,$(CYAN)Python GTK4系统首次部署完成！$(NC))
 	@echo ""
 	$(call log_highlight,架构信息:)
@@ -527,7 +527,7 @@ deploy: backup build-cpp build-python fix-gtk4-auto install-service start
 	@echo "  make performance-test - 性能监控"
 
 # 代码修改后快速重新部署
-redeploy: stop build-cpp build-python install start
+redeploy: stop build-cpp build-python install-service start
 	$(call log_success,$(CYAN)Python GTK4系统重新部署完成！$(NC))
 	@echo ""
 	$(call log_info,检查服务状态:)
