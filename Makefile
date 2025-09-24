@@ -191,6 +191,16 @@ install-python-deps:
 		python3 -m venv venv; \
 	fi
 	
+	# 验证虚拟环境创建成功
+	@if [ ! -f "venv/bin/pip" ]; then \
+		echo "$(RED)[ERROR]$(NC) 虚拟环境创建失败，正在重新创建..."; \
+		rm -rf venv; \
+		python3 -m venv venv --without-pip; \
+		wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py; \
+		./venv/bin/python get-pip.py; \
+		rm get-pip.py; \
+	fi
+	
 	# 激活虚拟环境并安装依赖
 	@echo "$(BLUE)[INFO]$(NC) 安装Python包..."
 	@./venv/bin/pip install --upgrade pip
