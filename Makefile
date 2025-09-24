@@ -121,9 +121,9 @@ check-deps:
 check-ai-config:
 	$(call log_ai,检查AI优化配置...)
 	@if [ ! -f "$(AI_CONFIG)" ]; then \
-		$(call log_warning,AI优化配置文件不存在: $(AI_CONFIG)); \
+		echo "$(YELLOW)[WARNING]$(NC) AI优化配置文件不存在: $(AI_CONFIG)"; \
 	else \
-		$(call log_success,AI优化配置文件存在: $(AI_CONFIG)); \
+		echo "$(GREEN)[SUCCESS]$(NC) AI优化配置文件存在: $(AI_CONFIG)"; \
 		echo "$(MAGENTA)启用的AI优化技术:$(NC)"; \
 		grep -E "enable: true" $(AI_CONFIG) | sed 's/^/  /' || true; \
 	fi
@@ -132,9 +132,10 @@ check-ai-config:
 build-cpp: check-deps check-ai-config check-cmake
 	$(call log_highlight,构建C++推理核心...)
 	$(call log_ai,集成AI优化: NAM注意力、GhostConv、VoV-GSCSP、Wise-IoU、SAHI切片推理)
+	@rm -rf $(CPP_BUILD_DIR)
 	@mkdir -p $(CPP_BUILD_DIR)
 	@cd $(CPP_BUILD_DIR) && \
-		cmake .. -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		cmake ../cpp_backend -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 			-DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX) \
 			-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 			-DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native -ffast-math" \
@@ -151,7 +152,7 @@ build-cpp: check-deps check-ai-config check-cmake
 			-DAI_CONFIG_PATH="../$(AI_CONFIG)" && \
 		make -j$(JOBS)
 	$(call log_success,C++推理核心构建完成)
-	$(call log_ai,AI优化推理库: $(CPP_BUILD_DIR)/libbamboo_cut)
+	$(call log_ai,AI优化推理库: $(CPP_BUILD_DIR)/libbamboo_inference.so)
 
 # 准备Python环境
 build-python: install-python-deps
