@@ -967,23 +967,59 @@ std::string StereoVision::build_stream_pipeline() {
         return "";
     }
     
-    // 创建其他元素
+    // 创建视频处理元素
     GstElement* videoconvert = gst_element_factory_make("videoconvert", "convert");
     GstElement* videoscale = gst_element_factory_make("videoscale", "scale");
     GstElement* capsfilter = gst_element_factory_make("capsfilter", "caps");
-    GstElement* x264enc = gst_element_factory_make("x264enc", "encoder");
-    GstElement* h264parse = gst_element_factory_make("h264parse", "parser");
-    GstElement* rtph264pay = gst_element_factory_make("rtph264pay", "payload");
+    
+    // Jetson Orin NX专用硬件编码器优先级列表
+    GstElement* encoder = nullptr;
+    const char* encoder_names[] = {
+        "nvv4l2h264enc",    // NVIDIA V4L2 H.264编码器 (推荐)
+        "omxh264enc",       // OpenMAX H.264编码器 (备用)
+        "nvh264enc",        // NVIDIA H.264编码器 (备用)
+        "x264enc",          // 软件编码器 (最后备用)
+        NULL
+    };
+    const char* used_encoder = nullptr;
+    
+    std::cout << "🔍 检测Jetson Orin NX可用编码器..." << std::endl;
+    for (int i = 0; encoder_names[i] != NULL; i++) {
+        std::cout << "   尝试: " << encoder_names[i];
+        encoder = gst_element_factory_make(encoder_names[i], "encoder");
+        if (encoder) {
+            used_encoder = encoder_names[i];
+            std::cout << " ✅" << std::endl;
+            break;
+        } else {
+            std::cout << " ❌" << std::endl;
+        }
+    }
+    
+    GstElement* parser = nullptr;
+    GstElement* payloader = nullptr;
+    
+    if (encoder) {
+        parser = gst_element_factory_make("h264parse", "parser");
+        payloader = gst_element_factory_make("rtph264pay", "payload");
+        std::cout << "✅ 使用编码器: " << used_encoder << std::endl;
+    } else {
+        std::cerr << "❌ 无法找到任何可用的H.264编码器" << std::endl;
+        if (gst_pipeline_) { gst_object_unref(gst_pipeline_); gst_pipeline_ = nullptr; }
+        return "";
+    }
+    
     GstElement* udpsink = gst_element_factory_make("udpsink", "sink");
     
-    if (!videoconvert || !videoscale || !capsfilter || !x264enc || !h264parse || !rtph264pay || !udpsink) {
+    // 检查关键元素是否创建成功
+    if (!videoconvert || !videoscale || !capsfilter || !encoder || !parser || !payloader || !udpsink) {
         std::cerr << "❌ 创建GStreamer元素失败:" << std::endl;
         std::cerr << "   videoconvert: " << (videoconvert ? "✅" : "❌") << std::endl;
         std::cerr << "   videoscale: " << (videoscale ? "✅" : "❌") << std::endl;
         std::cerr << "   capsfilter: " << (capsfilter ? "✅" : "❌") << std::endl;
-        std::cerr << "   x264enc: " << (x264enc ? "✅" : "❌") << std::endl;
-        std::cerr << "   h264parse: " << (h264parse ? "✅" : "❌") << std::endl;
-        std::cerr << "   rtph264pay: " << (rtph264pay ? "✅" : "❌") << std::endl;
+        std::cerr << "   encoder (" << (used_encoder ? used_encoder : "unknown") << "): " << (encoder ? "✅" : "❌") << std::endl;
+        std::cerr << "   h264parse: " << (parser ? "✅" : "❌") << std::endl;
+        std::cerr << "   rtph264pay: " << (payloader ? "✅" : "❌") << std::endl;
         std::cerr << "   udpsink: " << (udpsink ? "✅" : "❌") << std::endl;
         
         // 清理已创建的元素
@@ -997,6 +1033,8 @@ std::string StereoVision::build_stream_pipeline() {
         "format", GST_FORMAT_TIME,
         "is-live", TRUE,
         "do-timestamp", TRUE,
+        "max-buffers", 2,      // 限制缓冲区防止延迟
+        "drop", TRUE,          // 允许丢帧
         NULL);
     
     // 配置缩放和格式转换
@@ -1004,16 +1042,46 @@ std::string StereoVision::build_stream_pipeline() {
     g_object_set(G_OBJECT(capsfilter), "caps", scale_caps, NULL);
     gst_caps_unref(scale_caps);
     
-    // 配置H.264编码器
-    g_object_set(G_OBJECT(x264enc),
-        "tune", 4,  // zerolatency
-        "bitrate", 2000,  // 2Mbps
-        "speed-preset", 6,  // ultrafast
-        "key-int-max", 30,  // GOP size
-        NULL);
+    // 配置编码器 (针对不同编码器优化)
+    if (strstr(used_encoder, "nvv4l2h264enc")) {
+        // NVIDIA V4L2编码器配置 (推荐)
+        g_object_set(G_OBJECT(encoder),
+            "bitrate", 2000000,          // 2Mbps
+            "preset-level", 1,           // UltraFastPreset
+            "profile", 0,                // Baseline
+            "iframeinterval", 30,        // I帧间隔
+            "control-rate", 1,           // CBR
+            NULL);
+        std::cout << "🚀 使用NVIDIA V4L2硬件编码器 (最佳性能)" << std::endl;
+    } else if (strstr(used_encoder, "omxh264enc")) {
+        // OpenMAX编码器配置
+        g_object_set(G_OBJECT(encoder),
+            "bitrate", 2000000,          // 2Mbps
+            "preset-level", 0,           // UltraFastPreset
+            "profile", 0,                // Baseline
+            "iframeinterval", 30,        // I帧间隔
+            NULL);
+        std::cout << "⚡ 使用OpenMAX硬件编码器" << std::endl;
+    } else if (strstr(used_encoder, "nvh264enc")) {
+        // NVIDIA编码器配置
+        g_object_set(G_OBJECT(encoder),
+            "bitrate", 2000000,          // 2Mbps
+            "preset", 1,                 // low-latency-default
+            NULL);
+        std::cout << "🔧 使用NVIDIA编码器" << std::endl;
+    } else if (strstr(used_encoder, "x264enc")) {
+        // 软件编码器配置
+        g_object_set(G_OBJECT(encoder),
+            "tune", 4,                   // zerolatency
+            "bitrate", 2000,             // 2Mbps
+            "speed-preset", 6,           // ultrafast
+            "key-int-max", 30,           // GOP size
+            NULL);
+        std::cout << "💻 使用软件编码器 (性能较低)" << std::endl;
+    }
     
-    // 配置RTP负载
-    g_object_set(G_OBJECT(rtph264pay),
+    // 配置RTP负载器
+    g_object_set(G_OBJECT(payloader),
         "pt", 96,
         "config-interval", 1,
         NULL);
@@ -1022,22 +1090,26 @@ std::string StereoVision::build_stream_pipeline() {
     g_object_set(G_OBJECT(udpsink),
         "host", "127.0.0.1",
         "port", 5000,
+        "sync", FALSE,               // 异步发送，减少延迟
         NULL);
     
     // 添加所有元素到管道
     gst_bin_add_many(GST_BIN(gst_pipeline_),
         gst_appsrc_, videoconvert, videoscale, capsfilter,
-        x264enc, h264parse, rtph264pay, udpsink, NULL);
+        encoder, parser, payloader, udpsink, NULL);
     
     // 连接元素
     if (!gst_element_link_many(gst_appsrc_, videoconvert, videoscale, capsfilter,
-                               x264enc, h264parse, rtph264pay, udpsink, NULL)) {
-        std::cerr << "连接GStreamer元素失败" << std::endl;
+                               encoder, parser, payloader, udpsink, NULL)) {
+        std::cerr << "❌ 连接GStreamer元素失败" << std::endl;
+        gst_object_unref(gst_pipeline_);
+        gst_pipeline_ = nullptr;
+        gst_appsrc_ = nullptr;
         return "";
     }
     
-    std::cout << "GStreamer管道构建成功: BGR -> H.264 -> RTP -> UDP:5000" << std::endl;
-    return "stereo-video-pipeline"; // 返回管道名称
+    std::cout << "✅ Jetson Orin NX GStreamer管道构建成功: " << used_encoder << " -> RTP -> UDP:5000" << std::endl;
+    return "stereo-video-pipeline";
 }
 
 void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
