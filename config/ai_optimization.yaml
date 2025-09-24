@@ -66,17 +66,6 @@ wise_iou:
   use_diou: false
   use_ciou: false
 
-# DeepStream 流水线配置
-deepstream:
-  enable: false  # 在 Jetson 环境中启用
-  enable_tracking: true
-  enable_fp16: true
-  batch_size: 1
-  confidence_threshold: 0.5
-  nms_threshold: 0.4
-  input_width: 1280
-  input_height: 720
-  gpu_id: 0
 
 # SAHI 切片推理配置
 sahi_slicing:
