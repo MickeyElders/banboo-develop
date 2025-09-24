@@ -24,6 +24,7 @@
 #include "bamboo_cut/vision/stereo_vision.h"
 #include "bamboo_cut/communication/modbus_server.h"
 #include "bamboo_cut/core/logger.h"
+#include "bamboo_cut/core/types.h"
 
 // 现有前端组件 - 完全复用
 #include "gui/video_view.h"
@@ -294,7 +295,7 @@ private:
         }
         // 单摄像头处理
         else if (camera_manager_) {
-            auto frame_info = camera_manager_->getCurrentFrame();
+            bamboo_cut::vision::FrameInfo frame_info = camera_manager_->getCurrentFrame();
             if (frame_info.valid && !frame_info.image.empty()) {
                 // 更新视频到数据桥接
                 data_bridge_->updateVideo(frame_info.image, frame_info.timestamp);
