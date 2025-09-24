@@ -106,15 +106,15 @@ help:
 
 check-deps:
 	$(call log_info,检查Python LVGL系统依赖...)
-	@which cmake >/dev/null 2>&1 || ($(call log_error,cmake未安装) && exit 1)
-	@which gcc >/dev/null 2>&1 || ($(call log_error,gcc未安装) && exit 1)
-	@which g++ >/dev/null 2>&1 || ($(call log_error,g++未安装) && exit 1)
-	@which python3 >/dev/null 2>&1 || ($(call log_error,Python3未安装) && exit 1)
-	@which pip3 >/dev/null 2>&1 || ($(call log_error,pip3未安装) && exit 1)
-	@pkg-config --exists opencv4 || pkg-config --exists opencv || ($(call log_error,OpenCV未安装) && exit 1)
-	@pkg-config --exists libmodbus || ($(call log_warning,libmodbus未安装，将禁用PLC通信功能))
-	@pkg-config --exists gstreamer-1.0 || ($(call log_warning,GStreamer未安装，将禁用高级视频功能))
-	@python3 -c "import pybind11" 2>/dev/null || ($(call log_warning,pybind11未安装，将从requirements.txt安装))
+	@which cmake >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) cmake未安装" && exit 1)
+	@which gcc >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) gcc未安装" && exit 1)
+	@which g++ >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) g++未安装" && exit 1)
+	@which python3 >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) Python3未安装" && exit 1)
+	@which pip3 >/dev/null 2>&1 || (echo "$(RED)[ERROR]$(NC) pip3未安装" && exit 1)
+	@pkg-config --exists opencv4 || pkg-config --exists opencv || (echo "$(RED)[ERROR]$(NC) OpenCV未安装" && exit 1)
+	@pkg-config --exists libmodbus || echo "$(YELLOW)[WARNING]$(NC) libmodbus未安装，将禁用PLC通信功能"
+	@pkg-config --exists gstreamer-1.0 || echo "$(YELLOW)[WARNING]$(NC) GStreamer未安装，将禁用高级视频功能"
+	@python3 -c "import pybind11" 2>/dev/null || echo "$(YELLOW)[WARNING]$(NC) pybind11未安装，将从requirements.txt安装"
 	$(call log_success,依赖检查完成)
 
 # 检查AI优化配置
