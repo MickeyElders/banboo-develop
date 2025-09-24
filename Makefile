@@ -134,7 +134,7 @@ build-cpp: check-deps check-ai-config check-cmake
 	$(call log_ai,集成AI优化: NAM注意力、GhostConv、VoV-GSCSP、Wise-IoU、SAHI切片推理)
 	@mkdir -p $(CPP_BUILD_DIR)
 	@cd $(CPP_BUILD_DIR) && \
-		cmake ../cpp_backend -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		cmake .. -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 			-DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX) \
 			-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 			-DCMAKE_CXX_FLAGS="-O3 -march=native -mtune=native -ffast-math" \
@@ -151,7 +151,7 @@ build-cpp: check-deps check-ai-config check-cmake
 			-DAI_CONFIG_PATH="../$(AI_CONFIG)" && \
 		make -j$(JOBS)
 	$(call log_success,C++推理核心构建完成)
-	$(call log_ai,AI优化推理库: $(CPP_BUILD_DIR)/libbamboo_inference.so)
+	$(call log_ai,AI优化推理库: $(CPP_BUILD_DIR)/libbamboo_cut)
 
 # 准备Python环境
 build-python: install-python-deps
@@ -218,6 +218,9 @@ install: build-cpp build-python
 	# 安装C++推理库
 	@if [ -f "$(CPP_BUILD_DIR)/libbamboo_inference.so" ]; then \
 		sudo cp $(CPP_BUILD_DIR)/libbamboo_inference.so $(INSTALL_PREFIX)/lib/; \
+	fi
+	@if [ -f "$(CPP_BUILD_DIR)/bamboo_cut" ]; then \
+		sudo cp $(CPP_BUILD_DIR)/bamboo_cut $(INSTALL_PREFIX)/bin/; \
 	fi
 	@if [ -f "$(CPP_BUILD_DIR)/bamboo_inference_test" ]; then \
 		sudo cp $(CPP_BUILD_DIR)/bamboo_inference_test $(INSTALL_PREFIX)/bin/; \
@@ -404,9 +407,8 @@ redeploy: stop build-cpp build-python install start
 
 # CMakeLists.txt 检查和生成
 check-cmake:
-	@if [ ! -f "cpp_backend/CMakeLists.txt" ]; then \
-		$(call log_warning,C++后端CMakeLists.txt不存在，将创建基础版本); \
-		$(MAKE) generate-cpp-cmake; \
+	@if [ ! -f "CMakeLists.txt" ]; then \
+		$(call log_warning,根目录CMakeLists.txt不存在，将使用现有版本); \
 	fi
 
 generate-cpp-cmake:
