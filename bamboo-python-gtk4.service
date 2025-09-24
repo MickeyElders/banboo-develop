@@ -7,10 +7,10 @@ Requires=network.target
 
 [Service]
 Type=simple
-User=USER_PLACEHOLDER
-Group=USER_PLACEHOLDER
-Environment="HOME=/home/USER_PLACEHOLDER"
-Environment="XDG_RUNTIME_DIR=/run/user/UID_PLACEHOLDER"
+User=root
+Group=root
+Environment="HOME=/root"
+Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="DISPLAY=:0"
 Environment="WAYLAND_DISPLAY=wayland-0"
 Environment="PYTHONPATH=/opt/bamboo-cut:/opt/bamboo-cut/python_core:/usr/lib/python3/dist-packages"
@@ -27,8 +27,7 @@ Environment="GTK_THEME=Adwaita:dark"
 Environment="NO_AT_BRIDGE=1"
 
 WorkingDirectory=/opt/bamboo-cut
-ExecStartPre=/bin/bash -c 'mkdir -p /run/user/1000 && chown 1000:1000 /run/user/1000'
-ExecStart=cage -- /opt/bamboo-cut/venv/bin/python /opt/bamboo-cut/python_core/ai_bamboo_system.py
+ExecStart=/opt/bamboo-cut/venv/bin/python /opt/bamboo-cut/python_core/ai_bamboo_system.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
