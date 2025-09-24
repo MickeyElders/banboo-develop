@@ -3,6 +3,7 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include <iomanip>
 #include <opencv2/opencv.hpp>
 
 #ifdef ENABLE_OPENCV_CONTRIB
@@ -124,41 +125,73 @@ void StereoVision::shutdown() {
 }
 
 bool StereoVision::open_cameras() {
-    // 打开左相机
+    std::cout << "🔍 尝试打开双摄像头..." << std::endl;
+    
+    bool left_opened = false;
+    bool right_opened = false;
+    
+    // 尝试打开左相机
+    std::cout << "📷 尝试打开左相机: " << sync_config_.left_device << std::endl;
     left_camera_.open(sync_config_.left_device);
-    if (!left_camera_.isOpened()) {
-        std::cerr << "无法打开左相机: " << sync_config_.left_device << std::endl;
-        return false;
+    if (left_camera_.isOpened()) {
+        // 配置左相机参数
+        left_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
+        left_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
+        left_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
+        left_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+        
+        // 验证设置是否生效
+        double actual_width = left_camera_.get(cv::CAP_PROP_FRAME_WIDTH);
+        double actual_height = left_camera_.get(cv::CAP_PROP_FRAME_HEIGHT);
+        double actual_fps = left_camera_.get(cv::CAP_PROP_FPS);
+        
+        std::cout << "✅ 左相机打开成功: " << sync_config_.left_device
+                  << " @ " << actual_width << "x" << actual_height
+                  << " (" << actual_fps << "fps)" << std::endl;
+        left_opened = true;
+    } else {
+        std::cout << "❌ 无法打开左相机: " << sync_config_.left_device << std::endl;
     }
     
-    // 打开右相机
+    // 尝试打开右相机
+    std::cout << "📷 尝试打开右相机: " << sync_config_.right_device << std::endl;
     right_camera_.open(sync_config_.right_device);
-    if (!right_camera_.isOpened()) {
-        std::cerr << "无法打开右相机: " << sync_config_.right_device << std::endl;
-        left_camera_.release();
-        return false;
+    if (right_camera_.isOpened()) {
+        // 配置右相机参数
+        right_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
+        right_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
+        right_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
+        right_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+        
+        // 验证设置是否生效
+        double actual_width = right_camera_.get(cv::CAP_PROP_FRAME_WIDTH);
+        double actual_height = right_camera_.get(cv::CAP_PROP_FRAME_HEIGHT);
+        double actual_fps = right_camera_.get(cv::CAP_PROP_FPS);
+        
+        std::cout << "✅ 右相机打开成功: " << sync_config_.right_device
+                  << " @ " << actual_width << "x" << actual_height
+                  << " (" << actual_fps << "fps)" << std::endl;
+        right_opened = true;
+    } else {
+        std::cout << "❌ 无法打开右相机: " << sync_config_.right_device << std::endl;
     }
     
-    // 配置相机参数
-    left_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
-    left_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
-    left_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
+    // 硬件调试模式：即使摄像头不可用也继续运行
+    if (!left_opened && !right_opened) {
+        std::cout << "⚠️ 硬件调试模式：双摄像头都不可用，将生成测试画面" << std::endl;
+        std::cout << "💡 前端将显示彩色测试图案用于调试GStreamer流" << std::endl;
+    } else if (!left_opened) {
+        std::cout << "⚠️ 硬件调试模式：左相机不可用，将复制右相机画面" << std::endl;
+    } else if (!right_opened) {
+        std::cout << "⚠️ 硬件调试模式：右相机不可用，将复制左相机画面" << std::endl;
+    } else {
+        std::cout << "🎉 双摄像头都打开成功！" << std::endl;
+    }
     
-    right_camera_.set(cv::CAP_PROP_FRAME_WIDTH, sync_config_.width);
-    right_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, sync_config_.height);
-    right_camera_.set(cv::CAP_PROP_FPS, sync_config_.fps);
+    std::cout << "🚀 立体视觉系统将以硬件调试模式运行" << std::endl;
+    std::cout << "📺 预期视频流: UDP://127.0.0.1:5000 (H.264, 640x480@30fps)" << std::endl;
     
-    // 设置缓冲区大小以减少延迟
-    left_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
-    right_camera_.set(cv::CAP_PROP_BUFFERSIZE, 1);
-    
-    std::cout << "双摄像头打开成功" << std::endl;
-    std::cout << "左相机: " << sync_config_.left_device << " @ " 
-              << sync_config_.width << "x" << sync_config_.height << std::endl;
-    std::cout << "右相机: " << sync_config_.right_device << " @ " 
-              << sync_config_.width << "x" << sync_config_.height << std::endl;
-    
-    return true;
+    return true; // 硬件调试模式：总是返回成功
 }
 
 void StereoVision::close_cameras() {
@@ -171,57 +204,96 @@ void StereoVision::close_cameras() {
 }
 
 bool StereoVision::capture_synchronized_frames(cv::Mat& left, cv::Mat& right) {
-    if (!left_camera_.isOpened() || !right_camera_.isOpened()) {
-        return false;
-    }
+    // 硬件调试模式：尽力获取画面，忽略同步误差
+    static int debug_frame_count = 0;
+    debug_frame_count++;
     
-    auto start_time = std::chrono::steady_clock::now();
-    
-    // 尝试同步捕获
-    bool left_success = false, right_success = false;
+    // 优先尝试左摄像头
+    bool left_success = false;
+    bool right_success = false;
     cv::Mat left_temp, right_temp;
     
-    // 并行捕获以减少时间差
-    std::thread left_thread([&]() {
+    if (left_camera_.isOpened()) {
         left_success = left_camera_.read(left_temp);
-        last_left_timestamp_ = std::chrono::steady_clock::now();
-    });
+    }
     
-    std::thread right_thread([&]() {
+    if (right_camera_.isOpened()) {
         right_success = right_camera_.read(right_temp);
-        last_right_timestamp_ = std::chrono::steady_clock::now();
-    });
-    
-    left_thread.join();
-    right_thread.join();
-    
-    if (!left_success || !right_success) {
-        std::lock_guard<std::mutex> lock(stats_mutex_);
-        statistics_.sync_failures++;
-        return false;
     }
     
-    // 检查同步误差
-    double sync_error_ms = std::abs(std::chrono::duration_cast<std::chrono::microseconds>(
-        last_left_timestamp_ - last_right_timestamp_).count()) / 1000.0;
-    
-    if (sync_error_ms > sync_config_.sync_tolerance_ms) {
-        std::cerr << "警告: 相机同步误差过大: " << sync_error_ms << "ms" << std::endl;
+    // 如果两个都失败，生成测试画面
+    if (!left_success && !right_success) {
+        if (debug_frame_count % 100 == 0) {
+            std::cout << "📷 双摄像头都不可用，生成测试画面 (帧 #" << debug_frame_count << ")" << std::endl;
+        }
+        
+        // 生成彩色测试画面
+        left = cv::Mat(sync_config_.height, sync_config_.width, CV_8UC3);
+        right = cv::Mat(sync_config_.height, sync_config_.width, CV_8UC3);
+        
+        // 左摄像头: 蓝色渐变
+        for (int y = 0; y < left.rows; y++) {
+            for (int x = 0; x < left.cols; x++) {
+                cv::Vec3b& pixel = left.at<cv::Vec3b>(y, x);
+                pixel[0] = 255;  // B
+                pixel[1] = (x * 255) / left.cols;  // G
+                pixel[2] = (y * 255) / left.rows;  // R
+            }
+        }
+        
+        // 右摄像头: 红色渐变
+        for (int y = 0; y < right.rows; y++) {
+            for (int x = 0; x < right.cols; x++) {
+                cv::Vec3b& pixel = right.at<cv::Vec3b>(y, x);
+                pixel[0] = (y * 255) / right.rows;  // B
+                pixel[1] = (x * 255) / right.cols;  // G
+                pixel[2] = 255;  // R
+            }
+        }
+        
+        // 添加文字标识
+        cv::putText(left, "LEFT CAM (TEST)", cv::Point(20, 30),
+                   cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
+        cv::putText(right, "RIGHT CAM (TEST)", cv::Point(20, 30),
+                   cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
+        
         std::lock_guard<std::mutex> lock(stats_mutex_);
+        statistics_.total_frames++;
         statistics_.sync_failures++;
+        return true;
     }
     
-    left = left_temp.clone();
-    right = right_temp.clone();
+    // 如果只有一个摄像头可用，复制到另一个
+    if (left_success && !right_success) {
+        if (debug_frame_count % 100 == 0) {
+            std::cout << "📷 只有左摄像头可用 (帧 #" << debug_frame_count << ")" << std::endl;
+        }
+        left = left_temp.clone();
+        right = left_temp.clone();
+        cv::putText(right, "COPIED FROM LEFT", cv::Point(20, 30),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
+    } else if (right_success && !left_success) {
+        if (debug_frame_count % 100 == 0) {
+            std::cout << "📷 只有右摄像头可用 (帧 #" << debug_frame_count << ")" << std::endl;
+        }
+        right = right_temp.clone();
+        left = right_temp.clone();
+        cv::putText(left, "COPIED FROM RIGHT", cv::Point(20, 30),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
+    } else {
+        // 两个都成功，忽略同步误差直接使用
+        if (debug_frame_count % 300 == 0) {
+            std::cout << "📷 双摄像头都可用 (帧 #" << debug_frame_count << ")" << std::endl;
+        }
+        left = left_temp.clone();
+        right = right_temp.clone();
+    }
     
     // 更新统计信息
     {
         std::lock_guard<std::mutex> lock(stats_mutex_);
         statistics_.total_frames++;
         statistics_.successful_captures++;
-        statistics_.avg_sync_error_ms = 
-            (statistics_.avg_sync_error_ms * (statistics_.total_frames - 1) + sync_error_ms) / 
-            statistics_.total_frames;
         statistics_.last_capture_time = std::chrono::steady_clock::now();
     }
     
@@ -805,13 +877,16 @@ bool StereoVision::initialize_video_stream() {
     // 初始化GStreamer
     if (!gst_is_initialized()) {
         gst_init(nullptr, nullptr);
+        std::cout << "GStreamer已初始化" << std::endl;
     }
     
     std::string pipeline_desc = build_stream_pipeline();
     if (pipeline_desc.empty()) {
         std::cerr << "构建GStreamer管道失败" << std::endl;
-        return "";
+        return false;
     }
+    
+    std::cout << "GStreamer管道构建成功: " << pipeline_desc << std::endl;
     
     // 启动管道
     GstStateChangeReturn ret = gst_element_set_state(gst_pipeline_, GST_STATE_PLAYING);
@@ -820,10 +895,18 @@ bool StereoVision::initialize_video_stream() {
         gst_object_unref(gst_pipeline_);
         gst_pipeline_ = nullptr;
         gst_appsrc_ = nullptr;
-        return "";
+        return false;
     }
     
-    std::cout << "立体视觉GStreamer流输出初始化完成" << std::endl;
+    // 等待管道状态切换完成
+    GstState state;
+    ret = gst_element_get_state(gst_pipeline_, &state, nullptr, GST_SECOND * 2);
+    if (ret == GST_STATE_CHANGE_FAILURE || state != GST_STATE_PLAYING) {
+        std::cerr << "GStreamer管道启动超时或失败，当前状态: " << state << std::endl;
+        return false;
+    }
+    
+    std::cout << "立体视觉GStreamer流输出初始化完成，管道状态: PLAYING" << std::endl;
     return true;
 }
 
@@ -906,7 +989,31 @@ std::string StereoVision::build_stream_pipeline() {
 }
 
 void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
-    if (!gst_appsrc_ || !stream_enabled_ || frame.empty()) {
+    static int push_failures = 0;
+    static int push_successes = 0;
+    static auto last_debug_time = std::chrono::steady_clock::now();
+    
+    if (!gst_appsrc_) {
+        if (push_failures % 100 == 0) {
+            std::cerr << "GStreamer appsrc 未初始化" << std::endl;
+        }
+        push_failures++;
+        return;
+    }
+    
+    if (!stream_enabled_) {
+        if (push_failures % 100 == 0) {
+            std::cerr << "视频流未启用" << std::endl;
+        }
+        push_failures++;
+        return;
+    }
+    
+    if (frame.empty()) {
+        if (push_failures % 100 == 0) {
+            std::cerr << "输入帧为空" << std::endl;
+        }
+        push_failures++;
         return;
     }
     
@@ -914,6 +1021,9 @@ void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
     cv::Mat output_frame;
     if (frame.size() != cv::Size(640, 480)) {
         cv::resize(frame, output_frame, cv::Size(640, 480));
+        if (frame_counter_ % 300 == 0) {
+            std::cout << "缩放帧: " << frame.cols << "x" << frame.rows << " -> 640x480" << std::endl;
+        }
     } else {
         output_frame = frame;
     }
@@ -921,15 +1031,30 @@ void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
     // 确保是BGR格式
     if (output_frame.channels() != 3) {
         cv::cvtColor(output_frame, output_frame, cv::COLOR_GRAY2BGR);
+        if (frame_counter_ % 300 == 0) {
+            std::cout << "转换为BGR格式" << std::endl;
+        }
     }
     
     // 创建GStreamer缓冲区
     gsize size = output_frame.total() * output_frame.elemSize();
     GstBuffer* buffer = gst_buffer_new_allocate(NULL, size, NULL);
     
+    if (!buffer) {
+        std::cerr << "创建GStreamer缓冲区失败，大小: " << size << " 字节" << std::endl;
+        push_failures++;
+        return;
+    }
+    
     // 复制数据到缓冲区
     GstMapInfo map;
-    gst_buffer_map(buffer, &map, GST_MAP_WRITE);
+    if (!gst_buffer_map(buffer, &map, GST_MAP_WRITE)) {
+        std::cerr << "映射GStreamer缓冲区失败" << std::endl;
+        gst_buffer_unref(buffer);
+        push_failures++;
+        return;
+    }
+    
     memcpy(map.data, output_frame.data, size);
     gst_buffer_unmap(buffer, &map);
     
@@ -940,11 +1065,26 @@ void StereoVision::push_frame_to_stream(const cv::Mat& frame) {
     // 推送到appsrc
     GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(gst_appsrc_), buffer);
     if (ret != GST_FLOW_OK) {
-        std::cerr << "推送视频帧到流失败: " << ret << std::endl;
+        push_failures++;
+        if (push_failures % 10 == 0) {
+            std::cerr << "推送视频帧失败: " << ret << " (失败次数: " << push_failures << ")" << std::endl;
+        }
     } else {
+        push_successes++;
         frame_counter_++;
+        
+        // 每30帧输出一次详细状态
         if (frame_counter_ % 30 == 0) {
-            std::cout << "立体视觉流: 发送了 " << frame_counter_ << " 帧" << std::endl;
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_debug_time);
+            double fps = 30.0 * 1000.0 / elapsed.count();
+            
+            std::cout << "立体视觉流: 发送帧 #" << frame_counter_
+                     << ", 数据大小: " << size << " 字节"
+                     << ", FPS: " << std::fixed << std::setprecision(1) << fps
+                     << ", 成功/失败: " << push_successes << "/" << push_failures << std::endl;
+            
+            last_debug_time = now;
         }
     }
 }

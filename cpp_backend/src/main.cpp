@@ -126,21 +126,42 @@ public:
         // 检查全局退出标志
         LOG_INFO("🔍 检查退出标志: {}", g_shutdown_requested.load() ? "已设置" : "未设置");
         
-        // 主循环
+        // 主循环 - 针对30fps视频流优化
         auto last_stats_time = std::chrono::steady_clock::now();
+        auto last_frame_time = std::chrono::steady_clock::now();
         const auto stats_interval = std::chrono::seconds(30);
+        const auto target_frame_interval = std::chrono::milliseconds(33);  // 30fps = 33.33ms
         
         LOG_INFO("🔄 开始执行主循环...");
         int loop_count = 0;
+        int frame_count = 0;
         
         while (!g_shutdown_requested) {
             loop_count++;
-            if (loop_count <= 5 || loop_count % 100 == 0) {
-                LOG_INFO("🔄 主循环迭代 #{}, 退出标志: {}", loop_count, g_shutdown_requested.load() ? "是" : "否");
+            auto current_time = std::chrono::steady_clock::now();
+            
+            if (loop_count <= 5 || loop_count % 300 == 0) {  // 减少日志频率
+                LOG_INFO("🔄 主循环迭代 #{}, 帧数: {}, 退出标志: {}",
+                        loop_count, frame_count, g_shutdown_requested.load() ? "是" : "否");
             }
             
-            // 处理视觉检测
-            processVision();
+            // 检查是否到达下一帧时间
+            if (current_time - last_frame_time >= target_frame_interval) {
+                // 处理视觉检测和视频流
+                processVision();
+                last_frame_time = current_time;
+                frame_count++;
+                
+                // 每10秒输出一次帧率统计
+                if (frame_count % 300 == 0) {
+                    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - last_stats_time);
+                    if (elapsed.count() > 0) {
+                        double actual_fps = 300.0 / elapsed.count();
+                        LOG_INFO("📹 实际帧率: {:.1f} fps (目标: 30fps)", actual_fps);
+                        last_stats_time = current_time;
+                    }
+                }
+            }
             
             // 定期输出性能统计
             auto now = std::chrono::steady_clock::now();
@@ -149,8 +170,16 @@ public:
                 last_stats_time = now;
             }
             
-            // 短暂休眠避免CPU占用过高
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // 动态休眠时间，避免占用过多CPU
+            auto next_frame_time = last_frame_time + target_frame_interval;
+            auto sleep_time = next_frame_time - std::chrono::steady_clock::now();
+            
+            if (sleep_time > std::chrono::milliseconds(0) && sleep_time < std::chrono::milliseconds(20)) {
+                std::this_thread::sleep_for(sleep_time);
+            } else {
+                // 最小休眠避免CPU占用过高
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
         }
         
         LOG_INFO("主循环结束，退出原因: g_shutdown_requested = {}", g_shutdown_requested.load());
@@ -587,14 +616,32 @@ private:
     bool processStereovision() {
         // 捕获立体帧
         vision::StereoFrame stereo_frame;
+        static int capture_failures = 0;
+        static int successful_captures = 0;
+        
         if (!stereo_vision_->capture_stereo_frame(stereo_frame)) {
-            LOG_DEBUG("无法捕获立体帧");
+            capture_failures++;
+            if (capture_failures % 100 == 0) {  // 每100次失败输出一次日志
+                LOG_WARN("立体帧捕获失败次数: {}, 成功次数: {}", capture_failures, successful_captures);
+            }
+            
+            // 即使捕获失败，也推送一个测试帧保持流活跃
+            cv::Mat test_frame(480, 640, CV_8UC3, cv::Scalar(128, 128, 128));
+            stereo_vision_->push_frame_to_stream(test_frame);
             return false;
         }
         
         if (!stereo_frame.valid) {
-            LOG_DEBUG("立体帧无效");
+            LOG_DEBUG("立体帧无效，推送测试帧");
+            // 推送测试帧
+            cv::Mat test_frame(480, 640, CV_8UC3, cv::Scalar(64, 64, 64));
+            stereo_vision_->push_frame_to_stream(test_frame);
             return false;
+        }
+        
+        successful_captures++;
+        if (successful_captures % 30 == 0) {  // 每30次成功输出一次日志
+            LOG_INFO("立体帧捕获成功次数: {}, 失败次数: {}", successful_captures, capture_failures);
         }
         
         // 创建显示帧并推送到视频流
@@ -605,6 +652,10 @@ private:
         
         if (!display_frame.empty()) {
             stereo_vision_->push_frame_to_stream(display_frame);
+        } else {
+            LOG_WARN("显示帧为空，推送测试帧");
+            cv::Mat test_frame(480, 640, CV_8UC3, cv::Scalar(192, 192, 192));
+            stereo_vision_->push_frame_to_stream(test_frame);
         }
         
         // 3D模式 - 使用深度信息过滤检测点
