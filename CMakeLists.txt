@@ -133,12 +133,12 @@ if(TARGET_ARCH STREQUAL "aarch64")
     set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
     set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
     
-    # 查找CUDA头文件
+    # 查找CUDA头文件 - 用户环境有cuda, cuda-12, cuda-12.6三个版本
     find_path(CUDA_RUNTIME_INCLUDE cuda_runtime.h
         PATHS
             "/usr/local/cuda/include"
             "/usr/local/cuda-12.6/include"
-            "/usr/local/cuda-12.2/include"
+            "/usr/local/cuda-12/include"
         NO_DEFAULT_PATH)
     
     # 查找CUDA库
@@ -161,14 +161,20 @@ if(TARGET_ARCH STREQUAL "aarch64")
         # 设置CUDA包含目录
         include_directories(${CUDA_RUNTIME_INCLUDE})
         
+        # 添加CUDA库目录到链接器搜索路径
+        link_directories(${CUDA_LIB_PATHS})
+        
         # 设置CUDA编译器标志
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_87")  # Orin NX GPU架构
         set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -O3")
         
-        # 查找其他CUDA库
+        # 查找其他CUDA库 - 适配用户的多CUDA版本环境
         set(CUDA_LIB_PATHS
             "/usr/local/cuda-12.6/targets/aarch64-linux/lib"
+            "/usr/local/cuda-12/targets/aarch64-linux/lib"
             "/usr/local/cuda/targets/aarch64-linux/lib"
+            "/usr/local/cuda-12.6/lib64"
+            "/usr/local/cuda-12/lib64"
             "/usr/local/cuda/lib64"
             "/usr/lib/aarch64-linux-gnu"
         )
@@ -422,6 +428,11 @@ if(ENABLE_CUDA)
         cpp_backend/src/vision/hardware_accelerated_camera.cpp
     )
 endif()
+
+# 排除不需要的源文件 - 避免编译错误
+list(REMOVE_ITEM CPP_BACKEND_SOURCES
+    "cpp_backend/src/ffi/flutter_interface.cpp"  # 排除Flutter接口
+)
 
 # LVGL前端源文件 - 基于原有CMakeLists.txt的精确配置
 set(LVGL_FRONTEND_SOURCES
