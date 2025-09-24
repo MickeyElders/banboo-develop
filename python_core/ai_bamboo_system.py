@@ -6,7 +6,7 @@ AI Bamboo Recognition System - GTK3界面
 """
 
 import gi
-gi.require_version('', '3.0')
+gi.require_version('GTK', '3.0')
 from gi.repository import Gtk, Gdk, GLib, cairo, GdkPixbuf
 import time
 import threading
