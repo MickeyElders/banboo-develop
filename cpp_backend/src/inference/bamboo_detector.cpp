@@ -46,9 +46,9 @@ BambooDetector::BambooDetector(const DetectorConfig& config)
 BambooDetector::~BambooDetector() {
     if (initialized_) {
 #ifdef ENABLE_TENSORRT
-        if (context_) context_->destroy();
-        if (engine_) engine_->destroy();
-        if (runtime_) runtime_->destroy();
+        if (context_) delete context_;
+        if (engine_) delete engine_;
+        if (runtime_) delete runtime_;
         if (gpu_input_buffer_) cudaFree(gpu_input_buffer_);
         if (gpu_output_buffer_) cudaFree(gpu_output_buffer_);
         if (stream_) cudaStreamDestroy(stream_);
@@ -245,6 +245,18 @@ cv::Point2f BambooDetector::calculateCuttingPoint(const cv::Rect& bbox) {
 
 #ifdef ENABLE_TENSORRT
 bool BambooDetector::initializeTensorRT() {
+    // 创建TensorRT logger
+    class Logger : public nvinfer1::ILogger {
+        void log(Severity severity, const char* msg) override {
+            // 简单的日志输出
+            if (severity != Severity::kINFO) {
+                std::cout << "[TensorRT] " << msg << std::endl;
+            }
+        }
+    };
+    
+    static Logger gLogger;
+    
     // TensorRT初始化实现 (简化版本)
     runtime_ = nvinfer1::createInferRuntime(gLogger);
     if (!runtime_) {

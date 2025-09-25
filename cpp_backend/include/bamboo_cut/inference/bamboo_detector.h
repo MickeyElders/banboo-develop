@@ -11,6 +11,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <chrono>
 #include "bamboo_cut/core/data_bridge.h"
 
 #ifdef ENABLE_TENSORRT
