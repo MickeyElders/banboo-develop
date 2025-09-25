@@ -248,9 +248,15 @@ private:
     lv_indev_t* input_device_;
     
     // 显示缓冲区
+#ifdef ENABLE_LVGL
     static lv_color_t* disp_buf1_;
     static lv_color_t* disp_buf2_;
     static lv_disp_draw_buf_t draw_buf_;
+#else
+    static void* disp_buf1_;
+    static void* disp_buf2_;
+    static char draw_buf_[64]; // 占位符缓冲区
+#endif
     
     // 性能监控
     std::chrono::high_resolution_clock::time_point last_update_time_;
