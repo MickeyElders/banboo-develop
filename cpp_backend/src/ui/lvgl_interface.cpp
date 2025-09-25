@@ -43,6 +43,21 @@ extern "C" {
 }
 #endif
 
+// 强制符号导出 - 确保这些关键方法在所有情况下都被编译和链接
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// 强制导出LVGLInterface关键符号的C包装函数
+void force_export_lvgl_interface_symbols() {
+    // 这是一个虚拟函数，确保LVGLInterface的符号被导出
+    // 永远不会被调用，只是为了强制链接器包含这些符号
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> bridge) 
     : data_bridge_(bridge), running_(false), should_stop_(false) {
     // 初始化LVGL组件

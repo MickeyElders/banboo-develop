@@ -250,10 +250,16 @@ set(VALID_SOURCES)
 foreach(src ${ALL_SOURCES})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
         list(APPEND VALID_SOURCES ${src})
+        message(STATUS "包含源文件: ${src}")
     else()
         message(WARNING "Source file not found: ${src}")
     endif()
 endforeach()
+
+# 调试信息：显示UI源文件状态
+message(STATUS "ENABLE_LVGL: ${ENABLE_LVGL}")
+message(STATUS "UI_SOURCES: ${UI_SOURCES}")
+message(STATUS "VALID_SOURCES: ${VALID_SOURCES}")
 
 # 创建主库
 add_library(bamboo_system SHARED ${VALID_SOURCES})
