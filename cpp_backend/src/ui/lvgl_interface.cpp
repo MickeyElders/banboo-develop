@@ -299,38 +299,66 @@ void LVGLInterface::showMessageDialog(const std::string& title, const std::strin
     LOG_INFO("消息对话框: " + title + " - " + message);
 }
 
-// 事件处理器实现
+// 静态事件处理器实现
 void LVGLInterface::onStartButtonClicked(lv_event_t* e) {
     // TODO: 处理开始按钮点击事件
+    LOG_INFO("开始按钮点击");
 }
 
 void LVGLInterface::onStopButtonClicked(lv_event_t* e) {
     // TODO: 处理停止按钮点击事件
+    LOG_INFO("停止按钮点击");
 }
 
 void LVGLInterface::onPauseButtonClicked(lv_event_t* e) {
     // TODO: 处理暂停按钮点击事件
+    LOG_INFO("暂停按钮点击");
 }
 
 void LVGLInterface::onEmergencyButtonClicked(lv_event_t* e) {
     // TODO: 处理急停按钮点击事件
+    LOG_WARN("紧急停止按钮点击");
 }
 
 void LVGLInterface::onBladeSelectionChanged(lv_event_t* e) {
     // TODO: 处理刀具选择变化事件
+    LOG_INFO("刀具选择变化");
 }
 
 void LVGLInterface::onSettingsButtonClicked(lv_event_t* e) {
     // TODO: 处理设置按钮点击事件
+    LOG_INFO("设置按钮点击");
 }
 
 // LVGL驱动回调函数
 void lvgl_disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
     // TODO: 实现显示驱动刷新回调
+    // 现在使用占位符实现，防止链接错误
+    (void)disp_drv;
+    (void)area;
+    (void)color_p;
+    
+    #ifdef ENABLE_LVGL
+    // 实际实现时需要刷新显示缓冲区到屏幕
+    // lv_disp_flush_ready(disp_drv);
+    #endif
 }
 
 void lvgl_input_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data) {
     // TODO: 实现输入设备读取回调
+    // 现在使用占位符实现，防止链接错误
+    (void)indev_drv;
+    
+    #ifdef ENABLE_LVGL
+    // 实际实现时需要读取触摸屏或按键输入
+    if (data) {
+        data->state = 0; // LV_INDEV_STATE_REL
+        data->point.x = 0;
+        data->point.y = 0;
+    }
+    #else
+    (void)data;
+    #endif
 }
 
 } // namespace ui
