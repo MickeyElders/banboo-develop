@@ -231,6 +231,7 @@ set(UTILS_SOURCES
     src/utils/logger.cpp
     src/utils/config_loader.cpp
     src/utils/system_monitor.cpp
+    src/ui/lvgl_interface.cpp
 )
 
 # 合并所有源文件
