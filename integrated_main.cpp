@@ -267,8 +267,10 @@ private:
     
     // 使用真实的后端组件
     std::unique_ptr<inference::BambooDetector> detector_;
+    std::unique_ptr<vision::StereoVision> stereo_vision_;
     cv::VideoCapture camera_;
     bool use_mock_camera_ = false;
+    bool use_stereo_vision_ = true;  // 启用立体视觉模式
     
     // 性能统计
     int processed_frames_ = 0;
