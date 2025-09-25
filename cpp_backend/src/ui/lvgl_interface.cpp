@@ -22,9 +22,26 @@ namespace bamboo_cut {
 namespace ui {
 
 // 静态成员变量定义
+#ifdef ENABLE_LVGL
 lv_color_t* LVGLInterface::disp_buf1_ = nullptr;
 lv_color_t* LVGLInterface::disp_buf2_ = nullptr;
 lv_disp_draw_buf_t LVGLInterface::draw_buf_;
+#else
+// 占位符类型定义
+void* LVGLInterface::disp_buf1_ = nullptr;
+void* LVGLInterface::disp_buf2_ = nullptr;
+char LVGLInterface::draw_buf_[64]; // 占位符缓冲区
+#endif
+
+// 确保所有方法都有明确的实现，即使是占位符
+#ifndef ENABLE_LVGL
+// 占位符静态函数实现，确保链接器能找到所有符号
+extern "C" {
+    void lv_init() {}
+    void lv_task_handler() {}
+    void lv_disp_flush_ready(void*) {}
+}
+#endif
 
 LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> bridge) 
     : data_bridge_(bridge), running_(false), should_stop_(false) {
