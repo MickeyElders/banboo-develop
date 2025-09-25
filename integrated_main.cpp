@@ -106,77 +106,12 @@ public:
 #endif
 
 // 现有后端组件 - 直接包含实际存在的头文件
-// 注意：CMakeLists.txt已经包含了实现文件，所以直接使用真实的头文件
 #include "bamboo_cut/utils/logger.h"
+#include "bamboo_cut/inference/bamboo_detector.h"
+#include "bamboo_cut/core/data_bridge.h"
 
-// 占位符类型，当某些组件未启用时使用
-namespace bamboo_cut {
-    namespace vision {
-        struct DetectionPoint { float x, y; };
-        struct DetectionResult {
-            std::vector<DetectionPoint> points;
-            float processing_time_ms = 0.0f;
-            bool success = false;
-        };
-        struct FrameInfo {
-            cv::Mat image;
-            uint64_t timestamp = 0;
-            bool valid = false;
-        };
-        struct StereoFrame {
-            cv::Mat left_image, right_image;
-            bool valid = false;
-        };
-        struct CameraConfig {
-            std::string device_id;
-            int width = 640, height = 480, framerate = 30;
-        };
-        struct CameraSyncConfig {
-            std::string left_device, right_device;
-            int width = 640, height = 480, fps = 30;
-        };
-        
-        class CameraManager {
-        public:
-            CameraManager(const CameraConfig&) {}
-            bool initialize() { return false; }
-            FrameInfo getCurrentFrame() { return FrameInfo(); }
-        };
-        
-        class StereoVision {
-        public:
-            StereoVision(const CameraSyncConfig&) {}
-            bool initialize() { return false; }
-            bool load_calibration(const std::string&) { return false; }
-            bool capture_stereo_frame(StereoFrame&) { return false; }
-        };
-        
-        class BambooDetector {
-        public:
-            struct Config {
-                std::string model_path, engine_path;
-                bool use_tensorrt = false;
-            };
-            BambooDetector(const Config&) {}
-            bool initialize() { return false; }
-            DetectionResult detect(const cv::Mat&) { return DetectionResult(); }
-        };
-    }
-    
-    namespace communication {
-        struct ModbusConfig {
-            std::string ip_address;
-            int port = 502;
-        };
-        class ModbusServer {
-        public:
-            ModbusServer(const ModbusConfig&) {}
-            bool is_connected() const { return false; }
-            void set_connection_callback(std::function<void(bool, const std::string&)>) {}
-            void start() {}
-        };
-    }
-}
+// 使用真实的命名空间
+using namespace bamboo_cut;
 
 // 全局关闭标志
 std::atomic<bool> g_shutdown_requested{false};
@@ -206,7 +141,9 @@ public:
     };
     
     struct DetectionData {
-        std::vector<bamboo_cut::vision::DetectionPoint> points;
+        std::vector<cv::Point2f> cutting_points;
+        std::vector<cv::Rect> bboxes;
+        std::vector<float> confidences;
         float processing_time_ms;
         bool has_detection;
         
@@ -221,7 +158,7 @@ public:
         int total_detections;
         bool plc_connected;
         
-        SystemStats() : camera_fps(0), inference_fps(0), cpu_usage(0), 
+        SystemStats() : camera_fps(0), inference_fps(0), cpu_usage(0),
                        memory_usage_mb(0), total_detections(0), plc_connected(false) {}
     };
 
@@ -261,11 +198,13 @@ public:
     }
     
     // 检测数据更新 (从推理线程调用)
-    void updateDetection(const bamboo_cut::vision::DetectionResult& result) {
+    void updateDetection(const core::DetectionResult& result) {
         std::lock_guard<std::mutex> lock(detection_mutex_);
-        latest_detection_.points = result.points;
-        latest_detection_.processing_time_ms = result.processing_time_ms;
-        latest_detection_.has_detection = result.success && !result.points.empty();
+        latest_detection_.cutting_points = result.cutting_points;
+        latest_detection_.bboxes = result.bboxes;
+        latest_detection_.confidences = result.confidences;
+        latest_detection_.processing_time_ms = 50.0f; // 简化实现
+        latest_detection_.has_detection = result.valid && !result.bboxes.empty();
         new_detection_available_ = true;
     }
     
@@ -325,11 +264,9 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<bool> should_stop_{false};
     
-    // 复用现有的后端组件
-    std::unique_ptr<bamboo_cut::vision::CameraManager> camera_manager_;
-    std::unique_ptr<bamboo_cut::vision::StereoVision> stereo_vision_;
-    std::unique_ptr<bamboo_cut::vision::BambooDetector> detector_;
-    std::unique_ptr<bamboo_cut::communication::ModbusServer> modbus_server_;
+    // 使用真实的后端组件
+    std::unique_ptr<inference::BambooDetector> detector_;
+    cv::VideoCapture camera_;
     
     // 性能统计
     int processed_frames_ = 0;
@@ -347,24 +284,17 @@ public:
     bool initialize() {
         std::cout << "初始化推理系统..." << std::endl;
         
-        // 初始化检测器 (复用原有逻辑)
+        // 初始化检测器 (使用真实的BambooDetector)
         if (!initializeDetector()) {
             std::cout << "检测器初始化失败" << std::endl;
             return false;
         }
         
-        // 初始化立体视觉 (优先使用)
-        if (!initializeStereoVision()) {
-            std::cout << "立体视觉初始化失败，尝试单摄像头..." << std::endl;
-            // 尝试单摄像头系统
-            if (!initializeSingleCamera()) {
-                std::cout << "摄像头系统初始化完全失败" << std::endl;
-                return false;
-            }
+        // 初始化摄像头
+        if (!initializeCamera()) {
+            std::cout << "摄像头系统初始化失败" << std::endl;
+            return false;
         }
-        
-        // 初始化通信系统 (可选)
-        initializeModbus();
         
         std::cout << "推理系统初始化完成" << std::endl;
         return true;
@@ -418,42 +348,23 @@ private:
     }
     
     void processFrame() {
-        // 优先处理立体视觉
-        if (stereo_vision_) {
-            bamboo_cut::vision::StereoFrame stereo_frame;
-            if (stereo_vision_->capture_stereo_frame(stereo_frame) && stereo_frame.valid) {
-                // 更新视频到数据桥接
-                data_bridge_->updateStereoVideo(stereo_frame.left_image, stereo_frame.right_image);
-                
-                // AI检测
-                if (detector_ && !stereo_frame.left_image.empty()) {
-                    auto result = detector_->detect(stereo_frame.left_image);
-                    if (result.success) {
-                        data_bridge_->updateDetection(result);
-                    }
-                }
-                
-                processed_frames_++;
+        cv::Mat frame;
+        if (!camera_.read(frame) || frame.empty()) {
+            return;
+        }
+        
+        // 更新视频到数据桥接
+        data_bridge_->updateVideo(frame);
+        
+        // AI检测
+        if (detector_) {
+            core::DetectionResult result;
+            if (detector_->detect(frame, result)) {
+                data_bridge_->updateDetection(result);
             }
         }
-        // 单摄像头处理
-        else if (camera_manager_) {
-            bamboo_cut::vision::FrameInfo frame_info = camera_manager_->getCurrentFrame();
-            if (frame_info.valid && !frame_info.image.empty()) {
-                // 更新视频到数据桥接
-                data_bridge_->updateVideo(frame_info.image, frame_info.timestamp);
-                
-                // AI检测
-                if (detector_) {
-                    auto result = detector_->detect(frame_info.image);
-                    if (result.success) {
-                        data_bridge_->updateDetection(result);
-                    }
-                }
-                
-                processed_frames_++;
-            }
-        }
+        
+        processed_frames_++;
     }
     
     void updatePerformanceStats() {
@@ -470,7 +381,7 @@ private:
             stats.cpu_usage = getCpuUsage();
             stats.memory_usage_mb = getMemoryUsage();
             stats.total_detections += processed_frames_;
-            stats.plc_connected = (modbus_server_ && modbus_server_->is_connected());
+            stats.plc_connected = false; // 简化实现，后续可添加Modbus支持
             
             data_bridge_->updateStats(stats);
             
@@ -479,62 +390,33 @@ private:
         }
     }
     
-    // === 初始化方法 (复用现有逻辑) ===
+    // === 初始化方法 (使用真实的BambooDetector) ===
     bool initializeDetector() {
-        bamboo_cut::vision::BambooDetector::Config config;
+        inference::DetectorConfig config;
         config.model_path = "/opt/bamboo-cut/models/bamboo_detection.onnx";
-        config.engine_path = "/opt/bamboo-cut/models/bamboo_detection.trt";
+        config.confidence_threshold = 0.85f;
+        config.nms_threshold = 0.45f;
+        config.input_size = cv::Size(640, 640);
+        config.use_gpu = true;
         config.use_tensorrt = true;
         
-        detector_ = std::make_unique<bamboo_cut::vision::BambooDetector>(config);
-        return detector_->initialize();
+        detector_ = std::make_unique<inference::BambooDetector>();
+        return detector_->initialize(config);
     }
     
-    bool initializeStereoVision() {
-        bamboo_cut::vision::CameraSyncConfig config;
-        config.left_device = "/dev/video0";
-        config.right_device = "/dev/video1"; 
-        config.width = 640;
-        config.height = 480;
-        config.fps = 30;
-        
-        stereo_vision_ = std::make_unique<bamboo_cut::vision::StereoVision>(config);
-        
-        if (!stereo_vision_->initialize()) {
+    bool initializeCamera() {
+        camera_.open(0); // 使用摄像头0
+        if (!camera_.isOpened()) {
             return false;
         }
         
-        // 尝试加载标定文件
-        stereo_vision_->load_calibration("./config/stereo_calibration.xml");
+        // 设置摄像头参数
+        camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+        camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+        camera_.set(cv::CAP_PROP_FPS, 30);
+        
+        std::cout << "摄像头已初始化" << std::endl;
         return true;
-    }
-    
-    bool initializeSingleCamera() {
-        bamboo_cut::vision::CameraConfig config;
-        config.device_id = "/dev/video0";
-        config.width = 640;
-        config.height = 480;
-        config.framerate = 30;
-        
-        camera_manager_ = std::make_unique<bamboo_cut::vision::CameraManager>(config);
-        return camera_manager_->initialize();
-    }
-    
-    void initializeModbus() {
-        bamboo_cut::communication::ModbusConfig config;
-        config.ip_address = "0.0.0.0";
-        config.port = 502;
-        
-        modbus_server_ = std::make_unique<bamboo_cut::communication::ModbusServer>(config);
-        
-        // 设置回调
-        modbus_server_->set_connection_callback([](bool connected, const std::string& client_ip) {
-            if (connected) {
-                std::cout << "PLC已连接: " << client_ip << std::endl;
-            }
-        });
-        
-        modbus_server_->start(); // 非阻塞启动
     }
     
     float getCpuUsage() const { return 45.0f; } // 简化实现
