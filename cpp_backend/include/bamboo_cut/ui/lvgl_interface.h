@@ -6,7 +6,21 @@
 
 #pragma once
 
-#include <lvgl.h>
+#ifdef ENABLE_LVGL
+#include <lvgl/lvgl.h>
+#else
+// LVGL未启用时的占位符定义
+typedef void* lv_obj_t;
+typedef void* lv_event_t;
+typedef void* lv_disp_drv_t;
+typedef void* lv_indev_drv_t;
+typedef void* lv_disp_t;
+typedef void* lv_indev_t;
+typedef void* lv_area_t;
+typedef void* lv_color_t;
+typedef void* lv_disp_draw_buf_t;
+typedef void* lv_indev_data_t;
+#endif
 #include <memory>
 #include <string>
 #include <vector>
