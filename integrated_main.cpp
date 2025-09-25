@@ -50,6 +50,42 @@ inline lv_timer_t* lv_timer_create(void(*cb)(lv_timer_t*), unsigned int, void*) 
 inline void lv_timer_del(lv_timer_t*) {}
 inline bool lvgl_display_init() { return false; }
 inline bool touch_driver_init() { return false; }
+
+// 前端组件占位符 - 当LVGL未启用时
+struct frame_info_t {
+    uint64_t timestamp = 0;
+    bool valid = false;
+    int width = 640, height = 480;
+};
+struct performance_stats_t {
+    float cpu_usage = 0, memory_usage_mb = 0, fps = 0;
+};
+
+class Status_bar {
+public:
+    bool initialize() { return true; }
+    void update_workflow_status(int) {}
+    void update_heartbeat(int, int) {}
+};
+
+class Video_view {
+public:
+    bool initialize() { return true; }
+    void update_camera_frame(const frame_info_t&) {}
+    void update_detection_info(float, float) {}
+};
+
+class Control_panel {
+public:
+    bool initialize() { return true; }
+    void update_jetson_info(const performance_stats_t&) {}
+};
+
+class Settings_page {
+public:
+    bool initialize() { return true; }
+    void create_main_layout(Status_bar*, Video_view*, Control_panel*) {}
+};
 #endif
 
 // 现有后端组件 - 条件包含实际存在的头文件
@@ -128,48 +164,6 @@ namespace bamboo_cut {
         };
     }
 }
-#endif
-
-// 前端组件占位符 - 当LVGL未启用时
-#ifndef ENABLE_LVGL
-struct frame_info_t {
-    uint64_t timestamp = 0;
-    bool valid = false;
-    int width = 640, height = 480;
-};
-struct performance_stats_t {
-    float cpu_usage = 0, memory_usage_mb = 0, fps = 0;
-};
-
-class Status_bar {
-public:
-    bool initialize() { return true; }
-    void update_workflow_status(int) {}
-    void update_heartbeat(int, int) {}
-};
-
-class Video_view {
-public:
-    bool initialize() { return true; }
-    void update_camera_frame(const frame_info_t&) {}
-    void update_detection_info(float, float) {}
-};
-
-class Control_panel {
-public:
-    bool initialize() { return true; }
-    void update_jetson_info(const performance_stats_t&) {}
-};
-
-class Settings_page {
-public:
-    bool initialize() { return true; }
-    void create_main_layout(Status_bar*, Video_view*, Control_panel*) {}
-};
-
-inline bool lvgl_display_init() { return false; }
-inline bool touch_driver_init() { return false; }
-inline void lv_port_tick_init() {}
 #endif
 
 // 全局关闭标志
