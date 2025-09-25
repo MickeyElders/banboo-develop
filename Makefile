@@ -15,8 +15,8 @@ INSTALL_DIR := /opt/bamboo-cut
 SERVICE_NAME := bamboo-cpp-lvgl
 BINARY_NAME := bamboo-recognition
 
-# === C++ LVGL构建配置 ===
-BUILD_DIR := cpp_backend/build
+# === C++ LVGL一体化构建配置 ===
+BUILD_DIR := build
 CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
                -DENABLE_AI_OPTIMIZATION=ON \
@@ -24,6 +24,8 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DENABLE_CUDA=ON \
                -DENABLE_MODBUS=ON \
                -DENABLE_LVGL=ON \
+               -DENABLE_CPP_INFERENCE=ON \
+               -DENABLE_PYTHON_BINDINGS=ON \
                -DENABLE_HARDWARE_ACCELERATION=ON
 
 # === 颜色定义 ===

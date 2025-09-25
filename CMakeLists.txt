@@ -344,6 +344,11 @@ else()
     set(ENABLE_JSON OFF)
 endif()
 
+# 移除Python绑定相关配置 - 项目现在是纯C++架构
+set(ENABLE_PYBIND11 OFF)
+set(ENABLE_PYTHON OFF)
+message(STATUS "Python绑定已禁用 - 使用纯C++一体化架构")
+
 # ================================
 # LVGL配置
 # ================================
@@ -387,6 +392,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp_backend/include
     ${CMAKE_CURRENT_SOURCE_DIR}/lvgl_frontend/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/lvgl
     ${OpenCV_INCLUDE_DIRS}
     ${GSTREAMER_INCLUDE_DIRS}
@@ -396,6 +402,13 @@ include_directories(
 
 if(ENABLE_CUDA)
     include_directories(${CUDA_INCLUDE_DIRS})
+endif()
+
+if(ENABLE_PYTHON)
+    include_directories(
+        ${Python_INCLUDE_DIRS}
+        ${Python_NumPy_INCLUDE_DIRS}
+    )
 endif()
 
 # ================================
@@ -489,8 +502,22 @@ if(ENABLE_CUDA)
     )
 endif()
 
+# C++推理核心源文件 - 来自cpp_inference项目
+set(CPP_INFERENCE_SOURCES)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/inference_core.cpp)
+    set(CPP_INFERENCE_SOURCES
+        cpp_inference/inference_core.cpp
+        cpp_inference/utils.cpp
+    )
+    message(STATUS "Found cpp_inference components")
+    set(ENABLE_CPP_INFERENCE ON)
+else()
+    message(WARNING "cpp_inference components not found")
+    set(ENABLE_CPP_INFERENCE OFF)
+endif()
+
 # 过滤不存在的源文件
-set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${LVGL_FRONTEND_SOURCES})
+set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${LVGL_FRONTEND_SOURCES} ${CPP_INFERENCE_SOURCES})
 set(VALID_SOURCES)
 foreach(src ${ALL_SOURCES})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
@@ -521,6 +548,8 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
     $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
     $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
+    $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
+    $<$<BOOL:${ENABLE_PYTHON}>:ENABLE_PYTHON_BINDINGS>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
@@ -560,6 +589,50 @@ endif()
 # LVGL库
 if(ENABLE_LVGL)
     target_link_libraries(bamboo_integrated lvgl)
+endif()
+
+# ================================
+# 可选：创建Python绑定模块
+# ================================
+if(ENABLE_PYBIND11 AND ENABLE_PYTHON AND ENABLE_CPP_INFERENCE)
+    message(STATUS "构建Python绑定模块...")
+    
+    # 创建推理核心静态库
+    add_library(bamboo_inference_core STATIC ${CPP_INFERENCE_SOURCES})
+    
+    target_include_directories(bamboo_inference_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference
+        ${OpenCV_INCLUDE_DIRS}
+        ${TENSORRT_INCLUDE_DIR}
+        ${CUDA_INCLUDE_DIRS}
+    )
+    
+    target_link_libraries(bamboo_inference_core
+        ${OpenCV_LIBS}
+        $<$<BOOL:${ENABLE_TENSORRT}>:${TENSORRT_LIBRARIES}>
+        $<$<BOOL:${ENABLE_CUDA}>:${CUDA_LIBRARIES}>
+    )
+    
+    # 创建Python绑定模块
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/python_bindings.cpp)
+        pybind11_add_module(cpp_inference_core cpp_inference/python_bindings.cpp)
+        
+        target_link_libraries(cpp_inference_core PRIVATE bamboo_inference_core)
+        
+        target_compile_definitions(cpp_inference_core PRIVATE
+            VERSION_INFO=${PROJECT_VERSION}
+            $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
+            $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
+        )
+        
+        # 安装Python模块
+        install(TARGETS cpp_inference_core
+            LIBRARY DESTINATION python_core
+            COMPONENT PythonBindings
+        )
+        
+        message(STATUS "Python绑定模块已配置")
+    endif()
 endif()
 
 # ================================
@@ -606,6 +679,18 @@ message(STATUS "  TensorRT: ${ENABLE_TENSORRT}")
 message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
 message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
+message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
+message(STATUS "  pybind11: ${ENABLE_PYBIND11}")
+message(STATUS "  Python绑定: ${ENABLE_PYTHON}")
+message(STATUS "")
+message(STATUS "组件模块:")
+message(STATUS "  cpp_backend: 已集成")
+message(STATUS "  lvgl_frontend: 已集成")
+if(ENABLE_CPP_INFERENCE)
+    message(STATUS "  cpp_inference: 已集成")
+else()
+    message(STATUS "  cpp_inference: 未找到")
+endif()
 message(STATUS "")
 message(STATUS "有效源文件数量: ${VALID_SOURCES}")
 message(STATUS "编译器: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
