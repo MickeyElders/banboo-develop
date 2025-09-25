@@ -3,7 +3,8 @@
 # C++推理后端 + LVGL界面 + Modbus通信的完整一体化系统
 
 .PHONY: all install clean test deploy start stop restart status logs \
-        install-deps install-service enable-service disable-service \
+        install-deps install-system-deps install-lvgl build-lvgl-from-source \
+        install-service enable-service disable-service \
         check-system build-system install-system setup-config \
         build-debug test-system backup
 
@@ -70,7 +71,9 @@ help:
 	@echo ""
 	@echo "$(GREEN)安装命令:$(NC)"
 	@echo "  install          - 完整安装系统"
-	@echo "  install-deps     - 安装系统依赖"
+	@echo "  install-deps     - 安装所有依赖(系统+LVGL)"
+	@echo "  install-system-deps - 仅安装系统依赖"
+	@echo "  install-lvgl     - 检查并安装LVGL"
 	@echo "  install-system   - 安装编译好的系统"
 	@echo "  install-service  - 安装systemd服务"
 	@echo ""
@@ -127,21 +130,27 @@ check-system:
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统环境检查通过"
 
 # === 依赖安装 ===
-install-deps:
+install-deps: install-system-deps install-lvgl
+	@echo "$(GREEN)[SUCCESS]$(NC) 所有依赖安装完成"
+
+install-system-deps:
 	@echo "$(BLUE)[INFO]$(NC) 安装系统依赖..."
 	@sudo apt-get update
 	@sudo apt-get install -y \
 		build-essential \
 		cmake \
 		pkg-config \
+		git \
+		wget \
 		libopencv-dev \
 		libgstreamer1.0-dev \
 		libgstreamer-plugins-base1.0-dev \
 		libmodbus-dev \
-		liblvgl-dev \
 		libcurl4-openssl-dev \
 		libjson-c-dev \
-		libsystemd-dev
+		libsystemd-dev \
+		libsdl2-dev \
+		libfreetype6-dev
 	@if lspci | grep -i nvidia >/dev/null 2>&1; then \
 		echo "$(BLUE)[INFO]$(NC) 检测到NVIDIA GPU，检查CUDA环境..."; \
 		if [ -d "/usr/local/cuda" ]; then \
@@ -151,6 +160,36 @@ install-deps:
 		fi \
 	fi
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统依赖安装完成"
+
+install-lvgl:
+	@echo "$(CYAN)[LVGL]$(NC) 检查LVGL安装状态..."
+	@if [ ! -f "/usr/local/include/lvgl/lvgl.h" ] && [ ! -f "/usr/include/lvgl/lvgl.h" ]; then \
+		echo "$(BLUE)[INFO]$(NC) LVGL未找到，开始从源码编译安装..."; \
+		$(MAKE) build-lvgl-from-source; \
+	else \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL已安装"; \
+	fi
+
+build-lvgl-from-source:
+	@echo "$(CYAN)[LVGL]$(NC) 开始编译LVGL v9.2.0..."
+	@mkdir -p /tmp/lvgl_build
+	@cd /tmp/lvgl_build && \
+	if [ ! -d "lvgl" ]; then \
+		git clone --depth 1 --branch v9.2.0 https://github.com/lvgl/lvgl.git; \
+	fi
+	@cd /tmp/lvgl_build/lvgl && \
+	mkdir -p build && cd build && \
+	cmake .. \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr/local \
+		-DLV_CONF_BUILD_DISABLE_EXAMPLES=1 \
+		-DLV_CONF_BUILD_DISABLE_DEMOS=1 \
+		-DBUILD_SHARED_LIBS=ON
+	@cd /tmp/lvgl_build/lvgl/build && make -j$(shell nproc)
+	@cd /tmp/lvgl_build/lvgl/build && sudo make install
+	@sudo ldconfig
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL编译安装完成"
+	@rm -rf /tmp/lvgl_build
 
 # === C++系统构建 ===
 build-system:
