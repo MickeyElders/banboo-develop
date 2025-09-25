@@ -177,13 +177,45 @@ build-lvgl-from-source:
 	if [ ! -d "lvgl" ]; then \
 		git clone --depth 1 --branch v9.2.0 https://github.com/lvgl/lvgl.git; \
 	fi
+	@echo "$(BLUE)[INFO]$(NC) 创建LVGL配置文件..."
+	@cd /tmp/lvgl_build/lvgl && \
+	echo "#ifndef LV_CONF_H" > lv_conf.h && \
+	echo "#define LV_CONF_H" >> lv_conf.h && \
+	echo "" >> lv_conf.h && \
+	echo "#define LV_USE_STDLIB_MALLOC    1" >> lv_conf.h && \
+	echo "#define LV_USE_STDLIB_STRING    1" >> lv_conf.h && \
+	echo "#define LV_USE_STDLIB_SPRINTF   1" >> lv_conf.h && \
+	echo "#define LV_COLOR_DEPTH          32" >> lv_conf.h && \
+	echo "#define LV_MEM_SIZE             (128U * 1024U)" >> lv_conf.h && \
+	echo "#define LV_USE_PERF_MONITOR     1" >> lv_conf.h && \
+	echo "#define LV_USE_MEM_MONITOR      1" >> lv_conf.h && \
+	echo "#define LV_USE_LOG              1" >> lv_conf.h && \
+	echo "#define LV_LOG_LEVEL            LV_LOG_LEVEL_INFO" >> lv_conf.h && \
+	echo "#define LV_TICK_CUSTOM          1" >> lv_conf.h && \
+	echo "#define LV_DISP_DEF_REFR_PERIOD 33" >> lv_conf.h && \
+	echo "#define LV_USE_GPU_DRAW         1" >> lv_conf.h && \
+	echo "#define LV_USE_ASSERT_NULL      1" >> lv_conf.h && \
+	echo "#define LV_USE_ASSERT_MALLOC    1" >> lv_conf.h && \
+	echo "#define LV_USE_ASSERT_MEM_INTEGRITY 1" >> lv_conf.h && \
+	echo "#define LV_USE_ASSERT_OBJ       1" >> lv_conf.h && \
+	echo "#define LV_USE_ASSERT_STYLE     1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_14   1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_16   1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_18   1" >> lv_conf.h && \
+	echo "#define LV_USE_FILESYSTEM       1" >> lv_conf.h && \
+	echo "#define LV_USE_PNG              1" >> lv_conf.h && \
+	echo "#define LV_USE_BMP              1" >> lv_conf.h && \
+	echo "#define LV_USE_JPG              1" >> lv_conf.h && \
+	echo "#define LV_USE_GIF              1" >> lv_conf.h && \
+	echo "#define LV_USE_FREETYPE         1" >> lv_conf.h && \
+	echo "" >> lv_conf.h && \
+	echo "#endif /*LV_CONF_H*/" >> lv_conf.h
 	@cd /tmp/lvgl_build/lvgl && \
 	mkdir -p build && cd build && \
 	cmake .. \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr/local \
-		-DLV_CONF_BUILD_DISABLE_EXAMPLES=1 \
-		-DLV_CONF_BUILD_DISABLE_DEMOS=1 \
+		-DLV_CONF_PATH=/tmp/lvgl_build/lvgl/lv_conf.h \
 		-DBUILD_SHARED_LIBS=ON
 	@cd /tmp/lvgl_build/lvgl/build && make -j$(shell nproc)
 	@cd /tmp/lvgl_build/lvgl/build && sudo make install
