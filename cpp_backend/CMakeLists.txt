@@ -1,9 +1,9 @@
-# C++推理核心 CMake配置
-# 版本: 4.0.0 (Python LVGL Architecture)
-# C++推理后端 + Python LVGL前端的混合架构
+# C++ LVGL一体化竹子识别系统 CMake配置
+# 版本: 5.0.0 (C++ LVGL Integrated Architecture)
+# C++推理后端 + LVGL界面 + Modbus通信的完整一体化系统
 
 cmake_minimum_required(VERSION 3.16)
-project(BambooInferenceCore VERSION 4.0.0 LANGUAGES C CXX)
+project(BambooRecognitionSystem VERSION 5.0.0 LANGUAGES C CXX)
 
 # C++标准设置
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# AI优化特性选项
+# 特性选项
 option(ENABLE_AI_OPTIMIZATION "Enable AI optimizations" ON)
 option(ENABLE_NAM_ATTENTION "Enable NAM Attention" ON)
 option(ENABLE_GHOST_CONV "Enable GhostConv" ON)
@@ -21,6 +21,8 @@ option(ENABLE_SAHI_SLICING "Enable SAHI Slicing" ON)
 option(ENABLE_HARDWARE_ACCELERATION "Enable Hardware Acceleration" ON)
 option(ENABLE_TENSORRT "Enable TensorRT" ON)
 option(ENABLE_CUDA "Enable CUDA" ON)
+option(ENABLE_MODBUS "Enable Modbus Communication" ON)
+option(ENABLE_LVGL "Enable LVGL UI" ON)
 
 # 设置构建类型
 if(NOT CMAKE_BUILD_TYPE)
@@ -28,10 +30,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 编译选项
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -ffast-math -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -DNDEBUG")
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall -Wextra -DDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -DDEBUG")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -ffast-math -DNDEBUG -march=native")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -DNDEBUG -march=native")
 
 # 检测目标平台
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
@@ -52,31 +54,10 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 # OpenCV
-find_package(OpenCV QUIET)
+find_package(OpenCV REQUIRED)
 if(OpenCV_FOUND)
     message(STATUS "Found OpenCV: ${OpenCV_VERSION}")
-    set(ENABLE_OPENCV ON)
-else()
-    if(PkgConfig_FOUND)
-        pkg_check_modules(OPENCV QUIET opencv4)
-        if(NOT OPENCV_FOUND)
-            pkg_check_modules(OPENCV QUIET opencv)
-        endif()
-        
-        if(OPENCV_FOUND)
-            message(STATUS "Found OpenCV via pkg-config: ${OPENCV_VERSION}")
-            set(ENABLE_OPENCV ON)
-            set(OpenCV_FOUND TRUE)
-            set(OpenCV_LIBS ${OPENCV_LIBRARIES})
-            set(OpenCV_INCLUDE_DIRS ${OPENCV_INCLUDE_DIRS})
-            include_directories(${OPENCV_INCLUDE_DIRS})
-            link_directories(${OPENCV_LIBRARY_DIRS})
-        endif()
-    endif()
-endif()
-
-if(NOT ENABLE_OPENCV)
-    message(FATAL_ERROR "OpenCV not found! Please install OpenCV")
+    include_directories(${OpenCV_INCLUDE_DIRS})
 endif()
 
 # GStreamer
@@ -85,34 +66,35 @@ pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
 pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
 message(STATUS "Found GStreamer: ${GSTREAMER_VERSION}")
 
-# CUDA配置（如果启用）
+# LVGL
+if(ENABLE_LVGL)
+    find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
+        PATHS /usr/include /usr/local/include)
+    find_library(LVGL_LIBRARY lvgl
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu)
+    
+    if(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
+        message(STATUS "Found LVGL: ${LVGL_LIBRARY}")
+        include_directories(${LVGL_INCLUDE_DIR})
+    else()
+        message(FATAL_ERROR "LVGL not found! Please install LVGL development library")
+    endif()
+endif()
+
+# CUDA配置
 if(ENABLE_CUDA)
     if(TARGET_ARCH STREQUAL "aarch64")
-        message(STATUS "Configuring CUDA for Jetson...")
-        
-        # Jetson CUDA路径
-        set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
-        
         find_path(CUDA_RUNTIME_INCLUDE cuda_runtime.h
-            PATHS
-                "/usr/local/cuda/include"
-                "/usr/local/cuda-12.6/include"
-                "/usr/local/cuda-12/include"
+            PATHS "/usr/local/cuda/include" "/usr/local/cuda-12.6/include"
             NO_DEFAULT_PATH)
-        
         find_library(CUDA_RUNTIME_LIBRARY cudart
-            PATHS
-                "/usr/local/cuda/lib64"
-                "/usr/local/cuda-12.6/targets/aarch64-linux/lib"
-                "/usr/local/cuda/targets/aarch64-linux/lib"
+            PATHS "/usr/local/cuda/lib64" "/usr/local/cuda/targets/aarch64-linux/lib"
             NO_DEFAULT_PATH)
-        
+            
         if(CUDA_RUNTIME_INCLUDE AND CUDA_RUNTIME_LIBRARY)
-            message(STATUS "Found CUDA for Jetson: ${CUDA_RUNTIME_LIBRARY}")
             set(CUDA_FOUND TRUE)
-            enable_language(CUDA)
+            message(STATUS "Found CUDA for Jetson: ${CUDA_RUNTIME_LIBRARY}")
             include_directories(${CUDA_RUNTIME_INCLUDE})
-            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_87")
             set(CUDA_LIBRARIES ${CUDA_RUNTIME_LIBRARY})
         else()
             message(WARNING "CUDA not found - GPU功能将被禁用")
@@ -122,7 +104,6 @@ if(ENABLE_CUDA)
         find_package(CUDA QUIET)
         if(CUDA_FOUND)
             message(STATUS "Found CUDA: ${CUDA_VERSION}")
-            enable_language(CUDA)
             include_directories(${CUDA_INCLUDE_DIRS})
         else()
             message(WARNING "CUDA not found - GPU功能将被禁用")
@@ -131,124 +112,102 @@ if(ENABLE_CUDA)
     endif()
 endif()
 
-# TensorRT配置（如果启用）
+# TensorRT配置
 if(ENABLE_TENSORRT AND ENABLE_CUDA)
     if(TARGET_ARCH STREQUAL "aarch64")
         find_path(TENSORRT_INCLUDE_DIR NvInfer.h
-            PATHS "/usr/include/aarch64-linux-gnu" "/usr/include"
-            NO_DEFAULT_PATH)
-        
+            PATHS "/usr/include/aarch64-linux-gnu" "/usr/include")
         find_library(TENSORRT_INFER_LIBRARY nvinfer
-            PATHS "/usr/lib/aarch64-linux-gnu"
-            NO_DEFAULT_PATH)
-        
-        if(TENSORRT_INCLUDE_DIR AND TENSORRT_INFER_LIBRARY)
-            set(TENSORRT_FOUND ON)
-            message(STATUS "Found TensorRT for Jetson: ${TENSORRT_INFER_LIBRARY}")
-            include_directories(${TENSORRT_INCLUDE_DIR})
-            set(TENSORRT_LIBRARIES ${TENSORRT_INFER_LIBRARY})
-        else()
-            message(WARNING "TensorRT not found - 使用OpenCV DNN后备")
-            set(ENABLE_TENSORRT OFF)
-        endif()
+            PATHS "/usr/lib/aarch64-linux-gnu")
     else()
         find_path(TENSORRT_INCLUDE_DIR NvInfer.h
             PATHS /usr/include /usr/local/include)
         find_library(TENSORRT_INFER_LIBRARY nvinfer
             PATHS /usr/lib /usr/local/lib)
-        
-        if(TENSORRT_INCLUDE_DIR AND TENSORRT_INFER_LIBRARY)
-            set(TENSORRT_FOUND ON)
-            message(STATUS "Found TensorRT: ${TENSORRT_INFER_LIBRARY}")
-            include_directories(${TENSORRT_INCLUDE_DIR})
-            set(TENSORRT_LIBRARIES ${TENSORRT_INFER_LIBRARY})
-        else()
-            message(WARNING "TensorRT not found - 使用OpenCV DNN后备")
-            set(ENABLE_TENSORRT OFF)
-        endif()
+    endif()
+    
+    if(TENSORRT_INCLUDE_DIR AND TENSORRT_INFER_LIBRARY)
+        set(TENSORRT_FOUND ON)
+        message(STATUS "Found TensorRT: ${TENSORRT_INFER_LIBRARY}")
+        include_directories(${TENSORRT_INCLUDE_DIR})
+        set(TENSORRT_LIBRARIES ${TENSORRT_INFER_LIBRARY})
+    else()
+        message(WARNING "TensorRT not found - 使用OpenCV DNN后备")
+        set(ENABLE_TENSORRT OFF)
     endif()
 endif()
 
 # libmodbus
-find_library(MODBUS_LIBRARY modbus
-    PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu)
-find_path(MODBUS_INCLUDE_DIR modbus/modbus.h
-    PATHS /usr/include /usr/local/include)
-
-if(MODBUS_LIBRARY AND MODBUS_INCLUDE_DIR)
-    message(STATUS "Found libmodbus: ${MODBUS_LIBRARY}")
-    set(ENABLE_MODBUS ON)
-    include_directories(${MODBUS_INCLUDE_DIR})
-else()
-    message(WARNING "libmodbus not found - PLC通信功能将被禁用")
-    set(ENABLE_MODBUS OFF)
-endif()
-
-# pybind11 (for Python bindings)
-find_package(pybind11 QUIET)
-if(pybind11_FOUND)
-    message(STATUS "Found pybind11: ${pybind11_VERSION}")
-    set(ENABLE_PYBIND11 ON)
-else()
-    message(WARNING "pybind11 not found - Python绑定将被禁用")
-    set(ENABLE_PYBIND11 OFF)
+if(ENABLE_MODBUS)
+    find_library(MODBUS_LIBRARY modbus
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu)
+    find_path(MODBUS_INCLUDE_DIR modbus/modbus.h
+        PATHS /usr/include /usr/local/include)
+    
+    if(MODBUS_LIBRARY AND MODBUS_INCLUDE_DIR)
+        message(STATUS "Found libmodbus: ${MODBUS_LIBRARY}")
+        include_directories(${MODBUS_INCLUDE_DIR})
+    else()
+        message(WARNING "libmodbus not found - PLC通信功能将被禁用")
+        set(ENABLE_MODBUS OFF)
+    endif()
 endif()
 
 # 包含目录
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp_backend/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${OpenCV_INCLUDE_DIRS}
     ${GSTREAMER_INCLUDE_DIRS}
     ${GSTREAMER_APP_INCLUDE_DIRS}
     ${GSTREAMER_VIDEO_INCLUDE_DIRS}
 )
 
-# 源文件收集 - 只包含推理相关的源文件
-set(INFERENCE_SOURCES
-    ../cpp_backend/src/core/logger.cpp
-    ../cpp_backend/src/core/system_utils.cpp
-    ../cpp_backend/src/vision/detector.cpp
-    ../cpp_backend/src/vision/optimized_detector.cpp
-    ../cpp_backend/src/vision/camera_manager.cpp
-    ../cpp_backend/src/vision/shared_memory_manager.cpp
-    ../cpp_backend/src/communication/modbus_server.cpp
-    ../cpp_backend/src/communication/tcp_socket_server.cpp
+# 核心源文件
+set(CORE_SOURCES
+    src/core/data_bridge.cpp
+    src/core/bamboo_system.cpp
 )
 
-# AI优化源文件
-if(ENABLE_AI_OPTIMIZATION)
-    list(APPEND INFERENCE_SOURCES
-        ../cpp_backend/src/vision/nam_attention.cpp
-        ../cpp_backend/src/vision/ghost_conv.cpp
-        ../cpp_backend/src/vision/vov_gscsp.cpp
-        ../cpp_backend/src/vision/sahi_slicing.cpp
-        ../cpp_backend/src/vision/wise_iou.cpp
+# AI推理源文件
+set(INFERENCE_SOURCES
+    src/inference/bamboo_detector.cpp
+)
+
+# LVGL界面源文件
+if(ENABLE_LVGL)
+    set(UI_SOURCES
+        src/ui/lvgl_interface.cpp
+        src/ui/lvgl_display_driver.cpp
+        src/ui/lvgl_input_driver.cpp
     )
 endif()
 
-# CUDA相关源文件
-if(ENABLE_CUDA)
-    list(APPEND INFERENCE_SOURCES
-        ../cpp_backend/src/vision/hardware_accelerated_camera.cpp
+# 通信源文件
+if(ENABLE_MODBUS)
+    set(COMMUNICATION_SOURCES
+        src/communication/modbus_interface.cpp
     )
 endif()
 
-# TensorRT相关源文件
-if(ENABLE_TENSORRT)
-    list(APPEND INFERENCE_SOURCES
-        ../cpp_backend/src/vision/tensorrt_engine.cpp
-    )
-endif()
+# 工具源文件
+set(UTILS_SOURCES
+    src/utils/logger.cpp
+    src/utils/config_loader.cpp
+    src/utils/system_monitor.cpp
+)
 
-# 深度学习相关源文件
-list(APPEND INFERENCE_SOURCES
-    ../cpp_backend/src/vision/stereo_vision.cpp
-    ../cpp_backend/src/vision/deepstream_pipeline.cpp
+# 合并所有源文件
+set(ALL_SOURCES
+    ${CORE_SOURCES}
+    ${INFERENCE_SOURCES}
+    ${UI_SOURCES}
+    ${COMMUNICATION_SOURCES}
+    ${UTILS_SOURCES}
 )
 
 # 过滤存在的源文件
 set(VALID_SOURCES)
-foreach(src ${INFERENCE_SOURCES})
+foreach(src ${ALL_SOURCES})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
         list(APPEND VALID_SOURCES ${src})
     else()
@@ -256,103 +215,131 @@ foreach(src ${INFERENCE_SOURCES})
     endif()
 endforeach()
 
-# 创建推理库
-if(VALID_SOURCES)
-    add_library(bamboo_inference SHARED ${VALID_SOURCES})
-    
-    # 编译定义
-    target_compile_definitions(bamboo_inference PRIVATE
-        $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
-        $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
-        $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
-        $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
-        $<$<BOOL:${ENABLE_AI_OPTIMIZATION}>:ENABLE_AI_OPTIMIZATION>
-        $<$<BOOL:${ENABLE_NAM_ATTENTION}>:ENABLE_NAM_ATTENTION>
-        $<$<BOOL:${ENABLE_GHOST_CONV}>:ENABLE_GHOST_CONV>
-        $<$<BOOL:${ENABLE_VOV_GSCSP}>:ENABLE_VOV_GSCSP>
-        $<$<BOOL:${ENABLE_WISE_IOU}>:ENABLE_WISE_IOU>
-        $<$<BOOL:${ENABLE_SAHI_SLICING}>:ENABLE_SAHI_SLICING>
-        $<$<BOOL:${ENABLE_HARDWARE_ACCELERATION}>:ENABLE_HARDWARE_ACCELERATION>
-        $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_PLATFORM>
-    )
-    
-    # 链接库
-    target_link_libraries(bamboo_inference
-        ${OpenCV_LIBS}
-        ${GSTREAMER_LIBRARIES}
-        ${GSTREAMER_APP_LIBRARIES}
-        ${GSTREAMER_VIDEO_LIBRARIES}
-        Threads::Threads
-        pthread
-        dl
-        m
-    )
-    
-    # 条件链接库
-    if(ENABLE_CUDA)
-        target_link_libraries(bamboo_inference ${CUDA_LIBRARIES})
-    endif()
-    
-    if(ENABLE_TENSORRT)
-        target_link_libraries(bamboo_inference ${TENSORRT_LIBRARIES})
-    endif()
-    
-    if(ENABLE_MODBUS)
-        target_link_libraries(bamboo_inference ${MODBUS_LIBRARY})
-    endif()
-    
-    message(STATUS "Bamboo inference library configured with ${list(LENGTH VALID_SOURCES)} source files")
-else()
-    message(WARNING "No valid source files found, creating minimal library")
-    # 创建一个最小的库避免构建失败
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/minimal.cpp 
-        "// Minimal library implementation\nextern \"C\" { int bamboo_inference_version() { return 1; } }")
-    add_library(bamboo_inference SHARED ${CMAKE_CURRENT_BINARY_DIR}/minimal.cpp)
+# 创建主库
+add_library(bamboo_system SHARED ${VALID_SOURCES})
+
+# 编译定义
+target_compile_definitions(bamboo_system PRIVATE
+    $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
+    $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
+    $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
+    $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
+    $<$<BOOL:${ENABLE_AI_OPTIMIZATION}>:ENABLE_AI_OPTIMIZATION>
+    $<$<BOOL:${ENABLE_NAM_ATTENTION}>:ENABLE_NAM_ATTENTION>
+    $<$<BOOL:${ENABLE_GHOST_CONV}>:ENABLE_GHOST_CONV>
+    $<$<BOOL:${ENABLE_VOV_GSCSP}>:ENABLE_VOV_GSCSP>
+    $<$<BOOL:${ENABLE_WISE_IOU}>:ENABLE_WISE_IOU>
+    $<$<BOOL:${ENABLE_SAHI_SLICING}>:ENABLE_SAHI_SLICING>
+    $<$<BOOL:${ENABLE_HARDWARE_ACCELERATION}>:ENABLE_HARDWARE_ACCELERATION>
+    $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_PLATFORM>
+)
+
+# 链接库
+target_link_libraries(bamboo_system
+    ${OpenCV_LIBS}
+    ${GSTREAMER_LIBRARIES}
+    ${GSTREAMER_APP_LIBRARIES}
+    ${GSTREAMER_VIDEO_LIBRARIES}
+    Threads::Threads
+    pthread
+    dl
+    m
+)
+
+# 条件链接库
+if(ENABLE_CUDA)
+    target_link_libraries(bamboo_system ${CUDA_LIBRARIES})
 endif()
 
-# Python绑定（如果启用pybind11）
-if(ENABLE_PYBIND11 AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../cpp_inference/python_bindings.cpp)
-    pybind11_add_module(bamboo_py_inference ../cpp_inference/python_bindings.cpp)
-    target_link_libraries(bamboo_py_inference PRIVATE bamboo_inference)
-    target_compile_definitions(bamboo_py_inference PRIVATE VERSION_INFO=${PROJECT_VERSION})
-    message(STATUS "Python bindings enabled")
+if(ENABLE_TENSORRT)
+    target_link_libraries(bamboo_system ${TENSORRT_LIBRARIES})
 endif()
 
-# 测试程序（可选）
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../cpp_backend/src/main.cpp)
-    add_executable(bamboo_inference_test ../cpp_backend/src/main.cpp)
-    target_link_libraries(bamboo_inference_test bamboo_inference)
-    message(STATUS "Test executable configured")
+if(ENABLE_MODBUS)
+    target_link_libraries(bamboo_system ${MODBUS_LIBRARY})
 endif()
+
+if(ENABLE_LVGL)
+    target_link_libraries(bamboo_system ${LVGL_LIBRARY})
+endif()
+
+# 主程序可执行文件
+add_executable(bamboo_recognition src/main.cpp)
+target_link_libraries(bamboo_recognition bamboo_system)
+
+# 设置可执行文件输出名称
+set_target_properties(bamboo_recognition PROPERTIES OUTPUT_NAME "bamboo-recognition")
 
 # 安装配置
-install(TARGETS bamboo_inference
+install(TARGETS bamboo_system
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     COMPONENT Runtime
 )
 
-if(TARGET bamboo_inference_test)
-    install(TARGETS bamboo_inference_test
-        RUNTIME DESTINATION bin
-        COMPONENT Runtime
-    )
+install(TARGETS bamboo_recognition
+    RUNTIME DESTINATION bin
+    COMPONENT Runtime
+)
+
+# 安装头文件
+install(DIRECTORY include/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+    COMPONENT Development
+)
+
+# 安装配置文件
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../config/
+    DESTINATION etc/bamboo-recognition
+    FILES_MATCHING PATTERN "*.yaml" PATTERN "*.json"
+    COMPONENT Runtime
+)
+
+# 创建systemd服务文件
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deploy/systemd/bamboo-cpp-lvgl.service.in
+    ${CMAKE_CURRENT_BINARY_DIR}/bamboo-cpp-lvgl.service
+    @ONLY
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/bamboo-cpp-lvgl.service
+    DESTINATION lib/systemd/system
+    COMPONENT Runtime
+)
+
+# CPack配置
+set(CPACK_PACKAGE_NAME "bamboo-recognition-system")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "AI Bamboo Recognition System - C++ LVGL Edition")
+set(CPACK_PACKAGE_VENDOR "Bamboo Industries")
+set(CPACK_PACKAGE_CONTACT "admin@bamboo-industries.com")
+
+if(TARGET_ARCH STREQUAL "aarch64")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "arm64")
+    set(CPACK_RPM_PACKAGE_ARCHITECTURE "aarch64")
+else()
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+    set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
 endif()
 
-if(TARGET bamboo_py_inference)
-    install(TARGETS bamboo_py_inference
-        LIBRARY DESTINATION lib
-        COMPONENT Runtime
-    )
-endif()
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libopencv-dev, libgstreamer1.0-dev, libmodbus-dev, liblvgl-dev")
+set(CPACK_RPM_PACKAGE_REQUIRES "opencv-devel, gstreamer1-devel, libmodbus-devel, lvgl-devel")
+
+include(CPack)
 
 # 构建信息显示
 message(STATUS "")
-message(STATUS "=== C++推理核心构建配置 ===")
+message(STATUS "=== C++ LVGL一体化竹子识别系统构建配置 ===")
 message(STATUS "项目名称: ${PROJECT_NAME}")
 message(STATUS "版本: ${PROJECT_VERSION}")
 message(STATUS "构建类型: ${CMAKE_BUILD_TYPE}")
 message(STATUS "目标架构: ${TARGET_ARCH}")
+message(STATUS "")
+message(STATUS "功能模块:")
+message(STATUS "  AI推理: ${ENABLE_AI_OPTIMIZATION}")
+message(STATUS "  LVGL界面: ${ENABLE_LVGL}")
+message(STATUS "  Modbus通信: ${ENABLE_MODBUS}")
 message(STATUS "")
 message(STATUS "AI优化技术:")
 message(STATUS "  NAM注意力: ${ENABLE_NAM_ATTENTION}")
@@ -363,10 +350,10 @@ message(STATUS "  SAHI切片: ${ENABLE_SAHI_SLICING}")
 message(STATUS "  硬件加速: ${ENABLE_HARDWARE_ACCELERATION}")
 message(STATUS "")
 message(STATUS "依赖库状态:")
-message(STATUS "  OpenCV: ${ENABLE_OPENCV}")
-message(STATUS "  GStreamer: ${GSTREAMER_FOUND}")
+message(STATUS "  OpenCV: ${OpenCV_VERSION}")
+message(STATUS "  GStreamer: ${GSTREAMER_VERSION}")
 message(STATUS "  CUDA: ${ENABLE_CUDA}")
 message(STATUS "  TensorRT: ${ENABLE_TENSORRT}")
 message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
-message(STATUS "  pybind11: ${ENABLE_PYBIND11}")
-message(STATUS "===============================")
+message(STATUS "  LVGL: ${ENABLE_LVGL}")
+message(STATUS "===============================================")

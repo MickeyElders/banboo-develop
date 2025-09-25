@@ -1,0 +1,46 @@
+[Unit]
+Description=AI Bamboo Recognition System - C++ LVGL Edition
+Documentation=https://github.com/bamboo-industries/bamboo-recognition
+After=network.target graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=@CMAKE_INSTALL_PREFIX@/bin
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/bamboo-recognition --config @CMAKE_INSTALL_PREFIX@/etc/bamboo-recognition/system_config.yaml
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+# 环境变量
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64"
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="HOME=/root"
+
+# 显示和输入设备访问
+Environment="DISPLAY=:0"
+Environment="WAYLAND_DISPLAY=wayland-0"
+SupplementaryGroups=input video render
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+OOMScoreAdjust=-100
+
+# 重启策略
+Restart=always
+RestartSec=10
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillMode=mixed
+
+# 安全设置
+NoNewPrivileges=false
+PrivateTmp=false
+ProtectSystem=false
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

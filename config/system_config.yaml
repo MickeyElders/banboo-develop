@@ -1,26 +1,200 @@
-# 智能切竹机系统配置文件（重构版）
+# AI竹子识别系统配置文件
+# 版本: 5.0.0 (C++ LVGL Integrated Architecture)
+# C++推理后端 + LVGL界面 + Modbus通信的完整一体化系统
 
-hardware:
-  camera_id: 0
-  resolution: [1920, 1080]
-  fps: 30
+# 系统信息
+system:
+  name: "AI Bamboo Recognition System"
+  version: "5.0.0"
+  architecture: "C++ LVGL Integrated"
+  description: "工业级竹子识别切割系统"
 
-communication:
+# AI推理配置
+detector:
+  model_path: "models/best.pt"
+  confidence_threshold: 0.85
+  nms_threshold: 0.45
+  input_size: [640, 640]
+  use_gpu: true
+  use_tensorrt: true
+  
+  # AI优化功能
+  optimizations:
+    enable_nam_attention: true
+    enable_ghost_conv: true
+    enable_vov_gscsp: true
+    enable_wise_iou: true
+    enable_sahi_slicing: true
+    enable_hardware_acceleration: true
+
+# LVGL界面配置
+ui:
+  screen_width: 1280
+  screen_height: 800
+  refresh_rate: 60
+  touch_device: "/dev/input/event0"
+  display_device: "/dev/fb0"
+  enable_touch: true
+  
+  # 界面主题
+  theme:
+    primary_color: 0xFF6B35      # 橙色主题
+    secondary_color: 0x2196F3    # 蓝色辅助
+    success_color: 0x4CAF50      # 绿色成功
+    warning_color: 0xFFC107      # 黄色警告
+    error_color: 0xF44336        # 红色错误
+    background_color: 0x1E1E1E   # 深色背景
+    surface_color: 0x2D2D2D      # 表面色
+
+# Modbus通信配置
+modbus:
   server_ip: "192.168.1.100"
   server_port: 502
-  timeout: 5.0
+  slave_id: 1
+  timeout_ms: 1000
+  reconnect_interval: 5
+  auto_reconnect: true
+  
+  # 寄存器映射
+  registers:
+    system_status: 40001      # 系统状态
+    plc_command: 40002        # PLC命令
+    coord_ready: 40003        # 坐标就绪
+    x_coordinate_h: 40004     # X坐标高位
+    x_coordinate_l: 40005     # X坐标低位
+    cut_quality: 40006        # 切割质量
+    heartbeat_h: 40007        # 心跳计数器高位
+    heartbeat_l: 40008        # 心跳计数器低位
+    blade_number: 40009       # 刀具编号
+    health_status: 40010      # 健康状态
 
-ai:
-  model_path: "/opt/bamboo-cut/models/bamboo_detector.onnx"
-  tensorrt_engine_path: "/opt/bamboo-cut/models/tensorrt/bamboo_detector.trt"
-  confidence_threshold: 0.5
-  enable_tensorrt: true
-  enable_jetpack_optimization: true
+# 摄像头配置
+camera:
+  device_index: 0
+  width: 1280
+  height: 720
+  fps: 30
+  format: "MJPG"
+  auto_exposure: false
+  exposure: 100
+  gain: 50
+  
+  # GStreamer管道配置
+  gstreamer:
+    enabled: true
+    pipeline: "v4l2src device=/dev/video0 ! videoconvert ! appsink"
 
-user_interface:
-  theme: "dark"
-  language: "zh_CN"
+# 系统运行参数
+system_params:
+  enable_ai_inference: true
+  enable_ui_interface: true
+  enable_modbus_communication: true
+  enable_auto_start: false
+  main_loop_interval_ms: 10
+  stats_update_interval_ms: 1000
+  workflow_step_timeout_ms: 30000
 
+# 工作流程配置
+workflow:
+  steps:
+    - id: 1
+      name: "Feed Detection"
+      plc_command: 1
+      timeout_ms: 15000
+    - id: 2
+      name: "Vision Recognition"
+      plc_command: 0
+      timeout_ms: 5000
+    - id: 3
+      name: "Coordinate Transfer"
+      plc_command: 0
+      timeout_ms: 2000
+    - id: 4
+      name: "Cut Prepare"
+      plc_command: 2
+      timeout_ms: 10000
+    - id: 5
+      name: "Execute Cut"
+      plc_command: 3
+      timeout_ms: 8000
+
+# 日志配置
 logging:
-  level: "INFO"
-  file: "./logs/system.log" 
+  level: "INFO"           # DEBUG, INFO, WARNING, ERROR
+  enable_file_log: true
+  log_file: "/opt/bamboo-cut/logs/system.log"
+  max_file_size_mb: 100
+  max_files: 10
+  enable_console_log: true
+  enable_syslog: true
+
+# 性能监控
+performance:
+  enable_monitoring: true
+  stats_interval_ms: 5000
+  cpu_threshold: 80.0
+  memory_threshold: 80.0
+  temperature_threshold: 75.0
+  
+  # Jetson专用监控
+  jetson:
+    monitor_gpu: true
+    monitor_thermal: true
+    monitor_power: true
+    monitor_emc: true
+
+# 安全配置
+security:
+  enable_watchdog: true
+  watchdog_timeout_ms: 30000
+  enable_emergency_stop: true
+  emergency_stop_gpio: 18
+  enable_safety_checks: true
+
+# 网络配置
+network:
+  enable_tcp_server: false
+  tcp_port: 8080
+  enable_web_interface: false
+  web_port: 8081
+  enable_mqtt: false
+  mqtt_broker: "localhost"
+  mqtt_port: 1883
+
+# 备份和恢复
+backup:
+  enable_auto_backup: true
+  backup_interval_hours: 24
+  backup_directory: "/opt/bamboo-cut/backup"
+  max_backups: 7
+  backup_configs: true
+  backup_logs: false
+  backup_models: true
+
+# 调试和开发
+debug:
+  enable_debug_mode: false
+  debug_port: 9999
+  enable_profiling: false
+  enable_memory_debug: false
+  enable_opencv_debug: false
+  save_debug_frames: false
+  debug_frame_path: "/tmp/debug_frames"
+
+# 硬件特定配置
+hardware:
+  # Jetson Orin NX配置
+  jetson:
+    power_mode: "15W"         # 15W, 25W, 40W
+    cpu_governor: "performance" # performance, powersave, ondemand
+    gpu_governor: "performance"
+    emc_governor: "performance"
+    fan_mode: "auto"          # auto, manual
+    fan_speed: 255            # 0-255 (仅manual模式)
+  
+  # GPIO配置
+  gpio:
+    emergency_stop: 18
+    system_led: 19
+    status_led: 20
+    buzzer: 21
