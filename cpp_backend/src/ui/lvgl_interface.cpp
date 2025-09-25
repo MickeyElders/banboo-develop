@@ -13,6 +13,11 @@
 #include <thread>
 #include <chrono>
 
+// 确保使用正确的LOG宏
+#define LOG_INFO(msg) utils::Logger::getInstance().log(utils::LogLevel::INFO, msg)
+#define LOG_ERROR(msg) utils::Logger::getInstance().log(utils::LogLevel::ERROR, msg)
+#define LOG_WARN(msg) utils::Logger::getInstance().log(utils::LogLevel::WARN, msg)
+
 namespace bamboo_cut {
 namespace ui {
 
