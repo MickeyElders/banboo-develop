@@ -15,8 +15,42 @@
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
 
-// LVGL核心
+// LVGL头文件包含 - 智能检测多种可能的路径
+#ifdef ENABLE_LVGL
+#if __has_include(<lvgl/lvgl.h>)
+#include <lvgl/lvgl.h>
+#elif __has_include(<lvgl.h>)
+#include <lvgl.h>
+#elif __has_include("lvgl/lvgl.h")
+#include "lvgl/lvgl.h"
+#elif __has_include("lvgl.h")
 #include "lvgl.h"
+#else
+#warning "LVGL header not found, using placeholder types"
+#undef ENABLE_LVGL
+#endif
+#endif
+
+#ifndef ENABLE_LVGL
+// LVGL未启用时的类型占位符
+typedef void* lv_obj_t;
+typedef void* lv_timer_t;
+typedef void* lv_event_t;
+typedef void* lv_indev_drv_t;
+typedef void* lv_indev_data_t;
+typedef void* lv_disp_drv_t;
+typedef void* lv_area_t;
+typedef void* lv_color_t;
+
+// LVGL函数占位符
+inline void lv_init() {}
+inline void lv_timer_handler() {}
+inline void lv_port_tick_init() {}
+inline lv_timer_t* lv_timer_create(void(*cb)(lv_timer_t*), unsigned int, void*) { return nullptr; }
+inline void lv_timer_del(lv_timer_t*) {}
+inline bool lvgl_display_init() { return false; }
+inline bool touch_driver_init() { return false; }
+#endif
 
 // 现有后端组件 - 完全复用
 #include "bamboo_cut/vision/camera_manager.h"
