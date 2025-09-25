@@ -105,71 +105,12 @@ public:
 };
 #endif
 
-// 现有后端组件 - 条件包含实际存在的头文件
-#ifdef ENABLE_BACKEND_INTEGRATION
-#include "bamboo_cut/core/logger.h"
-#include "bamboo_cut/communication/modbus_interface.h"
-#include "bamboo_cut/inference/bamboo_detector.h"
-#include "bamboo_cut/utils/config_loader.h"
-#include "bamboo_cut/utils/system_monitor.h"
-#include "bamboo_cut/core/data_bridge.h"
-#else
-// 占位符类型，当后端组件未启用时使用
+// 现有后端组件 - 直接包含实际存在的头文件
+// 注意：CMakeLists.txt已经包含了实现文件，所以直接使用真实的头文件
+#include "bamboo_cut/utils/logger.h"
+
+// 占位符类型，当某些组件未启用时使用
 namespace bamboo_cut {
-    namespace utils {
-        // Logger 占位符实现
-        enum class LogLevel {
-            TRACE = 0, DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4, FATAL = 5
-        };
-        
-        class Logger {
-        public:
-            static Logger& getInstance() {
-                static Logger instance;
-                return instance;
-            }
-            
-            bool initialize(const std::string& = "bamboo_system.log",
-                           LogLevel = LogLevel::INFO, bool = true) {
-                return true;
-            }
-            
-            void log(LogLevel, const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[LOG] " << message << std::endl;
-            }
-            
-            void info(const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[INFO] " << message << std::endl;
-            }
-            
-            void error(const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[ERROR] " << message << std::endl;
-            }
-            
-            void warn(const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[WARN] " << message << std::endl;
-            }
-            
-            void debug(const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[DEBUG] " << message << std::endl;
-            }
-            
-            void trace(const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[TRACE] " << message << std::endl;
-            }
-            
-            void fatal(const std::string& message, const char* = nullptr, int = 0) {
-                std::cout << "[FATAL] " << message << std::endl;
-            }
-            
-        private:
-            Logger() = default;
-            ~Logger() = default;
-            Logger(const Logger&) = delete;
-            Logger& operator=(const Logger&) = delete;
-        };
-    }
-    
     namespace vision {
         struct DetectionPoint { float x, y; };
         struct DetectionResult {
@@ -236,7 +177,6 @@ namespace bamboo_cut {
         };
     }
 }
-#endif
 
 // 全局关闭标志
 std::atomic<bool> g_shutdown_requested{false};
