@@ -322,15 +322,15 @@ install(TARGETS bamboo_recognition
 # 安装头文件
 install(DIRECTORY include/
     DESTINATION include
-    FILES_MATCHING PATTERN "*.h"
     COMPONENT Development
+    FILES_MATCHING PATTERN "*.h"
 )
 
 # 安装配置文件
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../config/
     DESTINATION etc/bamboo-recognition
-    FILES_MATCHING PATTERN "*.yaml" PATTERN "*.json"
     COMPONENT Runtime
+    FILES_MATCHING PATTERN "*.yaml" PATTERN "*.json"
 )
 
 # 创建systemd服务文件
