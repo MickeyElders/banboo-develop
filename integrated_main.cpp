@@ -482,8 +482,8 @@ private:
     // === 初始化方法 (复用现有逻辑) ===
     bool initializeDetector() {
         bamboo_cut::vision::BambooDetector::Config config;
-        config.model_path = "./models/best.pt";
-        config.engine_path = "./models/bamboo_detection.trt";
+        config.model_path = "/opt/bamboo-cut/models/bamboo_detection.onnx";
+        config.engine_path = "/opt/bamboo-cut/models/bamboo_detection.trt";
         config.use_tensorrt = true;
         
         detector_ = std::make_unique<bamboo_cut::vision::BambooDetector>(config);

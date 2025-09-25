@@ -11,7 +11,7 @@ system:
 
 # AI推理配置
 detector:
-  model_path: "models/best.pt"
+  model_path: "/opt/bamboo-cut/models/bamboo_detection.onnx"
   confidence_threshold: 0.85
   nms_threshold: 0.45
   input_size: [640, 640]
