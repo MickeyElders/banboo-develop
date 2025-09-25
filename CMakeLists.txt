@@ -404,12 +404,6 @@ if(ENABLE_CUDA)
     include_directories(${CUDA_INCLUDE_DIRS})
 endif()
 
-if(ENABLE_PYTHON)
-    include_directories(
-        ${Python_INCLUDE_DIRS}
-        ${Python_NumPy_INCLUDE_DIRS}
-    )
-endif()
 
 # ================================
 # 源文件收集
@@ -549,7 +543,6 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
     $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
     $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
-    $<$<BOOL:${ENABLE_PYTHON}>:ENABLE_PYTHON_BINDINGS>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
@@ -591,49 +584,6 @@ if(ENABLE_LVGL)
     target_link_libraries(bamboo_integrated lvgl)
 endif()
 
-# ================================
-# 可选：创建Python绑定模块
-# ================================
-if(ENABLE_PYBIND11 AND ENABLE_PYTHON AND ENABLE_CPP_INFERENCE)
-    message(STATUS "构建Python绑定模块...")
-    
-    # 创建推理核心静态库
-    add_library(bamboo_inference_core STATIC ${CPP_INFERENCE_SOURCES})
-    
-    target_include_directories(bamboo_inference_core PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference
-        ${OpenCV_INCLUDE_DIRS}
-        ${TENSORRT_INCLUDE_DIR}
-        ${CUDA_INCLUDE_DIRS}
-    )
-    
-    target_link_libraries(bamboo_inference_core
-        ${OpenCV_LIBS}
-        $<$<BOOL:${ENABLE_TENSORRT}>:${TENSORRT_LIBRARIES}>
-        $<$<BOOL:${ENABLE_CUDA}>:${CUDA_LIBRARIES}>
-    )
-    
-    # 创建Python绑定模块
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/python_bindings.cpp)
-        pybind11_add_module(cpp_inference_core cpp_inference/python_bindings.cpp)
-        
-        target_link_libraries(cpp_inference_core PRIVATE bamboo_inference_core)
-        
-        target_compile_definitions(cpp_inference_core PRIVATE
-            VERSION_INFO=${PROJECT_VERSION}
-            $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
-            $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
-        )
-        
-        # 安装Python模块
-        install(TARGETS cpp_inference_core
-            LIBRARY DESTINATION python_core
-            COMPONENT PythonBindings
-        )
-        
-        message(STATUS "Python绑定模块已配置")
-    endif()
-endif()
 
 # ================================
 # 安装配置
@@ -680,8 +630,6 @@ message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
 message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
 message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
-message(STATUS "  pybind11: ${ENABLE_PYBIND11}")
-message(STATUS "  Python绑定: ${ENABLE_PYTHON}")
 message(STATUS "")
 message(STATUS "组件模块:")
 message(STATUS "  cpp_backend: 已集成")

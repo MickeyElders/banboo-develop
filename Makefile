@@ -25,7 +25,6 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DENABLE_MODBUS=ON \
                -DENABLE_LVGL=ON \
                -DENABLE_CPP_INFERENCE=ON \
-               -DENABLE_PYTHON_BINDINGS=ON \
                -DENABLE_HARDWARE_ACCELERATION=ON
 
 # === 颜色定义 ===

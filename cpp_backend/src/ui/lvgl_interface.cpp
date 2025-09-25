@@ -13,10 +13,24 @@
 #include <thread>
 #include <chrono>
 
-// 确保使用正确的LOG宏
-#define LOG_INFO(msg) utils::Logger::getInstance().log(utils::LogLevel::INFO, msg)
-#define LOG_ERROR(msg) utils::Logger::getInstance().log(utils::LogLevel::ERROR, msg)
-#define LOG_WARN(msg) utils::Logger::getInstance().log(utils::LogLevel::WARN, msg)
+// LVGL头文件包含 - 智能检测多种可能的路径
+#ifdef ENABLE_LVGL
+#if __has_include(<lvgl/lvgl.h>)
+#include <lvgl/lvgl.h>
+#elif __has_include(<lvgl.h>)
+#include <lvgl.h>
+#elif __has_include("lvgl/lvgl.h")
+#include "lvgl/lvgl.h"
+#elif __has_include("lvgl.h")
+#include "lvgl.h"
+#else
+#warning "LVGL header not found, using placeholder types"
+#undef ENABLE_LVGL
+#endif
+#endif
+
+// 移除冲突的LOG宏定义，直接使用logger.h中的宏
+// logger.h中已经定义了正确的LOG_INFO, LOG_ERROR, LOG_WARN宏
 
 namespace bamboo_cut {
 namespace ui {
