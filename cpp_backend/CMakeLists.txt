@@ -212,8 +212,6 @@ set(INFERENCE_SOURCES
 if(ENABLE_LVGL AND LVGL_FOUND)
     set(UI_SOURCES
         src/ui/lvgl_interface.cpp
-        src/ui/lvgl_display_driver.cpp
-        src/ui/lvgl_input_driver.cpp
     )
 else()
     set(UI_SOURCES)
@@ -231,7 +229,6 @@ set(UTILS_SOURCES
     src/utils/logger.cpp
     src/utils/config_loader.cpp
     src/utils/system_monitor.cpp
-    src/ui/lvgl_interface.cpp
 )
 
 # 合并所有源文件
