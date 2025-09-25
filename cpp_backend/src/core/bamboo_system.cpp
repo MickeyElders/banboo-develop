@@ -314,15 +314,22 @@ bool BambooSystem::initializeSubsystems() {
         // 初始化LVGL界面
         if (config_.system_params.enable_ui_interface) {
 #ifdef ENABLE_LVGL
-            ui_interface_ = std::make_unique<ui::LVGLInterface>(data_bridge_);
-            if (ui_interface_->initialize(config_.ui_config)) {
-                system_info_.ui_interface_active = true;
-                std::cout << "[BambooSystem] LVGL界面模块已初始化" << std::endl;
-            } else {
-                std::cerr << "[BambooSystem] LVGL界面初始化失败" << std::endl;
+            try {
+                ui_interface_ = std::make_unique<ui::LVGLInterface>(data_bridge_);
+                if (ui_interface_->initialize(config_.ui_config)) {
+                    system_info_.ui_interface_active = true;
+                    std::cout << "[BambooSystem] LVGL界面模块已初始化" << std::endl;
+                } else {
+                    std::cerr << "[BambooSystem] LVGL界面初始化失败" << std::endl;
+                    ui_interface_.reset(); // 清理失败的界面对象
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[BambooSystem] LVGL界面初始化异常: " << e.what() << std::endl;
+                ui_interface_.reset();
             }
 #else
             std::cout << "[BambooSystem] LVGL未启用，跳过界面初始化" << std::endl;
+            system_info_.ui_interface_active = false;
 #endif
         }
         
@@ -363,9 +370,16 @@ bool BambooSystem::startSubsystems() {
         }
         
         // 启动LVGL界面
-        if (ui_interface_ && !ui_interface_->start()) {
-            std::cerr << "[BambooSystem] 界面线程启动失败" << std::endl;
-            // 界面启动失败不影响核心功能
+        if (ui_interface_) {
+            try {
+                if (!ui_interface_->start()) {
+                    std::cerr << "[BambooSystem] 界面线程启动失败" << std::endl;
+                    // 界面启动失败不影响核心功能
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[BambooSystem] 界面线程启动异常: " << e.what() << std::endl;
+                ui_interface_.reset();
+            }
         }
         
         // 启动Modbus通信
@@ -404,7 +418,11 @@ void BambooSystem::stopSubsystems() {
     
     // 停止LVGL界面
     if (ui_interface_) {
-        ui_interface_->stop();
+        try {
+            ui_interface_->stop();
+        } catch (const std::exception& e) {
+            std::cerr << "[BambooSystem] 停止LVGL界面异常: " << e.what() << std::endl;
+        }
         ui_interface_.reset();
     }
     
@@ -456,9 +474,15 @@ void BambooSystem::monitorSystemHealth() {
         handleSystemError("推理线程异常停止");
     }
     
-    if (ui_interface_ && !ui_interface_->isRunning()) {
-        // 界面异常不影响核心功能
-        utils::Logger::getInstance().log(utils::LogLevel::WARN, "界面线程异常");
+    if (ui_interface_) {
+        try {
+            if (!ui_interface_->isRunning()) {
+                // 界面异常不影响核心功能
+                utils::Logger::getInstance().log(utils::LogLevel::WARN, "界面线程异常");
+            }
+        } catch (const std::exception& e) {
+            utils::Logger::getInstance().log(utils::LogLevel::WARN, "界面线程监控异常: " + std::string(e.what()));
+        }
     }
     
     if (modbus_interface_ && !modbus_interface_->isConnected()) {
