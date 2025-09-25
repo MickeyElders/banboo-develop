@@ -34,7 +34,6 @@
 #ifndef ENABLE_LVGL
 // LVGL未启用时的类型占位符
 typedef void* lv_obj_t;
-typedef void* lv_timer_t;
 typedef void* lv_event_t;
 typedef void* lv_indev_drv_t;
 typedef void* lv_indev_data_t;
@@ -42,12 +41,30 @@ typedef void* lv_disp_drv_t;
 typedef void* lv_area_t;
 typedef void* lv_color_t;
 
+// 模拟LVGL定时器结构体，包含user_data成员
+struct lv_timer_t {
+    void* user_data;
+    void(*timer_cb)(struct lv_timer_t*);
+    uint32_t period;
+    uint32_t last_run;
+    
+    lv_timer_t() : user_data(nullptr), timer_cb(nullptr), period(0), last_run(0) {}
+};
+
 // LVGL函数占位符
 inline void lv_init() {}
 inline void lv_timer_handler() {}
 inline void lv_port_tick_init() {}
-inline lv_timer_t* lv_timer_create(void(*cb)(lv_timer_t*), unsigned int, void*) { return nullptr; }
-inline void lv_timer_del(lv_timer_t*) {}
+inline lv_timer_t* lv_timer_create(void(*cb)(lv_timer_t*), unsigned int period_ms, void* user_data) {
+    lv_timer_t* timer = new lv_timer_t();
+    timer->timer_cb = cb;
+    timer->period = period_ms;
+    timer->user_data = user_data;
+    return timer;
+}
+inline void lv_timer_del(lv_timer_t* timer) {
+    if (timer) delete timer;
+}
 inline bool lvgl_display_init() { return false; }
 inline bool touch_driver_init() { return false; }
 
