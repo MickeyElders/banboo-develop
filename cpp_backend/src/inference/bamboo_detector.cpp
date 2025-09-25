@@ -247,7 +247,7 @@ cv::Point2f BambooDetector::calculateCuttingPoint(const cv::Rect& bbox) {
 bool BambooDetector::initializeTensorRT() {
     // 创建TensorRT logger
     class Logger : public nvinfer1::ILogger {
-        void log(Severity severity, const char* msg) override {
+        void log(Severity severity, const char* msg) noexcept override {
             // 简单的日志输出
             if (severity != Severity::kINFO) {
                 std::cout << "[TensorRT] " << msg << std::endl;

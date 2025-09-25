@@ -53,7 +53,7 @@ void SystemMonitor::stop() {
     std::cout << "[SystemMonitor] 系统监控已停止" << std::endl;
 }
 
-SystemStats SystemMonitor::getSystemStats() {
+SystemMonitor::SystemStats SystemMonitor::getSystemStats() {
     SystemStats stats;
     
     // 获取CPU使用率

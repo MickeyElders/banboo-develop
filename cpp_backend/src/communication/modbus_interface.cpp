@@ -133,7 +133,7 @@ bool ModbusInterface::readRegister(ModbusRegister reg, uint16_t& value) {
     
     stats_.total_requests++;
     
-    int result = modbus_read_holding_registers(modbus_ctx_, address, 1, &read_value);
+    int result = modbus_read_registers(modbus_ctx_, address, 1, &read_value);
     if (result == 1) {
         value = read_value;
         stats_.successful_requests++;
@@ -194,7 +194,7 @@ bool ModbusInterface::readRegisters(ModbusRegister start_reg, int count, uint16_
     
     stats_.total_requests++;
     
-    int result = modbus_read_holding_registers(modbus_ctx_, address, count, values);
+    int result = modbus_read_registers(modbus_ctx_, address, count, values);
     if (result == count) {
         stats_.successful_requests++;
         stats_.last_success_time = std::chrono::duration_cast<std::chrono::seconds>(

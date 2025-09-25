@@ -127,7 +127,7 @@ private:
     
 private:
     std::shared_ptr<ConfigNode> root_;
-    std::string last_error_;
+    mutable std::string last_error_;
 };
 
 } // namespace utils

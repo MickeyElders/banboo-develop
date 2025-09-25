@@ -99,8 +99,8 @@ public:
     void setMonitorInterval(int interval_ms);
 
 private:
-    SystemMonitor() = default;
-    ~SystemMonitor() = default;
+    SystemMonitor();
+    ~SystemMonitor();
     SystemMonitor(const SystemMonitor&) = delete;
     SystemMonitor& operator=(const SystemMonitor&) = delete;
     
