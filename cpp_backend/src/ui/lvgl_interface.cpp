@@ -3,7 +3,7 @@
  * @brief C++ LVGL一体化系统界面管理器实现
  * @version 5.0.0
  * @date 2024
- * 
+ *
  * 提供LVGL界面的初始化、管理和更新功能
  */
 
@@ -16,9 +16,28 @@
 namespace bamboo_cut {
 namespace ui {
 
-LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> bridge) 
-    : data_bridge_(bridge), running_(false), initialized_(false) {
-    // 构造函数实现
+LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> bridge)
+    : data_bridge_(bridge), running_(false), should_stop_(false) {
+    // 初始化LVGL组件
+    main_screen_ = nullptr;
+    header_panel_ = nullptr;
+    camera_panel_ = nullptr;
+    camera_canvas_ = nullptr;
+    control_panel_ = nullptr;
+    status_panel_ = nullptr;
+    footer_panel_ = nullptr;
+    display_ = nullptr;
+    input_device_ = nullptr;
+    
+    // 初始化状态变量
+    frame_count_ = 0;
+    ui_fps_ = 0.0f;
+    current_step_ = WorkflowStep::FEED_DETECTION;
+    system_running_ = false;
+    emergency_stop_ = false;
+    selected_blade_ = 3;
+    
+    last_update_time_ = std::chrono::high_resolution_clock::now();
 }
 
 LVGLInterface::~LVGLInterface() {
@@ -26,41 +45,43 @@ LVGLInterface::~LVGLInterface() {
 }
 
 bool LVGLInterface::initialize(const LVGLConfig& config) {
-    if (initialized_) {
-        return true;
-    }
-    
     config_ = config;
     
     // TODO: 初始化LVGL库
     // lv_init();
     
     // TODO: 初始化显示驱动
-    // initDisplay();
+    if (!initializeDisplay()) {
+        LOG_ERROR("LVGL显示驱动初始化失败");
+        return false;
+    }
     
     // TODO: 初始化输入驱动
-    // initInput();
+    if (!initializeInput()) {
+        LOG_ERROR("LVGL输入驱动初始化失败");
+        return false;
+    }
     
-    // TODO: 创建UI界面
-    // createUI();
+    // 创建主界面
+    createMainInterface();
     
-    initialized_ = true;
     LOG_INFO("LVGL界面初始化完成");
-    
     return true;
 }
 
-void LVGLInterface::start() {
-    if (running_ || !initialized_) {
-        return;
+bool LVGLInterface::start() {
+    if (running_) {
+        return true;
     }
     
     running_.store(true);
+    should_stop_.store(false);
     
     // 启动UI更新线程
     ui_thread_ = std::thread(&LVGLInterface::uiLoop, this);
     
     LOG_INFO("LVGL界面线程已启动");
+    return true;
 }
 
 void LVGLInterface::stop() {
