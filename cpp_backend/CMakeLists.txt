@@ -209,10 +209,15 @@ set(INFERENCE_SOURCES
 )
 
 # LVGL界面源文件
-if(ENABLE_LVGL AND LVGL_FOUND)
+if(ENABLE_LVGL)
+    # 如果启用LVGL，总是包含源文件（即使库未找到，也会包含占位符实现）
     set(UI_SOURCES
         src/ui/lvgl_interface.cpp
     )
+    
+    if(NOT LVGL_FOUND)
+        message(STATUS "LVGL库未找到，将使用占位符实现")
+    endif()
 else()
     set(UI_SOURCES)
 endif()
@@ -294,8 +299,13 @@ if(ENABLE_MODBUS)
     target_link_libraries(bamboo_system ${MODBUS_LIBRARY})
 endif()
 
-if(ENABLE_LVGL AND LVGL_FOUND)
-    target_link_libraries(bamboo_system ${LVGL_LIBRARY})
+if(ENABLE_LVGL)
+    if(LVGL_FOUND)
+        target_link_libraries(bamboo_system ${LVGL_LIBRARY})
+        message(STATUS "链接LVGL库: ${LVGL_LIBRARY}")
+    else()
+        message(STATUS "LVGL库未找到，使用占位符实现（无需额外链接）")
+    endif()
 endif()
 
 # 主程序可执行文件
