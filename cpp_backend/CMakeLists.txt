@@ -69,15 +69,50 @@ message(STATUS "Found GStreamer: ${GSTREAMER_VERSION}")
 # LVGL
 if(ENABLE_LVGL)
     find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
-        PATHS /usr/include /usr/local/include)
-    find_library(LVGL_LIBRARY lvgl
-        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu)
+        PATHS
+            /usr/include
+            /usr/local/include
+        PATH_SUFFIXES lvgl)
+        
+    find_library(LVGL_LIBRARY NAMES lvgl liblvgl
+        PATHS
+            /usr/lib
+            /usr/local/lib
+            /usr/lib/aarch64-linux-gnu
+            /usr/local/lib/aarch64-linux-gnu
+            /usr/lib64
+            /usr/local/lib64)
     
-    if(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
+    # 尝试查找pkg-config的LVGL
+    pkg_check_modules(LVGL_PKG QUIET lvgl)
+    if(LVGL_PKG_FOUND)
+        set(LVGL_INCLUDE_DIR ${LVGL_PKG_INCLUDE_DIRS})
+        set(LVGL_LIBRARY ${LVGL_PKG_LIBRARIES})
+        set(LVGL_FOUND TRUE)
+        message(STATUS "Found LVGL via pkg-config: ${LVGL_PKG_VERSION}")
+    elseif(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
+        set(LVGL_FOUND TRUE)
         message(STATUS "Found LVGL: ${LVGL_LIBRARY}")
-        include_directories(${LVGL_INCLUDE_DIR})
+        message(STATUS "LVGL include dir: ${LVGL_INCLUDE_DIR}")
     else()
-        message(FATAL_ERROR "LVGL not found! Please install LVGL development library")
+        # 检查是否LVGL头文件在标准位置但没有单独的包含目录
+        find_path(LVGL_INCLUDE_DIR_ALT lvgl.h
+            PATHS
+                /usr/include/lvgl
+                /usr/local/include/lvgl)
+        if(LVGL_INCLUDE_DIR_ALT AND LVGL_LIBRARY)
+            set(LVGL_INCLUDE_DIR ${LVGL_INCLUDE_DIR_ALT}/..)
+            set(LVGL_FOUND TRUE)
+            message(STATUS "Found LVGL (alternative path): ${LVGL_LIBRARY}")
+        else()
+            message(WARNING "LVGL not found! LVGL UI功能将被禁用")
+            set(ENABLE_LVGL OFF)
+            set(LVGL_FOUND FALSE)
+        endif()
+    endif()
+    
+    if(LVGL_FOUND)
+        include_directories(${LVGL_INCLUDE_DIR})
     endif()
 endif()
 
@@ -174,12 +209,14 @@ set(INFERENCE_SOURCES
 )
 
 # LVGL界面源文件
-if(ENABLE_LVGL)
+if(ENABLE_LVGL AND LVGL_FOUND)
     set(UI_SOURCES
         src/ui/lvgl_interface.cpp
         src/ui/lvgl_display_driver.cpp
         src/ui/lvgl_input_driver.cpp
     )
+else()
+    set(UI_SOURCES)
 endif()
 
 # 通信源文件
@@ -259,7 +296,7 @@ if(ENABLE_MODBUS)
     target_link_libraries(bamboo_system ${MODBUS_LIBRARY})
 endif()
 
-if(ENABLE_LVGL)
+if(ENABLE_LVGL AND LVGL_FOUND)
     target_link_libraries(bamboo_system ${LVGL_LIBRARY})
 endif()
 
