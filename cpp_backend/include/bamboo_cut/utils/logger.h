@@ -115,7 +115,7 @@ public:
     void flush();
 
 private:
-    Logger() = default;
+    Logger();
     ~Logger();
 
     // 禁用拷贝构造和赋值
