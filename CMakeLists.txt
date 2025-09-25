@@ -410,8 +410,9 @@ endif()
 # ================================
 
 # C++后端源文件 - 基于原有CMakeLists.txt的精确配置
+# 确保Logger实现文件被正确包含
 set(CPP_BACKEND_SOURCES
-    cpp_backend/src/core/logger.cpp
+    cpp_backend/src/utils/logger.cpp
     cpp_backend/src/core/system_utils.cpp
     cpp_backend/src/core/bamboo_system.cpp
     cpp_backend/src/core/data_bridge.cpp
