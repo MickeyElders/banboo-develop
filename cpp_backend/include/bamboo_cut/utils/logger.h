@@ -129,54 +129,6 @@ private:
      */
     std::string levelToString(LogLevel level) const;
     
-    /**
-     * @brief 设置日志级别（兼容接口）
-     * @param level 新的日志级别
-     */
-    void setLogLevel(LogLevel level);
-    
-    /**
-     * @brief 设置日志文件（兼容接口）
-     * @param filename 日志文件名
-     */
-    void setLogFile(const std::string& filename);
-    
-    /**
-     * @brief 记录日志（兼容接口）
-     * @param level 日志级别
-     * @param message 日志消息
-     */
-    void log(LogLevel level, const std::string& message);
-    
-    /**
-     * @brief 记录INFO级别日志（兼容接口）
-     * @param message 日志消息
-     */
-    void info(const std::string& message);
-    
-    /**
-     * @brief 记录WARNING级别日志（兼容接口）
-     * @param message 日志消息
-     */
-    void warning(const std::string& message);
-    
-    /**
-     * @brief 记录ERROR级别日志（兼容接口）
-     * @param message 日志消息
-     */
-    void error(const std::string& message);
-    
-    /**
-     * @brief 记录DEBUG级别日志（兼容接口）
-     * @param message 日志消息
-     */
-    void debug(const std::string& message);
-    
-    /**
-     * @brief 获取当前时间戳字符串
-     * @return 格式化的时间戳
-     */
-    std::string getCurrentTimestamp();
 
     /**
      * @brief 获取当前时间戳字符串
