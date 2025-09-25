@@ -52,22 +52,125 @@ inline bool lvgl_display_init() { return false; }
 inline bool touch_driver_init() { return false; }
 #endif
 
-// 现有后端组件 - 完全复用
-#include "bamboo_cut/vision/camera_manager.h"
-#include "bamboo_cut/vision/detector.h"
-#include "bamboo_cut/vision/stereo_vision.h"
-#include "bamboo_cut/communication/modbus_server.h"
+// 现有后端组件 - 条件包含实际存在的头文件
+#ifdef ENABLE_BACKEND_INTEGRATION
 #include "bamboo_cut/core/logger.h"
-#include "bamboo_cut/core/types.h"
+#include "bamboo_cut/communication/modbus_interface.h"
+#include "bamboo_cut/inference/bamboo_detector.h"
+#include "bamboo_cut/utils/config_loader.h"
+#include "bamboo_cut/utils/system_monitor.h"
+#include "bamboo_cut/core/data_bridge.h"
+#else
+// 占位符类型，当后端组件未启用时使用
+namespace bamboo_cut {
+    namespace vision {
+        struct DetectionPoint { float x, y; };
+        struct DetectionResult {
+            std::vector<DetectionPoint> points;
+            float processing_time_ms = 0.0f;
+            bool success = false;
+        };
+        struct FrameInfo {
+            cv::Mat image;
+            uint64_t timestamp = 0;
+            bool valid = false;
+        };
+        struct StereoFrame {
+            cv::Mat left_image, right_image;
+            bool valid = false;
+        };
+        struct CameraConfig {
+            std::string device_id;
+            int width = 640, height = 480, framerate = 30;
+        };
+        struct CameraSyncConfig {
+            std::string left_device, right_device;
+            int width = 640, height = 480, fps = 30;
+        };
+        
+        class CameraManager {
+        public:
+            CameraManager(const CameraConfig&) {}
+            bool initialize() { return false; }
+            FrameInfo getCurrentFrame() { return FrameInfo(); }
+        };
+        
+        class StereoVision {
+        public:
+            StereoVision(const CameraSyncConfig&) {}
+            bool initialize() { return false; }
+            bool load_calibration(const std::string&) { return false; }
+            bool capture_stereo_frame(StereoFrame&) { return false; }
+        };
+        
+        class BambooDetector {
+        public:
+            struct Config {
+                std::string model_path, engine_path;
+                bool use_tensorrt = false;
+            };
+            BambooDetector(const Config&) {}
+            bool initialize() { return false; }
+            DetectionResult detect(const cv::Mat&) { return DetectionResult(); }
+        };
+    }
+    namespace communication {
+        struct ModbusConfig {
+            std::string ip_address;
+            int port = 502;
+        };
+        class ModbusServer {
+        public:
+            ModbusServer(const ModbusConfig&) {}
+            bool is_connected() const { return false; }
+            void set_connection_callback(std::function<void(bool, const std::string&)>) {}
+            void start() {}
+        };
+    }
+}
+#endif
 
-// 现有前端组件 - 完全复用
-#include "gui/video_view.h"
-#include "gui/control_panel.h"
-#include "gui/status_bar.h"
-#include "gui/settings_page.h"
-#include "display/lvgl_display.h"
-#include "input/touch_driver.h"
-#include "system/lv_port_tick.h"
+// 前端组件占位符 - 当LVGL未启用时
+#ifndef ENABLE_LVGL
+struct frame_info_t {
+    uint64_t timestamp = 0;
+    bool valid = false;
+    int width = 640, height = 480;
+};
+struct performance_stats_t {
+    float cpu_usage = 0, memory_usage_mb = 0, fps = 0;
+};
+
+class Status_bar {
+public:
+    bool initialize() { return true; }
+    void update_workflow_status(int) {}
+    void update_heartbeat(int, int) {}
+};
+
+class Video_view {
+public:
+    bool initialize() { return true; }
+    void update_camera_frame(const frame_info_t&) {}
+    void update_detection_info(float, float) {}
+};
+
+class Control_panel {
+public:
+    bool initialize() { return true; }
+    void update_jetson_info(const performance_stats_t&) {}
+};
+
+class Settings_page {
+public:
+    bool initialize() { return true; }
+    void create_main_layout(Status_bar*, Video_view*, Control_panel*) {}
+};
+
+inline bool lvgl_display_init() { return false; }
+inline bool touch_driver_init() { return false; }
+inline void lv_port_tick_init() {}
+#endif
 
 // 全局关闭标志
 std::atomic<bool> g_shutdown_requested{false};
