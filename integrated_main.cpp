@@ -109,6 +109,7 @@ public:
 #include "bamboo_cut/utils/logger.h"
 #include "bamboo_cut/inference/bamboo_detector.h"
 #include "bamboo_cut/core/data_bridge.h"
+#include "bamboo_cut/vision/stereo_vision.h"
 
 // 使用真实的命名空间
 using namespace bamboo_cut;
@@ -267,6 +268,7 @@ private:
     // 使用真实的后端组件
     std::unique_ptr<inference::BambooDetector> detector_;
     cv::VideoCapture camera_;
+    bool use_mock_camera_ = false;
     
     // 性能统计
     int processed_frames_ = 0;
@@ -290,10 +292,18 @@ public:
             return false;
         }
         
-        // 初始化摄像头
-        if (!initializeCamera()) {
-            std::cout << "摄像头系统初始化失败" << std::endl;
-            return false;
+        // 优先初始化立体视觉系统
+        if (use_stereo_vision_ && initializeStereoVision()) {
+            std::cout << "立体视觉系统初始化成功" << std::endl;
+        } else {
+            std::cout << "立体视觉初始化失败，回退到单摄像头模式" << std::endl;
+            use_stereo_vision_ = false;
+            
+            // 初始化单摄像头
+            if (!initializeCamera()) {
+                std::cout << "摄像头系统初始化失败" << std::endl;
+                return false;
+            }
         }
         
         std::cout << "推理系统初始化完成" << std::endl;
@@ -348,16 +358,47 @@ private:
     }
     
     void processFrame() {
+        // 优先处理立体视觉
+        if (use_stereo_vision_ && stereo_vision_) {
+            vision::StereoFrame stereo_frame;
+            if (stereo_vision_->capture_stereo_frame(stereo_frame) && stereo_frame.valid) {
+                // 更新立体视频到数据桥接
+                data_bridge_->updateStereoVideo(stereo_frame.left_image, stereo_frame.right_image);
+                
+                // 计算深度信息
+                stereo_vision_->compute_depth(stereo_frame);
+                
+                // AI检测 (使用校正后的左图像)
+                if (detector_ && !stereo_frame.rectified_left.empty()) {
+                    core::DetectionResult result;
+                    if (detector_->detect(stereo_frame.rectified_left, result)) {
+                        data_bridge_->updateDetection(result);
+                    }
+                }
+                
+                processed_frames_++;
+                return;
+            }
+        }
+        
+        // 单摄像头处理（回退模式）
         cv::Mat frame;
-        if (!camera_.read(frame) || frame.empty()) {
-            return;
+        if (use_mock_camera_) {
+            // 生成模拟帧用于测试
+            frame = cv::Mat::zeros(480, 640, CV_8UC3);
+            cv::putText(frame, "MOCK CAMERA - " + std::to_string(processed_frames_),
+                       cv::Point(50, 240), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
+        } else {
+            if (!camera_.read(frame) || frame.empty()) {
+                return;
+            }
         }
         
         // 更新视频到数据桥接
         data_bridge_->updateVideo(frame);
         
         // AI检测
-        if (detector_) {
+        if (detector_ && !use_mock_camera_) {
             core::DetectionResult result;
             if (detector_->detect(frame, result)) {
                 data_bridge_->updateDetection(result);
@@ -405,18 +446,53 @@ private:
     }
     
     bool initializeCamera() {
-        camera_.open(0); // 使用摄像头0
-        if (!camera_.isOpened()) {
-            return false;
+        std::cout << "正在检测摄像头设备..." << std::endl;
+        
+        // 尝试多个摄像头设备ID
+        std::vector<int> camera_ids = {0, 1, 2, -1}; // -1 表示任意可用摄像头
+        
+        for (int id : camera_ids) {
+            std::cout << "尝试打开摄像头 " << id << std::endl;
+            camera_.open(id);
+            
+            if (camera_.isOpened()) {
+                // 测试是否真的能读取帧
+                cv::Mat test_frame;
+                if (camera_.read(test_frame) && !test_frame.empty()) {
+                    std::cout << "摄像头 " << id << " 初始化成功" << std::endl;
+                    
+                    // 设置摄像头参数
+                    camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+                    camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+                    camera_.set(cv::CAP_PROP_FPS, 30);
+                    
+                    return true;
+                } else {
+                    std::cout << "摄像头 " << id << " 无法读取帧，继续尝试下一个" << std::endl;
+                    camera_.release();
+                }
+            } else {
+                std::cout << "无法打开摄像头 " << id << std::endl;
+            }
         }
         
-        // 设置摄像头参数
-        camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-        camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-        camera_.set(cv::CAP_PROP_FPS, 30);
-        
-        std::cout << "摄像头已初始化" << std::endl;
+        // 如果没有真实摄像头，创建虚拟摄像头用于测试
+        std::cout << "未找到可用摄像头，启用模拟模式" << std::endl;
+        use_mock_camera_ = true;
         return true;
+    }
+    
+    // === 立体视觉初始化方法 ===
+    bool initializeStereoVision() {
+        vision::StereoConfig stereo_config;
+        stereo_config.calibration_file = "config/stereo_calibration.xml";
+        stereo_config.left_camera_id = 0;
+        stereo_config.right_camera_id = 1;
+        stereo_config.frame_size = cv::Size(640, 480);
+        stereo_config.fps = 30;
+        
+        stereo_vision_ = std::make_unique<vision::StereoVision>(stereo_config);
+        return stereo_vision_->initialize();
     }
     
     float getCpuUsage() const { return 45.0f; } // 简化实现
