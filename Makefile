@@ -13,7 +13,7 @@ PROJECT_NAME := bamboo-recognition-system
 VERSION := 5.0.0
 INSTALL_DIR := /opt/bamboo-cut
 SERVICE_NAME := bamboo-cpp-lvgl
-BINARY_NAME := bamboo-recognition
+BINARY_NAME := bamboo_integrated
 
 # === C++ LVGL一体化构建配置 ===
 BUILD_DIR := build
@@ -380,11 +380,11 @@ uninstall:
 # === 开发辅助 ===
 dev-run:
 	@echo "$(BLUE)[INFO]$(NC) 开发模式直接运行..."
-	@if [ ! -f "$(BUILD_DIR)/bamboo_recognition" ]; then \
+	@if [ ! -f "$(BUILD_DIR)/bamboo_integrated" ]; then \
 		echo "$(RED)[ERROR]$(NC) 可执行文件不存在，请先构建系统"; \
 		exit 1; \
 	fi
-	@cd $(BUILD_DIR) && sudo ./bamboo_recognition --verbose --config ../config/system_config.yaml
+	@cd $(BUILD_DIR) && sudo ./bamboo_integrated --verbose --config ../config/system_config.yaml
 
 monitor:
 	@echo "$(CYAN)=== 系统监控 (按Ctrl+C退出) ===$(NC)"

@@ -587,6 +587,22 @@ endif()
 
 
 # ================================
+# 服务文件配置和安装
+# ================================
+
+# 配置systemd服务文件
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deploy/systemd/bamboo-cpp-lvgl.service.in")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/deploy/systemd/bamboo-cpp-lvgl.service.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/bamboo-cpp-lvgl.service"
+        @ONLY
+    )
+    message(STATUS "Service file configured: ${CMAKE_CURRENT_BINARY_DIR}/bamboo-cpp-lvgl.service")
+else()
+    message(WARNING "Service template file not found: deploy/systemd/bamboo-cpp-lvgl.service.in")
+endif()
+
+# ================================
 # 安装配置
 # ================================
 install(TARGETS bamboo_integrated
@@ -606,6 +622,14 @@ endif()
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/models")
     install(DIRECTORY models/
         DESTINATION share/bamboo/models
+        COMPONENT Runtime
+    )
+endif()
+
+# 安装systemd服务文件
+if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/bamboo-cpp-lvgl.service")
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/bamboo-cpp-lvgl.service"
+        DESTINATION /etc/systemd/system
         COMPONENT Runtime
     )
 endif()

@@ -9,7 +9,7 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=@CMAKE_INSTALL_PREFIX@/bin
-ExecStart=@CMAKE_INSTALL_PREFIX@/bin/bamboo-recognition --config @CMAKE_INSTALL_PREFIX@/etc/bamboo-recognition/system_config.yaml
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/bamboo_integrated --config @CMAKE_INSTALL_PREFIX@/share/bamboo/config/system_config.yaml
 ExecReload=/bin/kill -USR1 $MAINPID
 ExecStop=/bin/kill -TERM $MAINPID
 
