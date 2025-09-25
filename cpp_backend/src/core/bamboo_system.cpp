@@ -178,7 +178,7 @@ void BambooSystem::emergencyStop() {
         workflow_manager_->emergencyStop();
     }
     
-    utils::Logger::getInstance().log(utils::LogLevel::CRITICAL, "系统紧急停止");
+    utils::Logger::getInstance().log(utils::LogLevel::FATAL, "系统紧急停止");
 }
 
 int BambooSystem::run() {
@@ -458,12 +458,12 @@ void BambooSystem::monitorSystemHealth() {
     
     if (ui_interface_ && !ui_interface_->isRunning()) {
         // 界面异常不影响核心功能
-        utils::Logger::getInstance().log(utils::LogLevel::WARNING, "界面线程异常");
+        utils::Logger::getInstance().log(utils::LogLevel::WARN, "界面线程异常");
     }
     
     if (modbus_interface_ && !modbus_interface_->isConnected()) {
         // Modbus连接异常不影响核心功能
-        utils::Logger::getInstance().log(utils::LogLevel::WARNING, "Modbus连接异常");
+        utils::Logger::getInstance().log(utils::LogLevel::WARN, "Modbus连接异常");
     }
     
     // 检查紧急停止状态

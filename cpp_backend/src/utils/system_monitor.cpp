@@ -3,14 +3,16 @@
  * @brief C++ LVGL一体化系统监控器实现
  * @version 5.0.0
  * @date 2024
+ * 
+ * 提供系统资源监控和性能统计功能
  */
 
 #include "bamboo_cut/utils/system_monitor.h"
-#include <iostream>
 #include <fstream>
+#include <sstream>
+#include <iostream>
 #include <thread>
 #include <chrono>
-#include <cstdio>
 
 namespace bamboo_cut {
 namespace utils {
@@ -20,124 +22,186 @@ SystemMonitor& SystemMonitor::getInstance() {
     return instance;
 }
 
-SystemMonitor::SystemMonitor() 
-    : running_(false) {
+SystemMonitor::SystemMonitor() {
+    start_time_ = std::chrono::system_clock::now();
 }
 
 SystemMonitor::~SystemMonitor() {
     stop();
 }
 
+bool SystemMonitor::initialize() {
+    return true;  // 基本初始化完成
+}
+
 void SystemMonitor::start() {
-    if (running_) {
-        return;
-    }
+    std::lock_guard<std::mutex> lock(monitor_mutex_);
+    monitoring_.store(true);
     
-    running_ = true;
-    monitor_thread_ = std::thread(&SystemMonitor::monitorLoop, this);
-    
-    std::cout << "[SystemMonitor] 系统监控已启动" << std::endl;
+    // 启动监控（这里简化处理）
+    updateCPUUsage();
+    updateMemoryUsage();
+    updateTemperatures();
+    updatePowerDraw();
 }
 
 void SystemMonitor::stop() {
-    if (!running_) {
+    monitoring_.store(false);
+}
+
+SystemResources SystemMonitor::getSystemResources() const {
+    std::lock_guard<std::mutex> lock(monitor_mutex_);
+    return resources_;
+}
+
+NetworkStats SystemMonitor::getNetworkStats() const {
+    std::lock_guard<std::mutex> lock(monitor_mutex_);
+    return network_stats_;
+}
+
+std::chrono::seconds SystemMonitor::getUptime() const {
+    auto now = std::chrono::system_clock::now();
+    auto duration = now - start_time_;
+    return std::chrono::duration_cast<std::chrono::seconds>(duration);
+}
+
+std::array<float, 3> SystemMonitor::getLoadAverage() const {
+    std::array<float, 3> load = {0.0f, 0.0f, 0.0f};
+    
+    std::ifstream file("/proc/loadavg");
+    if (file.is_open()) {
+        file >> load[0] >> load[1] >> load[2];
+        file.close();
+    }
+    
+    return load;
+}
+
+bool SystemMonitor::isOverheating() const {
+    std::lock_guard<std::mutex> lock(monitor_mutex_);
+    return resources_.cpu_temperature > CPU_TEMP_THRESHOLD ||
+           resources_.gpu_temperature > GPU_TEMP_THRESHOLD;
+}
+
+void SystemMonitor::setMonitorInterval(int interval_ms) {
+    monitor_interval_ms_ = interval_ms;
+}
+
+void SystemMonitor::updateCPUUsage() {
+    std::ifstream file("/proc/stat");
+    if (!file.is_open()) {
+        resources_.cpu_usage = 0.0f;
         return;
     }
     
-    running_ = false;
-    
-    if (monitor_thread_.joinable()) {
-        monitor_thread_.join();
-    }
-    
-    std::cout << "[SystemMonitor] 系统监控已停止" << std::endl;
-}
-
-SystemMonitor::SystemStats SystemMonitor::getSystemStats() {
-    SystemStats stats;
-    
-    // 获取CPU使用率
-    stats.cpu_usage = getCPUUsage();
-    
-    // 获取内存使用率
-    stats.memory_usage = getMemoryUsage();
-    
-    // 获取系统温度
-    stats.temperature = getTemperature();
-    
-    return stats;
-}
-
-float SystemMonitor::getCPUUsage() {
-    // TODO: 实现CPU使用率检测
-    return 25.5f; // 示例值
-}
-
-float SystemMonitor::getMemoryUsage() {
-    // 读取/proc/meminfo获取内存信息
-    std::ifstream meminfo("/proc/meminfo");
-    if (!meminfo.is_open()) {
-        return 0.0f;
-    }
-    
     std::string line;
-    long total_memory = 0;
-    long available_memory = 0;
+    std::getline(file, line);
+    file.close();
     
-    while (std::getline(meminfo, line)) {
-        if (line.find("MemTotal:") == 0) {
-            sscanf(line.c_str(), "MemTotal: %ld kB", &total_memory);
-        } else if (line.find("MemAvailable:") == 0) {
-            sscanf(line.c_str(), "MemAvailable: %ld kB", &available_memory);
+    std::istringstream ss(line);
+    std::string cpu_label;
+    uint64_t user, nice, system, idle, iowait, irq, softirq, steal;
+    
+    ss >> cpu_label >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal;
+    
+    uint64_t total = user + nice + system + idle + iowait + irq + softirq + steal;
+    uint64_t work_time = total - idle;
+    
+    if (last_cpu_total_ != 0) {
+        uint64_t total_diff = total - last_cpu_total_;
+        uint64_t work_diff = work_time - (last_cpu_total_ - last_cpu_idle_);
+        
+        if (total_diff > 0) {
+            resources_.cpu_usage = (static_cast<float>(work_diff) / total_diff) * 100.0f;
         }
     }
     
-    if (total_memory > 0) {
-        float used_memory = total_memory - available_memory;
-        return (used_memory / total_memory) * 100.0f;
-    }
-    
-    return 0.0f;
+    last_cpu_total_ = total;
+    last_cpu_idle_ = idle;
 }
 
-float SystemMonitor::getTemperature() {
-    // 尝试读取系统温度
-    std::ifstream thermal("/sys/class/thermal/thermal_zone0/temp");
-    if (!thermal.is_open()) {
-        return 0.0f;
+void SystemMonitor::updateMemoryUsage() {
+    std::ifstream file("/proc/meminfo");
+    if (!file.is_open()) {
+        resources_.memory_usage = 0.0f;
+        return;
     }
     
-    std::string temp_str;
-    std::getline(thermal, temp_str);
+    uint64_t total_mem = 0, free_mem = 0, available_mem = 0;
+    std::string line;
     
-    try {
-        int temp_millidegrees = std::stoi(temp_str);
-        return temp_millidegrees / 1000.0f;
-    } catch (...) {
-        return 0.0f;
+    while (std::getline(file, line)) {
+        std::istringstream ss(line);
+        std::string key;
+        uint64_t value;
+        
+        ss >> key >> value;
+        
+        if (key == "MemTotal:") {
+            total_mem = value;
+        } else if (key == "MemFree:") {
+            free_mem = value;
+        } else if (key == "MemAvailable:") {
+            available_mem = value;
+            break;
+        }
+    }
+    
+    file.close();
+    
+    if (total_mem > 0) {
+        uint64_t used_mem = total_mem - (available_mem > 0 ? available_mem : free_mem);
+        resources_.memory_usage = (static_cast<float>(used_mem) / total_mem) * 100.0f;
     }
 }
 
-void SystemMonitor::monitorLoop() {
-    while (running_) {
-        SystemStats stats = getSystemStats();
-        
-        // 检查系统状态
-        if (stats.cpu_usage > 90.0f) {
-            std::cout << "[SystemMonitor] 警告: CPU使用率过高: " << stats.cpu_usage << "%" << std::endl;
+void SystemMonitor::updateTemperatures() {
+    // CPU温度
+    std::string cpu_temp = readSystemFile("/sys/class/thermal/thermal_zone0/temp");
+    if (!cpu_temp.empty()) {
+        try {
+            float temp = std::stof(cpu_temp) / 1000.0f; // 转换为摄氏度
+            resources_.cpu_temperature = temp;
+        } catch (const std::exception&) {
+            resources_.cpu_temperature = 0.0f;
         }
-        
-        if (stats.memory_usage > 90.0f) {
-            std::cout << "[SystemMonitor] 警告: 内存使用率过高: " << stats.memory_usage << "%" << std::endl;
-        }
-        
-        if (stats.temperature > 80.0f) {
-            std::cout << "[SystemMonitor] 警告: 系统温度过高: " << stats.temperature << "°C" << std::endl;
-        }
-        
-        // 5秒检查一次
-        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
+    
+    // GPU温度（Jetson设备）
+    std::string gpu_temp = readSystemFile("/sys/devices/virtual/thermal/thermal_zone1/temp");
+    if (!gpu_temp.empty()) {
+        try {
+            float temp = std::stof(gpu_temp) / 1000.0f;
+            resources_.gpu_temperature = temp;
+        } catch (const std::exception&) {
+            resources_.gpu_temperature = 0.0f;
+        }
+    }
+}
+
+void SystemMonitor::updatePowerDraw() {
+    // 尝试读取功耗信息（Jetson特定）
+    std::string power = readSystemFile("/sys/bus/i2c/drivers/ina3221x/1-0040/iio:device0/in_power0_input");
+    if (!power.empty()) {
+        try {
+            resources_.power_draw = std::stof(power) / 1000.0f; // 转换为瓦特
+        } catch (const std::exception&) {
+            resources_.power_draw = 0.0f;
+        }
+    }
+}
+
+std::string SystemMonitor::readSystemFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return "";
+    }
+    
+    std::string content;
+    std::getline(file, content);
+    file.close();
+    
+    return content;
 }
 
 } // namespace utils

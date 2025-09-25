@@ -320,7 +320,7 @@ private:
     
     // 系统状态
     std::atomic<SystemState> current_state_{SystemState::UNINITIALIZED};
-    std::string last_error_;
+    mutable std::string last_error_;
     std::chrono::system_clock::time_point start_time_;
     
     // 核心数据桥接
