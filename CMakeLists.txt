@@ -406,6 +406,8 @@ endif()
 set(CPP_BACKEND_SOURCES
     cpp_backend/src/core/logger.cpp
     cpp_backend/src/core/system_utils.cpp
+    cpp_backend/src/core/bamboo_system.cpp
+    cpp_backend/src/core/data_bridge.cpp
     cpp_backend/src/vision/stereo_vision.cpp
     cpp_backend/src/vision/detector.cpp
     cpp_backend/src/vision/camera_manager.cpp
@@ -420,6 +422,11 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/vision/deepstream_pipeline.cpp
     cpp_backend/src/communication/modbus_server.cpp
     cpp_backend/src/communication/tcp_socket_server.cpp
+    cpp_backend/src/communication/modbus_interface.cpp
+    cpp_backend/src/inference/bamboo_detector.cpp
+    cpp_backend/src/ui/lvgl_interface.cpp
+    cpp_backend/src/utils/config_loader.cpp
+    cpp_backend/src/utils/system_monitor.cpp
 )
 
 # 条件包含CUDA相关文件
