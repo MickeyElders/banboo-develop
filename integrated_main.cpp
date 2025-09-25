@@ -400,8 +400,8 @@ private:
         config.use_gpu = true;
         config.use_tensorrt = true;
         
-        detector_ = std::make_unique<inference::BambooDetector>();
-        return detector_->initialize(config);
+        detector_ = std::make_unique<inference::BambooDetector>(config);
+        return detector_->initialize();
     }
     
     bool initializeCamera() {
