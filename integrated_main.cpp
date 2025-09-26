@@ -11,6 +11,8 @@
 #include <atomic>
 #include <signal.h>
 #include <chrono>
+#include <fcntl.h>      // for open(), O_RDWR, O_RDONLY
+#include <unistd.h>     // for close()
 
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
