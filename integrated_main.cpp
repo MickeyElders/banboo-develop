@@ -505,34 +505,20 @@ private:
     }
     
     bool initializeCamera() {
-        std::cout << "正在检测摄像头设备..." << std::endl;
+        std::cout << "正在检测Jetson CSI摄像头设备..." << std::endl;
         
-        // 尝试多个摄像头设备ID
-        std::vector<int> camera_ids = {0, 1, 2, -1}; // -1 表示任意可用摄像头
+        // 优先尝试Jetson CSI摄像头 (使用nvarguscamerasrc)
+        if (initializeJetsonCSICamera()) {
+            std::cout << "Jetson CSI摄像头初始化成功" << std::endl;
+            return true;
+        }
         
-        for (int id : camera_ids) {
-            std::cout << "尝试打开摄像头 " << id << std::endl;
-            camera_.open(id);
-            
-            if (camera_.isOpened()) {
-                // 测试是否真的能读取帧
-                cv::Mat test_frame;
-                if (camera_.read(test_frame) && !test_frame.empty()) {
-                    std::cout << "摄像头 " << id << " 初始化成功" << std::endl;
-                    
-                    // 设置摄像头参数
-                    camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-                    camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-                    camera_.set(cv::CAP_PROP_FPS, 30);
-                    
-                    return true;
-                } else {
-                    std::cout << "摄像头 " << id << " 无法读取帧，继续尝试下一个" << std::endl;
-                    camera_.release();
-                }
-            } else {
-                std::cout << "无法打开摄像头 " << id << std::endl;
-            }
+        std::cout << "CSI摄像头初始化失败，尝试USB摄像头..." << std::endl;
+        
+        // 回退到USB摄像头 (使用v4l2)
+        if (initializeUSBCamera()) {
+            std::cout << "USB摄像头初始化成功" << std::endl;
+            return true;
         }
         
         // 如果没有真实摄像头，创建虚拟摄像头用于测试
@@ -541,18 +527,134 @@ private:
         return true;
     }
     
+    bool initializeJetsonCSICamera() {
+        try {
+            // Jetson CSI摄像头 GStreamer pipeline
+            // sensor-id=0 表示第一个CSI摄像头, sensor-id=1 表示第二个
+            std::vector<std::string> csi_pipelines = {
+                "nvarguscamerasrc sensor-id=0 ! "
+                "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
+                "nvvidconv flip-method=0 ! "
+                "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
+                "videoconvert ! "
+                "video/x-raw, format=(string)BGR ! appsink",
+                
+                "nvarguscamerasrc sensor-id=1 ! "
+                "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
+                "nvvidconv flip-method=0 ! "
+                "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
+                "videoconvert ! "
+                "video/x-raw, format=(string)BGR ! appsink"
+            };
+            
+            for (size_t i = 0; i < csi_pipelines.size(); i++) {
+                std::cout << "尝试CSI摄像头 sensor-id=" << i << std::endl;
+                
+                camera_.open(csi_pipelines[i], cv::CAP_GSTREAMER);
+                
+                if (camera_.isOpened()) {
+                    // 测试是否真的能读取帧
+                    cv::Mat test_frame;
+                    if (camera_.read(test_frame) && !test_frame.empty()) {
+                        std::cout << "CSI摄像头 sensor-id=" << i << " 初始化成功，分辨率: "
+                                  << test_frame.cols << "x" << test_frame.rows << std::endl;
+                        return true;
+                    } else {
+                        std::cout << "CSI摄像头 sensor-id=" << i << " 无法读取帧" << std::endl;
+                        camera_.release();
+                    }
+                } else {
+                    std::cout << "无法打开CSI摄像头 sensor-id=" << i << std::endl;
+                }
+            }
+            
+            return false;
+        } catch (const cv::Exception& e) {
+            std::cout << "CSI摄像头初始化异常: " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
+    bool initializeUSBCamera() {
+        try {
+            // USB摄像头设备ID列表
+            std::vector<int> camera_ids = {0, 1, 2};
+            
+            for (int id : camera_ids) {
+                std::cout << "尝试打开USB摄像头 /dev/video" << id << std::endl;
+                
+                camera_.open(id, cv::CAP_V4L2);
+                
+                if (camera_.isOpened()) {
+                    // 设置摄像头参数
+                    camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+                    camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+                    camera_.set(cv::CAP_PROP_FPS, 30);
+                    
+                    // 测试是否真的能读取帧
+                    cv::Mat test_frame;
+                    if (camera_.read(test_frame) && !test_frame.empty()) {
+                        std::cout << "USB摄像头 " << id << " 初始化成功，分辨率: "
+                                  << test_frame.cols << "x" << test_frame.rows << std::endl;
+                        return true;
+                    } else {
+                        std::cout << "USB摄像头 " << id << " 无法读取帧" << std::endl;
+                        camera_.release();
+                    }
+                } else {
+                    std::cout << "无法打开USB摄像头 " << id << std::endl;
+                }
+            }
+            
+            return false;
+        } catch (const cv::Exception& e) {
+            std::cout << "USB摄像头初始化异常: " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
     // === 立体视觉初始化方法 ===
     bool initializeStereoVision() {
+        std::cout << "初始化双摄立体视觉系统..." << std::endl;
+        
         vision::StereoConfig stereo_config;
         // 修复立体标定文件路径为绝对路径
         stereo_config.calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
-        stereo_config.left_camera_id = 0;
-        stereo_config.right_camera_id = 1;
         stereo_config.frame_size = cv::Size(640, 480);
         stereo_config.fps = 30;
         
+        // Jetson CSI摄像头配置 - 使用GStreamer管道
+        stereo_config.left_camera_pipeline =
+            "nvarguscamerasrc sensor-id=0 ! "
+            "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
+            "nvvidconv flip-method=0 ! "
+            "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
+            "videoconvert ! "
+            "video/x-raw, format=(string)BGR ! appsink";
+            
+        stereo_config.right_camera_pipeline =
+            "nvarguscamerasrc sensor-id=1 ! "
+            "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
+            "nvvidconv flip-method=0 ! "
+            "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
+            "videoconvert ! "
+            "video/x-raw, format=(string)BGR ! appsink";
+        
+        // 回退选项：USB摄像头ID
+        stereo_config.left_camera_id = 0;   // /dev/video0
+        stereo_config.right_camera_id = 1;  // /dev/video1
+        stereo_config.use_gstreamer = true; // 优先使用GStreamer管道
+        
         stereo_vision_ = std::make_unique<vision::StereoVision>(stereo_config);
-        return stereo_vision_->initialize();
+        
+        bool initialized = stereo_vision_->initialize();
+        if (initialized) {
+            std::cout << "立体视觉系统初始化成功" << std::endl;
+        } else {
+            std::cout << "立体视觉系统初始化失败" << std::endl;
+        }
+        
+        return initialized;
     }
     
     float getCpuUsage() const { return 45.0f; } // 简化实现
