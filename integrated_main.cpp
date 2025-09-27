@@ -853,22 +853,34 @@ inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return drive
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
 inline bool lvgl_display_init() {
-    // Jetson Orin NX LVGL显示驱动初始化（优化的framebuffer）
+    // 优先尝试DRM/KMS显示系统
     try {
-        std::cout << "Initializing optimized framebuffer display driver..." << std::endl;
+        std::cout << "Initializing display system..." << std::endl;
         
-        // 首先抑制调试输出
-        suppress_all_debug_output();
+#ifdef ENABLE_DRM
+        // 尝试初始化DRM/KMS
+        if (initialize_drm_display()) {
+            std::cout << "DRM/KMS display initialized successfully" << std::endl;
+            draw_professional_ui();
+            return true;
+        } else {
+            std::cout << "DRM/KMS initialization failed, falling back to framebuffer" << std::endl;
+        }
+#endif
+        
+        // 回退到传统framebuffer
+        std::cout << "Initializing framebuffer display driver..." << std::endl;
         
         // 检查framebuffer设备
         const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
         bool has_framebuffer = false;
         
         for (const char* fb_dev : fb_devices) {
+            std::cout << "Trying framebuffer device: " << fb_dev << std::endl;
             fb_fd = open(fb_dev, O_RDWR);
             if (fb_fd >= 0) {
                 has_framebuffer = true;
-                std::cout << "Opening framebuffer device: " << fb_dev << std::endl;
+                std::cout << "Opened framebuffer device: " << fb_dev << std::endl;
                 
                 // 获取实际framebuffer信息
                 if (!get_framebuffer_info()) {
@@ -878,33 +890,43 @@ inline bool lvgl_display_init() {
                     continue;
                 }
                 
+                std::cout << "Framebuffer info: " << fb_width << "x" << fb_height
+                         << " bpp:" << (fb_bytes_per_pixel * 8) << " size:" << fb_mem_size << std::endl;
+                
                 // 映射framebuffer到内存
                 fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
                 
                 if (fb_mem == MAP_FAILED) {
-                    std::cout << "Framebuffer memory mapping failed" << std::endl;
+                    std::cout << "Framebuffer memory mapping failed: " << strerror(errno) << std::endl;
                     close(fb_fd);
                     fb_fd = -1;
                     fb_mem = nullptr;
                 } else {
-                    std::cout << "Optimized framebuffer mapping successful: " << fb_width << "x" << fb_height << std::endl;
-                    // Draw professional UI
+                    std::cout << "Framebuffer mapping successful: " << fb_width << "x" << fb_height << std::endl;
+                    // 绘制专业界面
                     draw_professional_ui();
+                    std::cout << "Professional UI drawn to framebuffer" << std::endl;
                 }
                 break;
+            } else {
+                std::cout << "Failed to open " << fb_dev << ": " << strerror(errno) << std::endl;
             }
         }
         
         if (has_framebuffer && fb_mem) {
-            std::cout << "Using optimized framebuffer display mode" << std::endl;
+            std::cout << "Using framebuffer display mode" << std::endl;
+            return true;
         } else {
-            std::cout << "Framebuffer initialization failed, using virtual display mode" << std::endl;
+            std::cout << "No framebuffer available, display disabled" << std::endl;
+            return false;
         }
         
-        return true;
+    } catch (const std::exception& e) {
+        std::cout << "Display initialization exception: " << e.what() << std::endl;
+        return false;
     } catch (...) {
-        std::cout << "Display driver initialization exception, using virtual display mode" << std::endl;
-        return true;
+        std::cout << "Display initialization unknown exception" << std::endl;
+        return false;
     }
 }
 inline bool touch_driver_init() {
