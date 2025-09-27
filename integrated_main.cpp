@@ -1967,11 +1967,13 @@ public:
 int main() {
     try {
         // 程序启动时立即抑制所有调试输出
-        suppress_all_debug_output();
+        suppress_camera_debug();
         
         IntegratedBambooSystem system;
         
         if (!system.initialize()) {
+            // 临时恢复stdout显示错误信息
+            freopen("/dev/tty", "w", stdout);
             std::cout << "System initialization failed" << std::endl;
             return -1;
         }
@@ -1980,6 +1982,8 @@ int main() {
         return 0;
         
     } catch (const std::exception& e) {
+        // 临时恢复stdout显示异常信息
+        freopen("/dev/tty", "w", stdout);
         std::cout << "System exception: " << e.what() << std::endl;
         return -1;
     }
