@@ -864,7 +864,8 @@ std::chrono::steady_clock::time_point g_shutdown_start_time;
 // 静态输出重定向文件描述符
 static int original_stdout = -1;
 static int original_stderr = -1;
-static int null_fd = -1;
+static int log_fd = -1;
+static std::string log_file_path = "/var/log/bamboo-cut/camera_debug.log";
 
 // 完全抑制所有调试信息的函数
 void suppress_all_debug_output() {
@@ -887,37 +888,69 @@ void suppress_all_debug_output() {
     setenv("GST_REGISTRY_UPDATE", "no", 1);
     setenv("GST_REGISTRY_FORK", "no", 1);
     
-    // 3. 创建空设备用于重定向
-    null_fd = open("/dev/null", O_WRONLY);
-    if (null_fd == -1) {
-        std::cout << "Warning: Cannot open /dev/null, debug output may still appear" << std::endl;
-        return;
+    // 3. 创建日志目录（如果不存在）
+    system("mkdir -p /var/log/bamboo-cut");
+    
+    // 4. 创建日志文件用于重定向调试信息
+    log_fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (log_fd == -1) {
+        std::cout << "Warning: Cannot create log file " << log_file_path << ", using /dev/null instead" << std::endl;
+        log_fd = open("/dev/null", O_WRONLY);
+        if (log_fd == -1) {
+            std::cout << "Error: Cannot open /dev/null either, debug output may still appear" << std::endl;
+            return;
+        }
+    } else {
+        std::cout << "Camera debug output will be redirected to: " << log_file_path << std::endl;
     }
     
-    // 4. 保存原始文件描述符
+    // 5. 保存原始文件描述符
     original_stdout = dup(STDOUT_FILENO);
     original_stderr = dup(STDERR_FILENO);
     
     if (original_stdout == -1 || original_stderr == -1) {
         std::cout << "Warning: Cannot backup original file descriptors" << std::endl;
-        if (null_fd >= 0) close(null_fd);
+        if (log_fd >= 0) close(log_fd);
         return;
+    }
+    
+    // 6. 写入日志文件头部信息
+    if (log_fd >= 0) {
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        std::string timestamp = std::ctime(&time_t);
+        timestamp.pop_back(); // 移除换行符
+        
+        std::string log_header = "\n=== Bamboo Cut Camera Debug Log - " + timestamp + " ===\n";
+        write(log_fd, log_header.c_str(), log_header.length());
     }
     
     std::cout << "Debug output suppression configured successfully" << std::endl;
 }
 
 // 临时重定向输出（在摄像头初始化期间使用）
-void redirect_output_to_null() {
-    if (null_fd >= 0) {
-        dup2(null_fd, STDOUT_FILENO);
-        dup2(null_fd, STDERR_FILENO);
+void redirect_output_to_log() {
+    if (log_fd >= 0) {
+        // 重定向stdout和stderr到日志文件
+        dup2(log_fd, STDOUT_FILENO);
+        dup2(log_fd, STDERR_FILENO);
+        
+        // 写入重定向开始标记
+        std::string start_msg = "[Camera Initialization Started]\n";
+        write(log_fd, start_msg.c_str(), start_msg.length());
     }
 }
 
 // 恢复原始输出
 void restore_output() {
     if (original_stdout >= 0 && original_stderr >= 0) {
+        // 写入重定向结束标记
+        if (log_fd >= 0) {
+            std::string end_msg = "[Camera Initialization Completed]\n\n";
+            write(log_fd, end_msg.c_str(), end_msg.length());
+        }
+        
+        // 恢复原始输出
         dup2(original_stdout, STDOUT_FILENO);
         dup2(original_stderr, STDERR_FILENO);
     }
@@ -933,9 +966,12 @@ void cleanup_output_redirection() {
         close(original_stderr);
         original_stderr = -1;
     }
-    if (null_fd >= 0) {
-        close(null_fd);
-        null_fd = -1;
+    if (log_fd >= 0) {
+        // 写入日志文件结束标记
+        std::string final_msg = "=== Log Session Ended ===\n\n";
+        write(log_fd, final_msg.c_str(), final_msg.length());
+        close(log_fd);
+        log_fd = -1;
     }
 }
 
@@ -1298,8 +1334,8 @@ private:
         try {
             std::cout << "Initializing Jetson CSI cameras with debug suppression..." << std::endl;
             
-            // 临时重定向输出以抑制调试信息
-            redirect_output_to_null();
+            // 临时重定向输出到日志文件
+            redirect_output_to_log();
             
             // Jetson CSI摄像头 GStreamer pipeline - 完全静默模式
             std::vector<std::string> csi_pipelines = {
@@ -1397,8 +1433,8 @@ private:
     bool initializeStereoVision() {
         std::cout << "初始化双摄立体视觉系统..." << std::endl;
         
-        // 临时重定向输出以抑制摄像头调试信息
-        redirect_output_to_null();
+        // 临时重定向输出到日志文件
+        redirect_output_to_log();
         
         vision::StereoConfig stereo_config;
         stereo_config.calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
