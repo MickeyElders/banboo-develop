@@ -1045,6 +1045,13 @@ void suppress_all_debug_output() {
     setenv("KERNEL_LOG_LEVEL", "0", 1);
     setenv("DMESG_RESTRICT", "1", 1);
     
+    // 强制重定向内核消息到null
+    system("echo 0 > /proc/sys/kernel/printk 2>/dev/null || true");
+    system("dmesg -n 0 2>/dev/null || true");
+    
+    // 抑制systemd journal输出到console
+    system("systemctl mask systemd-journald-dev-log.socket 2>/dev/null || true");
+    
     // 2. 设置GStreamer静默模式
     setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0", 1);
     setenv("GST_REGISTRY_UPDATE", "no", 1);
@@ -1503,6 +1510,10 @@ private:
             std::cout.setstate(std::ios::failbit);
             std::cerr.setstate(std::ios::failbit);
             
+            // 强制抑制内核级调试信息
+            system("echo 1 > /proc/sys/kernel/printk_devkmsg 2>/dev/null || true");
+            system("echo 0 > /sys/module/printk/parameters/console_suspend 2>/dev/null || true");
+            
             // Jetson CSI摄像头 GStreamer pipeline - 完全静默模式
             std::vector<std::string> csi_pipelines = {
                 "nvarguscamerasrc sensor-id=0 silent=true ! "
@@ -1904,6 +1915,9 @@ public:
  */
 int main() {
     try {
+        // 程序启动时立即抑制所有调试输出
+        suppress_all_debug_output();
+        
         IntegratedBambooSystem system;
         
         if (!system.initialize()) {
