@@ -108,80 +108,218 @@ void simple_fb_flush(int x1, int y1, int x2, int y2, const uint8_t* color_data) 
     }
 }
 
-// 绘制简单的测试界面
-void draw_test_ui() {
+// 颜色定义 - 按照参考界面的配色方案
+struct Color {
+    uint8_t b, g, r, a;
+    Color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha = 255)
+        : b(blue), g(green), r(red), a(alpha) {}
+};
+
+// 工业界面配色
+const Color BG_MAIN(30, 30, 30);          // #1E1E1E 主背景
+const Color BG_PANEL(45, 45, 45);         // #2D2D2D 面板背景
+const Color ACCENT(255, 107, 53);         // #FF6B35 橙色强调
+const Color SUCCESS(76, 175, 80);         // #4CAF50 成功绿色
+const Color WARNING(255, 193, 7);         // #FFC107 警告黄色
+const Color ERROR(244, 67, 54);           // #F44336 错误红色
+const Color TEXT_PRIMARY(255, 255, 255);  // #FFFFFF 主要文字
+const Color TEXT_SECONDARY(176, 176, 176); // #B0B0B0 次要文字
+const Color BORDER(64, 64, 64);           // #404040 边框
+const Color MODBUS_BLUE(33, 150, 243);    // #2196F3 Modbus蓝色
+const Color JETSON_GREEN(118, 185, 0);    // #76B900 Jetson绿色
+
+// 绘制矩形填充
+void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
     if (fb_fd < 0 || !fb_mem) return;
     
-    // 清屏 - 设置为深蓝色背景
-    for (int i = 0; i < fb_mem_size; i += 4) {
-        fb_mem[i] = 64;      // B
-        fb_mem[i + 1] = 32;  // G
-        fb_mem[i + 2] = 16;  // R
-        fb_mem[i + 3] = 255; // A
-    }
-    
-    // 绘制标题栏 - 橙色
-    for (int y = 0; y < 80; y++) {
-        for (int x = 0; x < fb_width; x++) {
-            size_t offset = (y * fb_width + x) * fb_bytes_per_pixel;
-            if (offset + 3 < fb_mem_size) {
-                fb_mem[offset] = 0;       // B
-                fb_mem[offset + 1] = 165; // G
-                fb_mem[offset + 2] = 255; // R (橙色)
-                fb_mem[offset + 3] = 255; // A
+    for (int py = y; py < y + h && py < fb_height; py++) {
+        for (int px = x; px < x + w && px < fb_width; px++) {
+            if (px >= 0 && py >= 0) {
+                size_t offset = (py * fb_width + px) * fb_bytes_per_pixel;
+                if (offset + 3 < fb_mem_size) {
+                    fb_mem[offset] = color.b;
+                    fb_mem[offset + 1] = color.g;
+                    fb_mem[offset + 2] = color.r;
+                    fb_mem[offset + 3] = color.a;
+                }
             }
         }
     }
+}
+
+// 绘制矩形边框
+void draw_rect_border(int x, int y, int w, int h, int thickness, const Color& color) {
+    draw_filled_rect(x, y, w, thickness, color);
+    draw_filled_rect(x, y + h - thickness, w, thickness, color);
+    draw_filled_rect(x, y, thickness, h, color);
+    draw_filled_rect(x + w - thickness, y, thickness, h, color);
+}
+
+// 绘制专业工业界面
+void draw_professional_ui() {
+    if (fb_fd < 0 || !fb_mem) return;
     
-    // 绘制状态区域 - 绿色
-    for (int y = fb_height - 100; y < fb_height; y++) {
-        for (int x = 0; x < fb_width; x++) {
-            size_t offset = (y * fb_width + x) * fb_bytes_per_pixel;
-            if (offset + 3 < fb_mem_size) {
-                fb_mem[offset] = 0;       // B
-                fb_mem[offset + 1] = 255; // G (绿色)
-                fb_mem[offset + 2] = 0;   // R
-                fb_mem[offset + 3] = 255; // A
-            }
-        }
+    // 清屏 - 主背景色
+    draw_filled_rect(0, 0, fb_width, fb_height, BG_MAIN);
+    
+    // ===== 顶部状态栏 =====
+    int header_height = 60;
+    draw_filled_rect(10, 0, fb_width - 20, header_height, BG_PANEL);
+    draw_rect_border(10, 0, fb_width - 20, header_height, 2, BORDER);
+    
+    // 系统标题区域
+    draw_filled_rect(20, 15, 300, 30, ACCENT);
+    
+    // 工作流程状态指示器
+    int workflow_x = 400;
+    int workflow_y = 20;
+    for (int i = 0; i < 5; i++) {
+        int step_x = workflow_x + i * 120;
+        Color step_color = (i == 0) ? ACCENT : BORDER;
+        draw_filled_rect(step_x, workflow_y, 100, 20, step_color);
+        draw_rect_border(step_x, workflow_y, 100, 20, 1, step_color);
     }
     
-    // 绘制中央视频区域边框 - 白色
-    int video_x = 200, video_y = 150, video_w = 880, video_h = 450;
-    for (int x = video_x; x < video_x + video_w; x++) {
-        for (int border = 0; border < 4; border++) {
-            // 上边框
-            size_t offset1 = ((video_y + border) * fb_width + x) * fb_bytes_per_pixel;
-            // 下边框
-            size_t offset2 = ((video_y + video_h - border - 1) * fb_width + x) * fb_bytes_per_pixel;
-            if (offset1 + 3 < fb_mem_size) {
-                fb_mem[offset1] = fb_mem[offset1 + 1] = fb_mem[offset1 + 2] = 255;
-                fb_mem[offset1 + 3] = 255;
-            }
-            if (offset2 + 3 < fb_mem_size) {
-                fb_mem[offset2] = fb_mem[offset2 + 1] = fb_mem[offset2 + 2] = 255;
-                fb_mem[offset2 + 3] = 255;
-            }
-        }
-    }
-    for (int y = video_y; y < video_y + video_h; y++) {
-        for (int border = 0; border < 4; border++) {
-            // 左边框
-            size_t offset1 = (y * fb_width + video_x + border) * fb_bytes_per_pixel;
-            // 右边框
-            size_t offset2 = (y * fb_width + video_x + video_w - border - 1) * fb_bytes_per_pixel;
-            if (offset1 + 3 < fb_mem_size) {
-                fb_mem[offset1] = fb_mem[offset1 + 1] = fb_mem[offset1 + 2] = 255;
-                fb_mem[offset1 + 3] = 255;
-            }
-            if (offset2 + 3 < fb_mem_size) {
-                fb_mem[offset2] = fb_mem[offset2 + 1] = fb_mem[offset2 + 2] = 255;
-                fb_mem[offset2 + 3] = 255;
-            }
-        }
+    // 心跳监控区域
+    draw_filled_rect(fb_width - 200, 20, 180, 20, SUCCESS);
+    
+    // ===== 主内容区域 =====
+    int main_y = header_height + 10;
+    int main_height = fb_height - header_height - 90;
+    
+    // 左侧摄像头区域
+    int camera_width = fb_width - 400;
+    draw_filled_rect(10, main_y, camera_width, main_height, BG_PANEL);
+    draw_rect_border(10, main_y, camera_width, main_height, 2, BORDER);
+    
+    // 摄像头标题栏
+    draw_filled_rect(25, main_y + 15, camera_width - 30, 30, Color(26, 26, 26));
+    draw_rect_border(25, main_y + 15, camera_width - 30, 30, 1, ACCENT);
+    
+    // 摄像头视野区域
+    int video_x = 25;
+    int video_y = main_y + 60;
+    int video_w = camera_width - 30;
+    int video_h = main_height - 150;
+    draw_filled_rect(video_x, video_y, video_w, video_h, Color(0, 0, 0));
+    draw_rect_border(video_x, video_y, video_w, video_h, 1, BORDER);
+    
+    // 导轨指示器
+    int rail_y = video_y + video_h - 40;
+    draw_filled_rect(video_x + 10, rail_y, video_w - 20, 30, Color(33, 150, 243, 77));
+    draw_rect_border(video_x + 10, rail_y, video_w - 20, 30, 1, MODBUS_BLUE);
+    
+    // 切割位置指示线
+    int cutting_pos = video_x + (video_w * 25 / 100);
+    draw_filled_rect(cutting_pos, video_y, 2, video_h, ERROR);
+    
+    // 坐标显示区域
+    int coord_y = main_y + main_height - 80;
+    draw_filled_rect(25, coord_y, camera_width - 30, 60, Color(26, 26, 26));
+    draw_rect_border(25, coord_y, camera_width - 30, 60, 1, ACCENT);
+    
+    // 坐标值显示框
+    int coord_box_w = (camera_width - 60) / 3;
+    for (int i = 0; i < 3; i++) {
+        int box_x = 35 + i * (coord_box_w + 10);
+        draw_filled_rect(box_x, coord_y + 10, coord_box_w, 40, Color(64, 64, 64, 128));
+        draw_rect_border(box_x, coord_y + 10, coord_box_w, 40, 1, ACCENT);
     }
     
-    std::cout << "已绘制测试界面到framebuffer" << std::endl;
+    // ===== 右侧控制面板 =====
+    int panel_x = camera_width + 20;
+    int panel_width = 360;
+    draw_filled_rect(panel_x, main_y, panel_width, main_height, BG_PANEL);
+    draw_rect_border(panel_x, main_y, panel_width, main_height, 2, BORDER);
+    
+    // Modbus寄存器状态区域
+    int section_y = main_y + 15;
+    int section_height = 120;
+    draw_filled_rect(panel_x + 10, section_y, panel_width - 20, section_height, Color(26, 26, 26));
+    draw_rect_border(panel_x + 10, section_y, panel_width - 20, section_height, 1, MODBUS_BLUE);
+    draw_filled_rect(panel_x + 15, section_y + 5, panel_width - 30, 25, MODBUS_BLUE);
+    
+    // 寄存器表格
+    for (int i = 0; i < 6; i++) {
+        int row_y = section_y + 35 + i * 13;
+        draw_filled_rect(panel_x + 15, row_y, panel_width - 30, 12,
+                        i % 2 == 0 ? Color(255, 255, 255, 16) : Color(64, 64, 64, 64));
+    }
+    
+    // PLC通信状态区域
+    section_y += section_height + 10;
+    section_height = 100;
+    draw_filled_rect(panel_x + 10, section_y, panel_width - 20, section_height, Color(26, 26, 26));
+    draw_rect_border(panel_x + 10, section_y, panel_width - 20, section_height, 1, SUCCESS);
+    draw_filled_rect(panel_x + 15, section_y + 5, panel_width - 30, 25, SUCCESS);
+    
+    // 状态网格
+    for (int i = 0; i < 4; i++) {
+        int status_x = panel_x + 15 + (i % 2) * 160;
+        int status_y = section_y + 35 + (i / 2) * 25;
+        draw_filled_rect(status_x, status_y, 150, 20, Color(255, 255, 255, 13));
+        draw_rect_border(status_x, status_y, 150, 20, 1, Color(64, 64, 64));
+    }
+    
+    // 刀片选择按钮
+    for (int i = 0; i < 3; i++) {
+        int btn_x = panel_x + 15 + i * 108;
+        int btn_y = section_y + 70;
+        Color btn_color = (i == 2) ? ACCENT : Color(64, 64, 64);
+        draw_filled_rect(btn_x, btn_y, 100, 25, btn_color);
+        draw_rect_border(btn_x, btn_y, 100, 25, 1, btn_color);
+    }
+    
+    // Jetson系统信息区域
+    section_y += section_height + 10;
+    section_height = 180;
+    draw_filled_rect(panel_x + 10, section_y, panel_width - 20, section_height, Color(26, 26, 26));
+    draw_rect_border(panel_x + 10, section_y, panel_width - 20, section_height, 1, JETSON_GREEN);
+    draw_filled_rect(panel_x + 15, section_y + 5, panel_width - 30, 25, JETSON_GREEN);
+    draw_filled_rect(panel_x + panel_width - 50, section_y + 8, 30, 18, ACCENT);
+    
+    // CPU/GPU/内存进度条
+    int progress_widths[] = {150, 112, 91};
+    Color progress_colors[] = {JETSON_GREEN, ACCENT, WARNING};
+    for (int i = 0; i < 3; i++) {
+        int bar_y = section_y + 40 + i * 25;
+        draw_filled_rect(panel_x + 15, bar_y, panel_width - 30, 20, Color(64, 64, 64));
+        draw_filled_rect(panel_x + 15, bar_y, progress_widths[i], 20, progress_colors[i]);
+    }
+    
+    // 详细系统信息网格
+    for (int i = 0; i < 12; i++) {
+        int info_x = panel_x + 15 + (i % 3) * 108;
+        int info_y = section_y + 115 + (i / 3) * 15;
+        draw_filled_rect(info_x, info_y, 105, 12, Color(255, 255, 255, 13));
+        draw_rect_border(info_x, info_y, 105, 12, 1, Color(64, 64, 64));
+    }
+    
+    // ===== 底部操作按钮区域 =====
+    int footer_y = fb_height - 80;
+    draw_filled_rect(10, footer_y, fb_width - 20, 70, BG_PANEL);
+    draw_rect_border(10, footer_y, fb_width - 20, 70, 2, BORDER);
+    
+    // 左侧控制按钮
+    const Color button_colors[] = {SUCCESS, WARNING, ERROR};
+    for (int i = 0; i < 3; i++) {
+        int btn_x = 30 + i * 140;
+        int btn_y = footer_y + 15;
+        draw_filled_rect(btn_x, btn_y, 120, 40, button_colors[i]);
+        draw_rect_border(btn_x, btn_y, 120, 40, 2, button_colors[i]);
+    }
+    
+    // 中央状态信息区域
+    draw_filled_rect(fb_width / 2 - 150, footer_y + 10, 300, 50, Color(26, 26, 26));
+    draw_rect_border(fb_width / 2 - 150, footer_y + 10, 300, 50, 1, TEXT_SECONDARY);
+    
+    // 右侧紧急按钮
+    draw_filled_rect(fb_width - 280, footer_y + 15, 120, 40, Color(255, 23, 68));
+    draw_rect_border(fb_width - 280, footer_y + 15, 120, 40, 2, Color(255, 23, 68));
+    draw_filled_rect(fb_width - 150, footer_y + 15, 120, 40, Color(156, 39, 176));
+    draw_rect_border(fb_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
+    
+    std::cout << "已绘制专业工业界面到framebuffer" << std::endl;
 }
 
 // 显示驱动相关占位符
