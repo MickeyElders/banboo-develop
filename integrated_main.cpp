@@ -988,6 +988,12 @@ public:
 };
 #endif
 
+// 函数前向声明（在任何调用之前）
+void suppress_all_debug_output();
+void redirect_output_to_log();
+void restore_output();
+void cleanup_output_redirection();
+
 // 现有后端组件 - 直接包含实际存在的头文件
 #include "bamboo_cut/utils/logger.h"
 #include "bamboo_cut/inference/bamboo_detector.h"
@@ -996,12 +1002,6 @@ public:
 
 // 使用真实的命名空间
 using namespace bamboo_cut;
-
-// 函数前向声明
-void suppress_all_debug_output();
-void redirect_output_to_log();
-void restore_output();
-void cleanup_output_redirection();
 
 // 全局关闭标志
 std::atomic<bool> g_shutdown_requested{false};
