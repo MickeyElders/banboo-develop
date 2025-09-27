@@ -19,14 +19,12 @@
 #include <cstdlib>      // for setenv()
 #include <fstream>      // for file operations
 
-// DRM/KMS相关头文件
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-#include <drm/drm_fourcc.h>
-#include <sys/ioctl.h>
-
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
+
+// Linux framebuffer相关头文件
+#include <linux/fb.h>
+#include <sys/ioctl.h>
 
 // LVGL头文件包含 - 智能检测多种可能的路径
 #ifdef ENABLE_LVGL
@@ -343,14 +341,9 @@ const Color BORDER(64, 64, 64);           // #404040 边框
 const Color MODBUS_BLUE(33, 150, 243);    // #2196F3 Modbus蓝色
 const Color JETSON_GREEN(118, 185, 0);    // #76B900 Jetson绿色
 
-// DRM绘制矩形填充（硬件加速优化）
+// 优化的framebuffer绘制矩形填充
 void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
-    if (!drm_display.initialized || !drm_display.mapped_memory) return;
-    
-    uint8_t* fb_mem = static_cast<uint8_t*>(drm_display.mapped_memory);
-    int fb_width = drm_display.width;
-    int fb_height = drm_display.height;
-    int fb_bytes_per_pixel = drm_display.bytes_per_pixel;
+    if (fb_fd < 0 || !fb_mem) return;
     
     // 计算32位颜色值（BGRA格式）
     uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
@@ -447,17 +440,12 @@ int get_char_index(char c) {
     return 36; // 默认返回空格
 }
 
-// DRM绘制单个字符（优化版本）
+// 优化的framebuffer绘制单个字符
 void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
-    if (!drm_display.initialized || !drm_display.mapped_memory) return;
+    if (fb_fd < 0 || !fb_mem) return;
     
     int char_index = get_char_index(c);
     if (char_index >= sizeof(font_8x8) / sizeof(font_8x8[0])) return;
-    
-    uint8_t* fb_mem = static_cast<uint8_t*>(drm_display.mapped_memory);
-    int fb_width = drm_display.width;
-    int fb_height = drm_display.height;
-    int fb_bytes_per_pixel = drm_display.bytes_per_pixel;
     
     const uint8_t* char_data = font_8x8[char_index];
     uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
@@ -497,12 +485,9 @@ void draw_text(int x, int y, const std::string& text, const Color& color, int sc
     }
 }
 
-// 绘制专业工业界面（DRM优化版本）
+// 绘制专业工业界面（优化版本）
 void draw_professional_ui() {
-    if (!drm_display.initialized) return;
-    
-    int fb_width = drm_display.width;
-    int fb_height = drm_display.height;
+    if (fb_fd < 0 || !fb_mem) return;
     
     // 清屏 - 主背景色
     draw_filled_rect(0, 0, fb_width, fb_height, BG_MAIN);
@@ -717,10 +702,7 @@ void draw_professional_ui() {
     draw_rect_border(fb_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
     draw_text(fb_width - 135, footer_y + 30, "POWER", TEXT_PRIMARY, 1);
     
-    // 呈现到屏幕
-    drm_flush_display();
-    
-    std::cout << "Professional industrial interface drawn via DRM/KMS" << std::endl;
+    std::cout << "Professional industrial interface drawn to optimized framebuffer" << std::endl;
 }
 
 // 显示驱动相关占位符
@@ -730,23 +712,55 @@ inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return drive
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
 inline bool lvgl_display_init() {
-    // Jetson Orin NX LVGL显示驱动初始化（DRM/KMS硬件加速）
+    // Jetson Orin NX LVGL显示驱动初始化（优化的framebuffer）
     try {
-        std::cout << "Initializing DRM/KMS display driver..." << std::endl;
+        std::cout << "Initializing optimized framebuffer display driver..." << std::endl;
         
         // 首先抑制调试输出
         suppress_all_debug_output();
         
-        if (initialize_drm_display()) {
-            std::cout << "DRM/KMS display initialization successful" << std::endl;
-            // 绘制专业界面
-            draw_professional_ui();
-            return true;
-        } else {
-            std::cout << "DRM/KMS initialization failed, using virtual display mode" << std::endl;
-            return true; // 仍然返回成功，允许程序继续运行
+        // 检查framebuffer设备
+        const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
+        bool has_framebuffer = false;
+        
+        for (const char* fb_dev : fb_devices) {
+            fb_fd = open(fb_dev, O_RDWR);
+            if (fb_fd >= 0) {
+                has_framebuffer = true;
+                std::cout << "Opening framebuffer device: " << fb_dev << std::endl;
+                
+                // 获取实际framebuffer信息
+                if (!get_framebuffer_info()) {
+                    std::cout << "Failed to get framebuffer info" << std::endl;
+                    close(fb_fd);
+                    fb_fd = -1;
+                    continue;
+                }
+                
+                // 映射framebuffer到内存
+                fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
+                
+                if (fb_mem == MAP_FAILED) {
+                    std::cout << "Framebuffer memory mapping failed" << std::endl;
+                    close(fb_fd);
+                    fb_fd = -1;
+                    fb_mem = nullptr;
+                } else {
+                    std::cout << "Optimized framebuffer mapping successful: " << fb_width << "x" << fb_height << std::endl;
+                    // Draw professional UI
+                    draw_professional_ui();
+                }
+                break;
+            }
         }
         
+        if (has_framebuffer && fb_mem) {
+            std::cout << "Using optimized framebuffer display mode" << std::endl;
+        } else {
+            std::cout << "Framebuffer initialization failed, using virtual display mode" << std::endl;
+        }
+        
+        return true;
     } catch (...) {
         std::cout << "Display driver initialization exception, using virtual display mode" << std::endl;
         return true;
