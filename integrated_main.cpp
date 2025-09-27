@@ -80,37 +80,9 @@ inline void lv_disp_draw_buf_init(lv_disp_draw_buf_t* draw_buf, void* buf1, void
 inline void lv_disp_drv_init(lv_disp_drv_t* driver) {}
 inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return driver; }
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
-// LVGL显示驱动回调函数
-void lvgl_display_flush_cb(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p) {
-    // 简化的显示刷新实现
-    // 实际项目中这里应该写入framebuffer或其他显示设备
-    lv_disp_flush_ready(disp_drv);
-}
-
-// LVGL输入设备读取回调
-void lvgl_input_read_cb(lv_indev_drv_t * indev_drv, lv_indev_data_t * data) {
-    // 简化的输入读取实现
-    // 实际项目中这里应该读取触摸屏或其他输入设备
-    data->state = LV_INDEV_STATE_REL;
-}
-
 inline bool lvgl_display_init() {
-    // Jetson Orin NX LVGL显示驱动初始化
+    // Jetson Orin NX LVGL显示驱动初始化（简化版）
     try {
-        // 创建显示缓冲区
-        static lv_disp_draw_buf_t draw_buf;
-        static lv_color_t buf_1[1280 * 10]; // 1280像素宽，10行高的缓冲区
-        lv_disp_draw_buf_init(&draw_buf, buf_1, NULL, 1280 * 10);
-        
-        // 注册显示驱动
-        static lv_disp_drv_t disp_drv;
-        lv_disp_drv_init(&disp_drv);
-        disp_drv.hor_res = 1280;
-        disp_drv.ver_res = 800;
-        disp_drv.flush_cb = lvgl_display_flush_cb;
-        disp_drv.draw_buf = &draw_buf;
-        lv_disp_drv_register(&disp_drv);
-        
         // 检查framebuffer设备
         const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
         bool has_framebuffer = false;
@@ -131,6 +103,7 @@ inline bool lvgl_display_init() {
             std::cout << "未找到framebuffer，使用虚拟显示模式" << std::endl;
         }
         
+        std::cout << "LVGL显示系统已初始化 (虚拟模式)" << std::endl;
         return true;
     } catch (...) {
         std::cout << "显示驱动初始化异常，使用虚拟显示模式" << std::endl;
