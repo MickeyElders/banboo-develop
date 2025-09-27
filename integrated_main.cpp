@@ -68,6 +68,7 @@ typedef void* lv_disp_drv_t;
 typedef void* lv_area_t;
 typedef void* lv_color_t;
 typedef void* lv_disp_draw_buf_t;
+typedef void* lv_display_t;
 
 // 模拟LVGL枚举
 enum lv_indev_state_t {
@@ -98,6 +99,11 @@ inline lv_timer_t* lv_timer_create(void(*cb)(lv_timer_t*), unsigned int period_m
 }
 inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
+}
+
+// LVGL DRM函数占位符
+inline lv_display_t* lv_linux_drm_create() {
+    return nullptr; // 当LVGL未启用时返回nullptr
 }
 
 // DRM/KMS显示系统变量
@@ -782,14 +788,40 @@ inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return drive
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
 inline bool lvgl_display_init() {
-    // DRM/KMS硬件加速显示系统初始化
+    // LVGL + DRM/KMS硬件加速显示系统初始化
     try {
-        std::cout << "Initializing DRM/KMS display system..." << std::endl;
+        std::cout << "Initializing LVGL with DRM/KMS display system..." << std::endl;
         
 #ifdef ENABLE_DRM
-        // 初始化DRM/KMS显示系统
+        // 确保LVGL能访问DRM设备
+        #ifdef ENABLE_LVGL
+        // 使用LVGL的Linux DRM驱动
+        lv_display_t * disp = lv_linux_drm_create();
+        if (!disp) {
+            std::cout << "Failed to create LVGL DRM display" << std::endl;
+            
+            // 回退到自定义DRM实现
+            if (initialize_drm_display()) {
+                std::cout << "Fallback: Custom DRM/KMS display initialized" << std::endl;
+                std::cout << "Display resolution: " << drm_display.width << "x" << drm_display.height << std::endl;
+                
+                // 绘制专业工业界面
+                draw_professional_ui();
+                std::cout << "Professional UI drawn to DRM display" << std::endl;
+                
+                return true;
+            } else {
+                std::cout << "Error: Both LVGL DRM and custom DRM initialization failed" << std::endl;
+                return false;
+            }
+        } else {
+            std::cout << "LVGL DRM display created successfully" << std::endl;
+            return true;
+        }
+        #else
+        // LVGL未启用时使用自定义DRM实现
         if (initialize_drm_display()) {
-            std::cout << "DRM/KMS display initialized successfully" << std::endl;
+            std::cout << "Custom DRM/KMS display initialized successfully" << std::endl;
             std::cout << "Display resolution: " << drm_display.width << "x" << drm_display.height << std::endl;
             
             // 绘制专业工业界面
@@ -805,9 +837,10 @@ inline bool lvgl_display_init() {
             
             return true;
         } else {
-            std::cout << "Error: DRM/KMS initialization failed" << std::endl;
+            std::cout << "Error: Custom DRM/KMS initialization failed" << std::endl;
             return false;
         }
+        #endif
 #else
         std::cout << "Error: DRM/KMS not enabled in build configuration" << std::endl;
         return false;
@@ -936,21 +969,13 @@ static int original_stderr = -1;
 static int log_fd = -1;
 static std::string log_file_path = "/var/log/bamboo-cut/camera_debug.log";
 
-// 强力调试信息抑制函数
-void suppress_camera_debug() {
-    // 重定向所有输出到日志文件
-    freopen("/tmp/app_stdout.log", "w", stdout);
-    freopen("/tmp/app_stderr.log", "w", stderr);
+// 温和的调试信息抑制函数
+void selective_debug_suppress() {
+    // 只禁用特定的相机调试，保留显示相关的输出
+    system("echo 0 > /sys/kernel/debug/tracing/events/camera/enable 2>/dev/null || true");
+    // 不要禁用DRM相关的调试信息
     
-    // 禁用console输出
-    system("dmesg -D 2>/dev/null || true");
-    system("echo 1 > /proc/sys/kernel/printk 2>/dev/null || true");
-    
-    // 禁用内核消息到控制台
-    system("echo 0 > /proc/sys/kernel/printk_devkmsg 2>/dev/null || true");
-    system("echo 0 > /sys/module/printk/parameters/console_suspend 2>/dev/null || true");
-    
-    // 设置环境变量
+    // 设置环境变量抑制Tegra相机调试
     setenv("GST_DEBUG", "0", 1);
     setenv("NVARGUS_LOG_LEVEL", "0", 1);
     setenv("NVARGUS_DISABLE_LOG", "1", 1);
@@ -959,6 +984,13 @@ void suppress_camera_debug() {
     setenv("CAMRTC_LOG_LEVEL", "0", 1);
     setenv("VI_LOG_LEVEL", "0", 1);
     setenv("NVCSI_LOG_LEVEL", "0", 1);
+    
+    std::cout << "Camera debug suppression configured (selective mode)" << std::endl;
+}
+
+// 保持向后兼容的函数名
+void suppress_camera_debug() {
+    selective_debug_suppress();
 }
 
 // 完全抑制所有调试信息的函数
@@ -1451,16 +1483,8 @@ private:
         try {
             std::cout << "Initializing Jetson CSI cameras with debug suppression..." << std::endl;
             
-            // 临时重定向输出到日志文件
-            redirect_output_to_log();
-            
-            // 额外的Tegra调试信息抑制
-            std::cout.setstate(std::ios::failbit);
-            std::cerr.setstate(std::ios::failbit);
-            
-            // 强制抑制内核级调试信息
-            system("echo 1 > /proc/sys/kernel/printk_devkmsg 2>/dev/null || true");
-            system("echo 0 > /sys/module/printk/parameters/console_suspend 2>/dev/null || true");
+            // 温和的调试信息抑制，只针对相机模块
+            selective_debug_suppress();
             
             // Jetson CSI摄像头 GStreamer pipeline - 完全静默模式
             std::vector<std::string> csi_pipelines = {
@@ -1489,8 +1513,6 @@ private:
                     cv::Mat test_frame;
                     if (camera_.read(test_frame) && !test_frame.empty()) {
                         camera_initialized = true;
-                        // 恢复输出后再打印成功消息
-                        restore_output();
                         std::cout << "CSI camera sensor-id=" << i << " initialization successful, resolution: "
                                   << test_frame.cols << "x" << test_frame.rows << std::endl;
                         return true;
@@ -1500,19 +1522,12 @@ private:
                 }
             }
             
-            // 恢复输出
-            std::cout.clear();
-            std::cerr.clear();
-            restore_output();
-            
             if (!camera_initialized) {
                 std::cout << "All CSI camera initialization attempts failed" << std::endl;
             }
             
             return false;
         } catch (const cv::Exception& e) {
-            // 确保输出被恢复
-            restore_output();
             std::cout << "CSI摄像头初始化异常: " << e.what() << std::endl;
             return false;
         }
@@ -1560,8 +1575,8 @@ private:
     bool initializeStereoVision() {
         std::cout << "初始化双摄立体视觉系统..." << std::endl;
         
-        // 临时重定向输出到日志文件
-        redirect_output_to_log();
+        // 应用温和的调试抑制
+        selective_debug_suppress();
         
         vision::StereoConfig stereo_config;
         stereo_config.calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
@@ -1598,9 +1613,6 @@ private:
         } catch (...) {
             initialized = false;
         }
-        
-        // 恢复输出
-        restore_output();
         
         if (initialized) {
             std::cout << "立体视觉系统初始化成功" << std::endl;
@@ -1876,9 +1888,9 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // 只在非详细模式下抑制调试输出
+        // 在非详细模式下使用温和的调试抑制
         if (!verbose_mode && !test_mode) {
-            suppress_camera_debug();
+            selective_debug_suppress();
         } else {
             std::cout << "Bamboo Recognition System starting in verbose mode..." << std::endl;
         }
