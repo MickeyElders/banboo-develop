@@ -997,6 +997,12 @@ public:
 // 使用真实的命名空间
 using namespace bamboo_cut;
 
+// 函数前向声明
+void suppress_all_debug_output();
+void redirect_output_to_log();
+void restore_output();
+void cleanup_output_redirection();
+
 // 全局关闭标志
 std::atomic<bool> g_shutdown_requested{false};
 std::chrono::steady_clock::time_point g_shutdown_start_time;
