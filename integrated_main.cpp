@@ -969,22 +969,22 @@ private:
         stereo_config.frame_size = cv::Size(640, 480);
         stereo_config.fps = 30;
         
-        // Jetson CSI摄像头配置 - 使用GStreamer管道
+        // Jetson CSI摄像头配置 - 使用GStreamer管道，减少调试信息
         stereo_config.left_camera_pipeline =
-            "nvarguscamerasrc sensor-id=0 ! "
+            "nvarguscamerasrc sensor-id=0 silent=true ! "
             "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
-            "nvvidconv flip-method=0 ! "
+            "nvvidconv flip-method=0 silent=true ! "
             "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
-            "videoconvert ! "
-            "video/x-raw, format=(string)BGR ! appsink";
+            "videoconvert silent=true ! "
+            "video/x-raw, format=(string)BGR ! appsink sync=false";
             
         stereo_config.right_camera_pipeline =
-            "nvarguscamerasrc sensor-id=1 ! "
+            "nvarguscamerasrc sensor-id=1 silent=true ! "
             "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
-            "nvvidconv flip-method=0 ! "
+            "nvvidconv flip-method=0 silent=true ! "
             "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
-            "videoconvert ! "
-            "video/x-raw, format=(string)BGR ! appsink";
+            "videoconvert silent=true ! "
+            "video/x-raw, format=(string)BGR ! appsink sync=false";
         
         // 回退选项：USB摄像头ID
         stereo_config.left_camera_id = 0;   // /dev/video0
