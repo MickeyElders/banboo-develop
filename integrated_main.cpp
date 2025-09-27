@@ -1939,18 +1939,41 @@ public:
 /**
  * 主函数入口
  */
-int main() {
+int main(int argc, char* argv[]) {
     try {
-        // 程序启动时立即抑制所有调试输出
-        suppress_camera_debug();
+        // 检查是否为测试模式或调试模式
+        bool verbose_mode = false;
+        bool test_mode = false;
+        
+        for (int i = 1; i < argc; i++) {
+            if (std::string(argv[i]) == "--verbose" || std::string(argv[i]) == "-v") {
+                verbose_mode = true;
+            }
+            if (std::string(argv[i]) == "--test" || std::string(argv[i]) == "-t") {
+                test_mode = true;
+            }
+        }
+        
+        // 只在非详细模式下抑制调试输出
+        if (!verbose_mode && !test_mode) {
+            suppress_camera_debug();
+        } else {
+            std::cout << "Bamboo Recognition System starting in verbose mode..." << std::endl;
+        }
         
         IntegratedBambooSystem system;
         
         if (!system.initialize()) {
             // 临时恢复stdout显示错误信息
-            freopen("/dev/tty", "w", stdout);
+            if (!verbose_mode) {
+                freopen("/dev/tty", "w", stdout);
+            }
             std::cout << "System initialization failed" << std::endl;
             return -1;
+        }
+        
+        if (verbose_mode || test_mode) {
+            std::cout << "System initialized successfully, starting main loop..." << std::endl;
         }
         
         system.run();
