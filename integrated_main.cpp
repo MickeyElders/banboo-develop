@@ -51,6 +51,12 @@
 #endif
 #endif
 
+// 函数前向声明 - 在文件最早位置
+void suppress_all_debug_output();
+void redirect_output_to_log();
+void restore_output();
+void cleanup_output_redirection();
+
 #ifndef ENABLE_LVGL
 // LVGL未启用时的类型占位符
 typedef void* lv_obj_t;
@@ -987,12 +993,6 @@ public:
     }
 };
 #endif
-
-// 函数前向声明（在任何调用之前）
-void suppress_all_debug_output();
-void redirect_output_to_log();
-void restore_output();
-void cleanup_output_redirection();
 
 // 现有后端组件 - 直接包含实际存在的头文件
 #include "bamboo_cut/utils/logger.h"
