@@ -344,6 +344,31 @@ else()
     set(ENABLE_JSON OFF)
 endif()
 
+# libdrm - DRM/KMS硬件加速显示支持
+pkg_check_modules(DRM QUIET libdrm)
+if(DRM_FOUND)
+    message(STATUS "Found libdrm: ${DRM_VERSION}")
+    set(ENABLE_DRM ON)
+    include_directories(${DRM_INCLUDE_DIRS})
+    link_directories(${DRM_LIBRARY_DIRS})
+else()
+    # 手动查找libdrm
+    find_library(DRM_LIBRARY drm
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+    find_path(DRM_INCLUDE_DIR xf86drm.h
+        PATHS /usr/include /usr/local/include /usr/include/libdrm)
+    
+    if(DRM_LIBRARY AND DRM_INCLUDE_DIR)
+        message(STATUS "Found libdrm manually: ${DRM_LIBRARY}")
+        set(ENABLE_DRM ON)
+        set(DRM_LIBRARIES ${DRM_LIBRARY})
+        include_directories(${DRM_INCLUDE_DIR})
+    else()
+        message(WARNING "libdrm not found - DRM/KMS硬件加速将被禁用，使用优化framebuffer")
+        set(ENABLE_DRM OFF)
+    endif()
+endif()
+
 # 移除Python绑定相关配置 - 项目现在是纯C++架构
 set(ENABLE_PYBIND11 OFF)
 set(ENABLE_PYTHON OFF)
@@ -544,6 +569,7 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
     $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
     $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
+    $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
@@ -578,6 +604,10 @@ endif()
 
 if(ENABLE_JSON)
     target_link_libraries(bamboo_integrated nlohmann_json::nlohmann_json)
+endif()
+
+if(ENABLE_DRM)
+    target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
 endif()
 
 # LVGL库
@@ -653,6 +683,7 @@ message(STATUS "  CUDA: ${ENABLE_CUDA}")
 message(STATUS "  TensorRT: ${ENABLE_TENSORRT}")
 message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
 message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
+message(STATUS "  libdrm: ${ENABLE_DRM}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
 message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
 message(STATUS "")
