@@ -353,26 +353,30 @@ void cleanup_drm_display() {}
 bool present_drm_framebuffer() { return false; }
 #endif
 
-// 简单的framebuffer显示刷新函数
-void simple_fb_flush(int x1, int y1, int x2, int y2, const uint8_t* color_data) {
-    if (fb_fd < 0 || !fb_mem) return;
+// DRM显示刷新函数（替换传统framebuffer）
+void drm_flush_region(int x1, int y1, int x2, int y2, const uint8_t* color_data) {
+#ifdef ENABLE_DRM
+    if (!drm_display.initialized || !drm_display.mapped_memory) return;
     
-    // 简单的像素复制到framebuffer
+    uint8_t* drm_mem = (uint8_t*)drm_display.mapped_memory;
+    
+    // 复制像素数据到DRM缓冲区
     for (int y = y1; y <= y2; y++) {
         for (int x = x1; x <= x2; x++) {
-            if (x >= 0 && x < fb_width && y >= 0 && y < fb_height) {
-                size_t fb_offset = (y * fb_width + x) * fb_bytes_per_pixel;
+            if (x >= 0 && x < drm_display.width && y >= 0 && y < drm_display.height) {
+                size_t drm_offset = (y * drm_display.width + x) * drm_display.bytes_per_pixel;
                 size_t data_offset = ((y - y1) * (x2 - x1 + 1) + (x - x1)) * 3; // RGB
                 
-                if (fb_offset + 3 < fb_mem_size && data_offset + 2 < (x2-x1+1)*(y2-y1+1)*3) {
-                    fb_mem[fb_offset] = color_data[data_offset + 2];     // B
-                    fb_mem[fb_offset + 1] = color_data[data_offset + 1]; // G
-                    fb_mem[fb_offset + 2] = color_data[data_offset];     // R
-                    fb_mem[fb_offset + 3] = 255;                         // A
+                if (drm_offset + 3 < drm_display.buffer_size && data_offset + 2 < (x2-x1+1)*(y2-y1+1)*3) {
+                    drm_mem[drm_offset] = color_data[data_offset + 2];     // B
+                    drm_mem[drm_offset + 1] = color_data[data_offset + 1]; // G
+                    drm_mem[drm_offset + 2] = color_data[data_offset];     // R
+                    drm_mem[drm_offset + 3] = 255;                         // A
                 }
             }
         }
     }
+#endif
 }
 
 // 颜色定义 - 按照参考界面的配色方案
@@ -395,14 +399,35 @@ const Color BORDER(64, 64, 64);           // #404040 边框
 const Color MODBUS_BLUE(33, 150, 243);    // #2196F3 Modbus蓝色
 const Color JETSON_GREEN(118, 185, 0);    // #76B900 Jetson绿色
 
-// 优化的framebuffer绘制矩形填充
+// DRM优化的矩形填充
 void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
-    if (fb_fd < 0 || !fb_mem) return;
+#ifdef ENABLE_DRM
+    if (!drm_display.initialized || !drm_display.mapped_memory) return;
+    
+    uint8_t* drm_mem = (uint8_t*)drm_display.mapped_memory;
     
     // 计算32位颜色值（BGRA格式）
     uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
     
     // 使用32位批量写入优化性能
+    for (int py = y; py < y + h && py < drm_display.height; py++) {
+        if (py < 0) continue;
+        
+        uint32_t* row_ptr = reinterpret_cast<uint32_t*>(
+            drm_mem + py * drm_display.width * drm_display.bytes_per_pixel);
+        
+        for (int px = x; px < x + w && px < drm_display.width; px++) {
+            if (px >= 0) {
+                row_ptr[px] = pixel_value;
+            }
+        }
+    }
+#else
+    // 传统framebuffer实现（回退）
+    if (fb_fd < 0 || !fb_mem) return;
+    
+    uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
+    
     for (int py = y; py < y + h && py < fb_height; py++) {
         if (py < 0) continue;
         
@@ -415,6 +440,7 @@ void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
             }
         }
     }
+#endif
 }
 
 // 绘制矩形边框
@@ -494,9 +520,12 @@ int get_char_index(char c) {
     return 36; // 默认返回空格
 }
 
-// 优化的framebuffer绘制单个字符
+// DRM优化的字符绘制
 void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
-    if (fb_fd < 0 || !fb_mem) return;
+#ifdef ENABLE_DRM
+    if (!drm_display.initialized || !drm_display.mapped_memory) return;
+    
+    uint8_t* drm_mem = (uint8_t*)drm_display.mapped_memory;
     
     int char_index = get_char_index(c);
     if (char_index >= sizeof(font_8x8) / sizeof(font_8x8[0])) return;
@@ -513,6 +542,34 @@ void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
                     for (int sx = 0; sx < scale; sx++) {
                         int px = x + col * scale + sx;
                         int py = y + row * scale + sy;
+                        if (px >= 0 && px < drm_display.width && py >= 0 && py < drm_display.height) {
+                            uint32_t* pixel_ptr = reinterpret_cast<uint32_t*>(
+                                drm_mem + (py * drm_display.width + px) * drm_display.bytes_per_pixel);
+                            *pixel_ptr = pixel_value;
+                        }
+                    }
+                }
+            }
+        }
+    }
+#else
+    // 传统framebuffer实现（回退）
+    if (fb_fd < 0 || !fb_mem) return;
+    
+    int char_index = get_char_index(c);
+    if (char_index >= sizeof(font_8x8) / sizeof(font_8x8[0])) return;
+    
+    const uint8_t* char_data = font_8x8[char_index];
+    uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
+    
+    for (int row = 0; row < 8; row++) {
+        uint8_t row_data = char_data[row];
+        for (int col = 0; col < 8; col++) {
+            if (row_data & (0x80 >> col)) {
+                for (int sy = 0; sy < scale; sy++) {
+                    for (int sx = 0; sx < scale; sx++) {
+                        int px = x + col * scale + sx;
+                        int py = y + row * scale + sy;
                         if (px >= 0 && px < fb_width && py >= 0 && py < fb_height) {
                             uint32_t* pixel_ptr = reinterpret_cast<uint32_t*>(
                                 fb_mem + (py * fb_width + px) * fb_bytes_per_pixel);
@@ -523,6 +580,7 @@ void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
             }
         }
     }
+#endif
 }
 
 // 绘制字符串
