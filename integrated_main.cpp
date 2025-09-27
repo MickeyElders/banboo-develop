@@ -100,14 +100,6 @@ inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
 }
 
-// 传统framebuffer全局变量
-static int fb_fd = -1;
-static uint8_t* fb_mem = nullptr;
-static size_t fb_mem_size = 0;
-static int fb_width = 1920;
-static int fb_height = 1080;
-static int fb_bytes_per_pixel = 4;
-
 // DRM/KMS显示系统变量
 #ifdef ENABLE_DRM
 struct DRMDisplay {
@@ -132,29 +124,6 @@ struct DRMDisplay {
 
 static DRMDisplay drm_display;
 #endif
-
-// 传统framebuffer信息获取函数
-bool get_framebuffer_info() {
-    if (fb_fd < 0) return false;
-    
-    struct fb_var_screeninfo vinfo;
-    struct fb_fix_screeninfo finfo;
-    
-    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
-        return false;
-    }
-    
-    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
-        return false;
-    }
-    
-    fb_width = vinfo.xres;
-    fb_height = vinfo.yres;
-    fb_bytes_per_pixel = vinfo.bits_per_pixel / 8;
-    fb_mem_size = finfo.line_length * vinfo.yres;
-    
-    return true;
-}
 
 #ifdef ENABLE_DRM
 // DRM/KMS初始化函数
