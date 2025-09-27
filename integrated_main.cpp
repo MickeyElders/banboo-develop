@@ -13,6 +13,7 @@
 #include <chrono>
 #include <fcntl.h>      // for open(), O_RDWR, O_RDONLY
 #include <unistd.h>     // for close()
+#include <sys/mman.h>   // for mmap(), munmap()
 
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
