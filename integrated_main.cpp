@@ -151,28 +151,59 @@ struct performance_stats_t {
 
 class Status_bar {
 public:
-    bool initialize() { return true; }
-    void update_workflow_status(int) {}
-    void update_heartbeat(int, int) {}
+    bool initialize() {
+        std::cout << "状态栏初始化完成" << std::endl;
+        return true;
+    }
+    void update_workflow_status(int status) {
+        std::cout << "更新工作流状态: " << status << std::endl;
+    }
+    void update_heartbeat(int count, int plc_status) {
+        std::cout << "更新心跳: count=" << count << ", plc=" << plc_status << std::endl;
+    }
 };
 
 class Video_view {
 public:
-    bool initialize() { return true; }
-    void update_camera_frame(const frame_info_t&) {}
-    void update_detection_info(float, float) {}
+    bool initialize() {
+        std::cout << "视频视图初始化完成" << std::endl;
+        return true;
+    }
+    void update_camera_frame(const frame_info_t& frame) {
+        std::cout << "更新摄像头帧: " << frame.width << "x" << frame.height
+                  << " (有效: " << frame.valid << ")" << std::endl;
+    }
+    void update_detection_info(float fps, float process_time) {
+        std::cout << "更新检测信息: FPS=" << fps << ", 处理时间=" << process_time << "ms" << std::endl;
+    }
 };
 
 class Control_panel {
 public:
-    bool initialize() { return true; }
-    void update_jetson_info(const performance_stats_t&) {}
+    bool initialize() {
+        std::cout << "控制面板初始化完成" << std::endl;
+        return true;
+    }
+    void update_jetson_info(const performance_stats_t& stats) {
+        std::cout << "更新Jetson信息: CPU=" << stats.cpu_usage << "%, 内存="
+                  << stats.memory_usage_mb << "MB, FPS=" << stats.fps << std::endl;
+    }
 };
 
 class Settings_page {
 public:
-    bool initialize() { return true; }
-    void create_main_layout(Status_bar*, Video_view*, Control_panel*) {}
+    bool initialize() {
+        std::cout << "设置页面初始化完成" << std::endl;
+        return true;
+    }
+    void create_main_layout(Status_bar* status, Video_view* video, Control_panel* control) {
+        std::cout << "创建主界面布局" << std::endl;
+        std::cout << "=== 竹子识别系统界面 ===" << std::endl;
+        std::cout << "状态栏: " << (status ? "已连接" : "未连接") << std::endl;
+        std::cout << "视频视图: " << (video ? "已连接" : "未连接") << std::endl;
+        std::cout << "控制面板: " << (control ? "已连接" : "未连接") << std::endl;
+        std::cout << "=========================" << std::endl;
+    }
 };
 #endif
 
