@@ -14,6 +14,8 @@
 #include <fcntl.h>      // for open(), O_RDWR, O_RDONLY
 #include <unistd.h>     // for close()
 #include <sys/mman.h>   // for mmap(), munmap()
+#include <sys/stat.h>   // for file status
+#include <sys/types.h>  // for system types
 
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
