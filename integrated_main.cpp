@@ -82,9 +82,43 @@ inline void lv_timer_del(lv_timer_t* timer) {
 static int fb_fd = -1;
 static uint8_t* fb_mem = nullptr;
 static size_t fb_mem_size = 0;
-static int fb_width = 1280;
-static int fb_height = 800;
+static int fb_width = 1920;  // 修改为标准1080p分辨率
+static int fb_height = 1080;
 static int fb_bytes_per_pixel = 4; // RGBA
+
+// 获取实际framebuffer信息
+#include <linux/fb.h>
+#include <sys/ioctl.h>
+
+bool get_framebuffer_info() {
+    if (fb_fd < 0) return false;
+    
+    struct fb_var_screeninfo vinfo;
+    struct fb_fix_screeninfo finfo;
+    
+    // 获取可变屏幕信息
+    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
+        std::cout << "Error reading variable framebuffer info" << std::endl;
+        return false;
+    }
+    
+    // 获取固定屏幕信息
+    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
+        std::cout << "Error reading fixed framebuffer info" << std::endl;
+        return false;
+    }
+    
+    // 更新全局变量
+    fb_width = vinfo.xres;
+    fb_height = vinfo.yres;
+    fb_bytes_per_pixel = vinfo.bits_per_pixel / 8;
+    fb_mem_size = finfo.smem_len;
+    
+    std::cout << "Framebuffer info: " << fb_width << "x" << fb_height
+              << ", " << vinfo.bits_per_pixel << "bpp, size=" << fb_mem_size << std::endl;
+    
+    return true;
+}
 
 // 简单的framebuffer显示刷新函数
 void simple_fb_flush(int x1, int y1, int x2, int y2, const uint8_t* color_data) {
@@ -341,8 +375,15 @@ inline bool lvgl_display_init() {
                 has_framebuffer = true;
                 std::cout << "Opening framebuffer device: " << fb_dev << std::endl;
                 
+                // 获取实际framebuffer信息
+                if (!get_framebuffer_info()) {
+                    std::cout << "Failed to get framebuffer info" << std::endl;
+                    close(fb_fd);
+                    fb_fd = -1;
+                    continue;
+                }
+                
                 // 映射framebuffer到内存
-                fb_mem_size = fb_width * fb_height * fb_bytes_per_pixel;
                 fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
                 
                 if (fb_mem == MAP_FAILED) {
@@ -834,22 +875,22 @@ private:
     
     bool initializeJetsonCSICamera() {
         try {
-            // Jetson CSI摄像头 GStreamer pipeline
+            // Jetson CSI摄像头 GStreamer pipeline - 添加silent=true减少调试信息
             // sensor-id=0 表示第一个CSI摄像头, sensor-id=1 表示第二个
             std::vector<std::string> csi_pipelines = {
-                "nvarguscamerasrc sensor-id=0 ! "
+                "nvarguscamerasrc sensor-id=0 silent=true ! "
                 "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
-                "nvvidconv flip-method=0 ! "
+                "nvvidconv flip-method=0 silent=true ! "
                 "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
-                "videoconvert ! "
-                "video/x-raw, format=(string)BGR ! appsink",
+                "videoconvert silent=true ! "
+                "video/x-raw, format=(string)BGR ! appsink sync=false",
                 
-                "nvarguscamerasrc sensor-id=1 ! "
+                "nvarguscamerasrc sensor-id=1 silent=true ! "
                 "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
-                "nvvidconv flip-method=0 ! "
+                "nvvidconv flip-method=0 silent=true ! "
                 "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
-                "videoconvert ! "
-                "video/x-raw, format=(string)BGR ! appsink"
+                "videoconvert silent=true ! "
+                "video/x-raw, format=(string)BGR ! appsink sync=false"
             };
             
             for (size_t i = 0; i < csi_pipelines.size(); i++) {
