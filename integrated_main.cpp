@@ -782,73 +782,36 @@ inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return drive
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
 inline bool lvgl_display_init() {
-    // 优先尝试DRM/KMS显示系统
+    // DRM/KMS硬件加速显示系统初始化
     try {
-        std::cout << "Initializing display system..." << std::endl;
+        std::cout << "Initializing DRM/KMS display system..." << std::endl;
         
 #ifdef ENABLE_DRM
-        // 尝试初始化DRM/KMS
+        // 初始化DRM/KMS显示系统
         if (initialize_drm_display()) {
             std::cout << "DRM/KMS display initialized successfully" << std::endl;
+            std::cout << "Display resolution: " << drm_display.width << "x" << drm_display.height << std::endl;
+            
+            // 绘制专业工业界面
             draw_professional_ui();
-            return true;
-        } else {
-            std::cout << "DRM/KMS initialization failed, falling back to framebuffer" << std::endl;
-        }
-#endif
-        
-        // 回退到传统framebuffer
-        std::cout << "Initializing framebuffer display driver..." << std::endl;
-        
-        // 检查framebuffer设备
-        const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
-        bool has_framebuffer = false;
-        
-        for (const char* fb_dev : fb_devices) {
-            std::cout << "Trying framebuffer device: " << fb_dev << std::endl;
-            fb_fd = open(fb_dev, O_RDWR);
-            if (fb_fd >= 0) {
-                has_framebuffer = true;
-                std::cout << "Opened framebuffer device: " << fb_dev << std::endl;
-                
-                // 获取实际framebuffer信息
-                if (!get_framebuffer_info()) {
-                    std::cout << "Failed to get framebuffer info" << std::endl;
-                    close(fb_fd);
-                    fb_fd = -1;
-                    continue;
-                }
-                
-                std::cout << "Framebuffer info: " << fb_width << "x" << fb_height
-                         << " bpp:" << (fb_bytes_per_pixel * 8) << " size:" << fb_mem_size << std::endl;
-                
-                // 映射framebuffer到内存
-                fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
-                
-                if (fb_mem == MAP_FAILED) {
-                    std::cout << "Framebuffer memory mapping failed: " << strerror(errno) << std::endl;
-                    close(fb_fd);
-                    fb_fd = -1;
-                    fb_mem = nullptr;
-                } else {
-                    std::cout << "Framebuffer mapping successful: " << fb_width << "x" << fb_height << std::endl;
-                    // 绘制专业界面
-                    draw_professional_ui();
-                    std::cout << "Professional UI drawn to framebuffer" << std::endl;
-                }
-                break;
+            std::cout << "Professional UI drawn to DRM display" << std::endl;
+            
+            // 立即呈现到屏幕
+            if (present_drm_framebuffer()) {
+                std::cout << "DRM framebuffer presented successfully" << std::endl;
             } else {
-                std::cout << "Failed to open " << fb_dev << ": " << strerror(errno) << std::endl;
+                std::cout << "Warning: DRM framebuffer presentation failed" << std::endl;
             }
-        }
-        
-        if (has_framebuffer && fb_mem) {
-            std::cout << "Using framebuffer display mode" << std::endl;
+            
             return true;
         } else {
-            std::cout << "No framebuffer available, display disabled" << std::endl;
+            std::cout << "Error: DRM/KMS initialization failed" << std::endl;
             return false;
         }
+#else
+        std::cout << "Error: DRM/KMS not enabled in build configuration" << std::endl;
+        return false;
+#endif
         
     } catch (const std::exception& e) {
         std::cout << "Display initialization exception: " << e.what() << std::endl;

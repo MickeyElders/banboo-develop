@@ -1,28 +1,31 @@
 [Unit]
 Description=AI Bamboo Recognition System - C++ LVGL Edition
 Documentation=https://github.com/bamboo-industries/bamboo-recognition
-After=network.target graphical.target
-Wants=graphical.target
+After=network.target multi-user.target
+Wants=multi-user.target
 
 [Service]
 Type=simple
 User=root
 Group=root
 WorkingDirectory=@CMAKE_INSTALL_PREFIX@/bin
-ExecStart=@CMAKE_INSTALL_PREFIX@/bin/bamboo_integrated --config @CMAKE_INSTALL_PREFIX@/share/bamboo/config/system_config.yaml
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/bamboo_integrated --verbose --config @CMAKE_INSTALL_PREFIX@/share/bamboo/config/system_config.yaml
 ExecReload=/bin/kill -USR1 $MAINPID
 ExecStop=/bin/kill -TERM $MAINPID
 
 # 环境变量
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64"
+Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu"
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="HOME=/root"
 
-# 显示和输入设备访问
-Environment="DISPLAY=:0"
-Environment="WAYLAND_DISPLAY=wayland-0"
-SupplementaryGroups=input video render
+# DRM/KMS显示设置
+Environment="QT_QPA_PLATFORM=eglfs"
+Environment="QT_QPA_EGLFS_INTEGRATION=eglfs_kms"
+Environment="QT_QPA_EGLFS_KMS_CONFIG=@CMAKE_INSTALL_PREFIX@/share/bamboo/config/kms.conf"
+
+# 设备权限组
+SupplementaryGroups=input video render tty dialout
 
 # 资源限制
 LimitNOFILE=65536
@@ -31,16 +34,20 @@ OOMScoreAdjust=-100
 
 # 重启策略
 Restart=always
-RestartSec=10
-TimeoutStartSec=60
+RestartSec=15
+TimeoutStartSec=120
 TimeoutStopSec=30
 KillMode=mixed
 
-# 安全设置
+# 安全设置（允许访问硬件设备）
 NoNewPrivileges=false
 PrivateTmp=false
 ProtectSystem=false
 ProtectHome=false
+
+# 日志输出
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
