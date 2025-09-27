@@ -75,42 +75,161 @@ inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
 }
 
+// 全局framebuffer相关变量
+static int fb_fd = -1;
+static uint8_t* fb_mem = nullptr;
+static size_t fb_mem_size = 0;
+static int fb_width = 1280;
+static int fb_height = 800;
+static int fb_bytes_per_pixel = 4; // RGBA
+
+// 简单的framebuffer显示刷新函数
+void simple_fb_flush(int x1, int y1, int x2, int y2, const uint8_t* color_data) {
+    if (fb_fd < 0 || !fb_mem) return;
+    
+    // 简单的像素复制到framebuffer
+    for (int y = y1; y <= y2; y++) {
+        for (int x = x1; x <= x2; x++) {
+            if (x >= 0 && x < fb_width && y >= 0 && y < fb_height) {
+                size_t fb_offset = (y * fb_width + x) * fb_bytes_per_pixel;
+                size_t data_offset = ((y - y1) * (x2 - x1 + 1) + (x - x1)) * 3; // RGB
+                
+                if (fb_offset + 3 < fb_mem_size && data_offset + 2 < (x2-x1+1)*(y2-y1+1)*3) {
+                    fb_mem[fb_offset] = color_data[data_offset + 2];     // B
+                    fb_mem[fb_offset + 1] = color_data[data_offset + 1]; // G
+                    fb_mem[fb_offset + 2] = color_data[data_offset];     // R
+                    fb_mem[fb_offset + 3] = 255;                         // A
+                }
+            }
+        }
+    }
+}
+
+// 绘制简单的测试界面
+void draw_test_ui() {
+    if (fb_fd < 0 || !fb_mem) return;
+    
+    // 清屏 - 设置为深蓝色背景
+    for (int i = 0; i < fb_mem_size; i += 4) {
+        fb_mem[i] = 64;      // B
+        fb_mem[i + 1] = 32;  // G
+        fb_mem[i + 2] = 16;  // R
+        fb_mem[i + 3] = 255; // A
+    }
+    
+    // 绘制标题栏 - 橙色
+    for (int y = 0; y < 80; y++) {
+        for (int x = 0; x < fb_width; x++) {
+            size_t offset = (y * fb_width + x) * fb_bytes_per_pixel;
+            if (offset + 3 < fb_mem_size) {
+                fb_mem[offset] = 0;       // B
+                fb_mem[offset + 1] = 165; // G
+                fb_mem[offset + 2] = 255; // R (橙色)
+                fb_mem[offset + 3] = 255; // A
+            }
+        }
+    }
+    
+    // 绘制状态区域 - 绿色
+    for (int y = fb_height - 100; y < fb_height; y++) {
+        for (int x = 0; x < fb_width; x++) {
+            size_t offset = (y * fb_width + x) * fb_bytes_per_pixel;
+            if (offset + 3 < fb_mem_size) {
+                fb_mem[offset] = 0;       // B
+                fb_mem[offset + 1] = 255; // G (绿色)
+                fb_mem[offset + 2] = 0;   // R
+                fb_mem[offset + 3] = 255; // A
+            }
+        }
+    }
+    
+    // 绘制中央视频区域边框 - 白色
+    int video_x = 200, video_y = 150, video_w = 880, video_h = 450;
+    for (int x = video_x; x < video_x + video_w; x++) {
+        for (int border = 0; border < 4; border++) {
+            // 上边框
+            size_t offset1 = ((video_y + border) * fb_width + x) * fb_bytes_per_pixel;
+            // 下边框
+            size_t offset2 = ((video_y + video_h - border - 1) * fb_width + x) * fb_bytes_per_pixel;
+            if (offset1 + 3 < fb_mem_size) {
+                fb_mem[offset1] = fb_mem[offset1 + 1] = fb_mem[offset1 + 2] = 255;
+                fb_mem[offset1 + 3] = 255;
+            }
+            if (offset2 + 3 < fb_mem_size) {
+                fb_mem[offset2] = fb_mem[offset2 + 1] = fb_mem[offset2 + 2] = 255;
+                fb_mem[offset2 + 3] = 255;
+            }
+        }
+    }
+    for (int y = video_y; y < video_y + video_h; y++) {
+        for (int border = 0; border < 4; border++) {
+            // 左边框
+            size_t offset1 = (y * fb_width + video_x + border) * fb_bytes_per_pixel;
+            // 右边框
+            size_t offset2 = (y * fb_width + video_x + video_w - border - 1) * fb_bytes_per_pixel;
+            if (offset1 + 3 < fb_mem_size) {
+                fb_mem[offset1] = fb_mem[offset1 + 1] = fb_mem[offset1 + 2] = 255;
+                fb_mem[offset1 + 3] = 255;
+            }
+            if (offset2 + 3 < fb_mem_size) {
+                fb_mem[offset2] = fb_mem[offset2 + 1] = fb_mem[offset2 + 2] = 255;
+                fb_mem[offset2 + 3] = 255;
+            }
+        }
+    }
+    
+    std::cout << "已绘制测试界面到framebuffer" << std::endl;
+}
+
 // 显示驱动相关占位符
 inline void lv_disp_draw_buf_init(lv_disp_draw_buf_t* draw_buf, void* buf1, void* buf2, uint32_t size_in_px_cnt) {}
 inline void lv_disp_drv_init(lv_disp_drv_t* driver) {}
 inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return driver; }
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
+
 inline bool lvgl_display_init() {
-    // Jetson Orin NX LVGL显示驱动初始化（简化版）
+    // Jetson Orin NX LVGL显示驱动初始化（真实framebuffer）
     try {
         // 检查framebuffer设备
         const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
         bool has_framebuffer = false;
         
         for (const char* fb_dev : fb_devices) {
-            int fb_fd = open(fb_dev, O_RDWR);
+            fb_fd = open(fb_dev, O_RDWR);
             if (fb_fd >= 0) {
-                close(fb_fd);
                 has_framebuffer = true;
-                std::cout << "找到framebuffer设备: " << fb_dev << std::endl;
+                std::cout << "打开framebuffer设备: " << fb_dev << std::endl;
+                
+                // 映射framebuffer到内存
+                fb_mem_size = fb_width * fb_height * fb_bytes_per_pixel;
+                fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
+                
+                if (fb_mem == MAP_FAILED) {
+                    std::cout << "framebuffer内存映射失败" << std::endl;
+                    close(fb_fd);
+                    fb_fd = -1;
+                    fb_mem = nullptr;
+                } else {
+                    std::cout << "framebuffer内存映射成功: " << fb_width << "x" << fb_height << std::endl;
+                    // 绘制测试界面
+                    draw_test_ui();
+                }
                 break;
             }
         }
         
-        if (has_framebuffer) {
+        if (has_framebuffer && fb_mem) {
             std::cout << "使用framebuffer显示模式" << std::endl;
         } else {
-            std::cout << "未找到framebuffer，使用虚拟显示模式" << std::endl;
+            std::cout << "framebuffer初始化失败，使用虚拟显示模式" << std::endl;
         }
         
-        std::cout << "LVGL显示系统已初始化 (虚拟模式)" << std::endl;
         return true;
     } catch (...) {
         std::cout << "显示驱动初始化异常，使用虚拟显示模式" << std::endl;
         return true;
     }
 }
-
 inline bool touch_driver_init() {
     // Jetson Orin NX 触摸驱动初始化（自适应）
     try {
