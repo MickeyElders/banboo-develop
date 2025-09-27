@@ -26,12 +26,13 @@
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 
-// DRM/KMS相关头文件
+// DRM/KMS相关头文件（使用tegra_drm）
 #ifdef ENABLE_DRM
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
+#include <drm/tegra_drm.h>
 #endif
 
 // LVGL头文件包含 - 智能检测多种可能的路径
@@ -340,12 +341,6 @@ bool present_drm_framebuffer() {
     
     return ret == 0;
 }
-#else
-// DRM禁用时的占位符函数
-bool initialize_drm_display() { return false; }
-void cleanup_drm_display() {}
-bool present_drm_framebuffer() { return false; }
-#endif
 #else
 // DRM禁用时的占位符函数
 bool initialize_drm_display() { return false; }
