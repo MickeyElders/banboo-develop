@@ -142,8 +142,8 @@ bool initialize_drm_display() {
     setenv("QT_QPA_EGLFS_KMS_CONFIG", "/opt/bamboo-cut/config/kms.conf", 1);
     setenv("QT_LOGGING_RULES", "qt.qpa.eglfs.kms.debug=true", 1);
     
-    // 打开DRM设备
-    const char* drm_devices[] = {"/dev/dri/card0", "/dev/dri/card1"};
+    // 打开DRM设备 - 优先使用card1
+    const char* drm_devices[] = {"/dev/dri/card1", "/dev/dri/card0"};
     for (const char* device : drm_devices) {
         drm_display.drm_fd = open(device, O_RDWR | O_CLOEXEC);
         if (drm_display.drm_fd >= 0) {
