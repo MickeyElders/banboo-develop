@@ -843,7 +843,7 @@ inline bool lvgl_display_init() {
         std::cout << "Initializing optimized framebuffer display driver..." << std::endl;
         
         // 首先抑制调试输出
-        // suppress_all_debug_output(); // 函数声明在后面，暂时注释
+        suppress_all_debug_output();
         
         // 检查framebuffer设备
         const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
@@ -1477,6 +1477,10 @@ private:
             // 临时重定向输出到日志文件
             redirect_output_to_log();
             
+            // 额外的Tegra调试信息抑制
+            std::cout.setstate(std::ios::failbit);
+            std::cerr.setstate(std::ios::failbit);
+            
             // Jetson CSI摄像头 GStreamer pipeline - 完全静默模式
             std::vector<std::string> csi_pipelines = {
                 "nvarguscamerasrc sensor-id=0 silent=true ! "
@@ -1516,6 +1520,8 @@ private:
             }
             
             // 恢复输出
+            std::cout.clear();
+            std::cerr.clear();
             restore_output();
             
             if (!camera_initialized) {
