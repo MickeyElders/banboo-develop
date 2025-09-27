@@ -16,6 +16,8 @@
 #include <sys/mman.h>   // for mmap(), munmap()
 #include <sys/stat.h>   // for file status
 #include <sys/types.h>  // for system types
+#include <cstdlib>      // for setenv()
+#include <fstream>      // for file operations
 
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
@@ -691,11 +693,92 @@ using namespace bamboo_cut;
 std::atomic<bool> g_shutdown_requested{false};
 std::chrono::steady_clock::time_point g_shutdown_start_time;
 
+// 静态输出重定向文件描述符
+static int original_stdout = -1;
+static int original_stderr = -1;
+static int null_fd = -1;
+
+// 完全抑制所有调试信息的函数
+void suppress_all_debug_output() {
+    std::cout << "Suppressing all camera and system debug output..." << std::endl;
+    
+    // 1. 设置环境变量抑制NVIDIA Tegra调试信息
+    setenv("GST_DEBUG", "0", 1);
+    setenv("GST_DEBUG_NO_COLOR", "1", 1);
+    setenv("NVARGUS_LOG_LEVEL", "0", 1);
+    setenv("NVARGUS_DISABLE_LOG", "1", 1);
+    setenv("TEGRA_LOG_LEVEL", "0", 1);
+    setenv("ARGUS_LOG_LEVEL", "0", 1);
+    setenv("ARGUS_DISABLE_LOG", "1", 1);
+    setenv("NVMEDIA_LOG_LEVEL", "0", 1);
+    setenv("NV_LOG_LEVEL", "0", 1);
+    setenv("NV_DISABLE_LOG", "1", 1);
+    
+    // 2. 设置GStreamer静默模式
+    setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0", 1);
+    setenv("GST_REGISTRY_UPDATE", "no", 1);
+    setenv("GST_REGISTRY_FORK", "no", 1);
+    
+    // 3. 创建空设备用于重定向
+    null_fd = open("/dev/null", O_WRONLY);
+    if (null_fd == -1) {
+        std::cout << "Warning: Cannot open /dev/null, debug output may still appear" << std::endl;
+        return;
+    }
+    
+    // 4. 保存原始文件描述符
+    original_stdout = dup(STDOUT_FILENO);
+    original_stderr = dup(STDERR_FILENO);
+    
+    if (original_stdout == -1 || original_stderr == -1) {
+        std::cout << "Warning: Cannot backup original file descriptors" << std::endl;
+        if (null_fd >= 0) close(null_fd);
+        return;
+    }
+    
+    std::cout << "Debug output suppression configured successfully" << std::endl;
+}
+
+// 临时重定向输出（在摄像头初始化期间使用）
+void redirect_output_to_null() {
+    if (null_fd >= 0) {
+        dup2(null_fd, STDOUT_FILENO);
+        dup2(null_fd, STDERR_FILENO);
+    }
+}
+
+// 恢复原始输出
+void restore_output() {
+    if (original_stdout >= 0 && original_stderr >= 0) {
+        dup2(original_stdout, STDOUT_FILENO);
+        dup2(original_stderr, STDERR_FILENO);
+    }
+}
+
+// 清理重定向资源
+void cleanup_output_redirection() {
+    if (original_stdout >= 0) {
+        close(original_stdout);
+        original_stdout = -1;
+    }
+    if (original_stderr >= 0) {
+        close(original_stderr);
+        original_stderr = -1;
+    }
+    if (null_fd >= 0) {
+        close(null_fd);
+        null_fd = -1;
+    }
+}
+
 // 信号处理
 void signal_handler(int sig) {
     std::cout << "\n收到信号 " << sig << "，开始优雅关闭..." << std::endl;
     g_shutdown_requested = true;
     g_shutdown_start_time = std::chrono::steady_clock::now();
+    
+    // 清理输出重定向资源
+    cleanup_output_redirection();
 }
 
 /**
