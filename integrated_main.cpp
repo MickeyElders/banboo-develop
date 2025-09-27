@@ -378,7 +378,7 @@ const Color BORDER(64, 64, 64);           // #404040 边框
 const Color MODBUS_BLUE(33, 150, 243);    // #2196F3 Modbus蓝色
 const Color JETSON_GREEN(118, 185, 0);    // #76B900 Jetson绿色
 
-// DRM优化的矩形填充
+// DRM/KMS优化的矩形填充
 void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
 #ifdef ENABLE_DRM
     if (!drm_display.initialized || !drm_display.mapped_memory) return;
@@ -402,23 +402,8 @@ void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
         }
     }
 #else
-    // 传统framebuffer实现（回退）
-    if (fb_fd < 0 || !fb_mem) return;
-    
-    uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
-    
-    for (int py = y; py < y + h && py < fb_height; py++) {
-        if (py < 0) continue;
-        
-        uint32_t* row_ptr = reinterpret_cast<uint32_t*>(
-            fb_mem + py * fb_width * fb_bytes_per_pixel);
-        
-        for (int px = x; px < x + w && px < fb_width; px++) {
-            if (px >= 0) {
-                row_ptr[px] = pixel_value;
-            }
-        }
-    }
+    // DRM未启用时的占位符
+    std::cout << "DRM not enabled, draw_filled_rect disabled" << std::endl;
 #endif
 }
 
@@ -499,7 +484,7 @@ int get_char_index(char c) {
     return 36; // 默认返回空格
 }
 
-// DRM优化的字符绘制
+// DRM/KMS优化的字符绘制
 void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
 #ifdef ENABLE_DRM
     if (!drm_display.initialized || !drm_display.mapped_memory) return;
@@ -532,33 +517,8 @@ void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
         }
     }
 #else
-    // 传统framebuffer实现（回退）
-    if (fb_fd < 0 || !fb_mem) return;
-    
-    int char_index = get_char_index(c);
-    if (char_index >= sizeof(font_8x8) / sizeof(font_8x8[0])) return;
-    
-    const uint8_t* char_data = font_8x8[char_index];
-    uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
-    
-    for (int row = 0; row < 8; row++) {
-        uint8_t row_data = char_data[row];
-        for (int col = 0; col < 8; col++) {
-            if (row_data & (0x80 >> col)) {
-                for (int sy = 0; sy < scale; sy++) {
-                    for (int sx = 0; sx < scale; sx++) {
-                        int px = x + col * scale + sx;
-                        int py = y + row * scale + sy;
-                        if (px >= 0 && px < fb_width && py >= 0 && py < fb_height) {
-                            uint32_t* pixel_ptr = reinterpret_cast<uint32_t*>(
-                                fb_mem + (py * fb_width + px) * fb_bytes_per_pixel);
-                            *pixel_ptr = pixel_value;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // DRM未启用时的占位符
+    std::cout << "DRM not enabled, draw_char disabled" << std::endl;
 #endif
 }
 
@@ -576,10 +536,15 @@ void draw_text(int x, int y, const std::string& text, const Color& color, int sc
     }
 }
 
-// 绘制专业工业界面（DRM优化版本）
+// 绘制专业工业界面（DRM/KMS硬件加速版本）
 void draw_professional_ui() {
 #ifdef ENABLE_DRM
-    if (!drm_display.initialized || !drm_display.mapped_memory) return;
+    if (!drm_display.initialized || !drm_display.mapped_memory) {
+        std::cout << "DRM display not initialized, cannot draw UI" << std::endl;
+        return;
+    }
+    
+    std::cout << "Drawing professional UI to DRM display: " << drm_display.width << "x" << drm_display.height << std::endl;
     
     // 清屏 - 主背景色
     draw_filled_rect(0, 0, drm_display.width, drm_display.height, BG_MAIN);
@@ -587,13 +552,8 @@ void draw_professional_ui() {
     int ui_width = drm_display.width;
     int ui_height = drm_display.height;
 #else
-    if (fb_fd < 0 || !fb_mem) return;
-    
-    // 清屏 - 主背景色
-    draw_filled_rect(0, 0, fb_width, fb_height, BG_MAIN);
-    
-    int ui_width = fb_width;
-    int ui_height = fb_height;
+    std::cout << "DRM not enabled, cannot draw UI" << std::endl;
+    return;
 #endif
     
     // ===== 顶部状态栏 =====
