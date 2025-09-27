@@ -319,7 +319,7 @@ void draw_professional_ui() {
     draw_filled_rect(fb_width - 150, footer_y + 15, 120, 40, Color(156, 39, 176));
     draw_rect_border(fb_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
     
-    std::cout << "已绘制专业工业界面到framebuffer" << std::endl;
+    std::cout << "Professional industrial interface drawn to framebuffer" << std::endl;
 }
 
 // 显示驱动相关占位符
@@ -339,35 +339,35 @@ inline bool lvgl_display_init() {
             fb_fd = open(fb_dev, O_RDWR);
             if (fb_fd >= 0) {
                 has_framebuffer = true;
-                std::cout << "打开framebuffer设备: " << fb_dev << std::endl;
+                std::cout << "Opening framebuffer device: " << fb_dev << std::endl;
                 
                 // 映射framebuffer到内存
                 fb_mem_size = fb_width * fb_height * fb_bytes_per_pixel;
                 fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
                 
                 if (fb_mem == MAP_FAILED) {
-                    std::cout << "framebuffer内存映射失败" << std::endl;
+                    std::cout << "Framebuffer memory mapping failed" << std::endl;
                     close(fb_fd);
                     fb_fd = -1;
                     fb_mem = nullptr;
                 } else {
-                    std::cout << "framebuffer内存映射成功: " << fb_width << "x" << fb_height << std::endl;
-                    // 绘制测试界面
-                    draw_test_ui();
+                    std::cout << "Framebuffer memory mapping successful: " << fb_width << "x" << fb_height << std::endl;
+                    // Draw professional UI
+                    draw_professional_ui();
                 }
                 break;
             }
         }
         
         if (has_framebuffer && fb_mem) {
-            std::cout << "使用framebuffer显示模式" << std::endl;
+            std::cout << "Using framebuffer display mode" << std::endl;
         } else {
-            std::cout << "framebuffer初始化失败，使用虚拟显示模式" << std::endl;
+            std::cout << "Framebuffer initialization failed, using virtual display mode" << std::endl;
         }
         
         return true;
     } catch (...) {
-        std::cout << "显示驱动初始化异常，使用虚拟显示模式" << std::endl;
+        std::cout << "Display driver initialization exception, using virtual display mode" << std::endl;
         return true;
     }
 }
@@ -383,18 +383,18 @@ inline bool touch_driver_init() {
             if (touch_fd >= 0) {
                 close(touch_fd);
                 has_touch = true;
-                std::cout << "找到触摸设备: " << touch_dev << std::endl;
+                std::cout << "Found touch device: " << touch_dev << std::endl;
                 break;
             }
         }
         
         if (!has_touch) {
-            std::cout << "未找到触摸设备，禁用触摸功能" << std::endl;
+            std::cout << "Touch device not found, disabling touch functionality" << std::endl;
         }
         
         return has_touch; // 返回实际检测结果
     } catch (...) {
-        std::cout << "触摸驱动初始化异常" << std::endl;
+        std::cout << "Touch driver initialization exception" << std::endl;
         return false;
     }
 }
@@ -412,40 +412,40 @@ struct performance_stats_t {
 class Status_bar {
 public:
     bool initialize() {
-        std::cout << "状态栏初始化完成" << std::endl;
+        std::cout << "Status bar initialization complete" << std::endl;
         return true;
     }
     void update_workflow_status(int status) {
-        std::cout << "更新工作流状态: " << status << std::endl;
+        std::cout << "Updating workflow status: " << status << std::endl;
     }
     void update_heartbeat(int count, int plc_status) {
-        std::cout << "更新心跳: count=" << count << ", plc=" << plc_status << std::endl;
+        std::cout << "Updating heartbeat: count=" << count << ", plc=" << plc_status << std::endl;
     }
 };
 
 class Video_view {
 public:
     bool initialize() {
-        std::cout << "视频视图初始化完成" << std::endl;
+        std::cout << "Video view initialization complete" << std::endl;
         return true;
     }
     void update_camera_frame(const frame_info_t& frame) {
-        std::cout << "更新摄像头帧: " << frame.width << "x" << frame.height
-                  << " (有效: " << frame.valid << ")" << std::endl;
+        std::cout << "Updating camera frame: " << frame.width << "x" << frame.height
+                  << " (valid: " << frame.valid << ")" << std::endl;
     }
     void update_detection_info(float fps, float process_time) {
-        std::cout << "更新检测信息: FPS=" << fps << ", 处理时间=" << process_time << "ms" << std::endl;
+        std::cout << "Updating detection info: FPS=" << fps << ", process_time=" << process_time << "ms" << std::endl;
     }
 };
 
 class Control_panel {
 public:
     bool initialize() {
-        std::cout << "控制面板初始化完成" << std::endl;
+        std::cout << "Control panel initialization complete" << std::endl;
         return true;
     }
     void update_jetson_info(const performance_stats_t& stats) {
-        std::cout << "更新Jetson信息: CPU=" << stats.cpu_usage << "%, 内存="
+        std::cout << "Updating Jetson info: CPU=" << stats.cpu_usage << "%, memory="
                   << stats.memory_usage_mb << "MB, FPS=" << stats.fps << std::endl;
     }
 };
@@ -453,16 +453,16 @@ public:
 class Settings_page {
 public:
     bool initialize() {
-        std::cout << "设置页面初始化完成" << std::endl;
+        std::cout << "Settings page initialization complete" << std::endl;
         return true;
     }
     void create_main_layout(Status_bar* status, Video_view* video, Control_panel* control) {
-        std::cout << "创建主界面布局" << std::endl;
-        std::cout << "=== 竹子识别系统界面 ===" << std::endl;
-        std::cout << "状态栏: " << (status ? "已连接" : "未连接") << std::endl;
-        std::cout << "视频视图: " << (video ? "已连接" : "未连接") << std::endl;
-        std::cout << "控制面板: " << (control ? "已连接" : "未连接") << std::endl;
-        std::cout << "=========================" << std::endl;
+        std::cout << "Creating main interface layout" << std::endl;
+        std::cout << "=== Bamboo Recognition System Interface ===" << std::endl;
+        std::cout << "Status bar: " << (status ? "Connected" : "Disconnected") << std::endl;
+        std::cout << "Video view: " << (video ? "Connected" : "Disconnected") << std::endl;
+        std::cout << "Control panel: " << (control ? "Connected" : "Disconnected") << std::endl;
+        std::cout << "===========================================" << std::endl;
     }
 };
 #endif
