@@ -320,19 +320,24 @@ void draw_professional_ui() {
     
     // 系统标题区域
     draw_filled_rect(20, 15, 300, 30, ACCENT);
+    draw_text(25, 22, "BAMBOO AI CUTTING SYSTEM V2.1", TEXT_PRIMARY, 1);
     
     // 工作流程状态指示器
     int workflow_x = 400;
     int workflow_y = 20;
+    const char* workflow_steps[] = {"FEED", "DETECT", "COORD", "PREPARE", "CUT"};
     for (int i = 0; i < 5; i++) {
         int step_x = workflow_x + i * 120;
         Color step_color = (i == 0) ? ACCENT : BORDER;
         draw_filled_rect(step_x, workflow_y, 100, 20, step_color);
         draw_rect_border(step_x, workflow_y, 100, 20, 1, step_color);
+        // 添加步骤文字
+        draw_text(step_x + 5, workflow_y + 6, workflow_steps[i], TEXT_PRIMARY, 1);
     }
     
     // 心跳监控区域
     draw_filled_rect(fb_width - 200, 20, 180, 20, SUCCESS);
+    draw_text(fb_width - 195, 27, "HEARTBEAT: 12345", TEXT_PRIMARY, 1);
     
     // ===== 主内容区域 =====
     int main_y = header_height + 10;
@@ -346,6 +351,7 @@ void draw_professional_ui() {
     // 摄像头标题栏
     draw_filled_rect(25, main_y + 15, camera_width - 30, 30, Color(26, 26, 26));
     draw_rect_border(25, main_y + 15, camera_width - 30, 30, 1, ACCENT);
+    draw_text(30, main_y + 25, "REAL-TIME DETECTION VIEW - 1280x720 | FPS: 28.5", TEXT_PRIMARY, 1);
     
     // 摄像头视野区域
     int video_x = 25;
@@ -359,10 +365,18 @@ void draw_professional_ui() {
     int rail_y = video_y + video_h - 40;
     draw_filled_rect(video_x + 10, rail_y, video_w - 20, 30, Color(33, 150, 243, 77));
     draw_rect_border(video_x + 10, rail_y, video_w - 20, 30, 1, MODBUS_BLUE);
+    draw_text(video_x + 15, rail_y + 11, "X-AXIS RAIL: 0-1000.0MM", MODBUS_BLUE, 1);
     
     // 切割位置指示线
     int cutting_pos = video_x + (video_w * 25 / 100);
     draw_filled_rect(cutting_pos, video_y, 2, video_h, ERROR);
+    
+    // 中央显示文字
+    int center_x = video_x + video_w / 2 - 80;
+    int center_y = video_y + video_h / 2 - 20;
+    draw_text(center_x, center_y, "BAMBOO DETECTION VIEW", TEXT_SECONDARY, 2);
+    draw_text(center_x + 20, center_y + 25, "1280 X 720 | YOLOV8", TEXT_SECONDARY, 1);
+    draw_text(center_x + 15, center_y + 40, "INFERENCE: 15.3MS", TEXT_SECONDARY, 1);
     
     // 坐标显示区域
     int coord_y = main_y + main_height - 80;
@@ -371,10 +385,15 @@ void draw_professional_ui() {
     
     // 坐标值显示框
     int coord_box_w = (camera_width - 60) / 3;
+    const char* coord_labels[] = {"X-COORD", "QUALITY", "BLADE"};
+    const char* coord_values[] = {"245.8MM", "NORMAL", "DUAL"};
     for (int i = 0; i < 3; i++) {
         int box_x = 35 + i * (coord_box_w + 10);
         draw_filled_rect(box_x, coord_y + 10, coord_box_w, 40, Color(64, 64, 64, 128));
         draw_rect_border(box_x, coord_y + 10, coord_box_w, 40, 1, ACCENT);
+        // 添加标签和数值
+        draw_text(box_x + 5, coord_y + 15, coord_labels[i], TEXT_SECONDARY, 1);
+        draw_text(box_x + 5, coord_y + 30, coord_values[i], ACCENT, 1);
     }
     
     // ===== 右侧控制面板 =====
@@ -389,12 +408,21 @@ void draw_professional_ui() {
     draw_filled_rect(panel_x + 10, section_y, panel_width - 20, section_height, Color(26, 26, 26));
     draw_rect_border(panel_x + 10, section_y, panel_width - 20, section_height, 1, MODBUS_BLUE);
     draw_filled_rect(panel_x + 15, section_y + 5, panel_width - 30, 25, MODBUS_BLUE);
+    draw_text(panel_x + 20, section_y + 15, "MODBUS REGISTER STATUS", TEXT_PRIMARY, 1);
     
     // 寄存器表格
+    const char* reg_addrs[] = {"40001", "40002", "40003", "40004", "40006", "40009"};
+    const char* reg_desc[] = {"SYS STATUS", "PLC CMD", "COORD RDY", "X-COORD", "QUALITY", "BLADE ID"};
+    const char* reg_vals[] = {"1", "2", "1", "2458", "0", "3"};
+    
     for (int i = 0; i < 6; i++) {
         int row_y = section_y + 35 + i * 13;
         draw_filled_rect(panel_x + 15, row_y, panel_width - 30, 12,
                         i % 2 == 0 ? Color(255, 255, 255, 16) : Color(64, 64, 64, 64));
+        // 添加寄存器信息
+        draw_text(panel_x + 18, row_y + 2, reg_addrs[i], MODBUS_BLUE, 1);
+        draw_text(panel_x + 80, row_y + 2, reg_desc[i], TEXT_SECONDARY, 1);
+        draw_text(panel_x + 200, row_y + 2, reg_vals[i], ACCENT, 1);
     }
     
     // PLC通信状态区域
@@ -403,22 +431,30 @@ void draw_professional_ui() {
     draw_filled_rect(panel_x + 10, section_y, panel_width - 20, section_height, Color(26, 26, 26));
     draw_rect_border(panel_x + 10, section_y, panel_width - 20, section_height, 1, SUCCESS);
     draw_filled_rect(panel_x + 15, section_y + 5, panel_width - 30, 25, SUCCESS);
+    draw_text(panel_x + 20, section_y + 15, "PLC COMMUNICATION STATUS", TEXT_PRIMARY, 1);
     
     // 状态网格
+    const char* plc_labels[] = {"STATUS:", "ADDRESS:", "RESPONSE:", "CUTS:"};
+    const char* plc_values[] = {"CONNECTED", "192.168.1.100", "12MS", "1247"};
     for (int i = 0; i < 4; i++) {
         int status_x = panel_x + 15 + (i % 2) * 160;
         int status_y = section_y + 35 + (i / 2) * 25;
         draw_filled_rect(status_x, status_y, 150, 20, Color(255, 255, 255, 13));
         draw_rect_border(status_x, status_y, 150, 20, 1, Color(64, 64, 64));
+        // 添加PLC状态信息
+        draw_text(status_x + 3, status_y + 3, plc_labels[i], TEXT_SECONDARY, 1);
+        draw_text(status_x + 3, status_y + 12, plc_values[i], TEXT_PRIMARY, 1);
     }
     
     // 刀片选择按钮
+    const char* blade_names[] = {"BLADE1", "BLADE2", "DUAL"};
     for (int i = 0; i < 3; i++) {
         int btn_x = panel_x + 15 + i * 108;
         int btn_y = section_y + 70;
         Color btn_color = (i == 2) ? ACCENT : Color(64, 64, 64);
         draw_filled_rect(btn_x, btn_y, 100, 25, btn_color);
         draw_rect_border(btn_x, btn_y, 100, 25, 1, btn_color);
+        draw_text(btn_x + 8, btn_y + 9, blade_names[i], TEXT_PRIMARY, 1);
     }
     
     // Jetson系统信息区域
@@ -427,23 +463,32 @@ void draw_professional_ui() {
     draw_filled_rect(panel_x + 10, section_y, panel_width - 20, section_height, Color(26, 26, 26));
     draw_rect_border(panel_x + 10, section_y, panel_width - 20, section_height, 1, JETSON_GREEN);
     draw_filled_rect(panel_x + 15, section_y + 5, panel_width - 30, 25, JETSON_GREEN);
+    draw_text(panel_x + 20, section_y + 15, "JETSON ORIN NX 8GB", TEXT_PRIMARY, 1);
     draw_filled_rect(panel_x + panel_width - 50, section_y + 8, 30, 18, ACCENT);
+    draw_text(panel_x + panel_width - 45, section_y + 15, "15W", TEXT_PRIMARY, 1);
     
     // CPU/GPU/内存进度条
     int progress_widths[] = {150, 112, 91};
     Color progress_colors[] = {JETSON_GREEN, ACCENT, WARNING};
+    const char* progress_labels[] = {"CPU: 45%", "GPU: 32%", "MEM: 26%"};
     for (int i = 0; i < 3; i++) {
         int bar_y = section_y + 40 + i * 25;
         draw_filled_rect(panel_x + 15, bar_y, panel_width - 30, 20, Color(64, 64, 64));
         draw_filled_rect(panel_x + 15, bar_y, progress_widths[i], 20, progress_colors[i]);
+        draw_text(panel_x + 20, bar_y + 6, progress_labels[i], TEXT_PRIMARY, 1);
     }
     
     // 详细系统信息网格
+    const char* sys_labels[] = {"CPU:1.5GHZ", "GPU:624MHZ", "EMC:2133MHZ",
+                               "TEMP:52C", "FAN:2150RPM", "PWR:8.2W",
+                               "VOLT:5.1V", "STOR:45/128GB", "UP:2D3H15M",
+                               "NET:1GBPS", "AI:15.3MS", "DETECT:89"};
     for (int i = 0; i < 12; i++) {
         int info_x = panel_x + 15 + (i % 3) * 108;
         int info_y = section_y + 115 + (i / 3) * 15;
         draw_filled_rect(info_x, info_y, 105, 12, Color(255, 255, 255, 13));
         draw_rect_border(info_x, info_y, 105, 12, 1, Color(64, 64, 64));
+        draw_text(info_x + 2, info_y + 2, sys_labels[i], TEXT_SECONDARY, 1);
     }
     
     // ===== 底部操作按钮区域 =====
@@ -453,22 +498,30 @@ void draw_professional_ui() {
     
     // 左侧控制按钮
     const Color button_colors[] = {SUCCESS, WARNING, ERROR};
+    const char* button_texts[] = {"START", "PAUSE", "STOP"};
     for (int i = 0; i < 3; i++) {
         int btn_x = 30 + i * 140;
         int btn_y = footer_y + 15;
         draw_filled_rect(btn_x, btn_y, 120, 40, button_colors[i]);
         draw_rect_border(btn_x, btn_y, 120, 40, 2, button_colors[i]);
+        draw_text(btn_x + 25, btn_y + 16, button_texts[i], TEXT_PRIMARY, 2);
     }
     
     // 中央状态信息区域
     draw_filled_rect(fb_width / 2 - 150, footer_y + 10, 300, 50, Color(26, 26, 26));
     draw_rect_border(fb_width / 2 - 150, footer_y + 10, 300, 50, 1, TEXT_SECONDARY);
+    draw_text(fb_width / 2 - 140, footer_y + 20, "CURRENT PROCESS:", TEXT_SECONDARY, 1);
+    draw_text(fb_width / 2 - 140, footer_y + 35, "FEED DETECTION IN PROGRESS", ACCENT, 1);
+    draw_text(fb_width / 2 - 140, footer_y + 50, "TODAY CUTS: 89 | EFFICIENCY: 94.2%", TEXT_SECONDARY, 1);
     
     // 右侧紧急按钮
     draw_filled_rect(fb_width - 280, footer_y + 15, 120, 40, Color(255, 23, 68));
     draw_rect_border(fb_width - 280, footer_y + 15, 120, 40, 2, Color(255, 23, 68));
+    draw_text(fb_width - 270, footer_y + 30, "EMERGENCY", TEXT_PRIMARY, 1);
+    
     draw_filled_rect(fb_width - 150, footer_y + 15, 120, 40, Color(156, 39, 176));
     draw_rect_border(fb_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
+    draw_text(fb_width - 135, footer_y + 30, "POWER", TEXT_PRIMARY, 1);
     
     std::cout << "Professional industrial interface drawn to framebuffer" << std::endl;
 }
