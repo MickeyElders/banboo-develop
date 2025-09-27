@@ -796,9 +796,9 @@ void draw_professional_ui() {
     }
     
     // ===== 底部操作按钮区域 =====
-    int footer_y = fb_height - 80;
-    draw_filled_rect(10, footer_y, fb_width - 20, 70, BG_PANEL);
-    draw_rect_border(10, footer_y, fb_width - 20, 70, 2, BORDER);
+    int footer_y = ui_height - 80;
+    draw_filled_rect(10, footer_y, ui_width - 20, 70, BG_PANEL);
+    draw_rect_border(10, footer_y, ui_width - 20, 70, 2, BORDER);
     
     // 左侧控制按钮
     const Color button_colors[] = {SUCCESS, WARNING, ERROR};
@@ -812,22 +812,28 @@ void draw_professional_ui() {
     }
     
     // 中央状态信息区域
-    draw_filled_rect(fb_width / 2 - 150, footer_y + 10, 300, 50, Color(26, 26, 26));
-    draw_rect_border(fb_width / 2 - 150, footer_y + 10, 300, 50, 1, TEXT_SECONDARY);
-    draw_text(fb_width / 2 - 140, footer_y + 20, "CURRENT PROCESS:", TEXT_SECONDARY, 1);
-    draw_text(fb_width / 2 - 140, footer_y + 35, "FEED DETECTION IN PROGRESS", ACCENT, 1);
-    draw_text(fb_width / 2 - 140, footer_y + 50, "TODAY CUTS: 89 | EFFICIENCY: 94.2%", TEXT_SECONDARY, 1);
+    draw_filled_rect(ui_width / 2 - 150, footer_y + 10, 300, 50, Color(26, 26, 26));
+    draw_rect_border(ui_width / 2 - 150, footer_y + 10, 300, 50, 1, TEXT_SECONDARY);
+    draw_text(ui_width / 2 - 140, footer_y + 20, "CURRENT PROCESS:", TEXT_SECONDARY, 1);
+    draw_text(ui_width / 2 - 140, footer_y + 35, "FEED DETECTION IN PROGRESS", ACCENT, 1);
+    draw_text(ui_width / 2 - 140, footer_y + 50, "TODAY CUTS: 89 | EFFICIENCY: 94.2%", TEXT_SECONDARY, 1);
     
     // 右侧紧急按钮
-    draw_filled_rect(fb_width - 280, footer_y + 15, 120, 40, Color(255, 23, 68));
-    draw_rect_border(fb_width - 280, footer_y + 15, 120, 40, 2, Color(255, 23, 68));
-    draw_text(fb_width - 270, footer_y + 30, "EMERGENCY", TEXT_PRIMARY, 1);
+    draw_filled_rect(ui_width - 280, footer_y + 15, 120, 40, Color(255, 23, 68));
+    draw_rect_border(ui_width - 280, footer_y + 15, 120, 40, 2, Color(255, 23, 68));
+    draw_text(ui_width - 270, footer_y + 30, "EMERGENCY", TEXT_PRIMARY, 1);
     
-    draw_filled_rect(fb_width - 150, footer_y + 15, 120, 40, Color(156, 39, 176));
-    draw_rect_border(fb_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
-    draw_text(fb_width - 135, footer_y + 30, "POWER", TEXT_PRIMARY, 1);
+    draw_filled_rect(ui_width - 150, footer_y + 15, 120, 40, Color(156, 39, 176));
+    draw_rect_border(ui_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
+    draw_text(ui_width - 135, footer_y + 30, "POWER", TEXT_PRIMARY, 1);
     
-    std::cout << "Professional industrial interface drawn to optimized framebuffer" << std::endl;
+#ifdef ENABLE_DRM
+    std::cout << "Professional industrial interface drawn to DRM display buffer" << std::endl;
+    // 立即显示到屏幕
+    present_drm_framebuffer();
+#else
+    std::cout << "Professional industrial interface drawn to framebuffer" << std::endl;
+#endif
 }
 
 // 显示驱动相关占位符
