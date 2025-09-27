@@ -52,6 +52,7 @@
 #endif
 
 // 函数前向声明 - 在文件最早位置
+void suppress_camera_debug();
 void suppress_all_debug_output();
 void redirect_output_to_log();
 void restore_output();
@@ -1012,6 +1013,31 @@ static int original_stdout = -1;
 static int original_stderr = -1;
 static int log_fd = -1;
 static std::string log_file_path = "/var/log/bamboo-cut/camera_debug.log";
+
+// 强力调试信息抑制函数
+void suppress_camera_debug() {
+    // 重定向所有输出到日志文件
+    freopen("/tmp/app_stdout.log", "w", stdout);
+    freopen("/tmp/app_stderr.log", "w", stderr);
+    
+    // 禁用console输出
+    system("dmesg -D 2>/dev/null || true");
+    system("echo 1 > /proc/sys/kernel/printk 2>/dev/null || true");
+    
+    // 禁用内核消息到控制台
+    system("echo 0 > /proc/sys/kernel/printk_devkmsg 2>/dev/null || true");
+    system("echo 0 > /sys/module/printk/parameters/console_suspend 2>/dev/null || true");
+    
+    // 设置环境变量
+    setenv("GST_DEBUG", "0", 1);
+    setenv("NVARGUS_LOG_LEVEL", "0", 1);
+    setenv("NVARGUS_DISABLE_LOG", "1", 1);
+    setenv("TEGRA_LOG_LEVEL", "0", 1);
+    setenv("ARGUS_LOG_LEVEL", "0", 1);
+    setenv("CAMRTC_LOG_LEVEL", "0", 1);
+    setenv("VI_LOG_LEVEL", "0", 1);
+    setenv("NVCSI_LOG_LEVEL", "0", 1);
+}
 
 // 完全抑制所有调试信息的函数
 void suppress_all_debug_output() {
