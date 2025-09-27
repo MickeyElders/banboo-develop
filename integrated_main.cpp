@@ -386,28 +386,28 @@ public:
     bool initialize() {
         std::cout << "初始化推理系统..." << std::endl;
         
-        // 初始化检测器 (使用真实的BambooDetector)
+        // 初始化检测器 (使用真实的BambooDetector) - 非阻塞
         if (!initializeDetector()) {
-            std::cout << "检测器初始化失败" << std::endl;
-            return false;
+            std::cout << "检测器初始化失败，使用模拟模式" << std::endl;
+            use_mock_camera_ = true; // 启用模拟模式
         }
         
-        // 优先初始化立体视觉系统
+        // 优先初始化立体视觉系统 - 非阻塞
         if (use_stereo_vision_ && initializeStereoVision()) {
             std::cout << "立体视觉系统初始化成功" << std::endl;
         } else {
             std::cout << "立体视觉初始化失败，回退到单摄像头模式" << std::endl;
             use_stereo_vision_ = false;
             
-            // 初始化单摄像头
+            // 初始化单摄像头 - 非阻塞，失败时使用模拟模式
             if (!initializeCamera()) {
-                std::cout << "摄像头系统初始化失败" << std::endl;
-                return false;
+                std::cout << "摄像头系统初始化失败，启用模拟模式" << std::endl;
+                use_mock_camera_ = true;
             }
         }
         
-        std::cout << "推理系统初始化完成" << std::endl;
-        return true;
+        std::cout << "推理系统初始化完成 (模拟模式: " << (use_mock_camera_ ? "是" : "否") << ")" << std::endl;
+        return true; // 总是返回成功，确保UI能够启动
     }
     
     bool start() {
