@@ -42,6 +42,13 @@ typedef void* lv_indev_data_t;
 typedef void* lv_disp_drv_t;
 typedef void* lv_area_t;
 typedef void* lv_color_t;
+typedef void* lv_disp_draw_buf_t;
+
+// 模拟LVGL枚举
+enum lv_indev_state_t {
+    LV_INDEV_STATE_REL = 0,
+    LV_INDEV_STATE_PR
+};
 
 // 模拟LVGL定时器结构体，包含user_data成员
 struct lv_timer_t {
@@ -67,6 +74,12 @@ inline lv_timer_t* lv_timer_create(void(*cb)(lv_timer_t*), unsigned int period_m
 inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
 }
+
+// 显示驱动相关占位符
+inline void lv_disp_draw_buf_init(lv_disp_draw_buf_t* draw_buf, void* buf1, void* buf2, uint32_t size_in_px_cnt) {}
+inline void lv_disp_drv_init(lv_disp_drv_t* driver) {}
+inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return driver; }
+inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 inline bool lvgl_display_init() {
     // Jetson Orin NX LVGL显示驱动初始化（多后端支持）
     try {

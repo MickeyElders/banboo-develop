@@ -24,12 +24,18 @@ struct StereoConfig {
     cv::Size frame_size;              // 帧尺寸
     int fps;                          // 帧率
     
-    StereoConfig() 
+    // GStreamer管道配置
+    std::string left_camera_pipeline;  // 左摄像头GStreamer管道
+    std::string right_camera_pipeline; // 右摄像头GStreamer管道
+    bool use_gstreamer;               // 是否使用GStreamer
+    
+    StereoConfig()
         : calibration_file("config/stereo_calibration.xml")
         , left_camera_id(0)
-        , right_camera_id(1) 
+        , right_camera_id(1)
         , frame_size(640, 480)
-        , fps(30) {}
+        , fps(30)
+        , use_gstreamer(false) {}
 };
 
 /**
