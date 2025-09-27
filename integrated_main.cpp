@@ -1023,6 +1023,22 @@ void suppress_all_debug_output() {
     setenv("NV_LOG_LEVEL", "0", 1);
     setenv("NV_DISABLE_LOG", "1", 1);
     
+    // 额外的Tegra Camera调试信息抑制
+    setenv("TEGRA_CAMERA_LOG_LEVEL", "0", 1);
+    setenv("TEGRA_CAMERA_DISABLE_LOG", "1", 1);
+    setenv("CAMRTC_LOG_LEVEL", "0", 1);
+    setenv("CAMRTC_DISABLE_LOG", "1", 1);
+    setenv("NVIDIA_TEGRA_LOG_LEVEL", "0", 1);
+    setenv("NVIDIA_DISABLE_LOG", "1", 1);
+    setenv("VI_LOG_LEVEL", "0", 1);
+    setenv("VI_DISABLE_LOG", "1", 1);
+    setenv("NVCSI_LOG_LEVEL", "0", 1);
+    setenv("NVCSI_DISABLE_LOG", "1", 1);
+    
+    // 抑制内核日志输出到用户空间
+    setenv("KERNEL_LOG_LEVEL", "0", 1);
+    setenv("DMESG_RESTRICT", "1", 1);
+    
     // 2. 设置GStreamer静默模式
     setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0", 1);
     setenv("GST_REGISTRY_UPDATE", "no", 1);
