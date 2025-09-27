@@ -648,29 +648,29 @@ public:
     }
     
     bool initialize() {
-        std::cout << "初始化推理系统..." << std::endl;
+        std::cout << "Initializing inference system..." << std::endl;
         
         // 初始化检测器 (使用真实的BambooDetector) - 非阻塞
         if (!initializeDetector()) {
-            std::cout << "检测器初始化失败，使用模拟模式" << std::endl;
+            std::cout << "Detector initialization failed, using simulation mode" << std::endl;
             use_mock_camera_ = true; // 启用模拟模式
         }
         
         // 优先初始化立体视觉系统 - 非阻塞
         if (use_stereo_vision_ && initializeStereoVision()) {
-            std::cout << "立体视觉系统初始化成功" << std::endl;
+            std::cout << "Stereo vision system initialization successful" << std::endl;
         } else {
-            std::cout << "立体视觉初始化失败，回退到单摄像头模式" << std::endl;
+            std::cout << "Stereo vision initialization failed, falling back to single camera mode" << std::endl;
             use_stereo_vision_ = false;
             
             // 初始化单摄像头 - 非阻塞，失败时使用模拟模式
             if (!initializeCamera()) {
-                std::cout << "摄像头系统初始化失败，启用模拟模式" << std::endl;
+                std::cout << "Camera system initialization failed, enabling simulation mode" << std::endl;
                 use_mock_camera_ = true;
             }
         }
         
-        std::cout << "推理系统初始化完成 (模拟模式: " << (use_mock_camera_ ? "是" : "否") << ")" << std::endl;
+        std::cout << "Inference system initialization complete (simulation mode: " << (use_mock_camera_ ? "yes" : "no") << ")" << std::endl;
         return true; // 总是返回成功，确保UI能够启动
     }
     
@@ -695,7 +695,7 @@ public:
 
 private:
     void workerLoop() {
-        std::cout << "推理工作线程启动" << std::endl;
+        std::cout << "Inference worker thread started" << std::endl;
         
         auto last_frame_time = std::chrono::steady_clock::now();
         const auto target_interval = std::chrono::milliseconds(33); // 30fps
@@ -718,7 +718,7 @@ private:
             }
         }
         
-        std::cout << "推理工作线程退出" << std::endl;
+        std::cout << "Inference worker thread exited" << std::endl;
     }
     
     void processFrame() {
@@ -810,24 +810,24 @@ private:
     }
     
     bool initializeCamera() {
-        std::cout << "正在检测Jetson CSI摄像头设备..." << std::endl;
+        std::cout << "Detecting Jetson CSI camera devices..." << std::endl;
         
         // 优先尝试Jetson CSI摄像头 (使用nvarguscamerasrc)
         if (initializeJetsonCSICamera()) {
-            std::cout << "Jetson CSI摄像头初始化成功" << std::endl;
+            std::cout << "Jetson CSI camera initialization successful" << std::endl;
             return true;
         }
         
-        std::cout << "CSI摄像头初始化失败，尝试USB摄像头..." << std::endl;
+        std::cout << "CSI camera initialization failed, trying USB camera..." << std::endl;
         
         // 回退到USB摄像头 (使用v4l2)
         if (initializeUSBCamera()) {
-            std::cout << "USB摄像头初始化成功" << std::endl;
+            std::cout << "USB camera initialization successful" << std::endl;
             return true;
         }
         
         // 如果没有真实摄像头，创建虚拟摄像头用于测试
-        std::cout << "未找到可用摄像头，启用模拟模式" << std::endl;
+        std::cout << "No available camera found, enabling simulation mode" << std::endl;
         use_mock_camera_ = true;
         return true;
     }
@@ -853,7 +853,7 @@ private:
             };
             
             for (size_t i = 0; i < csi_pipelines.size(); i++) {
-                std::cout << "尝试CSI摄像头 sensor-id=" << i << std::endl;
+                std::cout << "Trying CSI camera sensor-id=" << i << std::endl;
                 
                 camera_.open(csi_pipelines[i], cv::CAP_GSTREAMER);
                 
@@ -861,15 +861,15 @@ private:
                     // 测试是否真的能读取帧
                     cv::Mat test_frame;
                     if (camera_.read(test_frame) && !test_frame.empty()) {
-                        std::cout << "CSI摄像头 sensor-id=" << i << " 初始化成功，分辨率: "
+                        std::cout << "CSI camera sensor-id=" << i << " initialization successful, resolution: "
                                   << test_frame.cols << "x" << test_frame.rows << std::endl;
                         return true;
                     } else {
-                        std::cout << "CSI摄像头 sensor-id=" << i << " 无法读取帧" << std::endl;
+                        std::cout << "CSI camera sensor-id=" << i << " unable to read frame" << std::endl;
                         camera_.release();
                     }
                 } else {
-                    std::cout << "无法打开CSI摄像头 sensor-id=" << i << std::endl;
+                    std::cout << "Unable to open CSI camera sensor-id=" << i << std::endl;
                 }
             }
             
@@ -995,7 +995,7 @@ public:
     }
     
     bool initialize() {
-        std::cout << "初始化LVGL UI系统..." << std::endl;
+        std::cout << "Initializing LVGL UI system..." << std::endl;
         
         // 初始化LVGL核心
         lv_init();
@@ -1005,20 +1005,20 @@ public:
         
         // 初始化显示驱动 (复用现有实现)
         if (!lvgl_display_init()) {
-            std::cout << "LVGL显示驱动初始化失败" << std::endl;
+            std::cout << "LVGL display driver initialization failed" << std::endl;
             return false;
         }
         
         // 初始化触摸驱动 (复用现有实现)
         if (touch_driver_init()) {
-            std::cout << "触摸驱动初始化成功" << std::endl;
+            std::cout << "Touch driver initialization successful" << std::endl;
         } else {
-            std::cout << "触摸驱动初始化失败，将禁用触摸功能" << std::endl;
+            std::cout << "Touch driver initialization failed, touch functionality will be disabled" << std::endl;
         }
         
         // 创建UI组件 (复用现有实现)
         if (!createUIComponents()) {
-            std::cout << "UI组件创建失败" << std::endl;
+            std::cout << "UI component creation failed" << std::endl;
             return false;
         }
         
@@ -1026,14 +1026,14 @@ public:
         setupUpdateTimers();
         
         initialized_ = true;
-        std::cout << "LVGL UI系统初始化完成" << std::endl;
+        std::cout << "LVGL UI system initialization complete" << std::endl;
         return true;
     }
     
     void runMainLoop() {
         if (!initialized_) return;
         
-        std::cout << "LVGL主循环启动" << std::endl;
+        std::cout << "LVGL main loop started" << std::endl;
         
         while (!g_shutdown_requested) {
             // 处理LVGL任务
@@ -1043,7 +1043,7 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
         
-        std::cout << "LVGL主循环退出" << std::endl;
+        std::cout << "LVGL main loop exited" << std::endl;
     }
 
 private:
@@ -1149,7 +1149,7 @@ private:
 public:
     bool initialize() {
         std::cout << "=================================" << std::endl;
-        std::cout << "竹子识别系统一体化启动" << std::endl;
+        std::cout << "Bamboo Recognition System Integrated Startup" << std::endl;
         std::cout << "=================================" << std::endl;
         
         // 设置信号处理
@@ -1159,47 +1159,47 @@ public:
         // 初始化推理工作线程
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         if (!inference_worker_->initialize()) {
-            std::cout << "推理系统初始化失败" << std::endl;
+            std::cout << "Inference system initialization failed" << std::endl;
             return false;
         }
         
         // 初始化UI管理器
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
-            std::cout << "UI系统初始化失败" << std::endl;
+            std::cout << "UI system initialization failed" << std::endl;
             return false;
         }
         
-        std::cout << "一体化系统初始化完成" << std::endl;
+        std::cout << "Integrated system initialization complete" << std::endl;
         return true;
     }
     
     void run() {
-        std::cout << "启动一体化系统..." << std::endl;
+        std::cout << "Starting integrated system..." << std::endl;
         
         // 启动推理工作线程
         if (!inference_worker_->start()) {
-            std::cout << "推理线程启动失败" << std::endl;
+            std::cout << "Inference thread startup failed" << std::endl;
             return;
         }
         
-        std::cout << "推理线程已启动" << std::endl;
-        std::cout << "按 Ctrl+C 退出系统" << std::endl;
+        std::cout << "Inference thread started" << std::endl;
+        std::cout << "Press Ctrl+C to exit system" << std::endl;
         
         // 主线程运行UI (阻塞)
         ui_manager_->runMainLoop();
         
-        std::cout << "开始系统关闭..." << std::endl;
+        std::cout << "Starting system shutdown..." << std::endl;
         shutdown();
     }
     
     void shutdown() {
-        std::cout << "停止推理线程..." << std::endl;
+        std::cout << "Stopping inference thread..." << std::endl;
         if (inference_worker_) {
             inference_worker_->stop();
         }
         
-        std::cout << "系统关闭完成" << std::endl;
+        std::cout << "System shutdown complete" << std::endl;
     }
 };
 
@@ -1211,7 +1211,7 @@ int main() {
         IntegratedBambooSystem system;
         
         if (!system.initialize()) {
-            std::cout << "系统初始化失败" << std::endl;
+            std::cout << "System initialization failed" << std::endl;
             return -1;
         }
         
@@ -1219,7 +1219,7 @@ int main() {
         return 0;
         
     } catch (const std::exception& e) {
-        std::cout << "系统异常: " << e.what() << std::endl;
+        std::cout << "System exception: " << e.what() << std::endl;
         return -1;
     }
 }
