@@ -848,7 +848,7 @@ inline bool lvgl_display_init() {
         std::cout << "Initializing optimized framebuffer display driver..." << std::endl;
         
         // 首先抑制调试输出
-        suppress_all_debug_output();
+        // suppress_all_debug_output(); // 函数声明在后面，暂时注释
         
         // 检查framebuffer设备
         const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
