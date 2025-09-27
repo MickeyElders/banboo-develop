@@ -597,17 +597,30 @@ void draw_text(int x, int y, const std::string& text, const Color& color, int sc
     }
 }
 
-// 绘制专业工业界面（优化版本）
+// 绘制专业工业界面（DRM优化版本）
 void draw_professional_ui() {
+#ifdef ENABLE_DRM
+    if (!drm_display.initialized || !drm_display.mapped_memory) return;
+    
+    // 清屏 - 主背景色
+    draw_filled_rect(0, 0, drm_display.width, drm_display.height, BG_MAIN);
+    
+    int ui_width = drm_display.width;
+    int ui_height = drm_display.height;
+#else
     if (fb_fd < 0 || !fb_mem) return;
     
     // 清屏 - 主背景色
     draw_filled_rect(0, 0, fb_width, fb_height, BG_MAIN);
     
+    int ui_width = fb_width;
+    int ui_height = fb_height;
+#endif
+    
     // ===== 顶部状态栏 =====
     int header_height = 60;
-    draw_filled_rect(10, 0, fb_width - 20, header_height, BG_PANEL);
-    draw_rect_border(10, 0, fb_width - 20, header_height, 2, BORDER);
+    draw_filled_rect(10, 0, ui_width - 20, header_height, BG_PANEL);
+    draw_rect_border(10, 0, ui_width - 20, header_height, 2, BORDER);
     
     // 系统标题区域
     draw_filled_rect(20, 15, 300, 30, ACCENT);
@@ -627,15 +640,15 @@ void draw_professional_ui() {
     }
     
     // 心跳监控区域
-    draw_filled_rect(fb_width - 200, 20, 180, 20, SUCCESS);
-    draw_text(fb_width - 195, 27, "HEARTBEAT: 12345", TEXT_PRIMARY, 1);
+    draw_filled_rect(ui_width - 200, 20, 180, 20, SUCCESS);
+    draw_text(ui_width - 195, 27, "HEARTBEAT: 12345", TEXT_PRIMARY, 1);
     
     // ===== 主内容区域 =====
     int main_y = header_height + 10;
-    int main_height = fb_height - header_height - 90;
+    int main_height = ui_height - header_height - 90;
     
     // 左侧摄像头区域
-    int camera_width = fb_width - 400;
+    int camera_width = ui_width - 400;
     draw_filled_rect(10, main_y, camera_width, main_height, BG_PANEL);
     draw_rect_border(10, main_y, camera_width, main_height, 2, BORDER);
     
