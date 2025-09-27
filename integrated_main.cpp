@@ -19,6 +19,12 @@
 #include <cstdlib>      // for setenv()
 #include <fstream>      // for file operations
 
+// DRM/KMS相关头文件
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#include <drm/drm_fourcc.h>
+#include <sys/ioctl.h>
+
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
 
@@ -80,46 +86,219 @@ inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
 }
 
-// 全局framebuffer相关变量
-static int fb_fd = -1;
-static uint8_t* fb_mem = nullptr;
-static size_t fb_mem_size = 0;
-static int fb_width = 1920;  // 修改为标准1080p分辨率
-static int fb_height = 1080;
-static int fb_bytes_per_pixel = 4; // RGBA
-
-// 获取实际framebuffer信息
-#include <linux/fb.h>
-#include <sys/ioctl.h>
-
-bool get_framebuffer_info() {
-    if (fb_fd < 0) return false;
+// DRM/KMS显示系统变量
+struct DRMDisplay {
+    int drm_fd = -1;
+    drmModeRes* resources = nullptr;
+    drmModeConnector* connector = nullptr;
+    drmModeEncoder* encoder = nullptr;
+    drmModeCrtc* crtc = nullptr;
+    drmModeModeInfo mode_info = {};
     
-    struct fb_var_screeninfo vinfo;
-    struct fb_fix_screeninfo finfo;
+    uint32_t framebuffer_id = 0;
+    uint32_t bo_handle = 0;
+    void* mapped_memory = nullptr;
+    size_t buffer_size = 0;
     
-    // 获取可变屏幕信息
-    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
-        std::cout << "Error reading variable framebuffer info" << std::endl;
+    int width = 1920;
+    int height = 1080;
+    int bytes_per_pixel = 4; // RGBA
+    
+    bool initialized = false;
+};
+
+static DRMDisplay drm_display;
+
+// DRM/KMS初始化函数
+bool initialize_drm_display() {
+    std::cout << "Initializing DRM/KMS display system..." << std::endl;
+    
+    // 打开DRM设备
+    const char* drm_devices[] = {"/dev/dri/card0", "/dev/dri/card1"};
+    for (const char* device : drm_devices) {
+        drm_display.drm_fd = open(device, O_RDWR | O_CLOEXEC);
+        if (drm_display.drm_fd >= 0) {
+            std::cout << "Opened DRM device: " << device << std::endl;
+            break;
+        }
+    }
+    
+    if (drm_display.drm_fd < 0) {
+        std::cout << "Failed to open DRM device" << std::endl;
         return false;
     }
     
-    // 获取固定屏幕信息
-    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
-        std::cout << "Error reading fixed framebuffer info" << std::endl;
+    // 获取DRM资源
+    drm_display.resources = drmModeGetResources(drm_display.drm_fd);
+    if (!drm_display.resources) {
+        std::cout << "Failed to get DRM resources" << std::endl;
+        close(drm_display.drm_fd);
         return false;
     }
     
-    // 更新全局变量
-    fb_width = vinfo.xres;
-    fb_height = vinfo.yres;
-    fb_bytes_per_pixel = vinfo.bits_per_pixel / 8;
-    fb_mem_size = finfo.smem_len;
+    // 查找可用的连接器
+    for (int i = 0; i < drm_display.resources->count_connectors; i++) {
+        drm_display.connector = drmModeGetConnector(drm_display.drm_fd,
+                                                   drm_display.resources->connectors[i]);
+        if (drm_display.connector &&
+            drm_display.connector->connection == DRM_MODE_CONNECTED &&
+            drm_display.connector->count_modes > 0) {
+            std::cout << "Found connected display connector" << std::endl;
+            break;
+        }
+        if (drm_display.connector) {
+            drmModeFreeConnector(drm_display.connector);
+            drm_display.connector = nullptr;
+        }
+    }
     
-    std::cout << "Framebuffer info: " << fb_width << "x" << fb_height
-              << ", " << vinfo.bits_per_pixel << "bpp, size=" << fb_mem_size << std::endl;
+    if (!drm_display.connector) {
+        std::cout << "No connected display found" << std::endl;
+        drmModeFreeResources(drm_display.resources);
+        close(drm_display.drm_fd);
+        return false;
+    }
     
+    // 选择显示模式（使用首选模式）
+    drm_display.mode_info = drm_display.connector->modes[0];
+    drm_display.width = drm_display.mode_info.hdisplay;
+    drm_display.height = drm_display.mode_info.vdisplay;
+    
+    std::cout << "Selected display mode: " << drm_display.width << "x" << drm_display.height
+              << " @" << drm_display.mode_info.vrefresh << "Hz" << std::endl;
+    
+    // 查找编码器
+    if (drm_display.connector->encoder_id) {
+        drm_display.encoder = drmModeGetEncoder(drm_display.drm_fd,
+                                               drm_display.connector->encoder_id);
+    }
+    
+    if (!drm_display.encoder) {
+        for (int i = 0; i < drm_display.resources->count_encoders; i++) {
+            drm_display.encoder = drmModeGetEncoder(drm_display.drm_fd,
+                                                   drm_display.resources->encoders[i]);
+            if (drm_display.encoder &&
+                drm_display.encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
+                break;
+            }
+            if (drm_display.encoder) {
+                drmModeFreeEncoder(drm_display.encoder);
+                drm_display.encoder = nullptr;
+            }
+        }
+    }
+    
+    if (!drm_display.encoder) {
+        std::cout << "No suitable encoder found" << std::endl;
+        drmModeFreeConnector(drm_display.connector);
+        drmModeFreeResources(drm_display.resources);
+        close(drm_display.drm_fd);
+        return false;
+    }
+    
+    // 获取CRTC
+    if (drm_display.encoder->crtc_id) {
+        drm_display.crtc = drmModeGetCrtc(drm_display.drm_fd, drm_display.encoder->crtc_id);
+    }
+    
+    // 创建dumb buffer
+    struct drm_mode_create_dumb create_req = {};
+    create_req.width = drm_display.width;
+    create_req.height = drm_display.height;
+    create_req.bpp = 32; // 32位RGBA
+    
+    if (ioctl(drm_display.drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_req) < 0) {
+        std::cout << "Failed to create dumb buffer" << std::endl;
+        return false;
+    }
+    
+    drm_display.bo_handle = create_req.handle;
+    drm_display.buffer_size = create_req.size;
+    
+    // 创建framebuffer
+    if (drmModeAddFB(drm_display.drm_fd, drm_display.width, drm_display.height,
+                     24, 32, create_req.pitch, drm_display.bo_handle,
+                     &drm_display.framebuffer_id) < 0) {
+        std::cout << "Failed to create framebuffer" << std::endl;
+        return false;
+    }
+    
+    // 映射缓冲区到内存
+    struct drm_mode_map_dumb map_req = {};
+    map_req.handle = drm_display.bo_handle;
+    
+    if (ioctl(drm_display.drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) {
+        std::cout << "Failed to map dumb buffer" << std::endl;
+        return false;
+    }
+    
+    drm_display.mapped_memory = mmap(0, drm_display.buffer_size,
+                                    PROT_READ | PROT_WRITE, MAP_SHARED,
+                                    drm_display.drm_fd, map_req.offset);
+    
+    if (drm_display.mapped_memory == MAP_FAILED) {
+        std::cout << "Failed to mmap framebuffer" << std::endl;
+        return false;
+    }
+    
+    std::cout << "DRM/KMS display system initialized successfully" << std::endl;
+    drm_display.initialized = true;
     return true;
+}
+
+// 清理DRM/KMS资源
+void cleanup_drm_display() {
+    if (!drm_display.initialized) return;
+    
+    if (drm_display.mapped_memory && drm_display.mapped_memory != MAP_FAILED) {
+        munmap(drm_display.mapped_memory, drm_display.buffer_size);
+    }
+    
+    if (drm_display.framebuffer_id) {
+        drmModeRmFB(drm_display.drm_fd, drm_display.framebuffer_id);
+    }
+    
+    if (drm_display.bo_handle) {
+        struct drm_mode_destroy_dumb destroy_req = {};
+        destroy_req.handle = drm_display.bo_handle;
+        ioctl(drm_display.drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_req);
+    }
+    
+    if (drm_display.crtc) {
+        drmModeFreeCrtc(drm_display.crtc);
+    }
+    
+    if (drm_display.encoder) {
+        drmModeFreeEncoder(drm_display.encoder);
+    }
+    
+    if (drm_display.connector) {
+        drmModeFreeConnector(drm_display.connector);
+    }
+    
+    if (drm_display.resources) {
+        drmModeFreeResources(drm_display.resources);
+    }
+    
+    if (drm_display.drm_fd >= 0) {
+        close(drm_display.drm_fd);
+    }
+    
+    drm_display.initialized = false;
+    std::cout << "DRM/KMS display system cleaned up" << std::endl;
+}
+
+// 显示framebuffer内容到屏幕
+bool present_drm_framebuffer() {
+    if (!drm_display.initialized || !drm_display.crtc) return false;
+    
+    // 设置CRTC显示framebuffer
+    int ret = drmModeSetCrtc(drm_display.drm_fd, drm_display.crtc->crtc_id,
+                            drm_display.framebuffer_id, 0, 0,
+                            &drm_display.connector->connector_id, 1,
+                            &drm_display.mode_info);
+    
+    return ret == 0;
 }
 
 // 简单的framebuffer显示刷新函数
@@ -164,20 +343,28 @@ const Color BORDER(64, 64, 64);           // #404040 边框
 const Color MODBUS_BLUE(33, 150, 243);    // #2196F3 Modbus蓝色
 const Color JETSON_GREEN(118, 185, 0);    // #76B900 Jetson绿色
 
-// 绘制矩形填充
+// DRM绘制矩形填充（硬件加速优化）
 void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
-    if (fb_fd < 0 || !fb_mem) return;
+    if (!drm_display.initialized || !drm_display.mapped_memory) return;
     
+    uint8_t* fb_mem = static_cast<uint8_t*>(drm_display.mapped_memory);
+    int fb_width = drm_display.width;
+    int fb_height = drm_display.height;
+    int fb_bytes_per_pixel = drm_display.bytes_per_pixel;
+    
+    // 计算32位颜色值（BGRA格式）
+    uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
+    
+    // 使用32位批量写入优化性能
     for (int py = y; py < y + h && py < fb_height; py++) {
+        if (py < 0) continue;
+        
+        uint32_t* row_ptr = reinterpret_cast<uint32_t*>(
+            fb_mem + py * fb_width * fb_bytes_per_pixel);
+        
         for (int px = x; px < x + w && px < fb_width; px++) {
-            if (px >= 0 && py >= 0) {
-                size_t offset = (py * fb_width + px) * fb_bytes_per_pixel;
-                if (offset + 3 < fb_mem_size) {
-                    fb_mem[offset] = color.b;
-                    fb_mem[offset + 1] = color.g;
-                    fb_mem[offset + 2] = color.r;
-                    fb_mem[offset + 3] = color.a;
-                }
+            if (px >= 0) {
+                row_ptr[px] = pixel_value;
             }
         }
     }
@@ -260,14 +447,20 @@ int get_char_index(char c) {
     return 36; // 默认返回空格
 }
 
-// 绘制单个字符
+// DRM绘制单个字符（优化版本）
 void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
-    if (fb_fd < 0 || !fb_mem) return;
+    if (!drm_display.initialized || !drm_display.mapped_memory) return;
     
     int char_index = get_char_index(c);
     if (char_index >= sizeof(font_8x8) / sizeof(font_8x8[0])) return;
     
+    uint8_t* fb_mem = static_cast<uint8_t*>(drm_display.mapped_memory);
+    int fb_width = drm_display.width;
+    int fb_height = drm_display.height;
+    int fb_bytes_per_pixel = drm_display.bytes_per_pixel;
+    
     const uint8_t* char_data = font_8x8[char_index];
+    uint32_t pixel_value = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
     
     for (int row = 0; row < 8; row++) {
         uint8_t row_data = char_data[row];
@@ -279,13 +472,9 @@ void draw_char(int x, int y, char c, const Color& color, int scale = 1) {
                         int px = x + col * scale + sx;
                         int py = y + row * scale + sy;
                         if (px >= 0 && px < fb_width && py >= 0 && py < fb_height) {
-                            size_t offset = (py * fb_width + px) * fb_bytes_per_pixel;
-                            if (offset + 3 < fb_mem_size) {
-                                fb_mem[offset] = color.b;
-                                fb_mem[offset + 1] = color.g;
-                                fb_mem[offset + 2] = color.r;
-                                fb_mem[offset + 3] = color.a;
-                            }
+                            uint32_t* pixel_ptr = reinterpret_cast<uint32_t*>(
+                                fb_mem + (py * fb_width + px) * fb_bytes_per_pixel);
+                            *pixel_ptr = pixel_value;
                         }
                     }
                 }
@@ -308,9 +497,12 @@ void draw_text(int x, int y, const std::string& text, const Color& color, int sc
     }
 }
 
-// 绘制专业工业界面
+// 绘制专业工业界面（DRM优化版本）
 void draw_professional_ui() {
-    if (fb_fd < 0 || !fb_mem) return;
+    if (!drm_display.initialized) return;
+    
+    int fb_width = drm_display.width;
+    int fb_height = drm_display.height;
     
     // 清屏 - 主背景色
     draw_filled_rect(0, 0, fb_width, fb_height, BG_MAIN);
@@ -525,7 +717,10 @@ void draw_professional_ui() {
     draw_rect_border(fb_width - 150, footer_y + 15, 120, 40, 2, Color(156, 39, 176));
     draw_text(fb_width - 135, footer_y + 30, "POWER", TEXT_PRIMARY, 1);
     
-    std::cout << "Professional industrial interface drawn to framebuffer" << std::endl;
+    // 呈现到屏幕
+    drm_flush_display();
+    
+    std::cout << "Professional industrial interface drawn via DRM/KMS" << std::endl;
 }
 
 // 显示驱动相关占位符
@@ -535,50 +730,23 @@ inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return drive
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
 inline bool lvgl_display_init() {
-    // Jetson Orin NX LVGL显示驱动初始化（真实framebuffer）
+    // Jetson Orin NX LVGL显示驱动初始化（DRM/KMS硬件加速）
     try {
-        // 检查framebuffer设备
-        const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
-        bool has_framebuffer = false;
+        std::cout << "Initializing DRM/KMS display driver..." << std::endl;
         
-        for (const char* fb_dev : fb_devices) {
-            fb_fd = open(fb_dev, O_RDWR);
-            if (fb_fd >= 0) {
-                has_framebuffer = true;
-                std::cout << "Opening framebuffer device: " << fb_dev << std::endl;
-                
-                // 获取实际framebuffer信息
-                if (!get_framebuffer_info()) {
-                    std::cout << "Failed to get framebuffer info" << std::endl;
-                    close(fb_fd);
-                    fb_fd = -1;
-                    continue;
-                }
-                
-                // 映射framebuffer到内存
-                fb_mem = (uint8_t*)mmap(NULL, fb_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
-                
-                if (fb_mem == MAP_FAILED) {
-                    std::cout << "Framebuffer memory mapping failed" << std::endl;
-                    close(fb_fd);
-                    fb_fd = -1;
-                    fb_mem = nullptr;
-                } else {
-                    std::cout << "Framebuffer memory mapping successful: " << fb_width << "x" << fb_height << std::endl;
-                    // Draw professional UI
-                    draw_professional_ui();
-                }
-                break;
-            }
-        }
+        // 首先抑制调试输出
+        suppress_all_debug_output();
         
-        if (has_framebuffer && fb_mem) {
-            std::cout << "Using framebuffer display mode" << std::endl;
+        if (initialize_drm_display()) {
+            std::cout << "DRM/KMS display initialization successful" << std::endl;
+            // 绘制专业界面
+            draw_professional_ui();
+            return true;
         } else {
-            std::cout << "Framebuffer initialization failed, using virtual display mode" << std::endl;
+            std::cout << "DRM/KMS initialization failed, using virtual display mode" << std::endl;
+            return true; // 仍然返回成功，允许程序继续运行
         }
         
-        return true;
     } catch (...) {
         std::cout << "Display driver initialization exception, using virtual display mode" << std::endl;
         return true;
@@ -1128,8 +1296,12 @@ private:
     
     bool initializeJetsonCSICamera() {
         try {
-            // Jetson CSI摄像头 GStreamer pipeline - 添加silent=true减少调试信息
-            // sensor-id=0 表示第一个CSI摄像头, sensor-id=1 表示第二个
+            std::cout << "Initializing Jetson CSI cameras with debug suppression..." << std::endl;
+            
+            // 临时重定向输出以抑制调试信息
+            redirect_output_to_null();
+            
+            // Jetson CSI摄像头 GStreamer pipeline - 完全静默模式
             std::vector<std::string> csi_pipelines = {
                 "nvarguscamerasrc sensor-id=0 silent=true ! "
                 "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
@@ -1146,29 +1318,38 @@ private:
                 "video/x-raw, format=(string)BGR ! appsink sync=false"
             };
             
+            bool camera_initialized = false;
+            
             for (size_t i = 0; i < csi_pipelines.size(); i++) {
-                std::cout << "Trying CSI camera sensor-id=" << i << std::endl;
-                
                 camera_.open(csi_pipelines[i], cv::CAP_GSTREAMER);
                 
                 if (camera_.isOpened()) {
                     // 测试是否真的能读取帧
                     cv::Mat test_frame;
                     if (camera_.read(test_frame) && !test_frame.empty()) {
+                        camera_initialized = true;
+                        // 恢复输出后再打印成功消息
+                        restore_output();
                         std::cout << "CSI camera sensor-id=" << i << " initialization successful, resolution: "
                                   << test_frame.cols << "x" << test_frame.rows << std::endl;
                         return true;
                     } else {
-                        std::cout << "CSI camera sensor-id=" << i << " unable to read frame" << std::endl;
                         camera_.release();
                     }
-                } else {
-                    std::cout << "Unable to open CSI camera sensor-id=" << i << std::endl;
                 }
+            }
+            
+            // 恢复输出
+            restore_output();
+            
+            if (!camera_initialized) {
+                std::cout << "All CSI camera initialization attempts failed" << std::endl;
             }
             
             return false;
         } catch (const cv::Exception& e) {
+            // 确保输出被恢复
+            restore_output();
             std::cout << "CSI摄像头初始化异常: " << e.what() << std::endl;
             return false;
         }
@@ -1216,13 +1397,15 @@ private:
     bool initializeStereoVision() {
         std::cout << "初始化双摄立体视觉系统..." << std::endl;
         
+        // 临时重定向输出以抑制摄像头调试信息
+        redirect_output_to_null();
+        
         vision::StereoConfig stereo_config;
-        // 修复立体标定文件路径为绝对路径
         stereo_config.calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
         stereo_config.frame_size = cv::Size(640, 480);
         stereo_config.fps = 30;
         
-        // Jetson CSI摄像头配置 - 使用GStreamer管道，减少调试信息
+        // Jetson CSI摄像头配置 - 完全静默模式
         stereo_config.left_camera_pipeline =
             "nvarguscamerasrc sensor-id=0 silent=true ! "
             "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
@@ -1246,7 +1429,16 @@ private:
         
         stereo_vision_ = std::make_unique<vision::StereoVision>(stereo_config);
         
-        bool initialized = stereo_vision_->initialize();
+        bool initialized = false;
+        try {
+            initialized = stereo_vision_->initialize();
+        } catch (...) {
+            initialized = false;
+        }
+        
+        // 恢复输出
+        restore_output();
+        
         if (initialized) {
             std::cout << "立体视觉系统初始化成功" << std::endl;
         } else {
@@ -1492,6 +1684,12 @@ public:
         if (inference_worker_) {
             inference_worker_->stop();
         }
+        
+        // 清理DRM/KMS资源
+        cleanup_drm_display();
+        
+        // 清理输出重定向资源
+        cleanup_output_redirection();
         
         std::cout << "System shutdown complete" << std::endl;
     }
