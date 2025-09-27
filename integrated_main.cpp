@@ -161,6 +161,12 @@ bool get_framebuffer_info() {
 bool initialize_drm_display() {
     std::cout << "Initializing DRM/KMS display system..." << std::endl;
     
+    // 设置必要的环境变量
+    setenv("QT_QPA_PLATFORM", "eglfs", 1);
+    setenv("QT_QPA_EGLFS_INTEGRATION", "eglfs_kms", 1);
+    setenv("QT_QPA_EGLFS_KMS_CONFIG", "/opt/bamboo-cut/config/kms.conf", 1);
+    setenv("QT_LOGGING_RULES", "qt.qpa.eglfs.kms.debug=true", 1);
+    
     // 打开DRM设备
     const char* drm_devices[] = {"/dev/dri/card0", "/dev/dri/card1"};
     for (const char* device : drm_devices) {
@@ -168,11 +174,13 @@ bool initialize_drm_display() {
         if (drm_display.drm_fd >= 0) {
             std::cout << "Opened DRM device: " << device << std::endl;
             break;
+        } else {
+            std::cout << "Failed to open " << device << ": " << strerror(errno) << std::endl;
         }
     }
     
     if (drm_display.drm_fd < 0) {
-        std::cout << "Failed to open DRM device" << std::endl;
+        std::cout << "Failed to open DRM device, falling back to framebuffer" << std::endl;
         return false;
     }
     
