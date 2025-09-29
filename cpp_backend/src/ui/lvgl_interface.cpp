@@ -199,18 +199,51 @@ bool LVGLInterface::initializeDisplay() {
                      LV_COLOR_FORMAT_XRGB8888, config_.screen_width * 4,
                      disp_buf1_, buf_size * sizeof(lv_color_t));
     
-    // 创建显示器
-    display_ = lv_display_create(config_.screen_width, config_.screen_height);
-    if (!display_) {
-        std::cerr << "[LVGLInterface] 显示器创建失败" << std::endl;
+    // 创建显示器 - 添加异常保护和验证
+    try {
+        display_ = lv_display_create(config_.screen_width, config_.screen_height);
+        if (!display_) {
+            std::cerr << "[LVGLInterface] 显示器创建失败" << std::endl;
+            if (disp_buf1_) { delete[] disp_buf1_; disp_buf1_ = nullptr; }
+            if (disp_buf2_) { delete[] disp_buf2_; disp_buf2_ = nullptr; }
+            return false;
+        }
+        
+        // 验证显示器创建成功
+        if (lv_display_get_horizontal_resolution(display_) != config_.screen_width ||
+            lv_display_get_vertical_resolution(display_) != config_.screen_height) {
+            std::cerr << "[LVGLInterface] 显示器分辨率验证失败" << std::endl;
+            return false;
+        }
+        
+        // 设置显示缓冲区 - 添加缓冲区验证
+        if (!disp_buf1_ || buf_size == 0) {
+            std::cerr << "[LVGLInterface] 显示缓冲区无效" << std::endl;
+            return false;
+        }
+        
+        lv_display_set_buffers(display_, disp_buf1_, disp_buf2_, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+        
+        // 设置刷新回调函数
+        lv_display_set_flush_cb(display_, display_flush_cb);
+        
+        // 强制刷新一次以验证显示系统工作正常
+        lv_obj_invalidate(lv_scr_act());
+        lv_timer_handler();
+        
+        std::cout << "[LVGLInterface] 显示器创建和验证成功" << std::endl;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] 显示器创建异常: " << e.what() << std::endl;
+        if (disp_buf1_) { delete[] disp_buf1_; disp_buf1_ = nullptr; }
+        if (disp_buf2_) { delete[] disp_buf2_; disp_buf2_ = nullptr; }
+        return false;
+    } catch (...) {
+        std::cerr << "[LVGLInterface] 显示器创建未知异常" << std::endl;
+        if (disp_buf1_) { delete[] disp_buf1_; disp_buf1_ = nullptr; }
+        if (disp_buf2_) { delete[] disp_buf2_; disp_buf2_ = nullptr; }
         return false;
     }
-    
-    // 设置显示缓冲区
-    lv_display_set_buffers(display_, disp_buf1_, disp_buf2_, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
-    
-    // 设置刷新回调函数
-    lv_display_set_flush_cb(display_, display_flush_cb);
     
     std::cout << "[LVGLInterface] DRM显示驱动初始化成功 ("
               << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
