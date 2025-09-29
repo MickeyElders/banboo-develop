@@ -945,9 +945,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_clear_flag(ai_info_grid, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置网格布局：2列3行
-    static const lv_coord_t grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    static const lv_coord_t grid_row_dsc[] = {20, 20, 20, LV_GRID_TEMPLATE_LAST};
-    lv_obj_set_grid_dsc_array(ai_info_grid, grid_col_dsc, grid_row_dsc);
+    static lv_coord_t ai_grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t ai_grid_row_dsc[] = {20, 20, 20, LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(ai_info_grid, ai_grid_col_dsc, ai_grid_row_dsc);
     
     // 第一行：模型版本 | 检测精度
     control_widgets_.ai_model_version_label = lv_label_create(ai_info_grid);
@@ -1063,9 +1063,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_clear_flag(camera_grid, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置网格布局：2列5行（两个摄像头并排显示）
-    static const lv_coord_t camera_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    static const lv_coord_t camera_row_dsc[] = {15, 15, 15, 15, 15, LV_GRID_TEMPLATE_LAST};
-    lv_obj_set_grid_dsc_array(camera_grid, camera_col_dsc, camera_row_dsc);
+    static lv_coord_t camera_grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t camera_grid_row_dsc[] = {15, 15, 15, 15, 15, LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(camera_grid, camera_grid_col_dsc, camera_grid_row_dsc);
     
     // 摄像头-1状态（左列）
     control_widgets_.camera1_status_label = lv_label_create(camera_grid);
@@ -1181,9 +1181,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_clear_flag(modbus_reg_grid, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置网格布局：1列7行（每个寄存器一行）
-    static const lv_coord_t modbus_col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    static const lv_coord_t modbus_row_dsc[] = {16, 16, 16, 16, 16, 16, 16, LV_GRID_TEMPLATE_LAST};
-    lv_obj_set_grid_dsc_array(modbus_reg_grid, modbus_col_dsc, modbus_row_dsc);
+    static lv_coord_t modbus_grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t modbus_grid_row_dsc[] = {16, 16, 16, 16, 16, 16, 16, LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(modbus_reg_grid, modbus_grid_col_dsc, modbus_grid_row_dsc);
     
     // 按行排列各个寄存器状态
     control_widgets_.modbus_system_status_label = lv_label_create(modbus_reg_grid);
@@ -1255,9 +1255,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_clear_flag(version_grid, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置网格布局：1列5行
-    static const lv_coord_t version_col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    static const lv_coord_t version_row_dsc[] = {17, 17, 17, 17, 17, LV_GRID_TEMPLATE_LAST};
-    lv_obj_set_grid_dsc_array(version_grid, version_col_dsc, version_row_dsc);
+    static lv_coord_t version_grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t version_grid_row_dsc[] = {17, 17, 17, 17, 17, LV_GRID_TEMPLATE_LAST};
+    lv_obj_set_grid_dsc_array(version_grid, version_grid_col_dsc, version_grid_row_dsc);
     
     // 按行排列版本信息
     status_widgets_.jetpack_version = lv_label_create(version_grid);
