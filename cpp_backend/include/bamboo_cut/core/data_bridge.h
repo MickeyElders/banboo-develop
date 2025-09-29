@@ -38,6 +38,21 @@ struct DetectionResult {
 };
 
 /**
+ * @brief 竹子检测详细信息
+ */
+struct BambooDetection {
+    float diameter_mm;                   // 竹子直径(毫米)
+    float length_mm;                     // 竹子长度(毫米)
+    std::vector<float> cut_positions;    // 预切位置(毫米)
+    float confidence;                    // 检测置信度
+    float detection_time_ms;             // 检测耗时(毫秒)
+    bool has_bamboo;                     // 是否检测到竹子
+    
+    BambooDetection() : diameter_mm(0), length_mm(0), confidence(0),
+                       detection_time_ms(0), has_bamboo(false) {}
+};
+
+/**
  * @brief AI模型性能统计
  */
 struct AIModelStats {
@@ -48,6 +63,9 @@ struct AIModelStats {
     int total_detections;          // 总检测数
     int daily_detections;          // 今日检测数
     float average_confidence;       // 平均置信度
+    
+    // 当前竹子检测状态
+    BambooDetection current_bamboo;
     
     AIModelStats() : model_version("YOLOv8n"), inference_time_ms(0),
                     confidence_threshold(0.85f), detection_accuracy(0),

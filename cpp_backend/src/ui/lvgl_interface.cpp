@@ -748,7 +748,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === AI Model Monitoring Area ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(ai_section, lv_pct(100), 110);
+    lv_obj_set_size(ai_section, lv_pct(100), 220);  // 增加高度以容纳更多信息
     lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(ai_section, 12, 0);
     lv_obj_set_style_border_width(ai_section, 1, 0);
@@ -762,6 +762,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
     lv_obj_align(ai_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
+    // === 基本AI模型信息 (上半部分) ===
     // 模型版本
     control_widgets_.ai_model_version_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.ai_model_version_label, "模型版本: YOLOv8n");
@@ -803,6 +804,55 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_color(control_widgets_.ai_daily_detections_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_daily_detections_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.ai_daily_detections_label, LV_ALIGN_TOP_RIGHT, 0, 65);
+    
+    // === 分隔线 ===
+    lv_obj_t* separator = lv_obj_create(ai_section);
+    lv_obj_set_size(separator, lv_pct(100), 1);
+    lv_obj_set_pos(separator, 0, 90);
+    lv_obj_set_style_bg_color(separator, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_border_width(separator, 0, 0);
+    lv_obj_clear_flag(separator, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // === 当前竹子检测状态 (下半部分) ===
+    lv_obj_t* bamboo_status_title = lv_label_create(ai_section);
+    lv_label_set_text(bamboo_status_title, LV_SYMBOL_CHARGE " 当前竹子：");
+    lv_obj_set_style_text_color(bamboo_status_title, color_warning_, 0);
+    lv_obj_set_style_text_font(bamboo_status_title, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(bamboo_status_title, 0, 100);
+    
+    // 竹子直径
+    control_widgets_.bamboo_diameter_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.bamboo_diameter_label, "- 直径：45.2mm");
+    lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_diameter_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.bamboo_diameter_label, 0, 120);
+    
+    // 竹子长度
+    control_widgets_.bamboo_length_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.bamboo_length_label, "- 长度：2850mm");
+    lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_length_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.bamboo_length_label, 0, 140);
+    
+    // 预切位置
+    control_widgets_.bamboo_cut_positions_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "- 预切位置：[250mm, 1450mm, 2650mm]");
+    lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_cut_positions_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.bamboo_cut_positions_label, 0, 160);
+    
+    // 检测置信度和耗时 (同一行)
+    control_widgets_.bamboo_confidence_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.bamboo_confidence_label, "- 置信度：0.96");
+    lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_confidence_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.bamboo_confidence_label, 0, 180);
+    
+    control_widgets_.bamboo_detection_time_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：16.8ms");
+    lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_detection_time_label, &lv_font_montserrat_12, 0);
+    lv_obj_align_to(control_widgets_.bamboo_detection_time_label, control_widgets_.bamboo_confidence_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
@@ -1457,6 +1507,104 @@ void LVGLInterface::updateSystemStats() {
         if (control_widgets_.ai_daily_detections_label) {
             lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "今日检测: %d",
                                   databridge_stats.ai_model.daily_detections);
+        }
+        
+        // === 更新当前竹子检测状态 ===
+        const auto& bamboo_detection = databridge_stats.ai_model.current_bamboo;
+        
+        // 更新竹子直径
+        if (control_widgets_.bamboo_diameter_label) {
+            if (bamboo_detection.has_bamboo) {
+                lv_label_set_text_fmt(control_widgets_.bamboo_diameter_label, "- 直径：%.1fmm",
+                                     bamboo_detection.diameter_mm);
+                
+                // 根据直径设置颜色 (合理范围20-80mm)
+                if (bamboo_detection.diameter_mm >= 20.0f && bamboo_detection.diameter_mm <= 80.0f) {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, color_primary_, 0);
+                } else {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, color_warning_, 0);
+                }
+            } else {
+                lv_label_set_text(control_widgets_.bamboo_diameter_label, "- 直径：无检测");
+                lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        // 更新竹子长度
+        if (control_widgets_.bamboo_length_label) {
+            if (bamboo_detection.has_bamboo) {
+                lv_label_set_text_fmt(control_widgets_.bamboo_length_label, "- 长度：%.0fmm",
+                                     bamboo_detection.length_mm);
+                
+                // 根据长度设置颜色 (合理范围1000-5000mm)
+                if (bamboo_detection.length_mm >= 1000.0f && bamboo_detection.length_mm <= 5000.0f) {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, color_primary_, 0);
+                } else {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, color_warning_, 0);
+                }
+            } else {
+                lv_label_set_text(control_widgets_.bamboo_length_label, "- 长度：无检测");
+                lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        // 更新预切位置
+        if (control_widgets_.bamboo_cut_positions_label) {
+            if (bamboo_detection.has_bamboo && !bamboo_detection.cut_positions.empty()) {
+                // 构建预切位置字符串
+                std::string positions_str = "- 预切位置：[";
+                for (size_t i = 0; i < bamboo_detection.cut_positions.size(); i++) {
+                    if (i > 0) positions_str += ", ";
+                    positions_str += std::to_string(static_cast<int>(bamboo_detection.cut_positions[i])) + "mm";
+                }
+                positions_str += "]";
+                
+                lv_label_set_text(control_widgets_.bamboo_cut_positions_label, positions_str.c_str());
+                lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, color_success_, 0);
+            } else {
+                lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "- 预切位置：无数据");
+                lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        // 更新检测置信度
+        if (control_widgets_.bamboo_confidence_label) {
+            if (bamboo_detection.has_bamboo) {
+                lv_label_set_text_fmt(control_widgets_.bamboo_confidence_label, "- 置信度：%.2f",
+                                     bamboo_detection.confidence);
+                
+                // 根据置信度设置颜色
+                if (bamboo_detection.confidence >= 0.9f) {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_success_, 0);
+                } else if (bamboo_detection.confidence >= 0.7f) {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_warning_, 0);
+                } else {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_error_, 0);
+                }
+            } else {
+                lv_label_set_text(control_widgets_.bamboo_confidence_label, "- 置信度：N/A");
+                lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        // 更新检测耗时
+        if (control_widgets_.bamboo_detection_time_label) {
+            if (bamboo_detection.has_bamboo) {
+                lv_label_set_text_fmt(control_widgets_.bamboo_detection_time_label, "- 检测耗时：%.1fms",
+                                     bamboo_detection.detection_time_ms);
+                
+                // 根据检测时间设置颜色
+                if (bamboo_detection.detection_time_ms <= 20.0f) {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_success_, 0);
+                } else if (bamboo_detection.detection_time_ms <= 35.0f) {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_warning_, 0);
+                } else {
+                    lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_error_, 0);
+                }
+            } else {
+                lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：N/A");
+                lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, lv_color_hex(0x8A92A1), 0);
+            }
         }
         
         // 更新温度信息

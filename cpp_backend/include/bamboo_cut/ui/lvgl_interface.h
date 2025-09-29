@@ -264,6 +264,13 @@ private:
         lv_obj_t* ai_total_detections_label;    // 总检测数
         lv_obj_t* ai_daily_detections_label;    // 今日检测数
         
+        // 当前竹子检测状态组件
+        lv_obj_t* bamboo_diameter_label;       // 竹子直径
+        lv_obj_t* bamboo_length_label;         // 竹子长度
+        lv_obj_t* bamboo_cut_positions_label;  // 预切位置
+        lv_obj_t* bamboo_confidence_label;     // 检测置信度
+        lv_obj_t* bamboo_detection_time_label; // 检测耗时
+        
         // Modbus通信统计组件
         lv_obj_t* modbus_connection_label;
         lv_obj_t* modbus_packets_label;
