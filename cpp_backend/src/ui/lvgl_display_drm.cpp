@@ -324,7 +324,7 @@ void LVGLInterface::setFullscreen(bool fullscreen) {
 
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 #ifdef ENABLE_LVGL
-    // 全面的DRM显示刷新实现 - 修复白屏问题
+    // 修复DRM双重释放内存错误 - 改进静态变量管理
     static int drm_fd = -1;
     static uint32_t fb_id = 0;
     static drmModeCrtc* crtc = nullptr;
@@ -338,16 +338,18 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
     static uint32_t drm_height = 0;
     static uint32_t stride = 0;
     static uint32_t buffer_size = 0;
-    static uint32_t flush_count = 0;  // 新增：刷新计数器
+    static uint32_t flush_count = 0;
+    static bool resources_cleaned = false;  // 新增：防止重复清理
     
     flush_count++;
     
     // 详细的调试信息
-    if (flush_count <= 5 || flush_count % 60 == 0) {  // 前5次和每60次刷新输出调试信息
+    if (flush_count <= 5 || flush_count % 60 == 0) {
         std::cout << "[DRM] flush_cb调用 #" << flush_count
                   << " area(" << (area ? area->x1 : -1) << "," << (area ? area->y1 : -1)
                   << " to " << (area ? area->x2 : -1) << "," << (area ? area->y2 : -1)
-                  << ") px_map=" << (px_map ? "valid" : "null") << std::endl;
+                  << ") px_map=" << (px_map ? "valid" : "null")
+                  << " drm_init=" << drm_initialized << " failed=" << drm_init_failed << std::endl;
     }
     
     // 严格的参数验证
@@ -368,16 +370,39 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
     
     // 初始化DRM设备 (只初始化一次，限制重试次数)
     if (!drm_initialized && !drm_init_failed) {
+        // 重置资源清理标志，准备新的初始化尝试
+        resources_cleaned = false;
+        
         if (!initializeDRMDevice(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
                                 init_attempt_count, drm_width, drm_height, stride, buffer_size)) {
+            // 初始化失败 - 确保资源被清理且只清理一次
+            if (!resources_cleaned) {
+                std::cout << "[DRM] 初始化失败，清理资源..." << std::endl;
+                cleanupDRMResources(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle, buffer_size);
+                
+                // 重置所有静态变量到初始状态
+                drm_fd = -1;
+                fb_id = 0;
+                crtc = nullptr;
+                connector = nullptr;
+                framebuffer = nullptr;
+                fb_handle = 0;
+                drm_width = 0;
+                drm_height = 0;
+                stride = 0;
+                buffer_size = 0;
+                resources_cleaned = true;
+            }
             drm_init_failed = true;
         } else {
             drm_initialized = true;
+            std::cout << "[DRM] 初始化成功" << std::endl;
         }
     }
     
     // 安全的像素数据复制 - 修复段错误和内存访问问题
-    if (drm_initialized && framebuffer && drm_width > 0 && drm_height > 0 && stride > 0) {
+    if (drm_initialized && framebuffer && framebuffer != MAP_FAILED &&
+        drm_width > 0 && drm_height > 0 && stride > 0) {
         copyPixelData(area, px_map, framebuffer, drm_width, drm_height, stride, buffer_size);
     }
     
