@@ -577,9 +577,9 @@ bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
 #endif
 }
 
-void cleanupDRMResources(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc, 
-                        drmModeConnector*& connector, uint32_t*& framebuffer, 
-                        uint32_t& fb_handle, uint32_t buffer_size) {
+void cleanupDRMResources(int drm_fd, uint32_t fb_id, drmModeCrtc* crtc,
+                        drmModeConnector* connector, uint32_t* framebuffer,
+                        uint32_t fb_handle, uint32_t buffer_size) {
 #ifdef ENABLE_LVGL
     // 完善的资源清理
     if (framebuffer && framebuffer != MAP_FAILED) {

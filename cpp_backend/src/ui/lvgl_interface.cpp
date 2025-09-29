@@ -460,5 +460,158 @@ void LVGLInterface::uiLoop() {
 #endif
 }
 
+/**
+ * @brief 创建AI模型监控区域
+ */
+void LVGLInterface::createAIModelSection(lv_obj_t* parent) {
+#ifdef ENABLE_LVGL
+    lv_obj_t* ai_section = lv_obj_create(parent);
+    lv_obj_set_width(ai_section, lv_pct(100));
+    lv_obj_set_height(ai_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(ai_section, 12, 0);
+    lv_obj_set_style_border_width(ai_section, 1, 0);
+    lv_obj_set_style_border_color(ai_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(ai_section, 12, 0);
+    lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(ai_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(ai_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(ai_section, 6, 0);
+
+    lv_obj_t* ai_label = lv_label_create(ai_section);
+    lv_label_set_text(ai_label, LV_SYMBOL_SETTINGS " AI Model Status");
+    lv_obj_set_style_text_color(ai_label, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(ai_label, &lv_font_montserrat_14, 0);
+    
+    // AI模型版本
+    control_widgets_.ai_model_version_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_model_version_label, "Model: YOLOv8n v1.0.3");
+    lv_obj_set_style_text_color(control_widgets_.ai_model_version_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_model_version_label, &lv_font_montserrat_12, 0);
+    
+    // 推理时间
+    control_widgets_.ai_inference_time_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_inference_time_label, "Inference: 23.5ms");
+    lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
+    
+    // 置信阈值
+    control_widgets_.ai_confidence_threshold_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "Confidence: 0.85");
+    lv_obj_set_style_text_color(control_widgets_.ai_confidence_threshold_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_confidence_threshold_label, &lv_font_montserrat_12, 0);
+    
+    // 检测精度
+    control_widgets_.ai_detection_accuracy_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "Accuracy: 96.2%");
+    lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_detection_accuracy_label, &lv_font_montserrat_12, 0);
+#endif
+}
+
+/**
+ * @brief 创建Modbus通信区域
+ */
+void LVGLInterface::createModbusSection(lv_obj_t* parent) {
+#ifdef ENABLE_LVGL
+    lv_obj_t* modbus_section = lv_obj_create(parent);
+    lv_obj_set_width(modbus_section, lv_pct(100));
+    lv_obj_set_height(modbus_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(modbus_section, 12, 0);
+    lv_obj_set_style_border_width(modbus_section, 1, 0);
+    lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(modbus_section, 12, 0);
+    lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(modbus_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(modbus_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(modbus_section, 6, 0);
+
+    lv_obj_t* modbus_label = lv_label_create(modbus_section);
+    lv_label_set_text(modbus_label, LV_SYMBOL_WIFI " Modbus Communication");
+    lv_obj_set_style_text_color(modbus_label, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(modbus_label, &lv_font_montserrat_14, 0);
+    
+    // 连接状态
+    control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_connection_label, "Status: Connected");
+    lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
+    
+    // 数据包统计
+    control_widgets_.modbus_packets_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_packets_label, "Packets: 1247 TX/1245 RX");
+    lv_obj_set_style_text_color(control_widgets_.modbus_packets_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_packets_label, &lv_font_montserrat_12, 0);
+    
+    // 错误统计
+    control_widgets_.modbus_errors_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_errors_label, "Errors: 2 (0.16%)");
+    lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_errors_label, &lv_font_montserrat_12, 0);
+    
+    // 心跳状态
+    control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "Heartbeat: 1.2s");
+    lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
+#endif
+}
+
+/**
+ * @brief 创建版本信息区域
+ */
+void LVGLInterface::createVersionSection(lv_obj_t* parent) {
+#ifdef ENABLE_LVGL
+    lv_obj_t* version_section = lv_obj_create(parent);
+    lv_obj_set_width(version_section, lv_pct(100));
+    lv_obj_set_height(version_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(version_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(version_section, 12, 0);
+    lv_obj_set_style_border_width(version_section, 1, 0);
+    lv_obj_set_style_border_color(version_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(version_section, 12, 0);
+    lv_obj_clear_flag(version_section, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(version_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(version_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(version_section, 6, 0);
+
+    lv_obj_t* version_label = lv_label_create(version_section);
+    lv_label_set_text(version_label, LV_SYMBOL_LIST " System Information");
+    lv_obj_set_style_text_color(version_label, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(version_label, &lv_font_montserrat_14, 0);
+    
+    // JetPack版本
+    status_widgets_.jetpack_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.jetpack_version, "JetPack: 5.1.2");
+    lv_obj_set_style_text_color(status_widgets_.jetpack_version, lv_color_white(), 0);
+    lv_obj_set_style_text_font(status_widgets_.jetpack_version, &lv_font_montserrat_12, 0);
+    
+    // CUDA版本
+    status_widgets_.cuda_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.cuda_version, "CUDA: 11.8.89");
+    lv_obj_set_style_text_color(status_widgets_.cuda_version, color_success_, 0);
+    lv_obj_set_style_text_font(status_widgets_.cuda_version, &lv_font_montserrat_12, 0);
+    
+    // TensorRT版本
+    status_widgets_.tensorrt_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.tensorrt_version, "TensorRT: 8.6.1");
+    lv_obj_set_style_text_color(status_widgets_.tensorrt_version, color_warning_, 0);
+    lv_obj_set_style_text_font(status_widgets_.tensorrt_version, &lv_font_montserrat_12, 0);
+    
+    // OpenCV版本
+    status_widgets_.opencv_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.opencv_version, "OpenCV: 4.8.0");
+    lv_obj_set_style_text_color(status_widgets_.opencv_version, color_primary_, 0);
+    lv_obj_set_style_text_font(status_widgets_.opencv_version, &lv_font_montserrat_12, 0);
+    
+    // Ubuntu版本
+    status_widgets_.ubuntu_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.ubuntu_version, "Ubuntu: 20.04.6 LTS");
+    lv_obj_set_style_text_color(status_widgets_.ubuntu_version, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(status_widgets_.ubuntu_version, &lv_font_montserrat_12, 0);
+#endif
+}
+
 } // namespace ui
 } // namespace bamboo_cut
