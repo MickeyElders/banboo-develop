@@ -270,14 +270,8 @@ bool LVGLInterface::initializeDisplay() {
                   
         lv_display_set_buffers(display_, disp_buf1_, disp_buf2_, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
         
-        // 验证缓冲区设置
-        void* actual_buf1 = nullptr;
-        void* actual_buf2 = nullptr;
-        uint32_t actual_size = 0;
-        lv_display_render_mode_t actual_mode = lv_display_get_buffers(display_, &actual_buf1, &actual_buf2, &actual_size);
-        
-        std::cout << "[LVGLInterface] 缓冲区验证: actual_buf1=" << actual_buf1 << " actual_buf2=" << actual_buf2
-                  << " actual_size=" << actual_size << " actual_mode=" << (int)actual_mode << std::endl;
+        // 删除缓冲区验证代码（LVGL v9中lv_display_get_buffers函数不存在）
+        std::cout << "[LVGLInterface] 显示缓冲区设置完成，跳过验证步骤" << std::endl;
         
         // 设置刷新回调函数
         lv_display_set_flush_cb(display_, display_flush_cb);
@@ -478,7 +472,7 @@ void LVGLInterface::createMainInterface() {
     // 1. 设置主屏幕背景色为可见颜色（避免全透明或全白）
     lv_obj_set_style_bg_color(main_screen_, color_background_, 0);
     lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
-    std::cout << "[LVGLInterface] 设置主屏幕背景色为: 0x" << std::hex << lv_color_to32(color_background_) << std::dec << std::endl;
+    std::cout << "[LVGLInterface] 设置主屏幕背景色为: 0x" << std::hex << lv_color_to_32(color_background_) << std::dec << std::endl;
     
     // 2. 创建测试标签验证屏幕可见性（修复版）
     lv_obj_t* test_label = lv_label_create(main_screen_);
