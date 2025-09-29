@@ -612,7 +612,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_pos(control_widgets_.cpu_bar, 0, y_pos);
     lv_bar_set_range(control_widgets_.cpu_bar, 0, 100);
     lv_bar_set_value(control_widgets_.cpu_bar, 45, LV_ANIM_ON);
-    lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_success_, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
     
     control_widgets_.cpu_label = lv_label_create(jetson_section);
     lv_label_set_text(control_widgets_.cpu_label, "CPU: 45%@1.9GHz");
@@ -660,7 +660,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_pos(control_widgets_.mem_bar, 0, y_pos);
     lv_bar_set_range(control_widgets_.mem_bar, 0, 100);
     lv_bar_set_value(control_widgets_.mem_bar, 58, LV_ANIM_ON);
-    lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_primary_, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
     
     control_widgets_.mem_label = lv_label_create(jetson_section);
     lv_label_set_text(control_widgets_.mem_label, "RAM: 3347/7467MB");
@@ -1486,14 +1486,8 @@ void LVGLInterface::updateSystemStats() {
             lv_bar_set_value(control_widgets_.cpu_bar, avg_usage, LV_ANIM_ON);
             lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @%dMHz", avg_usage, avg_freq);
             
-            // 根据使用率设置颜色
-            if (avg_usage > 80) {
-                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_error_, LV_PART_INDICATOR);
-            } else if (avg_usage > 60) {
-                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
-            } else {
-                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_success_, LV_PART_INDICATOR);
-            }
+            // 使用黄色条块代表已使用的量
+            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
         }
         
         // 更新GPU信息
@@ -1503,13 +1497,8 @@ void LVGLInterface::updateSystemStats() {
             lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @%dMHz",
                                  gpu_usage, stats.gpu.frequency_mhz);
             
-            if (gpu_usage > 85) {
-                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_error_, LV_PART_INDICATOR);
-            } else if (gpu_usage > 70) {
-                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
-            } else {
-                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_success_, LV_PART_INDICATOR);
-            }
+            // 使用黄色条块代表已使用的量
+            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
         }
         
         // 更新内存信息
@@ -1520,13 +1509,8 @@ void LVGLInterface::updateSystemStats() {
                                  mem_percentage, stats.memory.ram_used_mb, stats.memory.ram_total_mb,
                                  stats.memory.lfb_blocks, stats.memory.lfb_size_mb);
             
-            if (mem_percentage > 85) {
-                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_error_, LV_PART_INDICATOR);
-            } else if (mem_percentage > 70) {
-                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
-            } else {
-                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_primary_, LV_PART_INDICATOR);
-            }
+            // 使用黄色条块代表已使用的量
+            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
         }
         
         // 从DataBridge获取真实的AI模型统计数据
