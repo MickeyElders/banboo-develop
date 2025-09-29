@@ -282,76 +282,47 @@ void LVGLInterface::createMainInterface() {
     
     main_screen_ = lv_scr_act();
     
-    // === 主界面初始化增强 - 修复白屏问题 ===
+    // === 完全使用Flex布局 - 修复布局冲突 ===
     
-    // 1. 设置主屏幕背景色为可见颜色（避免全透明或全白）
+    // 1. 设置主屏幕背景色和Flex布局
     lv_obj_set_style_bg_color(main_screen_, color_background_, 0);
     lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
-    std::cout << "[LVGLInterface] 设置主屏幕背景色完成" << std::endl;
+    lv_obj_set_style_pad_all(main_screen_, 0, 0);
+    lv_obj_clear_flag(main_screen_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 2. 创建测试标签验证屏幕可见性（修复版）
-    lv_obj_t* test_label = lv_label_create(main_screen_);
-    lv_label_set_text(test_label, "BAMBOO SYSTEM INITIALIZING...");
+    // 设置主屏幕为垂直Flex布局
+    lv_obj_set_flex_flow(main_screen_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(main_screen_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(main_screen_, 5, 0);
+    std::cout << "[LVGLInterface] 设置主屏幕Flex布局完成" << std::endl;
     
-    // 使用32位颜色值，避免lv_color_white()的类型转换问题
-    lv_color_t white_color;
-    #if LV_COLOR_DEPTH == 32
-        white_color = lv_color_hex(0xFFFFFF);  // 直接使用32位白色
-    #else
-        white_color = lv_color_white();
-    #endif
+    // 2. 创建头部面板
+    header_panel_ = createHeaderPanel();
+    lv_obj_set_flex_grow(header_panel_, 0);  // 头部面板不允许增长
     
-    lv_obj_set_style_text_color(test_label, white_color, 0);
-    lv_obj_set_style_text_font(test_label, &lv_font_montserrat_24, 0);
-    lv_obj_center(test_label);
-    std::cout << "[LVGLInterface] 创建初始化测试标签（32位颜色格式）" << std::endl;
-    
-    // 3. 强制刷新主屏幕，确保背景色和测试内容可见
-    lv_obj_invalidate(main_screen_);
-    lv_refr_now(NULL);  // 立即强制刷新
-    std::cout << "[LVGLInterface] 执行强制屏幕刷新" << std::endl;
-    
-    // 4. 延迟以确保测试内容显示
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    
-    // 5. 移除测试标签，开始创建正常界面
-    lv_obj_del(test_label);
-    std::cout << "[LVGLInterface] 移除测试标签，开始创建正常界面" << std::endl;
-    
-    // 创建头部面板
-    createHeaderPanel();
-    
-    // 创建中间内容容器（使用Flex布局管理左右面板）
+    // 3. 创建中间内容容器（使用Flex布局管理左右面板）
     lv_obj_t* content_container = lv_obj_create(main_screen_);
-    lv_obj_set_size(content_container, lv_pct(100), LV_SIZE_CONTENT);  // ✅ 宽度填满，高度自适应
-    lv_obj_align(content_container, LV_ALIGN_TOP_MID, 0, 75);  // ✅ 距离顶部75px（header高度70px + 5px间距）
+    lv_obj_set_width(content_container, lv_pct(100));
+    lv_obj_set_flex_grow(content_container, 1);  // 中间容器占据剩余空间
     lv_obj_set_style_bg_opa(content_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(content_container, 0, 0);
-    lv_obj_set_style_pad_all(content_container, 5, 0);  // 减少padding
+    lv_obj_set_style_pad_all(content_container, 5, 0);
     lv_obj_clear_flag(content_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 设置Flex布局：水平排列，左右分布
+    // 设置中间容器为水平Flex布局
     lv_obj_set_flex_flow(content_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(content_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(content_container, 10, 0);
     
-    // ✅ 计算容器实际可用高度（屏幕高度 - header - footer - 间距）
-    int32_t available_height = config_.screen_height - 70 - 90 - 15;  // header(70) + footer(80+10) + gaps(15)
-    lv_obj_set_height(content_container, available_height);  // ✅ 设置精确高度
+    // 4. 在容器内创建左右面板
+    camera_panel_ = createCameraPanel(content_container);
+    control_panel_ = createControlPanel(content_container);
     
-    // 在容器内创建左右面板
-    createCameraPanel(content_container);
-    createControlPanel(content_container);
+    // 5. 创建底部面板
+    footer_panel_ = createFooterPanel();
+    lv_obj_set_flex_grow(footer_panel_, 0);  // 底部面板不允许增长
     
-    // 创建底部面板
-    createFooterPanel();
-    
-    // 6. 最终强制刷新确保所有界面元素可见
-    lv_obj_invalidate(main_screen_);
-    lv_refr_now(NULL);
-    std::cout << "[LVGLInterface] 执行最终界面刷新" << std::endl;
-    
-    std::cout << "[LVGLInterface] 主界面创建完成，包含白屏修复增强" << std::endl;
+    std::cout << "[LVGLInterface] 主界面创建完成，使用完全Flex布局" << std::endl;
 #endif
 }
 
