@@ -941,47 +941,67 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
     
     // === 基本AI模型信息 (上半部分) ===
-    // 模型版本
-    control_widgets_.ai_model_version_label = lv_label_create(ai_section);
+    // ✅ AI模型信息使用行容器布局，移除所有固定对齐
+    
+    // 第一行：模型版本 | 检测精度
+    lv_obj_t* ai_info_row1 = lv_obj_create(ai_section);
+    lv_obj_set_width(ai_info_row1, lv_pct(100));
+    lv_obj_set_height(ai_info_row1, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(ai_info_row1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ai_info_row1, 0, 0);
+    lv_obj_set_style_pad_all(ai_info_row1, 0, 0);
+    lv_obj_set_flex_flow(ai_info_row1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ai_info_row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.ai_model_version_label = lv_label_create(ai_info_row1);
     lv_label_set_text(control_widgets_.ai_model_version_label, "模型版本: YOLOv8n");
     lv_obj_set_style_text_color(control_widgets_.ai_model_version_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_model_version_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_model_version_label, LV_ALIGN_TOP_LEFT, 0, 25);
     
-    // 推理时间
-    control_widgets_.ai_inference_time_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_inference_time_label, "推理时间: 18.3ms");
-    lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_inference_time_label, LV_ALIGN_TOP_LEFT, 0, 45);
-    
-    // 置信阈值
-    control_widgets_.ai_confidence_threshold_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "置信阈值: 0.85");
-    lv_obj_set_style_text_color(control_widgets_.ai_confidence_threshold_label, color_warning_, 0);
-    lv_obj_set_style_text_font(control_widgets_.ai_confidence_threshold_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_confidence_threshold_label, LV_ALIGN_TOP_LEFT, 0, 65);
-    
-    // 检测精度
-    control_widgets_.ai_detection_accuracy_label = lv_label_create(ai_section);
+    control_widgets_.ai_detection_accuracy_label = lv_label_create(ai_info_row1);
     lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "检测精度: 94.2%");
     lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_detection_accuracy_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_detection_accuracy_label, LV_ALIGN_TOP_RIGHT, 0, 25);
     
-    // 总检测数
-    control_widgets_.ai_total_detections_label = lv_label_create(ai_section);
+    // 第二行：推理时间 | 总检测数
+    lv_obj_t* ai_info_row2 = lv_obj_create(ai_section);
+    lv_obj_set_width(ai_info_row2, lv_pct(100));
+    lv_obj_set_height(ai_info_row2, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(ai_info_row2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ai_info_row2, 0, 0);
+    lv_obj_set_style_pad_all(ai_info_row2, 0, 0);
+    lv_obj_set_flex_flow(ai_info_row2, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ai_info_row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.ai_inference_time_label = lv_label_create(ai_info_row2);
+    lv_label_set_text(control_widgets_.ai_inference_time_label, "推理时间: 18.3ms");
+    lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.ai_total_detections_label = lv_label_create(ai_info_row2);
     lv_label_set_text(control_widgets_.ai_total_detections_label, "总检测数: 15,432");
     lv_obj_set_style_text_color(control_widgets_.ai_total_detections_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.ai_total_detections_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_total_detections_label, LV_ALIGN_TOP_RIGHT, 0, 45);
     
-    // 今日检测数
-    control_widgets_.ai_daily_detections_label = lv_label_create(ai_section);
+    // 第三行：置信阈值 | 今日检测数
+    lv_obj_t* ai_info_row3 = lv_obj_create(ai_section);
+    lv_obj_set_width(ai_info_row3, lv_pct(100));
+    lv_obj_set_height(ai_info_row3, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(ai_info_row3, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ai_info_row3, 0, 0);
+    lv_obj_set_style_pad_all(ai_info_row3, 0, 0);
+    lv_obj_set_flex_flow(ai_info_row3, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ai_info_row3, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.ai_confidence_threshold_label = lv_label_create(ai_info_row3);
+    lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "置信阈值: 0.85");
+    lv_obj_set_style_text_color(control_widgets_.ai_confidence_threshold_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_confidence_threshold_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.ai_daily_detections_label = lv_label_create(ai_info_row3);
     lv_label_set_text(control_widgets_.ai_daily_detections_label, "今日检测: 89");
     lv_obj_set_style_text_color(control_widgets_.ai_daily_detections_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_daily_detections_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_daily_detections_label, LV_ALIGN_TOP_RIGHT, 0, 65);
     
     // === 分隔线 ===
     lv_obj_t* separator = lv_obj_create(ai_section);
