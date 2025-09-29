@@ -81,8 +81,8 @@ void LVGLInterface::onBladeSelectionChanged(lv_event_t* e) {
                 
                 // 更新摄像头面板的刀片显示
                 if (self->camera_widgets_.blade_value) {
-                    lv_label_set_text_fmt(self->camera_widgets_.blade_value,
-                        LV_SYMBOL_SETTINGS " 刀片: #%d", self->selected_blade_);
+                    std::string blade_text = LV_SYMBOL_SETTINGS " 刀片: #" + std::to_string(self->selected_blade_);
+                    lv_label_set_text(self->camera_widgets_.blade_value, blade_text.c_str());
                 }
                 
                 break;
@@ -134,8 +134,8 @@ void LVGLInterface::updateModbusDisplay() {
     // 更新连接状态信息（使用模拟数据）
     if (control_widgets_.modbus_connection_label) {
         bool is_connected = (modbus_registers.heartbeat > 0);
-        lv_label_set_text_fmt(control_widgets_.modbus_connection_label,
-            "PLC连接: %s", is_connected ? "在线 ✓" : "离线 ✗");
+        std::string connection_text = "PLC连接: " + std::string(is_connected ? "在线 ✓" : "离线 ✗");
+        lv_label_set_text(control_widgets_.modbus_connection_label, connection_text.c_str());
         lv_obj_set_style_text_color(control_widgets_.modbus_connection_label,
             is_connected ? color_success_ : color_error_, 0);
     }
@@ -150,7 +150,8 @@ void LVGLInterface::updateModbusDisplay() {
     if (control_widgets_.modbus_latency_label) {
         static int latency_ms = 8;
         latency_ms = 5 + (rand() % 10);  // 模拟5-15ms延迟
-        lv_label_set_text_fmt(control_widgets_.modbus_latency_label, "通讯延迟: %dms", latency_ms);
+        std::string latency_text = "通讯延迟: " + std::to_string(latency_ms) + "ms";
+        lv_label_set_text(control_widgets_.modbus_latency_label, latency_text.c_str());
         
         // 根据延迟设置颜色
         if (latency_ms <= 10) {
@@ -166,7 +167,8 @@ void LVGLInterface::updateModbusDisplay() {
     if (control_widgets_.modbus_last_success_label) {
         static int last_comm_seconds = 2;
         last_comm_seconds = (rand() % 5) + 1;  // 模拟1-5秒前
-        lv_label_set_text_fmt(control_widgets_.modbus_last_success_label, "最后通讯: %d秒前", last_comm_seconds);
+        std::string last_success_text = "最后通讯: " + std::to_string(last_comm_seconds) + "秒前";
+        lv_label_set_text(control_widgets_.modbus_last_success_label, last_success_text.c_str());
         lv_obj_set_style_text_color(control_widgets_.modbus_last_success_label, color_primary_, 0);
     }
     
@@ -174,7 +176,8 @@ void LVGLInterface::updateModbusDisplay() {
     if (control_widgets_.modbus_error_count_label) {
         static int error_count = 0;
         if (rand() % 100 == 0) error_count++;  // 偶尔增加错误计数
-        lv_label_set_text_fmt(control_widgets_.modbus_error_count_label, "错误计数: %d", error_count);
+        std::string error_count_text = "错误计数: " + std::to_string(error_count);
+        lv_label_set_text(control_widgets_.modbus_error_count_label, error_count_text.c_str());
         lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label,
             error_count == 0 ? color_success_ : color_warning_, 0);
     }
@@ -183,20 +186,23 @@ void LVGLInterface::updateModbusDisplay() {
     if (control_widgets_.modbus_message_count_label) {
         static int message_count = 1523;
         message_count += 1 + (rand() % 3);  // 模拟消息增长
-        lv_label_set_text_fmt(control_widgets_.modbus_message_count_label, "今日消息: %d", message_count);
+        std::string message_count_text = "今日消息: " + std::to_string(message_count);
+        lv_label_set_text(control_widgets_.modbus_message_count_label, message_count_text.c_str());
         lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
     }
     
     if (control_widgets_.modbus_packets_label) {
         static int packets = 1247;
         packets += 1 + (rand() % 3);  // 模拟数据包增长
-        lv_label_set_text_fmt(control_widgets_.modbus_packets_label, "数据包: %d", packets);
+        std::string packets_text = "数据包: " + std::to_string(packets);
+        lv_label_set_text(control_widgets_.modbus_packets_label, packets_text.c_str());
     }
     
     if (control_widgets_.modbus_errors_label) {
         static float error_rate = 0.02f;
         error_rate = (rand() % 10) / 1000.0f;  // 模拟0.000-0.010%错误率
-        lv_label_set_text_fmt(control_widgets_.modbus_errors_label, "错误率: %.3f%%", error_rate);
+        std::string error_rate_text = "错误率: " + std::to_string(static_cast<int>(error_rate * 1000) / 1000.0) + "%%";
+        lv_label_set_text(control_widgets_.modbus_errors_label, error_rate_text.c_str());
         
         // 根据错误率设置颜色
         if (error_rate > 1.0f) {
@@ -229,8 +235,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint16_t system_status = modbus_registers.system_status;
         const char* status_str = (system_status < 5) ? status_names[system_status] : "未知";
         
-        lv_label_set_text_fmt(control_widgets_.modbus_system_status_label,
-            "40001 系统状态: %s", status_str);
+        std::string system_status_text = "40001 系统状态: " + std::string(status_str);
+        lv_label_set_text(control_widgets_.modbus_system_status_label, system_status_text.c_str());
         
         // 根据状态设置颜色
         if (system_status == 1) { // 运行
@@ -251,8 +257,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint16_t plc_command = modbus_registers.plc_command;
         const char* command_str = (plc_command < 9) ? command_names[plc_command] : "未知命令";
         
-        lv_label_set_text_fmt(control_widgets_.modbus_plc_command_label,
-            "40002 PLC命令: %s", command_str);
+        std::string plc_command_text = "40002 PLC命令: " + std::string(command_str);
+        lv_label_set_text(control_widgets_.modbus_plc_command_label, plc_command_text.c_str());
         
         // 根据命令类型设置颜色
         if (plc_command >= 1 && plc_command <= 5) { // 正常操作命令
@@ -269,8 +275,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint16_t coord_ready = modbus_registers.coord_ready;
         const char* ready_str = coord_ready ? "是" : "否";
         
-        lv_label_set_text_fmt(control_widgets_.modbus_coord_ready_label,
-            "40003 坐标就绪: %s", ready_str);
+        std::string coord_ready_text = "40003 坐标就绪: " + std::string(ready_str);
+        lv_label_set_text(control_widgets_.modbus_coord_ready_label, coord_ready_text.c_str());
         
         lv_obj_set_style_text_color(control_widgets_.modbus_coord_ready_label,
             coord_ready ? color_success_ : color_warning_, 0);
@@ -281,8 +287,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint32_t x_coord_raw = modbus_registers.x_coordinate;
         float x_coord_mm = static_cast<float>(x_coord_raw) * 0.1f; // 0.1mm精度
         
-        lv_label_set_text_fmt(control_widgets_.modbus_x_coordinate_label,
-            "40004 X坐标: %.1fmm", x_coord_mm);
+        std::string x_coord_text = "40004 X坐标: " + std::to_string(static_cast<int>(x_coord_mm * 10) / 10.0) + "mm";
+        lv_label_set_text(control_widgets_.modbus_x_coordinate_label, x_coord_text.c_str());
         
         // 根据坐标值设置颜色（假设有效范围是0-1000mm）
         if (x_coord_mm >= 0.0f && x_coord_mm <= 1000.0f) {
@@ -298,8 +304,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint16_t cut_quality = modbus_registers.cut_quality;
         const char* quality_str = (cut_quality < 2) ? quality_names[cut_quality] : "未知";
         
-        lv_label_set_text_fmt(control_widgets_.modbus_cut_quality_label,
-            "40006 切割质量: %s", quality_str);
+        std::string cut_quality_text = "40006 切割质量: " + std::string(quality_str);
+        lv_label_set_text(control_widgets_.modbus_cut_quality_label, cut_quality_text.c_str());
         
         lv_obj_set_style_text_color(control_widgets_.modbus_cut_quality_label,
             (cut_quality == 0) ? color_success_ : color_error_, 0);
@@ -311,8 +317,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint16_t blade_number = modbus_registers.blade_number;
         const char* blade_str = (blade_number < 4) ? blade_names[blade_number] : "未知刀片";
         
-        lv_label_set_text_fmt(control_widgets_.modbus_blade_number_label,
-            "40009 刀片编号: %s", blade_str);
+        std::string blade_number_text = "40009 刀片编号: " + std::string(blade_str);
+        lv_label_set_text(control_widgets_.modbus_blade_number_label, blade_number_text.c_str());
         
         // 根据刀片状态设置颜色
         if (blade_number >= 1 && blade_number <= 3) { // 有刀片
@@ -328,8 +334,8 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
         uint16_t health_status = modbus_registers.health_status;
         const char* health_str = (health_status < 4) ? health_names[health_status] : "未知";
         
-        lv_label_set_text_fmt(control_widgets_.modbus_health_status_label,
-            "40010 健康状态: %s", health_str);
+        std::string health_status_text = "40010 健康状态: " + std::string(health_str);
+        lv_label_set_text(control_widgets_.modbus_health_status_label, health_status_text.c_str());
         
         // 根据健康状态设置颜色
         if (health_status == 0) { // 正常
