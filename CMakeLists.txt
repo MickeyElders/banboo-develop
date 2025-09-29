@@ -400,8 +400,14 @@ set(LV_USE_DEMO_MULTILANG OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_TRANSFORM OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_SCROLL OFF CACHE BOOL "" FORCE)
 
-# 获取LVGL源码
-FetchContent_MakeAvailable(lvgl)
+# 手动获取LVGL源码，但不自动构建所有目标
+FetchContent_GetProperties(lvgl)
+if(NOT lvgl_POPULATED)
+    FetchContent_Populate(lvgl)
+    
+    # 手动添加LVGL子目录，排除示例
+    add_subdirectory(${lvgl_SOURCE_DIR} ${lvgl_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 # 检查LVGL是否成功获取
 FetchContent_GetProperties(lvgl)
