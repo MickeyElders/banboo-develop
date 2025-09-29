@@ -160,7 +160,8 @@ bool LVGLInterface::initializeDisplay() {
     
     // 初始化显示缓冲区 (LVGL v9 API)
     lv_draw_buf_init(&draw_buf_, config_.screen_width, config_.screen_height,
-                     LV_COLOR_FORMAT_RGB888, config_.screen_width * 4);
+                     LV_COLOR_FORMAT_RGB888, config_.screen_width * 4,
+                     disp_buf1_, buf_size * sizeof(lv_color_t));
     
     // 创建显示器
     display_ = lv_display_create(config_.screen_width, config_.screen_height);
@@ -241,7 +242,7 @@ void LVGLInterface::initializeTheme() {
     lv_style_set_bg_color(&style_btn_primary, color_primary_);
     lv_style_set_bg_opa(&style_btn_primary, LV_OPA_COVER);
     lv_style_set_shadow_width(&style_btn_primary, 8);
-    lv_style_set_shadow_opa(&style_btn_primary, LV_OPA_15);
+    lv_style_set_shadow_opa(&style_btn_primary, LV_OPA_10);
     lv_style_set_shadow_color(&style_btn_primary, lv_color_black());
     lv_style_set_text_color(&style_btn_primary, lv_color_white());
     lv_style_set_border_width(&style_btn_primary, 0);
@@ -345,7 +346,7 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
     
     // 简洁的背景样式
     lv_obj_set_style_bg_color(header_panel_, color_surface_, 0);
-    lv_obj_set_style_bg_opa(header_panel_, LV_OPA_95, 0);
+    lv_obj_set_style_bg_opa(header_panel_, LV_OPA_90, 0);
     lv_obj_set_style_radius(header_panel_, 0, 0);
     lv_obj_set_style_border_width(header_panel_, 1, 0);
     lv_obj_set_style_border_side(header_panel_, LV_BORDER_SIDE_BOTTOM, 0);
@@ -404,7 +405,7 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
             lv_obj_set_style_bg_color(step, color_success_, 0);
             lv_obj_set_style_border_color(step, color_success_, 0);
             lv_obj_set_style_shadow_width(step, 4, 0);
-            lv_obj_set_style_shadow_opa(step, LV_OPA_15, 0);
+            lv_obj_set_style_shadow_opa(step, LV_OPA_10, 0);
             lv_obj_set_style_shadow_color(step, lv_color_black(), 0);
         } else {
             lv_obj_set_style_bg_color(step, lv_color_hex(0x3A4048), 0);
@@ -465,7 +466,7 @@ lv_obj_t* LVGLInterface::createCameraPanel() {
     lv_obj_set_style_border_opa(camera_panel_, LV_OPA_60, 0);
     lv_obj_set_style_shadow_width(camera_panel_, 12, 0);
     lv_obj_set_style_shadow_color(camera_panel_, lv_color_black(), 0);
-    lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_15, 0);
+    lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_10, 0);
     lv_obj_set_style_radius(camera_panel_, 16, 0);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
@@ -520,7 +521,7 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     lv_obj_set_style_pad_all(control_panel_, 24, 0);  // 增加内边距，增强呼吸感
     lv_obj_set_style_radius(control_panel_, 16, 0);
     lv_obj_set_flex_flow(control_panel_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_STRETCH, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
     
     // 增加间距，营造呼吸感
     lv_obj_set_style_pad_gap(control_panel_, 20, 0);
@@ -584,7 +585,7 @@ lv_obj_t* LVGLInterface::createControlPanel() {
         
         lv_obj_t* label = lv_label_create(btn);
         lv_label_set_text_fmt(label, "#%d", i);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
         lv_obj_center(label);
         
         lv_obj_add_event_cb(btn, onBladeSelectionChanged, LV_EVENT_CLICKED, this);
@@ -751,7 +752,7 @@ lv_obj_t* LVGLInterface::createFooterPanel() {
     
     lv_obj_t* power_label = lv_label_create(footer_widgets_.power_btn);
     lv_label_set_text(power_label, LV_SYMBOL_SETTINGS);
-    lv_obj_set_style_text_font(power_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(power_label, &lv_font_montserrat_16, 0);
     lv_obj_center(power_label);
     lv_obj_add_event_cb(footer_widgets_.power_btn, onSettingsButtonClicked,
                         LV_EVENT_CLICKED, this);
@@ -980,7 +981,7 @@ void LVGLInterface::onEmergencyButtonClicked(lv_event_t* e) {
 void LVGLInterface::onBladeSelectionChanged(lv_event_t* e) {
 #ifdef ENABLE_LVGL
     LVGLInterface* self = static_cast<LVGLInterface*>(lv_event_get_user_data(e));
-    lv_obj_t* btn = lv_event_get_target(e);
+    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
     
     if (self && btn) {
         // 找到被点击的刀片编号
