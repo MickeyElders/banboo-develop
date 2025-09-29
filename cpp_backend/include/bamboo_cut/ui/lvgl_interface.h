@@ -270,6 +270,15 @@ private:
         lv_obj_t* modbus_errors_label;
         lv_obj_t* modbus_heartbeat_label;
         
+        // Modbus寄存器状态组件
+        lv_obj_t* modbus_system_status_label;      // 40001: 系统状态
+        lv_obj_t* modbus_plc_command_label;        // 40002: PLC命令
+        lv_obj_t* modbus_coord_ready_label;        // 40003: 坐标就绪
+        lv_obj_t* modbus_x_coordinate_label;       // 40004-05: X坐标
+        lv_obj_t* modbus_cut_quality_label;        // 40006: 切割质量
+        lv_obj_t* modbus_blade_number_label;       // 40009: 刀片编号
+        lv_obj_t* modbus_health_status_label;      // 40010: 健康状态
+        
         // 原有组件
         lv_obj_t* modbus_table;
         std::vector<lv_obj_t*> blade_buttons;

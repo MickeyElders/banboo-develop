@@ -806,43 +806,96 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(modbus_section, lv_pct(100), 90);  // 减小高度
+    lv_obj_set_size(modbus_section, lv_pct(100), 200);  // 增加高度以容纳寄存器信息
     lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(modbus_section, 12, 0);
     lv_obj_set_style_border_width(modbus_section, 1, 0);
     lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x2A3441), 0);
-    lv_obj_set_style_pad_all(modbus_section, 10, 0);  // 减小内边距
+    lv_obj_set_style_pad_all(modbus_section, 10, 0);
     lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* modbus_title = lv_label_create(modbus_section);
-    lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus Statistics");
+    lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus通信状态");
     lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xE6A055), 0);
-    lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_12, 0);  // 使用较小字体
+    lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_12, 0);
     lv_obj_align(modbus_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
+    // 连接统计信息（第一行）
     control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_connection_label, "Connection: 02:15:32");
+    lv_label_set_text(control_widgets_.modbus_connection_label, "连接: 02:15:32");
     lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 20);
+    lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 18);
     
     control_widgets_.modbus_packets_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_packets_label, "Packets: 1247");
+    lv_label_set_text(control_widgets_.modbus_packets_label, "数据包: 1247");
     lv_obj_set_style_text_color(control_widgets_.modbus_packets_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_packets_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 38);
+    lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 34);
     
     control_widgets_.modbus_errors_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_errors_label, "Error Rate: 0.02%");
+    lv_label_set_text(control_widgets_.modbus_errors_label, "错误率: 0.02%");
     lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_errors_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 20);
+    lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 18);
     
     control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "Heartbeat: OK");
+    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "心跳: OK");
     lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 38);
+    lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 34);
+    
+    // === Modbus寄存器状态区域 ===
+    int reg_y_start = 55;
+    
+    // 系统状态 (40001)
+    control_widgets_.modbus_system_status_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_system_status_label, "40001 系统状态: 运行");
+    lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_system_status_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_system_status_label, 0, reg_y_start);
+    
+    // PLC命令 (40002)
+    control_widgets_.modbus_plc_command_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_plc_command_label, "40002 PLC命令: 无");
+    lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_plc_command_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_plc_command_label, 0, reg_y_start + 16);
+    
+    // 坐标就绪 (40003)
+    control_widgets_.modbus_coord_ready_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_coord_ready_label, "40003 坐标就绪: 否");
+    lv_obj_set_style_text_color(control_widgets_.modbus_coord_ready_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_coord_ready_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_coord_ready_label, 0, reg_y_start + 32);
+    
+    // X坐标 (40004-05)
+    control_widgets_.modbus_x_coordinate_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_x_coordinate_label, "40004 X坐标: 0.0mm");
+    lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_x_coordinate_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_x_coordinate_label, 0, reg_y_start + 48);
+    
+    // 切割质量 (40006)
+    control_widgets_.modbus_cut_quality_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_cut_quality_label, "40006 切割质量: 正常");
+    lv_obj_set_style_text_color(control_widgets_.modbus_cut_quality_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_cut_quality_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_cut_quality_label, 0, reg_y_start + 64);
+    
+    // 刀片编号 (40009)
+    control_widgets_.modbus_blade_number_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_blade_number_label, "40009 刀片编号: 3");
+    lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_blade_number_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_blade_number_label, 0, reg_y_start + 80);
+    
+    // 健康状态 (40010)
+    control_widgets_.modbus_health_status_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_health_status_label, "40010 健康状态: 正常");
+    lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_health_status_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.modbus_health_status_label, 0, reg_y_start + 96);
     
     // === 系统版本信息区域 - 添加到控制面板底部 ===
     lv_obj_t* version_section = lv_obj_create(control_panel_);
@@ -1588,20 +1641,174 @@ void LVGLInterface::updateSystemStats() {
 
 void LVGLInterface::updateModbusDisplay() {
 #ifdef ENABLE_LVGL
-    if (!control_widgets_.modbus_table) return;
+    if (!data_bridge_) return;
     
-    // 示例数据更新
-    lv_table_set_cell_value(control_widgets_.modbus_table, 1, 0, "40001");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 1, 1, "1234");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 1, 2, LV_SYMBOL_OK);
+    // 从DataBridge获取真实的Modbus寄存器数据
+    core::SystemStats stats = data_bridge_->getStats();
+    auto modbus_registers = data_bridge_->getModbusRegisters();
     
-    lv_table_set_cell_value(control_widgets_.modbus_table, 2, 0, "40002");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 2, 1, "5678");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 2, 2, LV_SYMBOL_OK);
+    // 更新连接状态信息
+    if (control_widgets_.modbus_connection_label) {
+        static int hours = 2, minutes = 15, seconds = 32;
+        seconds++;
+        if (seconds >= 60) { seconds = 0; minutes++; }
+        if (minutes >= 60) { minutes = 0; hours++; }
+        lv_label_set_text_fmt(control_widgets_.modbus_connection_label,
+            "连接: %02d:%02d:%02d", hours, minutes, seconds);
+    }
     
-    lv_table_set_cell_value(control_widgets_.modbus_table, 3, 0, "40003");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 3, 1, "9012");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 3, 2, LV_SYMBOL_OK);
+    if (control_widgets_.modbus_packets_label) {
+        lv_label_set_text_fmt(control_widgets_.modbus_packets_label,
+            "数据包: %d", stats.modbus.packets_sent + stats.modbus.packets_received);
+    }
+    
+    if (control_widgets_.modbus_errors_label) {
+        float error_rate = stats.modbus.total_requests > 0 ?
+            (float)stats.modbus.error_count * 100.0f / stats.modbus.total_requests : 0.0f;
+        lv_label_set_text_fmt(control_widgets_.modbus_errors_label, "错误率: %.2f%%", error_rate);
+        
+        // 根据错误率设置颜色
+        if (error_rate > 1.0f) {
+            lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_error_, 0);
+        } else if (error_rate > 0.1f) {
+            lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_warning_, 0);
+        } else {
+            lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
+        }
+    }
+    
+    if (control_widgets_.modbus_heartbeat_label) {
+        bool heartbeat_ok = stats.modbus.connection_status &&
+                           (stats.modbus.last_response_time < 1000); // 1秒内有响应
+        lv_label_set_text(control_widgets_.modbus_heartbeat_label,
+            heartbeat_ok ? "心跳: OK" : "心跳: 超时");
+        lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label,
+            heartbeat_ok ? color_success_ : color_error_, 0);
+    }
+    
+    // === 更新Modbus寄存器状态信息 ===
+    
+    // 40001: 系统状态
+    if (control_widgets_.modbus_system_status_label) {
+        const char* status_names[] = {"停止", "运行", "错误", "暂停", "紧急停止"};
+        uint16_t system_status = modbus_registers.count(40001) ? modbus_registers.at(40001) : 0;
+        const char* status_str = (system_status < 5) ? status_names[system_status] : "未知";
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_system_status_label,
+            "40001 系统状态: %s", status_str);
+        
+        // 根据状态设置颜色
+        if (system_status == 1) { // 运行
+            lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_success_, 0);
+        } else if (system_status == 2 || system_status == 4) { // 错误或紧急停止
+            lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_error_, 0);
+        } else if (system_status == 3) { // 暂停
+            lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_warning_, 0);
+        } else { // 停止或未知
+            lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, lv_color_hex(0xB0B8C1), 0);
+        }
+    }
+    
+    // 40002: PLC命令
+    if (control_widgets_.modbus_plc_command_label) {
+        const char* command_names[] = {"无", "进料检测", "切割准备", "切割完成", "启动送料",
+                                       "停止送料", "复位系统", "保持", "刀片选择"};
+        uint16_t plc_command = modbus_registers.count(40002) ? modbus_registers.at(40002) : 0;
+        const char* command_str = (plc_command < 9) ? command_names[plc_command] : "未知命令";
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_plc_command_label,
+            "40002 PLC命令: %s", command_str);
+        
+        // 根据命令类型设置颜色
+        if (plc_command >= 1 && plc_command <= 5) { // 正常操作命令
+            lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, color_primary_, 0);
+        } else if (plc_command == 6) { // 复位系统
+            lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, color_warning_, 0);
+        } else { // 无命令或其他
+            lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, lv_color_hex(0xB0B8C1), 0);
+        }
+    }
+    
+    // 40003: 坐标就绪标志
+    if (control_widgets_.modbus_coord_ready_label) {
+        uint16_t coord_ready = modbus_registers.count(40003) ? modbus_registers.at(40003) : 0;
+        const char* ready_str = coord_ready ? "是" : "否";
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_coord_ready_label,
+            "40003 坐标就绪: %s", ready_str);
+        
+        lv_obj_set_style_text_color(control_widgets_.modbus_coord_ready_label,
+            coord_ready ? color_success_ : color_warning_, 0);
+    }
+    
+    // 40004-40005: X坐标 (32位合并，0.1mm精度)
+    if (control_widgets_.modbus_x_coordinate_label) {
+        uint16_t x_low = modbus_registers.count(40004) ? modbus_registers.at(40004) : 0;
+        uint16_t x_high = modbus_registers.count(40005) ? modbus_registers.at(40005) : 0;
+        uint32_t x_coord_raw = (static_cast<uint32_t>(x_high) << 16) | x_low;
+        float x_coord_mm = static_cast<float>(x_coord_raw) * 0.1f; // 0.1mm精度
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_x_coordinate_label,
+            "40004 X坐标: %.1fmm", x_coord_mm);
+        
+        // 根据坐标值设置颜色（假设有效范围是0-1000mm）
+        if (x_coord_mm >= 0.0f && x_coord_mm <= 1000.0f) {
+            lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, color_primary_, 0);
+        } else {
+            lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, color_warning_, 0);
+        }
+    }
+    
+    // 40006: 切割质量
+    if (control_widgets_.modbus_cut_quality_label) {
+        const char* quality_names[] = {"正常", "异常"};
+        uint16_t cut_quality = modbus_registers.count(40006) ? modbus_registers.at(40006) : 0;
+        const char* quality_str = (cut_quality < 2) ? quality_names[cut_quality] : "未知";
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_cut_quality_label,
+            "40006 切割质量: %s", quality_str);
+        
+        lv_obj_set_style_text_color(control_widgets_.modbus_cut_quality_label,
+            (cut_quality == 0) ? color_success_ : color_error_, 0);
+    }
+    
+    // 40009: 刀片编号
+    if (control_widgets_.modbus_blade_number_label) {
+        const char* blade_names[] = {"无", "刀片1", "刀片2", "双刀片"};
+        uint16_t blade_number = modbus_registers.count(40009) ? modbus_registers.at(40009) : 0;
+        const char* blade_str = (blade_number < 4) ? blade_names[blade_number] : "未知刀片";
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_blade_number_label,
+            "40009 刀片编号: %s", blade_str);
+        
+        // 根据刀片状态设置颜色
+        if (blade_number >= 1 && blade_number <= 3) { // 有刀片
+            lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, color_success_, 0);
+        } else { // 无刀片或未知
+            lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, color_warning_, 0);
+        }
+    }
+    
+    // 40010: 健康状态
+    if (control_widgets_.modbus_health_status_label) {
+        const char* health_names[] = {"正常", "警告", "错误", "严重"};
+        uint16_t health_status = modbus_registers.count(40010) ? modbus_registers.at(40010) : 0;
+        const char* health_str = (health_status < 4) ? health_names[health_status] : "未知";
+        
+        lv_label_set_text_fmt(control_widgets_.modbus_health_status_label,
+            "40010 健康状态: %s", health_str);
+        
+        // 根据健康状态设置颜色
+        if (health_status == 0) { // 正常
+            lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_success_, 0);
+        } else if (health_status == 1) { // 警告
+            lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_warning_, 0);
+        } else if (health_status >= 2) { // 错误或严重
+            lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_error_, 0);
+        } else { // 未知
+            lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, lv_color_hex(0xB0B8C1), 0);
+        }
+    }
 #endif
 }
 
