@@ -385,6 +385,12 @@ FetchContent_Declare(
     GIT_TAG        release/v9.0
 )
 
+# ⭐ 关键：在Populate之前设置这些变量
+set(LV_CONF_BUILD_DISABLE_EXAMPLES 1 CACHE INTERNAL "")
+set(LV_CONF_BUILD_DISABLE_DEMOS 1 CACHE INTERNAL "")
+set(BUILD_EXAMPLES OFF CACHE INTERNAL "")
+set(BUILD_DEMOS OFF CACHE INTERNAL "")
+
 # 设置LVGL配置选项
 set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "Path to lv_conf.h")
 
@@ -400,40 +406,40 @@ set(LV_USE_DEMO_MULTILANG OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_TRANSFORM OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_SCROLL OFF CACHE BOOL "" FORCE)
 
-# 手动获取LVGL源码，但不自动构建所有目标
+# 手动获取LVGL源码
 FetchContent_GetProperties(lvgl)
 if(NOT lvgl_POPULATED)
     FetchContent_Populate(lvgl)
     
-    # 手动添加LVGL子目录，排除示例
-    add_subdirectory(${lvgl_SOURCE_DIR} ${lvgl_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
-
-# 检查LVGL是否成功获取
-FetchContent_GetProperties(lvgl)
-if(lvgl_POPULATED)
-    set(ENABLE_LVGL ON)
-    message(STATUS "LVGL successfully fetched and configured")
+    # ⭐ 关键：只添加src目录，跳过examples
+    add_library(lvgl STATIC)
     
-    # 确保LVGL目标存在
-    if(TARGET lvgl)
-        # 添加LVGL包含目录
-        target_include_directories(lvgl PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}
-        )
-        
-        # 添加编译定义
-        target_compile_definitions(lvgl PUBLIC
-            LV_CONF_INCLUDE_SIMPLE=1
-        )
-        
-        message(STATUS "LVGL target configured successfully")
-    else()
-        message(WARNING "LVGL target not found, creating fallback")
-        set(ENABLE_LVGL OFF)
-    endif()
+    # 添加LVGL核心源文件
+    file(GLOB_RECURSE LVGL_SOURCES 
+        "${lvgl_SOURCE_DIR}/src/*.c"
+    )
+    
+    # 排除examples相关文件
+    list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*examples.*")
+    list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*demos.*")
+    
+    target_sources(lvgl PRIVATE ${LVGL_SOURCES})
+    
+    # 设置包含目录
+    target_include_directories(lvgl PUBLIC
+        ${lvgl_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    
+    # 添加编译定义
+    target_compile_definitions(lvgl PUBLIC
+        LV_CONF_INCLUDE_SIMPLE=1
+    )
+    
+    message(STATUS "LVGL core library configured (examples disabled)")
+    set(ENABLE_LVGL ON)
 else()
-    message(WARNING "Failed to fetch LVGL, disabling LVGL support")
+    message(WARNING "Failed to fetch LVGL")
     set(ENABLE_LVGL OFF)
 endif()
 
