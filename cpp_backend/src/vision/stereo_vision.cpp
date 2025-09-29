@@ -104,48 +104,67 @@ bool StereoVision::load_calibration() {
 }
 
 bool StereoVision::initialize_cameras() {
-    // 检测和释放被占用的摄像头设备
-    std::cout << "检测摄像头设备占用情况..." << std::endl;
+    std::cout << "初始化 Jetson CSI 双摄像头系统..." << std::endl;
     
-    // 尝试释放可能被占用的设备
-    std::vector<int> camera_ids = {config_.left_camera_id, config_.right_camera_id};
-    for (int id : camera_ids) {
-        std::string device_path = "/dev/video" + std::to_string(id);
-        std::string cmd = "fuser -k " + device_path + " 2>/dev/null || true";
-        if (system(cmd.c_str()) == 0) {
-            std::cout << "已释放被占用的设备: " << device_path << std::endl;
-        }
-        // 等待设备释放
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-    
-    std::cout << "初始化左摄像头 (ID: " << config_.left_camera_id << ")..." << std::endl;
-    
-    // 确保摄像头完全释放
+    // 确保任何已打开的摄像头被释放
     if (left_camera_.isOpened()) {
         left_camera_.release();
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-    
-    left_camera_.open(config_.left_camera_id);
-    if (!left_camera_.isOpened()) {
-        std::cout << "无法打开左摄像头，设备可能被占用" << std::endl;
-        return false;
-    }
-    
-    std::cout << "初始化右摄像头 (ID: " << config_.right_camera_id << ")..." << std::endl;
-    
-    // 确保摄像头完全释放
     if (right_camera_.isOpened()) {
         right_camera_.release();
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
     
-    right_camera_.open(config_.right_camera_id);
-    if (!right_camera_.isOpened()) {
-        std::cout << "无法打开右摄像头，设备可能被占用" << std::endl;
-        left_camera_.release(); // 释放已打开的左摄像头
-        return false;
+    // 优先使用 GStreamer 管道（nvarguscamerasrc）
+    if (config_.use_gstreamer && !config_.left_camera_pipeline.empty() && !config_.right_camera_pipeline.empty()) {
+        std::cout << "使用 nvarguscamerasrc 访问 CSI 摄像头..." << std::endl;
+        
+        // 初始化左摄像头 (nvarguscamerasrc)
+        std::cout << "初始化左摄像头 (nvarguscamerasrc sensor-id=0)..." << std::endl;
+        left_camera_.open(config_.left_camera_pipeline, cv::CAP_GSTREAMER);
+        if (!left_camera_.isOpened()) {
+            std::cout << "无法打开左摄像头 nvarguscamerasrc 管道" << std::endl;
+            return false;
+        }
+        
+        // 初始化右摄像头 (nvarguscamerasrc)
+        std::cout << "初始化右摄像头 (nvarguscamerasrc sensor-id=1)..." << std::endl;
+        right_camera_.open(config_.right_camera_pipeline, cv::CAP_GSTREAMER);
+        if (!right_camera_.isOpened()) {
+            std::cout << "无法打开右摄像头 nvarguscamerasrc 管道" << std::endl;
+            left_camera_.release();
+            return false;
+        }
+        
+        std::cout << "nvarguscamerasrc 双摄像头初始化成功" << std::endl;
+    } else {
+        // 回退到传统 V4L2 方式，但只释放 video0（避免影响 nvargus-daemon 的 video1）
+        std::cout << "回退到 V4L2 方式访问摄像头..." << std::endl;
+        
+        // 只释放 video0 设备（video1 被 nvargus-daemon 正常占用）
+        if (config_.left_camera_id == 0) {
+            std::string cmd = "fuser -k /dev/video0 2>/dev/null || true";
+            system(cmd.c_str());
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        
+        std::cout << "初始化左摄像头 (ID: " << config_.left_camera_id << ")..." << std::endl;
+        left_camera_.open(config_.left_camera_id);
+        if (!left_camera_.isOpened()) {
+            std::cout << "无法打开左摄像头，建议使用 nvarguscamerasrc" << std::endl;
+            return false;
+        }
+        
+        std::cout << "初始化右摄像头 (ID: " << config_.right_camera_id << ")..." << std::endl;
+        right_camera_.open(config_.right_camera_id);
+        if (!right_camera_.isOpened()) {
+            std::cout << "无法打开右摄像头，nvargus-daemon 可能正在使用该设备" << std::endl;
+            left_camera_.release();
+            return false;
+        }
+        
+        std::cout << "V4L2 双摄像头初始化成功" << std::endl;
     }
     
     // 设置摄像头参数
