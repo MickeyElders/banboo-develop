@@ -134,6 +134,30 @@ private:
      */
     lv_obj_t* createFooterPanel();
 
+    // === 新增拆分的面板创建函数 ===
+    
+    /**
+     * @brief 创建Jetson监控区域
+     */
+    void createJetsonMonitoringSection(lv_obj_t* parent);
+
+    /**
+     * @brief 创建AI模型监控区域
+     */
+    void createAIModelSection(lv_obj_t* parent);
+
+    /**
+     * @brief 创建Modbus通信区域
+     */
+    void createModbusSection(lv_obj_t* parent);
+
+    /**
+     * @brief 创建版本信息区域
+     */
+    void createVersionSection(lv_obj_t* parent);
+
+    // === 数据更新逻辑函数 ===
+
     /**
      * @brief 更新界面数据
      */
@@ -148,6 +172,21 @@ private:
      * @brief 更新系统状态信息
      */
     void updateSystemStats();
+
+    /**
+     * @brief 更新AI模型监控数据
+     */
+    void updateAIModelStats();
+
+    /**
+     * @brief 更新竹子检测状态数据
+     */
+    void updateBambooDetectionStats();
+
+    /**
+     * @brief 更新摄像头状态数据
+     */
+    void updateCameraStats();
 
     /**
      * @brief 更新Modbus寄存器显示
@@ -196,6 +235,48 @@ private:
      * @brief 自动检测DRM显示器分辨率
      */
     bool detectDisplayResolution(int& width, int& height);
+
+    // === DRM显示驱动相关函数 ===
+
+    /**
+     * @brief 设置LVGL显示缓冲区
+     */
+    void setupLVGLDisplayBuffer();
+
+    /**
+     * @brief 创建LVGL显示驱动
+     */
+    lv_display_t* createLVGLDisplay();
+
+    /**
+     * @brief 查找可用的DRM设备
+     */
+    int findDRMDevice();
+
+    /**
+     * @brief 打开DRM设备并配置显示
+     */
+    bool openDRMDevice(int fd);
+
+    /**
+     * @brief 配置DRM连接器
+     */
+    bool configureDRMConnector(int fd);
+
+    /**
+     * @brief 创建DRM帧缓冲区
+     */
+    bool createDRMFramebuffer(int fd);
+
+    /**
+     * @brief 设置DRM显示模式
+     */
+    bool setDRMMode(int fd);
+
+    /**
+     * @brief 复制像素数据到DRM缓冲区
+     */
+    void copyPixelsToDRM(const lv_area_t* area, const uint8_t* px_map);
 
 private:
     std::shared_ptr<core::DataBridge> data_bridge_;
@@ -339,6 +420,16 @@ private:
     static void* disp_buf2_;
     static char draw_buf_[64]; // 占位符缓冲区
 #endif
+
+    // === DRM设备相关成员变量 ===
+    static int drm_fd_;                    // DRM设备文件描述符
+    static uint32_t drm_crtc_id_;         // CRTC ID
+    static uint32_t drm_connector_id_;    // 连接器 ID
+    static uint32_t drm_fb_id_;           // 帧缓冲区 ID
+    static void* drm_map_;                // 内存映射指针
+    static uint32_t drm_handle_;          // DRM对象句柄
+    static uint32_t drm_stride_;          // 行字节数
+    static uint32_t drm_size_;            // 缓冲区大小
     
     // 性能监控
     std::chrono::high_resolution_clock::time_point last_update_time_;
