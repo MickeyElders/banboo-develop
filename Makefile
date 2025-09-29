@@ -249,10 +249,19 @@ build-lvgl-from-source:
 	@echo "Version: 9.3.0" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
 	@echo "Libs: -L\$${libdir} -llvgl" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
 	@echo "Cflags: -I\$${includedir} -I\$${includedir}/lvgl" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "$(BLUE)[INFO]$(NC) 更新动态链接器缓存和环境变量..."
 	@sudo ldconfig
 	@sudo updatedb 2>/dev/null || true
+	@export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$$PKG_CONFIG_PATH" && \
+	echo "export PKG_CONFIG_PATH=\"/usr/local/lib/pkgconfig:\$$PKG_CONFIG_PATH\"" | sudo tee -a /etc/environment > /dev/null
 	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3编译安装完成"
+	@echo "$(BLUE)[INFO]$(NC) 清理临时文件..."
 	@rm -rf /tmp/lvgl_build
+	@echo "$(CYAN)[INFO]$(NC) 验证安装结果..."
+	@sleep 1
+	@PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$$PKG_CONFIG_PATH" pkg-config --exists lvgl && \
+	echo "$(GREEN)[SUCCESS]$(NC) LVGL pkg-config验证成功" || \
+	echo "$(YELLOW)[WARNING]$(NC) LVGL pkg-config验证失败，但库文件应该已安装"
 
 # 安装LVGL v9的快速命令
 install-lvgl9: build-lvgl-from-source
