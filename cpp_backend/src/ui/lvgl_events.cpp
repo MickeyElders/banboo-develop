@@ -128,12 +128,58 @@ void LVGLInterface::updateModbusDisplay() {
     
     // 更新连接状态信息（使用模拟数据）
     if (control_widgets_.modbus_connection_label) {
-        static int hours = 2, minutes = 15, seconds = 32;
-        seconds++;
-        if (seconds >= 60) { seconds = 0; minutes++; }
-        if (minutes >= 60) { minutes = 0; hours++; }
+        bool is_connected = (modbus_registers.heartbeat > 0);
         lv_label_set_text_fmt(control_widgets_.modbus_connection_label,
-            "连接: %02d:%02d:%02d", hours, minutes, seconds);
+            "PLC连接: %s", is_connected ? "在线 ✓" : "离线 ✗");
+        lv_obj_set_style_text_color(control_widgets_.modbus_connection_label,
+            is_connected ? color_success_ : color_error_, 0);
+    }
+    
+    // 更新Modbus地址信息
+    if (control_widgets_.modbus_address_label) {
+        lv_label_set_text(control_widgets_.modbus_address_label, "地址: 192.168.1.100:502");
+        lv_obj_set_style_text_color(control_widgets_.modbus_address_label, lv_color_hex(0xB0B8C1), 0);
+    }
+    
+    // 更新通讯延迟
+    if (control_widgets_.modbus_latency_label) {
+        static int latency_ms = 8;
+        latency_ms = 5 + (rand() % 10);  // 模拟5-15ms延迟
+        lv_label_set_text_fmt(control_widgets_.modbus_latency_label, "通讯延迟: %dms", latency_ms);
+        
+        // 根据延迟设置颜色
+        if (latency_ms <= 10) {
+            lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_success_, 0);
+        } else if (latency_ms <= 20) {
+            lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_warning_, 0);
+        } else {
+            lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_error_, 0);
+        }
+    }
+    
+    // 更新最后通讯时间
+    if (control_widgets_.modbus_last_success_label) {
+        static int last_comm_seconds = 2;
+        last_comm_seconds = (rand() % 5) + 1;  // 模拟1-5秒前
+        lv_label_set_text_fmt(control_widgets_.modbus_last_success_label, "最后通讯: %d秒前", last_comm_seconds);
+        lv_obj_set_style_text_color(control_widgets_.modbus_last_success_label, color_primary_, 0);
+    }
+    
+    // 更新错误计数
+    if (control_widgets_.modbus_error_count_label) {
+        static int error_count = 0;
+        if (rand() % 100 == 0) error_count++;  // 偶尔增加错误计数
+        lv_label_set_text_fmt(control_widgets_.modbus_error_count_label, "错误计数: %d", error_count);
+        lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label,
+            error_count == 0 ? color_success_ : color_warning_, 0);
+    }
+    
+    // 更新消息计数
+    if (control_widgets_.modbus_message_count_label) {
+        static int message_count = 1523;
+        message_count += 1 + (rand() % 3);  // 模拟消息增长
+        lv_label_set_text_fmt(control_widgets_.modbus_message_count_label, "今日消息: %d", message_count);
+        lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
     }
     
     if (control_widgets_.modbus_packets_label) {

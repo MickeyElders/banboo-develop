@@ -436,7 +436,12 @@ private:
         lv_obj_t* camera2_lighting_label;      // 摄像头-2光照评分
         
         // Modbus通信统计组件
-        lv_obj_t* modbus_connection_label;
+        lv_obj_t* modbus_connection_label;      // 连接状态
+        lv_obj_t* modbus_address_label;         // 连接地址
+        lv_obj_t* modbus_latency_label;         // 通讯延迟
+        lv_obj_t* modbus_last_success_label;    // 最后通讯时间
+        lv_obj_t* modbus_error_count_label;     // 错误计数
+        lv_obj_t* modbus_message_count_label;   // 消息计数
         lv_obj_t* modbus_packets_label;
         lv_obj_t* modbus_errors_label;
         lv_obj_t* modbus_heartbeat_label;
@@ -453,6 +458,14 @@ private:
         // 原有组件
         lv_obj_t* modbus_table;
         std::vector<lv_obj_t*> blade_buttons;
+        
+        // 版本信息控件（移到这里）
+        lv_obj_t* system_version_label;     // 系统版本
+        lv_obj_t* lvgl_version_label;       // LVGL版本
+        lv_obj_t* build_time_label;         // 编译时间
+        lv_obj_t* git_commit_label;         // Git提交
+        lv_obj_t* jetpack_version_label;    // JetPack版本
+        lv_obj_t* cuda_version_label;       // CUDA版本
     } control_widgets_;
     
     struct {
@@ -465,6 +478,14 @@ private:
         lv_obj_t* tensorrt_version;
         lv_obj_t* opencv_version;
         lv_obj_t* ubuntu_version;
+        
+        // 版本信息控件（系统版本部分）
+        lv_obj_t* system_version_label;     // 系统版本
+        lv_obj_t* lvgl_version_label;       // LVGL版本
+        lv_obj_t* build_time_label;         // 编译时间
+        lv_obj_t* git_commit_label;         // Git提交
+        lv_obj_t* jetpack_version_label;    // JetPack版本
+        lv_obj_t* cuda_version_label;       // CUDA版本
     } status_widgets_;
     
     struct {
