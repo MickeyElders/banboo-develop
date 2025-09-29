@@ -131,7 +131,7 @@ check-system:
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统环境检查通过"
 
 # === 依赖安装 ===
-install-deps: install-system-deps install-lvgl
+install-deps: install-system-deps install-lvgl9-auto
 	@echo "$(GREEN)[SUCCESS]$(NC) 所有依赖安装完成"
 
 install-system-deps:
@@ -235,7 +235,19 @@ build-lvgl-from-source:
 
 # 安装LVGL v9的快速命令
 install-lvgl9: build-lvgl-from-source
-	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.0安装完成，系统已准备就绪"
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3安装完成，系统已准备就绪"
+
+# 自动检查和安装LVGL v9（编译前自动执行）
+install-lvgl9-auto:
+	@echo "$(CYAN)[AUTO-INSTALL]$(NC) 检查LVGL v9安装状态..."
+	@LVGL_VERSION=$$(pkg-config --modversion lvgl 2>/dev/null || echo "not_found"); \
+	if [ "$$LVGL_VERSION" = "not_found" ] || [ "$$(echo $$LVGL_VERSION | cut -d. -f1)" != "9" ]; then \
+		echo "$(BLUE)[INFO]$(NC) LVGL v9未找到 (当前版本: $$LVGL_VERSION)，开始自动安装..."; \
+		$(MAKE) build-lvgl-from-source; \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3自动安装完成"; \
+	else \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9已安装 (版本: $$LVGL_VERSION)，跳过安装"; \
+	fi
 
 # === C++系统构建 ===
 build-system:
