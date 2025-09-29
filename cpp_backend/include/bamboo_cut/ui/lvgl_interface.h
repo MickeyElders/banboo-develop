@@ -18,7 +18,7 @@ typedef void* lv_disp_t;
 typedef void* lv_indev_t;
 typedef void* lv_area_t;
 typedef void* lv_color_t;
-typedef void* lv_disp_draw_buf_t;
+typedef void* lv_draw_buf_t;
 typedef void* lv_indev_data_t;
 #endif
 #include <memory>
@@ -246,17 +246,15 @@ private:
         lv_obj_t* stats_label;
     } footer_widgets_;
     
-    // LVGL驱动
-    lv_disp_drv_t disp_drv_;
-    lv_indev_drv_t indev_drv_;
-    lv_disp_t* display_;
+    // LVGL驱动 (v9 API)
+    lv_display_t* display_;
     lv_indev_t* input_device_;
     
     // 显示缓冲区
 #ifdef ENABLE_LVGL
     static lv_color_t* disp_buf1_;
     static lv_color_t* disp_buf2_;
-    static lv_disp_draw_buf_t draw_buf_;
+    static lv_draw_buf_t draw_buf_;
 #else
     static void* disp_buf1_;
     static void* disp_buf2_;
@@ -285,14 +283,14 @@ private:
 };
 
 /**
- * @brief LVGL显示驱动回调
+ * @brief LVGL显示刷新回调 (v9 API)
  */
-void lvgl_disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p);
+void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 
 /**
- * @brief LVGL输入设备回调
+ * @brief LVGL输入设备读取回调 (v9 API)
  */
-void lvgl_input_read(lv_indev_drv_t* indev_drv, lv_indev_data_t* data);
+void input_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
 
 } // namespace ui
 } // namespace bamboo_cut

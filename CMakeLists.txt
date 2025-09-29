@@ -378,11 +378,11 @@ message(STATUS "Python绑定已禁用 - 使用纯C++一体化架构")
 # LVGL配置 - 使用FetchContent自动下载
 # ================================
 
-# 使用FetchContent下载LVGL
+# 使用FetchContent下载LVGL v9
 FetchContent_Declare(
     lvgl
     GIT_REPOSITORY https://github.com/lvgl/lvgl.git
-    GIT_TAG        release/v8.3
+    GIT_TAG        release/v9.0
 )
 
 # 设置LVGL配置选项
