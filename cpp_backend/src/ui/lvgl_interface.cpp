@@ -14,7 +14,6 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <linux/fb.h>
 #include <cstring>
 #include <cerrno>
 
@@ -1120,87 +1119,129 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
 
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 #ifdef ENABLE_LVGL
-    // 实际的framebuffer刷新实现
-    static int fb_fd = -1;
+    // 实际的DRM显示刷新实现
+    static int drm_fd = -1;
+    static uint32_t fb_id = 0;
+    static drmModeCrtc* crtc = nullptr;
+    static drmModeConnector* connector = nullptr;
     static uint32_t* framebuffer = nullptr;
-    static uint32_t fb_width = 0;
-    static uint32_t fb_height = 0;
-    static bool fb_initialized = false;
+    static uint32_t fb_handle = 0;
+    static bool drm_initialized = false;
+    static uint32_t drm_width = 0;
+    static uint32_t drm_height = 0;
     
-    // 初始化framebuffer (只初始化一次)
-    if (!fb_initialized) {
-        // 尝试打开framebuffer设备
-        const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
+    // 初始化DRM设备 (只初始化一次)
+    if (!drm_initialized) {
+        const char* drm_devices[] = {"/dev/dri/card1", "/dev/dri/card0", "/dev/dri/card2"};
         
-        for (const char* fb_device : fb_devices) {
-            fb_fd = open(fb_device, O_RDWR);
-            if (fb_fd >= 0) {
-                std::cout << "[FB] 成功打开framebuffer设备: " << fb_device << std::endl;
+        for (const char* device_path : drm_devices) {
+            drm_fd = open(device_path, O_RDWR);
+            if (drm_fd >= 0) {
+                std::cout << "[DRM] 成功打开设备: " << device_path << std::endl;
                 
-                // 获取framebuffer信息
-                struct fb_var_screeninfo vinfo;
-                struct fb_fix_screeninfo finfo;
-                
-                if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == 0 &&
-                    ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == 0) {
-                    
-                    fb_width = vinfo.xres;
-                    fb_height = vinfo.yres;
-                    uint32_t fb_size = finfo.line_length * fb_height;
-                    
-                    std::cout << "[FB] Framebuffer信息: " << fb_width << "x" << fb_height
-                              << ", bpp: " << vinfo.bits_per_pixel << std::endl;
-                    
-                    // 映射framebuffer到内存
-                    framebuffer = (uint32_t*)mmap(0, fb_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
-                    if (framebuffer != MAP_FAILED) {
-                        // 清空framebuffer (黑色背景)
-                        memset(framebuffer, 0, fb_size);
-                        fb_initialized = true;
-                        std::cout << "[FB] Framebuffer映射成功" << std::endl;
-                        break;
-                    } else {
-                        std::cerr << "[FB] Framebuffer映射失败: " << strerror(errno) << std::endl;
-                        close(fb_fd);
-                        fb_fd = -1;
+                // 获取DRM资源
+                drmModeRes* resources = drmModeGetResources(drm_fd);
+                if (resources) {
+                    // 查找连接的显示器
+                    for (int i = 0; i < resources->count_connectors; i++) {
+                        connector = drmModeGetConnector(drm_fd, resources->connectors[i]);
+                        if (connector && connector->connection == DRM_MODE_CONNECTED && connector->count_modes > 0) {
+                            // 找到CRTC
+                            if (connector->encoder_id) {
+                                drmModeEncoder* encoder = drmModeGetEncoder(drm_fd, connector->encoder_id);
+                                if (encoder && encoder->crtc_id) {
+                                    crtc = drmModeGetCrtc(drm_fd, encoder->crtc_id);
+                                    if (crtc) {
+                                        drm_width = crtc->width;
+                                        drm_height = crtc->height;
+                                        std::cout << "[DRM] 找到CRTC: " << drm_width << "x" << drm_height << std::endl;
+                                    }
+                                    drmModeFreeEncoder(encoder);
+                                    break;
+                                }
+                            }
+                        }
                     }
+                    
+                    // 创建dumb buffer
+                    if (crtc && connector && drm_width > 0 && drm_height > 0) {
+                        struct drm_mode_create_dumb create_req = {};
+                        create_req.width = drm_width;
+                        create_req.height = drm_height;
+                        create_req.bpp = 32;
+                        
+                        if (drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_req) == 0) {
+                            fb_handle = create_req.handle;
+                            uint32_t stride = create_req.pitch;
+                            uint32_t size = create_req.size;
+                            
+                            // 创建framebuffer对象
+                            if (drmModeAddFB(drm_fd, drm_width, drm_height, 24, 32, stride, fb_handle, &fb_id) == 0) {
+                                // 映射framebuffer
+                                struct drm_mode_map_dumb map_req = {};
+                                map_req.handle = fb_handle;
+                                
+                                if (drmIoctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) == 0) {
+                                    framebuffer = (uint32_t*)mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, map_req.offset);
+                                    if (framebuffer != MAP_FAILED) {
+                                        // 设置CRTC使用我们的framebuffer
+                                        int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0, &connector->connector_id, 1, &connector->modes[0]);
+                                        if (ret == 0) {
+                                            drm_initialized = true;
+                                            std::cout << "[DRM] DRM framebuffer初始化成功: " << drm_width << "x" << drm_height << std::endl;
+                                            // 清空framebuffer (黑色背景)
+                                            memset(framebuffer, 0, size);
+                                        } else {
+                                            std::cerr << "[DRM] drmModeSetCrtc失败: " << ret << std::endl;
+                                        }
+                                    } else {
+                                        std::cerr << "[DRM] framebuffer映射失败" << std::endl;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    drmModeFreeResources(resources);
+                }
+                
+                if (drm_initialized) {
+                    break;
                 } else {
-                    std::cerr << "[FB] 无法获取framebuffer信息" << std::endl;
-                    close(fb_fd);
-                    fb_fd = -1;
+                    close(drm_fd);
+                    drm_fd = -1;
                 }
             }
         }
         
-        if (fb_fd < 0) {
-            std::cerr << "[FB] 无法打开任何framebuffer设备" << std::endl;
+        if (!drm_initialized) {
+            std::cerr << "[DRM] 无法初始化任何DRM设备" << std::endl;
+            drm_initialized = true; // 避免重复尝试
         }
-        fb_initialized = true; // 避免重复尝试
     }
     
-    // 将LVGL像素数据复制到framebuffer
-    if (framebuffer && fb_width > 0 && fb_height > 0) {
+    // 将LVGL像素数据复制到DRM framebuffer
+    if (drm_initialized && framebuffer && drm_width > 0 && drm_height > 0) {
         uint32_t area_width = area->x2 - area->x1 + 1;
         uint32_t area_height = area->y2 - area->y1 + 1;
         
         // 确保坐标在有效范围内
         if (area->x1 >= 0 && area->y1 >= 0 &&
-            area->x1 < (int32_t)fb_width && area->y1 < (int32_t)fb_height) {
+            area->x1 < (int32_t)drm_width && area->y1 < (int32_t)drm_height) {
             
             for (uint32_t y = 0; y < area_height; y++) {
-                if ((area->y1 + y) >= (int32_t)fb_height) break;
+                if ((area->y1 + y) >= (int32_t)drm_height) break;
                 
                 for (uint32_t x = 0; x < area_width; x++) {
-                    if ((area->x1 + x) >= (int32_t)fb_width) break;
+                    if ((area->x1 + x) >= (int32_t)drm_width) break;
                     
                     // 计算源像素和目标像素位置
                     uint32_t src_idx = (y * area_width + x);
-                    uint32_t dst_idx = (area->y1 + y) * fb_width + (area->x1 + x);
+                    uint32_t dst_idx = (area->y1 + y) * drm_width + (area->x1 + x);
                     
-                    // LVGL使用lv_color_t格式，需要转换为framebuffer格式
+                    // LVGL使用lv_color_t格式，需要转换为DRM格式
                     lv_color_t* src_color = (lv_color_t*)px_map + src_idx;
                     
-                    // 转换为32位ARGB格式
+                    // 转换为32位ARGB格式 (DRM格式)
                     uint32_t pixel = 0xFF000000 | // Alpha = 255 (不透明)
                                     (src_color->red << 16) |
                                     (src_color->green << 8) |
