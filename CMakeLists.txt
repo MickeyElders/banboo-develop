@@ -571,10 +571,12 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/inference_core.cpp)
         cpp_inference/inference_core.cpp
         cpp_inference/utils.cpp
     )
-    message(STATUS "Found cpp_inference components")
+    message(STATUS "Found cpp_inference components:")
+    message(STATUS "  inference_core.cpp: ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/inference_core.cpp")
+    message(STATUS "  utils.cpp: ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/utils.cpp")
     set(ENABLE_CPP_INFERENCE ON)
 else()
-    message(WARNING "cpp_inference components not found")
+    message(WARNING "cpp_inference components not found at: ${CMAKE_CURRENT_SOURCE_DIR}/cpp_inference/inference_core.cpp")
     set(ENABLE_CPP_INFERENCE OFF)
 endif()
 

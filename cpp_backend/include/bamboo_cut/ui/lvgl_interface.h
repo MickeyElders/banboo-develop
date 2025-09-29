@@ -239,6 +239,23 @@ private:
         lv_obj_t* mem_bar;
         lv_obj_t* mem_label;
         
+        // 温度监控组件
+        lv_obj_t* cpu_temp_label;
+        lv_obj_t* gpu_temp_label;
+        lv_obj_t* soc_temp_label;
+        lv_obj_t* thermal_temp_label;
+        
+        // 电源监控组件
+        lv_obj_t* power_in_label;
+        lv_obj_t* power_cpu_gpu_label;
+        lv_obj_t* power_soc_label;
+        
+        // 其他系统信息组件
+        lv_obj_t* emc_freq_label;
+        lv_obj_t* vic_usage_label;
+        lv_obj_t* fan_speed_label;
+        lv_obj_t* swap_usage_label;
+        
         // AI模型监控组件
         lv_obj_t* ai_fps_label;
         lv_obj_t* ai_confidence_label;
