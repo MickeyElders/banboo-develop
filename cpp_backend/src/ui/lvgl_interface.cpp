@@ -242,7 +242,7 @@ bool LVGLInterface::initializeDisplay() {
         
         // 手动设置缓冲区结构体 - 完全绕过 lv_draw_buf_init
         std::memset(&draw_buf_, 0, sizeof(draw_buf_));
-        draw_buf_.data = disp_buf1_;
+        draw_buf_.data = reinterpret_cast<uint8_t*>(disp_buf1_);  // 类型转换
         draw_buf_.data_size = actual_buffer_size;
         draw_buf_.header.w = config_.screen_width;
         draw_buf_.header.h = config_.screen_height;
