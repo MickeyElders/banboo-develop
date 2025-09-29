@@ -56,14 +56,16 @@ void LVGLInterface::updateSystemStats() {
 #ifdef ENABLE_LVGL
     // 添加空指针保护 - 检查关键组件是否已初始化
     if (!header_panel_ || !control_panel_) {
-        std::cout << "[LVGLInterface] 面板未初始化，跳过系统状态更新" << std::endl;
-        return;
+        return;  // 静默跳过，避免日志过多
     }
     
-    // 更新头部响应时间标签 - 添加空指针检查
+    // 更新头部响应时间标签 - 添加空指针检查和范围限制
     if (header_widgets_.response_label) {
         static int counter = 0;
         int response_ms = 12 + (counter++ % 10);
+        // 确保响应时间在合理范围内
+        if (response_ms < 1) response_ms = 1;
+        if (response_ms > 999) response_ms = 999;
         lv_label_set_text_fmt(header_widgets_.response_label,
             LV_SYMBOL_LOOP " %dms", response_ms);
     }
@@ -72,46 +74,97 @@ void LVGLInterface::updateSystemStats() {
     if (jetson_monitor_ && jetson_monitor_->isRunning()) {
         utils::SystemStats stats = jetson_monitor_->getLatestStats();
         
-        // 更新CPU信息
-        if (control_widgets_.cpu_bar && !stats.cpu_cores.empty()) {
-            // 计算平均CPU使用率
+        // 更新CPU信息 - 添加完善的空指针检查和数据验证
+        if (control_widgets_.cpu_bar && control_widgets_.cpu_label && !stats.cpu_cores.empty()) {
+            // 计算平均CPU使用率，添加数据验证
             int total_usage = 0;
             int total_freq = 0;
+            int valid_cores = 0;
+            
             for (const auto& core : stats.cpu_cores) {
-                total_usage += core.usage_percent;
-                total_freq += core.frequency_mhz;
+                // 验证CPU核心数据的有效性
+                if (core.usage_percent >= 0 && core.usage_percent <= 100 &&
+                    core.frequency_mhz >= 0 && core.frequency_mhz <= 10000) {
+                    total_usage += core.usage_percent;
+                    total_freq += core.frequency_mhz;
+                    valid_cores++;
+                }
             }
-            int avg_usage = total_usage / stats.cpu_cores.size();
-            int avg_freq = total_freq / stats.cpu_cores.size();
             
-            lv_bar_set_value(control_widgets_.cpu_bar, avg_usage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @%dMHz", avg_usage, avg_freq);
-            
-            // 使用黄色条块代表已使用的量
-            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
+            if (valid_cores > 0) {
+                int avg_usage = total_usage / valid_cores;
+                int avg_freq = total_freq / valid_cores;
+                
+                // 确保数值在合理范围内
+                avg_usage = std::max(0, std::min(100, avg_usage));
+                avg_freq = std::max(0, std::min(9999, avg_freq));
+                
+                lv_bar_set_value(control_widgets_.cpu_bar, avg_usage, LV_ANIM_ON);
+                lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @%dMHz", avg_usage, avg_freq);
+                
+                // 使用黄色条块代表已使用的量
+                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
+            } else {
+                // 没有有效数据时显示默认值
+                lv_bar_set_value(control_widgets_.cpu_bar, 0, LV_ANIM_ON);
+                lv_label_set_text(control_widgets_.cpu_label, "CPU: N/A");
+            }
+        } else if (control_widgets_.cpu_label) {
+            // CPU栏不可用时的回退显示
+            lv_label_set_text(control_widgets_.cpu_label, "CPU: 未检测到");
         }
         
-        // 更新GPU信息
-        if (control_widgets_.gpu_bar) {
+        // 更新GPU信息 - 添加完善的空指针检查和数据验证
+        if (control_widgets_.gpu_bar && control_widgets_.gpu_label) {
             int gpu_usage = stats.gpu.usage_percent;
-            lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @%dMHz",
-                                 gpu_usage, stats.gpu.frequency_mhz);
+            int gpu_freq = stats.gpu.frequency_mhz;
             
-            // 使用黄色条块代表已使用的量
-            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
+            // 验证GPU数据的有效性
+            if (gpu_usage >= 0 && gpu_usage <= 100 && gpu_freq >= 0 && gpu_freq <= 10000) {
+                lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
+                lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @%dMHz", gpu_usage, gpu_freq);
+                
+                // 使用黄色条块代表已使用的量
+                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
+            } else {
+                // 数据无效时显示默认值
+                lv_bar_set_value(control_widgets_.gpu_bar, 0, LV_ANIM_ON);
+                lv_label_set_text(control_widgets_.gpu_label, "GPU: 数据无效");
+            }
+        } else if (control_widgets_.gpu_label) {
+            // GPU栏不可用时的回退显示
+            lv_label_set_text(control_widgets_.gpu_label, "GPU: 未检测到");
         }
         
-        // 更新内存信息
-        if (control_widgets_.mem_bar && stats.memory.ram_total_mb > 0) {
-            int mem_percentage = (stats.memory.ram_used_mb * 100) / stats.memory.ram_total_mb;
-            lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %d/%dMB (LFB:%dx%dMB)",
-                                 mem_percentage, stats.memory.ram_used_mb, stats.memory.ram_total_mb,
-                                 stats.memory.lfb_blocks, stats.memory.lfb_size_mb);
-            
-            // 使用黄色条块代表已使用的量
-            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
+        // 更新内存信息 - 添加完善的空指针检查和数据验证
+        if (control_widgets_.mem_bar && control_widgets_.mem_label) {
+            if (stats.memory.ram_total_mb > 0 && stats.memory.ram_used_mb >= 0 &&
+                stats.memory.ram_used_mb <= stats.memory.ram_total_mb &&
+                stats.memory.ram_total_mb <= 100000) {  // 合理的内存上限100GB
+                
+                int mem_percentage = (stats.memory.ram_used_mb * 100) / stats.memory.ram_total_mb;
+                mem_percentage = std::max(0, std::min(100, mem_percentage));  // 确保在0-100范围内
+                
+                lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
+                
+                // 验证LFB数据的有效性
+                int lfb_blocks = std::max(0, stats.memory.lfb_blocks);
+                int lfb_size = std::max(0, stats.memory.lfb_size_mb);
+                
+                lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %d/%dMB (LFB:%dx%dMB)",
+                                     mem_percentage, stats.memory.ram_used_mb, stats.memory.ram_total_mb,
+                                     lfb_blocks, lfb_size);
+                
+                // 使用黄色条块代表已使用的量
+                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
+            } else {
+                // 内存数据无效时显示默认值
+                lv_bar_set_value(control_widgets_.mem_bar, 0, LV_ANIM_ON);
+                lv_label_set_text(control_widgets_.mem_label, "RAM: 数据无效");
+            }
+        } else if (control_widgets_.mem_label) {
+            // 内存栏不可用时的回退显示
+            lv_label_set_text(control_widgets_.mem_label, "RAM: 未检测到");
         }
         
         updateAIModelStats();
@@ -132,61 +185,97 @@ void LVGLInterface::updateSystemStats() {
 
 void LVGLInterface::updateAIModelStats() {
 #ifdef ENABLE_LVGL
-    // 从DataBridge获取真实的AI模型统计数据
-    core::SystemStats databridge_stats = data_bridge_->getStats();
+    // 添加DataBridge空指针保护
+    if (!data_bridge_) {
+        std::cout << "[LVGLInterface] DataBridge未初始化，跳过AI模型统计更新" << std::endl;
+        return;
+    }
     
-    // 更新AI模型版本
+    // 获取AI模型统计数据，添加异常保护
+    core::SystemStats databridge_stats;
+    try {
+        databridge_stats = data_bridge_->getStats();
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] 获取AI模型统计数据异常: " << e.what() << std::endl;
+        return;
+    }
+    
+    // 更新AI模型版本 - 添加默认值处理
     if (control_widgets_.ai_model_version_label) {
-        lv_label_set_text_fmt(control_widgets_.ai_model_version_label, "模型版本: %s",
-                              databridge_stats.ai_model.model_version.c_str());
+        const std::string& model_version = databridge_stats.ai_model.model_version;
+        const char* version_text = model_version.empty() ? "未知版本" : model_version.c_str();
+        lv_label_set_text_fmt(control_widgets_.ai_model_version_label, "模型版本: %s", version_text);
     }
     
-    // 更新推理时间
+    // 更新推理时间 - 添加有效性检查和默认值
     if (control_widgets_.ai_inference_time_label) {
-        lv_label_set_text_fmt(control_widgets_.ai_inference_time_label, "推理时间: %.1fms",
-                              databridge_stats.ai_model.inference_time_ms);
-        
-        // 根据推理时间设置颜色
-        if (databridge_stats.ai_model.inference_time_ms > 30.0f) {
-            lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_error_, 0);
-        } else if (databridge_stats.ai_model.inference_time_ms > 20.0f) {
-            lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_warning_, 0);
+        float inference_time = databridge_stats.ai_model.inference_time_ms;
+        if (inference_time < 0.0f || inference_time > 1000.0f) {
+            inference_time = 0.0f;  // 无效值时使用默认值
+            lv_label_set_text(control_widgets_.ai_inference_time_label, "推理时间: N/A");
+            lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, lv_color_hex(0x8A92A1), 0);
         } else {
-            lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
+            lv_label_set_text_fmt(control_widgets_.ai_inference_time_label, "推理时间: %.1fms", inference_time);
+        
+            // 根据推理时间设置颜色
+            if (inference_time > 30.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_error_, 0);
+            } else if (inference_time > 20.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
+            }
         }
     }
     
-    // 更新置信阈值
+    // 更新置信阈值 - 添加范围检查和默认值
     if (control_widgets_.ai_confidence_threshold_label) {
-        lv_label_set_text_fmt(control_widgets_.ai_confidence_threshold_label, "置信阈值: %.2f",
-                              databridge_stats.ai_model.confidence_threshold);
-    }
-    
-    // 更新检测精度
-    if (control_widgets_.ai_detection_accuracy_label) {
-        lv_label_set_text_fmt(control_widgets_.ai_detection_accuracy_label, "检测精度: %.1f%%",
-                              databridge_stats.ai_model.detection_accuracy);
-        
-        // 根据检测精度设置颜色
-        if (databridge_stats.ai_model.detection_accuracy > 90.0f) {
-            lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_success_, 0);
-        } else if (databridge_stats.ai_model.detection_accuracy > 80.0f) {
-            lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_warning_, 0);
+        float confidence_threshold = databridge_stats.ai_model.confidence_threshold;
+        if (confidence_threshold < 0.0f || confidence_threshold > 1.0f) {
+            confidence_threshold = 0.5f;  // 默认值
+            lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "置信阈值: 默认(0.50)");
         } else {
-            lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_error_, 0);
+            lv_label_set_text_fmt(control_widgets_.ai_confidence_threshold_label, "置信阈值: %.2f", confidence_threshold);
         }
     }
     
-    // 更新总检测数
-    if (control_widgets_.ai_total_detections_label) {
-        lv_label_set_text_fmt(control_widgets_.ai_total_detections_label, "总检测数: %d",
-                              databridge_stats.ai_model.total_detections);
+    // 更新检测精度 - 添加范围检查和默认值
+    if (control_widgets_.ai_detection_accuracy_label) {
+        float detection_accuracy = databridge_stats.ai_model.detection_accuracy;
+        if (detection_accuracy < 0.0f || detection_accuracy > 100.0f) {
+            detection_accuracy = 0.0f;  // 无效值时使用0
+            lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "检测精度: N/A");
+            lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, lv_color_hex(0x8A92A1), 0);
+        } else {
+            lv_label_set_text_fmt(control_widgets_.ai_detection_accuracy_label, "检测精度: %.1f%%", detection_accuracy);
+        
+            // 根据检测精度设置颜色
+            if (detection_accuracy > 90.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_success_, 0);
+            } else if (detection_accuracy > 80.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_error_, 0);
+            }
+        }
     }
     
-    // 更新今日检测数
+    // 更新总检测数 - 添加有效性检查
+    if (control_widgets_.ai_total_detections_label) {
+        int total_detections = databridge_stats.ai_model.total_detections;
+        if (total_detections < 0) {
+            total_detections = 0;  // 负值时使用0
+        }
+        lv_label_set_text_fmt(control_widgets_.ai_total_detections_label, "总检测数: %d", total_detections);
+    }
+    
+    // 更新今日检测数 - 添加有效性检查
     if (control_widgets_.ai_daily_detections_label) {
-        lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "今日检测: %d",
-                              databridge_stats.ai_model.daily_detections);
+        int daily_detections = databridge_stats.ai_model.daily_detections;
+        if (daily_detections < 0) {
+            daily_detections = 0;  // 负值时使用0
+        }
+        lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "今日检测: %d", daily_detections);
     }
     
     // 更新当前竹子检测状态
@@ -295,8 +384,21 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
 
 void LVGLInterface::updateCameraStats() {
 #ifdef ENABLE_LVGL
-    // 从DataBridge获取摄像头系统状态
-    core::SystemStats databridge_stats = data_bridge_->getStats();
+    // 添加DataBridge空指针保护
+    if (!data_bridge_) {
+        std::cout << "[LVGLInterface] DataBridge未初始化，跳过摄像头统计更新" << std::endl;
+        return;
+    }
+    
+    // 获取摄像头系统状态，添加异常保护
+    core::SystemStats databridge_stats;
+    try {
+        databridge_stats = data_bridge_->getStats();
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] 获取摄像头统计数据异常: " << e.what() << std::endl;
+        return;
+    }
+    
     const auto& camera_system = databridge_stats.ai_model.camera_system;
     
     // 更新摄像头-1状态
@@ -322,6 +424,11 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
                                            lv_obj_t* resolution_label, lv_obj_t* exposure_label,
                                            lv_obj_t* lighting_label) {
 #ifdef ENABLE_LVGL
+    // 验证摄像头ID的有效性
+    if (camera_id < 1 || camera_id > 99) {
+        camera_id = 1;  // 默认值
+    }
+    
     if (status_label) {
         if (camera_info.is_online) {
             lv_label_set_text_fmt(status_label, "摄像头-%d：在线 ✓", camera_id);
@@ -334,8 +441,15 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
     
     if (fps_label) {
         if (camera_info.is_online) {
-            lv_label_set_text_fmt(fps_label, "  帧率：%.0f FPS", camera_info.fps);
-            lv_obj_set_style_text_color(fps_label, lv_color_hex(0xB0B8C1), 0);
+            float fps = camera_info.fps;
+            // 验证帧率数据的有效性
+            if (fps >= 0.0f && fps <= 240.0f) {  // 合理的帧率范围
+                lv_label_set_text_fmt(fps_label, "  帧率：%.0f FPS", fps);
+                lv_obj_set_style_text_color(fps_label, lv_color_hex(0xB0B8C1), 0);
+            } else {
+                lv_label_set_text(fps_label, "  帧率：数据无效");
+                lv_obj_set_style_text_color(fps_label, lv_color_hex(0x8A92A1), 0);
+            }
         } else {
             lv_label_set_text(fps_label, "  帧率：N/A");
             lv_obj_set_style_text_color(fps_label, lv_color_hex(0x8A92A1), 0);
@@ -344,9 +458,16 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
     
     if (resolution_label) {
         if (camera_info.is_online) {
-            lv_label_set_text_fmt(resolution_label, "  分辨率：%dx%d",
-                                 camera_info.width, camera_info.height);
-            lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xB0B8C1), 0);
+            int width = camera_info.width;
+            int height = camera_info.height;
+            // 验证分辨率数据的有效性
+            if (width > 0 && width <= 8192 && height > 0 && height <= 8192) {
+                lv_label_set_text_fmt(resolution_label, "  分辨率：%dx%d", width, height);
+                lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xB0B8C1), 0);
+            } else {
+                lv_label_set_text(resolution_label, "  分辨率：数据无效");
+                lv_obj_set_style_text_color(resolution_label, lv_color_hex(0x8A92A1), 0);
+            }
         } else {
             lv_label_set_text(resolution_label, "  分辨率：N/A");
             lv_obj_set_style_text_color(resolution_label, lv_color_hex(0x8A92A1), 0);
@@ -355,9 +476,14 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
     
     if (exposure_label) {
         if (camera_info.is_online) {
-            lv_label_set_text_fmt(exposure_label, "  曝光：%s",
-                                 camera_info.exposure_mode.c_str());
-            lv_obj_set_style_text_color(exposure_label, color_primary_, 0);
+            const std::string& exposure_mode = camera_info.exposure_mode;
+            if (!exposure_mode.empty()) {
+                lv_label_set_text_fmt(exposure_label, "  曝光：%s", exposure_mode.c_str());
+                lv_obj_set_style_text_color(exposure_label, color_primary_, 0);
+            } else {
+                lv_label_set_text(exposure_label, "  曝光：未知模式");
+                lv_obj_set_style_text_color(exposure_label, lv_color_hex(0x8A92A1), 0);
+            }
         } else {
             lv_label_set_text(exposure_label, "  曝光：N/A");
             lv_obj_set_style_text_color(exposure_label, lv_color_hex(0x8A92A1), 0);
@@ -366,18 +492,23 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
     
     if (lighting_label) {
         if (camera_info.is_online) {
-            lv_label_set_text_fmt(lighting_label, "  光照评分：%s",
-                                 camera_info.lighting_quality.c_str());
-            
-            // 根据光照质量设置颜色
-            if (camera_info.lighting_quality == "良好") {
-                lv_obj_set_style_text_color(lighting_label, color_success_, 0);
-            } else if (camera_info.lighting_quality == "一般") {
-                lv_obj_set_style_text_color(lighting_label, color_warning_, 0);
-            } else if (camera_info.lighting_quality == "差") {
-                lv_obj_set_style_text_color(lighting_label, color_error_, 0);
+            const std::string& lighting_quality = camera_info.lighting_quality;
+            if (!lighting_quality.empty()) {
+                lv_label_set_text_fmt(lighting_label, "  光照评分：%s", lighting_quality.c_str());
+                
+                // 根据光照质量设置颜色
+                if (lighting_quality == "良好") {
+                    lv_obj_set_style_text_color(lighting_label, color_success_, 0);
+                } else if (lighting_quality == "一般") {
+                    lv_obj_set_style_text_color(lighting_label, color_warning_, 0);
+                } else if (lighting_quality == "差") {
+                    lv_obj_set_style_text_color(lighting_label, color_error_, 0);
+                } else {
+                    lv_obj_set_style_text_color(lighting_label, color_primary_, 0);
+                }
             } else {
-                lv_obj_set_style_text_color(lighting_label, color_primary_, 0);
+                lv_label_set_text(lighting_label, "  光照评分：未知");
+                lv_obj_set_style_text_color(lighting_label, lv_color_hex(0x8A92A1), 0);
             }
         } else {
             lv_label_set_text(lighting_label, "  光照评分：N/A");
@@ -389,59 +520,107 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
 
 void LVGLInterface::updateTemperatureStats(const utils::SystemStats& stats) {
 #ifdef ENABLE_LVGL
-    // 更新温度信息
+    // 更新CPU温度信息 - 添加数据验证和默认值处理
     if (control_widgets_.cpu_temp_label) {
-        lv_label_set_text_fmt(control_widgets_.cpu_temp_label, "CPU: %.1f°C", stats.temperature.cpu_temp);
-        
-        // 根据温度设置颜色
-        if (stats.temperature.cpu_temp > 80.0f) {
-            lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_error_, 0);
-        } else if (stats.temperature.cpu_temp > 70.0f) {
-            lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_warning_, 0);
+        float cpu_temp = stats.temperature.cpu_temp;
+        if (cpu_temp >= -50.0f && cpu_temp <= 150.0f) {  // 合理的温度范围
+            lv_label_set_text_fmt(control_widgets_.cpu_temp_label, "CPU: %.1f°C", cpu_temp);
+            
+            // 根据温度设置颜色
+            if (cpu_temp > 80.0f) {
+                lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_error_, 0);
+            } else if (cpu_temp > 70.0f) {
+                lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_success_, 0);
+            }
         } else {
-            lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_success_, 0);
+            lv_label_set_text(control_widgets_.cpu_temp_label, "CPU: N/A");
+            lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, lv_color_hex(0x8A92A1), 0);
         }
     }
     
+    // 更新GPU温度信息 - 添加数据验证和默认值处理
     if (control_widgets_.gpu_temp_label) {
-        lv_label_set_text_fmt(control_widgets_.gpu_temp_label, "GPU: %.1f°C", stats.temperature.gpu_temp);
-        
-        // 根据温度设置颜色
-        if (stats.temperature.gpu_temp > 75.0f) {
-            lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_error_, 0);
-        } else if (stats.temperature.gpu_temp > 65.0f) {
-            lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_warning_, 0);
+        float gpu_temp = stats.temperature.gpu_temp;
+        if (gpu_temp >= -50.0f && gpu_temp <= 150.0f) {  // 合理的温度范围
+            lv_label_set_text_fmt(control_widgets_.gpu_temp_label, "GPU: %.1f°C", gpu_temp);
+            
+            // 根据温度设置颜色
+            if (gpu_temp > 75.0f) {
+                lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_error_, 0);
+            } else if (gpu_temp > 65.0f) {
+                lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_success_, 0);
+            }
         } else {
-            lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_success_, 0);
+            lv_label_set_text(control_widgets_.gpu_temp_label, "GPU: N/A");
+            lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, lv_color_hex(0x8A92A1), 0);
         }
     }
     
+    // 更新SOC温度信息 - 添加数据验证
     if (control_widgets_.soc_temp_label) {
-        lv_label_set_text_fmt(control_widgets_.soc_temp_label, "SOC: %.1f°C", stats.temperature.soc_temp);
+        float soc_temp = stats.temperature.soc_temp;
+        if (soc_temp >= -50.0f && soc_temp <= 150.0f) {
+            lv_label_set_text_fmt(control_widgets_.soc_temp_label, "SOC: %.1f°C", soc_temp);
+        } else {
+            lv_label_set_text(control_widgets_.soc_temp_label, "SOC: N/A");
+        }
     }
     
+    // 更新Thermal温度信息 - 添加数据验证
     if (control_widgets_.thermal_temp_label) {
-        lv_label_set_text_fmt(control_widgets_.thermal_temp_label, "Thermal: %.1f°C", stats.temperature.thermal_temp);
+        float thermal_temp = stats.temperature.thermal_temp;
+        if (thermal_temp >= -50.0f && thermal_temp <= 150.0f) {
+            lv_label_set_text_fmt(control_widgets_.thermal_temp_label, "Thermal: %.1f°C", thermal_temp);
+        } else {
+            lv_label_set_text(control_widgets_.thermal_temp_label, "Thermal: N/A");
+        }
     }
 #endif
 }
 
 void LVGLInterface::updatePowerStats(const utils::SystemStats& stats) {
 #ifdef ENABLE_LVGL
-    // 更新电源信息
+    // 更新VDD_IN电源信息 - 添加数据验证和默认值处理
     if (control_widgets_.power_in_label) {
-        lv_label_set_text_fmt(control_widgets_.power_in_label, "VDD_IN: %dmA/%dmW",
-                             stats.power.vdd_in_current_ma, stats.power.vdd_in_power_mw);
+        int current_ma = stats.power.vdd_in_current_ma;
+        int power_mw = stats.power.vdd_in_power_mw;
+        
+        // 验证电流和功率数据的有效性
+        if (current_ma >= 0 && current_ma <= 50000 && power_mw >= 0 && power_mw <= 500000) {
+            lv_label_set_text_fmt(control_widgets_.power_in_label, "VDD_IN: %dmA/%dmW", current_ma, power_mw);
+        } else {
+            lv_label_set_text(control_widgets_.power_in_label, "VDD_IN: N/A");
+        }
     }
     
+    // 更新CPU_GPU电源信息 - 添加数据验证和默认值处理
     if (control_widgets_.power_cpu_gpu_label) {
-        lv_label_set_text_fmt(control_widgets_.power_cpu_gpu_label, "CPU_GPU: %dmA/%dmW",
-                             stats.power.vdd_cpu_gpu_cv_current_ma, stats.power.vdd_cpu_gpu_cv_power_mw);
+        int current_ma = stats.power.vdd_cpu_gpu_cv_current_ma;
+        int power_mw = stats.power.vdd_cpu_gpu_cv_power_mw;
+        
+        // 验证电流和功率数据的有效性
+        if (current_ma >= 0 && current_ma <= 50000 && power_mw >= 0 && power_mw <= 500000) {
+            lv_label_set_text_fmt(control_widgets_.power_cpu_gpu_label, "CPU_GPU: %dmA/%dmW", current_ma, power_mw);
+        } else {
+            lv_label_set_text(control_widgets_.power_cpu_gpu_label, "CPU_GPU: N/A");
+        }
     }
     
+    // 更新SOC电源信息 - 添加数据验证和默认值处理
     if (control_widgets_.power_soc_label) {
-        lv_label_set_text_fmt(control_widgets_.power_soc_label, "SOC: %dmA/%dmW",
-                             stats.power.vdd_soc_current_ma, stats.power.vdd_soc_power_mw);
+        int current_ma = stats.power.vdd_soc_current_ma;
+        int power_mw = stats.power.vdd_soc_power_mw;
+        
+        // 验证电流和功率数据的有效性
+        if (current_ma >= 0 && current_ma <= 50000 && power_mw >= 0 && power_mw <= 500000) {
+            lv_label_set_text_fmt(control_widgets_.power_soc_label, "SOC: %dmA/%dmW", current_ma, power_mw);
+        } else {
+            lv_label_set_text(control_widgets_.power_soc_label, "SOC: N/A");
+        }
     }
 #endif
 }
