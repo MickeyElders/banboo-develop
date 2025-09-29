@@ -12,19 +12,43 @@ namespace ui {
 
 void LVGLInterface::updateInterface() {
 #ifdef ENABLE_LVGL
-    if (!data_bridge_) return;
+    if (!data_bridge_) {
+        std::cout << "[LVGLInterface] DataBridge未初始化，跳过数据更新" << std::endl;
+        return;
+    }
     
-    // 更新系统状态
-    updateSystemStats();
+    // 添加静态计数器，确保界面完全初始化后才开始更新
+    static bool first_update_done = false;
+    static int safe_update_counter = 0;
     
-    // 更新Modbus显示
-    updateModbusDisplay();
+    if (!first_update_done) {
+        safe_update_counter++;
+        if (safe_update_counter < 10) {  // 前10次调用跳过，确保界面稳定
+            std::cout << "[LVGLInterface] 界面初始化期间，跳过数据更新 (" << safe_update_counter << "/10)" << std::endl;
+            return;
+        }
+        first_update_done = true;
+        std::cout << "[LVGLInterface] 界面初始化完成，开始正常数据更新" << std::endl;
+    }
     
-    // 更新工作流程
-    updateWorkflowStatus();
-    
-    // 更新摄像头
-    updateCameraView();
+    try {
+        // 更新系统状态 - 添加异常保护
+        updateSystemStats();
+        
+        // 更新Modbus显示 - 添加异常保护
+        updateModbusDisplay();
+        
+        // 更新工作流程 - 添加异常保护
+        updateWorkflowStatus();
+        
+        // 更新摄像头 - 添加异常保护
+        updateCameraView();
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] 数据更新异常: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[LVGLInterface] 数据更新未知异常" << std::endl;
+    }
 #endif
 }
 
