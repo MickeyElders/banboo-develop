@@ -853,33 +853,33 @@ lv_obj_t* LVGLInterface::createFooterPanel() {
     lv_obj_set_flex_align(main_controls, LV_FLEX_ALIGN_SPACE_EVENLY,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    // 启动按钮
+    // Start Button
     footer_widgets_.start_btn = lv_btn_create(main_controls);
-    lv_obj_set_size(footer_widgets_.start_btn, 110, 48);  // 更紧凑
+    lv_obj_set_size(footer_widgets_.start_btn, 110, 48);  // More compact
     lv_obj_add_style(footer_widgets_.start_btn, &style_btn_success, 0);
     lv_obj_add_style(footer_widgets_.start_btn, &style_btn_pressed, LV_STATE_PRESSED);
     
     lv_obj_t* start_label = lv_label_create(footer_widgets_.start_btn);
-    lv_label_set_text(start_label, LV_SYMBOL_PLAY " 启动");
+    lv_label_set_text(start_label, LV_SYMBOL_PLAY " START");
     lv_obj_set_style_text_font(start_label, &lv_font_montserrat_16, 0);
     lv_obj_center(start_label);
     lv_obj_add_event_cb(footer_widgets_.start_btn, onStartButtonClicked,
                         LV_EVENT_CLICKED, this);
     
-    // 暂停按钮
+    // Pause Button
     footer_widgets_.pause_btn = lv_btn_create(main_controls);
     lv_obj_set_size(footer_widgets_.pause_btn, 110, 48);
     lv_obj_add_style(footer_widgets_.pause_btn, &style_btn_warning, 0);
     lv_obj_add_style(footer_widgets_.pause_btn, &style_btn_pressed, LV_STATE_PRESSED);
     
     lv_obj_t* pause_label = lv_label_create(footer_widgets_.pause_btn);
-    lv_label_set_text(pause_label, LV_SYMBOL_PAUSE " 暂停");
+    lv_label_set_text(pause_label, LV_SYMBOL_PAUSE " PAUSE");
     lv_obj_set_style_text_font(pause_label, &lv_font_montserrat_16, 0);
     lv_obj_center(pause_label);
     lv_obj_add_event_cb(footer_widgets_.pause_btn, onPauseButtonClicked,
                         LV_EVENT_CLICKED, this);
     
-    // 停止按钮
+    // Stop Button
     footer_widgets_.stop_btn = lv_btn_create(main_controls);
     lv_obj_set_size(footer_widgets_.stop_btn, 110, 48);
     lv_obj_add_style(footer_widgets_.stop_btn, &style_btn_primary, 0);
@@ -887,7 +887,7 @@ lv_obj_t* LVGLInterface::createFooterPanel() {
     lv_obj_set_style_bg_color(footer_widgets_.stop_btn, lv_color_hex(0x6B7280), 0);
     
     lv_obj_t* stop_label = lv_label_create(footer_widgets_.stop_btn);
-    lv_label_set_text(stop_label, LV_SYMBOL_STOP " 停止");
+    lv_label_set_text(stop_label, LV_SYMBOL_STOP " STOP");
     lv_obj_set_style_text_font(stop_label, &lv_font_montserrat_16, 0);
     lv_obj_center(stop_label);
     lv_obj_add_event_cb(footer_widgets_.stop_btn, onStopButtonClicked,
