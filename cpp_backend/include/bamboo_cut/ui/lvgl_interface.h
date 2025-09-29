@@ -33,6 +33,15 @@ typedef void* lv_indev_data_t;
 namespace bamboo_cut {
 namespace ui {
 
+// === 全局样式声明 ===
+#ifdef ENABLE_LVGL
+extern lv_style_t style_card;
+extern lv_style_t style_text_title;
+#else
+extern char style_card[64];
+extern char style_text_title[64];
+#endif
+
 /**
  * @brief LVGL配置参数
  */

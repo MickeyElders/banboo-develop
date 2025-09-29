@@ -33,32 +33,32 @@ void* LVGLInterface::disp_buf2_ = nullptr;
 char LVGLInterface::draw_buf_[64] = {0};
 #endif
 
-// 全局样式变量
+// 全局样式变量定义
 #ifdef ENABLE_LVGL
-static lv_style_t style_card;
-static lv_style_t style_btn_primary;
-static lv_style_t style_btn_success;
-static lv_style_t style_btn_warning;
-static lv_style_t style_btn_danger;
-static lv_style_t style_btn_pressed;
-static lv_style_t style_text_title;
-static lv_style_t style_text_body;
-static lv_style_t style_text_small;
-static lv_style_t style_table_header;
-static lv_style_t style_table_cell;
+lv_style_t style_card;
+lv_style_t style_btn_primary;
+lv_style_t style_btn_success;
+lv_style_t style_btn_warning;
+lv_style_t style_btn_danger;
+lv_style_t style_btn_pressed;
+lv_style_t style_text_title;
+lv_style_t style_text_body;
+lv_style_t style_text_small;
+lv_style_t style_table_header;
+lv_style_t style_table_cell;
 #else
 // LVGL未启用时的占位符
-static char style_card[64];
-static char style_btn_primary[64];
-static char style_btn_success[64];
-static char style_btn_warning[64];
-static char style_btn_danger[64];
-static char style_btn_pressed[64];
-static char style_text_title[64];
-static char style_text_body[64];
-static char style_text_small[64];
-static char style_table_header[64];
-static char style_table_cell[64];
+char style_card[64];
+char style_btn_primary[64];
+char style_btn_success[64];
+char style_btn_warning[64];
+char style_btn_danger[64];
+char style_btn_pressed[64];
+char style_text_title[64];
+char style_text_body[64];
+char style_text_small[64];
+char style_table_header[64];
+char style_table_cell[64];
 #endif
 
 LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> data_bridge)
