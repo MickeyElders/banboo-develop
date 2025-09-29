@@ -24,6 +24,9 @@
 /*Color depth: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)*/
 #define LV_COLOR_DEPTH 32
 
+/*Force LVGL v9 to use 32-bit ARGB8888 format instead of 24-bit RGB888*/
+#define LV_COLOR_FORMAT LV_COLOR_FORMAT_ARGB8888
+
 /*Swap the 2 bytes of RGB565 color. Useful if the display has an 8-bit interface (e.g. SPI)*/
 #define LV_COLOR_16_SWAP 0
 

@@ -169,7 +169,7 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
-    // === 修复像素格式不匹配问题 ===
+    // === 使用uint32_t强制32位像素格式处理 ===
     
     uint32_t buf_size = config_.screen_width * config_.screen_height;
     
@@ -179,18 +179,10 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
-    // 强制验证LVGL颜色深度配置
-    std::cout << "[LVGLInterface] LVGL配置验证: LV_COLOR_DEPTH=" << LV_COLOR_DEPTH
+    // 显示当前LVGL配置信息（仅用于调试）
+    std::cout << "[LVGLInterface] LVGL配置: LV_COLOR_DEPTH=" << LV_COLOR_DEPTH
               << " sizeof(lv_color_t)=" << sizeof(lv_color_t) << " bytes" << std::endl;
-              
-    // 确保LVGL使用32位颜色深度，与DRM framebuffer匹配
-    if (LV_COLOR_DEPTH != 32 || sizeof(lv_color_t) != 4) {
-        std::cerr << "[LVGLInterface] 错误：LVGL颜色深度不匹配DRM要求" << std::endl;
-        std::cerr << "[LVGLInterface] 需要：LV_COLOR_DEPTH=32, sizeof(lv_color_t)=4" << std::endl;
-        std::cerr << "[LVGLInterface] 当前：LV_COLOR_DEPTH=" << LV_COLOR_DEPTH
-                  << ", sizeof(lv_color_t)=" << sizeof(lv_color_t) << std::endl;
-        return false;
-    }
+    std::cout << "[LVGLInterface] 使用uint32_t强制32位ARGB8888格式处理" << std::endl;
     
     try {
         // 使用uint32_t分配，确保与DRM framebuffer完全一致
