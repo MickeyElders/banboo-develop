@@ -80,9 +80,16 @@ void LVGLInterface::updateSystemStats() {
         return;
     }
     
-    // 获取真实的Jetson系统状态
+    // 获取真实的Jetson系统状态 - 添加安全检查
     if (jetson_monitor_ && jetson_monitor_->isRunning()) {
-        utils::SystemStats stats = jetson_monitor_->getLatestStats();
+        utils::SystemStats stats;
+        try {
+            stats = jetson_monitor_->getLatestStats();
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception getting Jetson stats: " << e.what() << std::endl;
+            updateSimulatedStats();
+            return;
+        }
         
         // 更新CPU信息 - 添加完善的空指针检查和数据验证
         if (control_widgets_.cpu_bar && control_widgets_.cpu_label && !stats.cpu_cores.empty()) {
@@ -177,11 +184,36 @@ void LVGLInterface::updateSystemStats() {
             lv_label_set_text(control_widgets_.mem_label, "RAM: Not Detected");
         }
         
-        updateAIModelStats();
-        updateCameraStats();
-        updateTemperatureStats(stats);
-        updatePowerStats(stats);
-        updateSystemExtendedStats(stats);
+        // Call update functions with exception protection
+        try {
+            updateAIModelStats();
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception in updateAIModelStats: " << e.what() << std::endl;
+        }
+        
+        try {
+            updateCameraStats();
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception in updateCameraStats: " << e.what() << std::endl;
+        }
+        
+        try {
+            updateTemperatureStats(stats);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception in updateTemperatureStats: " << e.what() << std::endl;
+        }
+        
+        try {
+            updatePowerStats(stats);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception in updatePowerStats: " << e.what() << std::endl;
+        }
+        
+        try {
+            updateSystemExtendedStats(stats);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception in updateSystemExtendedStats: " << e.what() << std::endl;
+        }
         
     } else {
         // 如果Jetson监控不可用，回退到模拟数据
