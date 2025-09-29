@@ -631,33 +631,86 @@ void cleanupDRMResources(int drm_fd, uint32_t fb_id, drmModeCrtc* crtc,
                         drmModeConnector* connector, uint32_t* framebuffer,
                         uint32_t fb_handle, uint32_t buffer_size) {
 #ifdef ENABLE_LVGL
-    // 完善的资源清理
-    if (framebuffer && framebuffer != MAP_FAILED) {
-        munmap(framebuffer, buffer_size);
+    // 修复双重释放内存错误 - 增强资源清理的安全性
+    std::cout << "[DRM] 开始清理DRM资源..." << std::endl;
+    std::cout << "[DRM] 清理状态: fd=" << drm_fd << " fb_id=" << fb_id
+              << " fb_handle=" << fb_handle << " framebuffer=" << framebuffer
+              << " crtc=" << crtc << " connector=" << connector << std::endl;
+    
+    // 1. 清理framebuffer映射 - 防止重复unmap
+    if (framebuffer && framebuffer != MAP_FAILED && buffer_size > 0) {
+        std::cout << "[DRM] 解除framebuffer映射，大小: " << buffer_size << " bytes" << std::endl;
+        int unmap_result = munmap(framebuffer, buffer_size);
+        if (unmap_result != 0) {
+            std::cerr << "[DRM] framebuffer解映射失败: " << strerror(errno) << std::endl;
+        } else {
+            std::cout << "[DRM] framebuffer解映射成功" << std::endl;
+        }
+        framebuffer = nullptr;
+    } else if (framebuffer) {
+        std::cout << "[DRM] framebuffer已经是无效状态，跳过解映射" << std::endl;
         framebuffer = nullptr;
     }
-    if (fb_id) {
-        drmModeRmFB(drm_fd, fb_id);
+    
+    // 2. 移除framebuffer对象 - 检查是否有效
+    if (fb_id > 0 && drm_fd >= 0) {
+        std::cout << "[DRM] 移除framebuffer对象 ID: " << fb_id << std::endl;
+        int rmfb_result = drmModeRmFB(drm_fd, fb_id);
+        if (rmfb_result != 0) {
+            std::cerr << "[DRM] 移除framebuffer失败: " << rmfb_result << std::endl;
+        } else {
+            std::cout << "[DRM] framebuffer对象移除成功" << std::endl;
+        }
+        fb_id = 0;
+    } else if (fb_id > 0) {
+        std::cout << "[DRM] fb_id有效但drm_fd无效，跳过framebuffer移除" << std::endl;
         fb_id = 0;
     }
-    if (fb_handle) {
+    
+    // 3. 销毁dumb buffer - 检查句柄有效性
+    if (fb_handle > 0 && drm_fd >= 0) {
+        std::cout << "[DRM] 销毁dumb buffer句柄: " << fb_handle << std::endl;
         struct drm_mode_destroy_dumb destroy_req = {};
         destroy_req.handle = fb_handle;
-        drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_req);
+        int destroy_result = drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_req);
+        if (destroy_result != 0) {
+            std::cerr << "[DRM] 销毁dumb buffer失败: " << destroy_result << " (" << strerror(errno) << ")" << std::endl;
+        } else {
+            std::cout << "[DRM] dumb buffer销毁成功" << std::endl;
+        }
+        fb_handle = 0;
+    } else if (fb_handle > 0) {
+        std::cout << "[DRM] fb_handle有效但drm_fd无效，跳过dumb buffer销毁" << std::endl;
         fb_handle = 0;
     }
+    
+    // 4. 释放CRTC结构体 - 检查指针有效性
     if (crtc) {
+        std::cout << "[DRM] 释放CRTC结构体" << std::endl;
         drmModeFreeCrtc(crtc);
         crtc = nullptr;
     }
+    
+    // 5. 释放连接器结构体 - 检查指针有效性
     if (connector) {
+        std::cout << "[DRM] 释放连接器结构体" << std::endl;
         drmModeFreeConnector(connector);
         connector = nullptr;
     }
+    
+    // 6. 关闭DRM文件描述符 - 最后执行，防止重复关闭
     if (drm_fd >= 0) {
-        close(drm_fd);
+        std::cout << "[DRM] 关闭DRM文件描述符: " << drm_fd << std::endl;
+        int close_result = close(drm_fd);
+        if (close_result != 0) {
+            std::cerr << "[DRM] 关闭文件描述符失败: " << strerror(errno) << std::endl;
+        } else {
+            std::cout << "[DRM] 文件描述符关闭成功" << std::endl;
+        }
         drm_fd = -1;
     }
+    
+    std::cout << "[DRM] DRM资源清理完成" << std::endl;
 #endif
 }
 
