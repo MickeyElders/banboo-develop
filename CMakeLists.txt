@@ -388,13 +388,17 @@ FetchContent_Declare(
 # 设置LVGL配置选项
 set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "Path to lv_conf.h")
 
-# 禁用LVGL示例和演示
+# 完全禁用LVGL示例和演示
 set(LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_WIDGETS OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_KEYPAD_AND_ENCODER OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_BENCHMARK OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_STRESS OFF CACHE BOOL "" FORCE)
 set(LV_USE_DEMO_MUSIC OFF CACHE BOOL "" FORCE)
+set(LV_USE_DEMO_FLEX_LAYOUT OFF CACHE BOOL "" FORCE)
+set(LV_USE_DEMO_MULTILANG OFF CACHE BOOL "" FORCE)
+set(LV_USE_DEMO_TRANSFORM OFF CACHE BOOL "" FORCE)
+set(LV_USE_DEMO_SCROLL OFF CACHE BOOL "" FORCE)
 
 # 获取LVGL源码
 FetchContent_MakeAvailable(lvgl)
@@ -567,6 +571,11 @@ endforeach()
 # ================================
 # 主程序 - 一体化可执行文件
 # ================================
+# 确保只构建我们的主程序，不构建LVGL示例
+if(TARGET lvgl_examples)
+    set_target_properties(lvgl_examples PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
 add_executable(bamboo_integrated
     integrated_main.cpp
     ${VALID_SOURCES}
