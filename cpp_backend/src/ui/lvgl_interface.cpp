@@ -312,7 +312,7 @@ void LVGLInterface::initializeTheme() {
     lv_style_init(&style_table_cell);
     lv_style_set_bg_color(&style_table_cell, color_surface_);
     lv_style_set_text_color(&style_table_cell, lv_color_hex(0xB0B8C1));
-    lv_style_set_text_font(&style_table_cell, &lv_font_montserrat_12);
+    lv_style_set_text_font(&style_table_cell, &lv_font_montserrat_14);
     lv_style_set_border_color(&style_table_cell, lv_color_hex(0x2A3441));
     lv_style_set_border_width(&style_table_cell, 1);
     lv_style_set_pad_all(&style_table_cell, 8);

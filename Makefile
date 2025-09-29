@@ -195,6 +195,7 @@ build-lvgl-from-source:
 	echo "#ifndef LV_CONF_H" > lv_conf.h && \
 	echo "#define LV_CONF_H" >> lv_conf.h && \
 	echo "#define LV_COLOR_DEPTH 32" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_12 1" >> lv_conf.h && \
 	echo "#define LV_FONT_MONTSERRAT_14 1" >> lv_conf.h && \
 	echo "#define LV_FONT_MONTSERRAT_16 1" >> lv_conf.h && \
 	echo "#define LV_FONT_MONTSERRAT_20 1" >> lv_conf.h && \
