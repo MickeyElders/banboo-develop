@@ -296,11 +296,28 @@ void LVGLInterface::createMainInterface() {
     lv_obj_set_style_pad_gap(main_screen_, 5, 0);
     std::cout << "[LVGLInterface] 设置主屏幕Flex布局完成" << std::endl;
     
-    // 2. 创建头部面板
-    header_panel_ = createHeaderPanel();
-    lv_obj_set_flex_grow(header_panel_, 0);  // 头部面板不允许增长
+    // 2. 添加可见性测试标签
+    lv_obj_t* test_label = lv_label_create(main_screen_);
+    lv_label_set_text(test_label, "BAMBOO SYSTEM - Interface Test");
+    lv_obj_set_style_text_color(test_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(test_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_bg_color(test_label, lv_color_hex(0xFF0000), 0);  // 红色背景便于识别
+    lv_obj_set_style_bg_opa(test_label, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(test_label, 10, 0);
+    std::cout << "[LVGLInterface] 创建测试标签完成" << std::endl;
     
-    // 3. 创建中间内容容器（使用Flex布局管理左右面板）
+    // 3. 创建头部面板
+    std::cout << "[LVGLInterface] 开始创建头部面板..." << std::endl;
+    header_panel_ = createHeaderPanel();
+    if (header_panel_) {
+        lv_obj_set_flex_grow(header_panel_, 0);  // 头部面板不允许增长
+        std::cout << "[LVGLInterface] 头部面板创建成功" << std::endl;
+    } else {
+        std::cerr << "[LVGLInterface] 头部面板创建失败" << std::endl;
+    }
+    
+    // 4. 创建中间内容容器（使用Flex布局管理左右面板）
+    std::cout << "[LVGLInterface] 开始创建中间内容容器..." << std::endl;
     lv_obj_t* content_container = lv_obj_create(main_screen_);
     lv_obj_set_width(content_container, lv_pct(100));
     lv_obj_set_flex_grow(content_container, 1);  // 中间容器占据剩余空间
@@ -313,14 +330,39 @@ void LVGLInterface::createMainInterface() {
     lv_obj_set_flex_flow(content_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(content_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(content_container, 10, 0);
+    std::cout << "[LVGLInterface] 中间内容容器创建完成" << std::endl;
     
-    // 4. 在容器内创建左右面板
+    // 5. 在容器内创建左右面板
+    std::cout << "[LVGLInterface] 开始创建摄像头面板..." << std::endl;
     camera_panel_ = createCameraPanel(content_container);
-    control_panel_ = createControlPanel(content_container);
+    if (camera_panel_) {
+        std::cout << "[LVGLInterface] 摄像头面板创建成功" << std::endl;
+    } else {
+        std::cerr << "[LVGLInterface] 摄像头面板创建失败" << std::endl;
+    }
     
-    // 5. 创建底部面板
+    std::cout << "[LVGLInterface] 开始创建控制面板..." << std::endl;
+    control_panel_ = createControlPanel(content_container);
+    if (control_panel_) {
+        std::cout << "[LVGLInterface] 控制面板创建成功" << std::endl;
+    } else {
+        std::cerr << "[LVGLInterface] 控制面板创建失败" << std::endl;
+    }
+    
+    // 6. 创建底部面板
+    std::cout << "[LVGLInterface] 开始创建底部面板..." << std::endl;
     footer_panel_ = createFooterPanel();
-    lv_obj_set_flex_grow(footer_panel_, 0);  // 底部面板不允许增长
+    if (footer_panel_) {
+        lv_obj_set_flex_grow(footer_panel_, 0);  // 底部面板不允许增长
+        std::cout << "[LVGLInterface] 底部面板创建成功" << std::endl;
+    } else {
+        std::cerr << "[LVGLInterface] 底部面板创建失败" << std::endl;
+    }
+    
+    // 7. 强制刷新界面
+    lv_obj_invalidate(main_screen_);
+    lv_refr_now(NULL);
+    std::cout << "[LVGLInterface] 执行强制界面刷新" << std::endl;
     
     std::cout << "[LVGLInterface] 主界面创建完成，使用完全Flex布局" << std::endl;
 #endif
