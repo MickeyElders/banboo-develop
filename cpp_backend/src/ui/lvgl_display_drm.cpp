@@ -611,7 +611,7 @@ void cleanupDRMResources(int drm_fd, uint32_t fb_id, drmModeCrtc* crtc,
 #endif
 }
 
-void copyPixelData(const lv_area_t* area, uint8_t* px_map, uint32_t* framebuffer,
+void copyPixelData(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
                   uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size) {
 #ifdef ENABLE_LVGL
     // 严格的区域边界检查
