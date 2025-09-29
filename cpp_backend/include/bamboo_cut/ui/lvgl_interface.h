@@ -30,6 +30,14 @@ typedef void* lv_indev_data_t;
 #include "bamboo_cut/core/data_bridge.h"
 #include "bamboo_cut/utils/jetson_monitor.h"
 
+// DRM头文件包含
+#ifdef ENABLE_DRM
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
+#endif
+
 namespace bamboo_cut {
 namespace ui {
 
