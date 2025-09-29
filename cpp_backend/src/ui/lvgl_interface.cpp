@@ -13,6 +13,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <linux/fb.h>
+#include <cstring>
+#include <cerrno>
 
 #ifdef ENABLE_LVGL
 #include <lvgl/lvgl.h>
@@ -1116,8 +1120,99 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
 
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 #ifdef ENABLE_LVGL
-    // 简单的显示刷新实现
-    // 在实际项目中，这里应该将像素数据写入到DRM framebuffer
+    // 实际的framebuffer刷新实现
+    static int fb_fd = -1;
+    static uint32_t* framebuffer = nullptr;
+    static uint32_t fb_width = 0;
+    static uint32_t fb_height = 0;
+    static bool fb_initialized = false;
+    
+    // 初始化framebuffer (只初始化一次)
+    if (!fb_initialized) {
+        // 尝试打开framebuffer设备
+        const char* fb_devices[] = {"/dev/fb0", "/dev/fb1"};
+        
+        for (const char* fb_device : fb_devices) {
+            fb_fd = open(fb_device, O_RDWR);
+            if (fb_fd >= 0) {
+                std::cout << "[FB] 成功打开framebuffer设备: " << fb_device << std::endl;
+                
+                // 获取framebuffer信息
+                struct fb_var_screeninfo vinfo;
+                struct fb_fix_screeninfo finfo;
+                
+                if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &vinfo) == 0 &&
+                    ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == 0) {
+                    
+                    fb_width = vinfo.xres;
+                    fb_height = vinfo.yres;
+                    uint32_t fb_size = finfo.line_length * fb_height;
+                    
+                    std::cout << "[FB] Framebuffer信息: " << fb_width << "x" << fb_height
+                              << ", bpp: " << vinfo.bits_per_pixel << std::endl;
+                    
+                    // 映射framebuffer到内存
+                    framebuffer = (uint32_t*)mmap(0, fb_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
+                    if (framebuffer != MAP_FAILED) {
+                        // 清空framebuffer (黑色背景)
+                        memset(framebuffer, 0, fb_size);
+                        fb_initialized = true;
+                        std::cout << "[FB] Framebuffer映射成功" << std::endl;
+                        break;
+                    } else {
+                        std::cerr << "[FB] Framebuffer映射失败: " << strerror(errno) << std::endl;
+                        close(fb_fd);
+                        fb_fd = -1;
+                    }
+                } else {
+                    std::cerr << "[FB] 无法获取framebuffer信息" << std::endl;
+                    close(fb_fd);
+                    fb_fd = -1;
+                }
+            }
+        }
+        
+        if (fb_fd < 0) {
+            std::cerr << "[FB] 无法打开任何framebuffer设备" << std::endl;
+        }
+        fb_initialized = true; // 避免重复尝试
+    }
+    
+    // 将LVGL像素数据复制到framebuffer
+    if (framebuffer && fb_width > 0 && fb_height > 0) {
+        uint32_t area_width = area->x2 - area->x1 + 1;
+        uint32_t area_height = area->y2 - area->y1 + 1;
+        
+        // 确保坐标在有效范围内
+        if (area->x1 >= 0 && area->y1 >= 0 &&
+            area->x1 < (int32_t)fb_width && area->y1 < (int32_t)fb_height) {
+            
+            for (uint32_t y = 0; y < area_height; y++) {
+                if ((area->y1 + y) >= (int32_t)fb_height) break;
+                
+                for (uint32_t x = 0; x < area_width; x++) {
+                    if ((area->x1 + x) >= (int32_t)fb_width) break;
+                    
+                    // 计算源像素和目标像素位置
+                    uint32_t src_idx = (y * area_width + x);
+                    uint32_t dst_idx = (area->y1 + y) * fb_width + (area->x1 + x);
+                    
+                    // LVGL使用lv_color_t格式，需要转换为framebuffer格式
+                    lv_color_t* src_color = (lv_color_t*)px_map + src_idx;
+                    
+                    // 转换为32位ARGB格式
+                    uint32_t pixel = 0xFF000000 | // Alpha = 255 (不透明)
+                                    (src_color->red << 16) |
+                                    (src_color->green << 8) |
+                                    (src_color->blue);
+                    
+                    framebuffer[dst_idx] = pixel;
+                }
+            }
+        }
+    }
+    
+    // 通知LVGL刷新完成
     lv_display_flush_ready(disp);
 #endif
 }
