@@ -73,8 +73,8 @@ void LVGLInterface::updateSystemStats() {
         int response_ms = 12 + (response_counter % 10);
         // Ensure response time is within reasonable range
         response_ms = std::max(1, std::min(999, response_ms));
-        lv_label_set_text_fmt(header_widgets_.response_label,
-            LV_SYMBOL_LOOP " %dms", response_ms);
+        std::string response_text = LV_SYMBOL_LOOP " " + std::to_string(response_ms) + "ms";
+        lv_label_set_text(header_widgets_.response_label, response_text.c_str());
     } catch (const std::exception& e) {
         std::cerr << "[LVGLInterface] Exception in response time update: " << e.what() << std::endl;
         return;
@@ -117,7 +117,8 @@ void LVGLInterface::updateSystemStats() {
                 avg_freq = std::max(0, std::min(9999, avg_freq));
                 
                 lv_bar_set_value(control_widgets_.cpu_bar, avg_usage, LV_ANIM_ON);
-                lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @%dMHz", avg_usage, avg_freq);
+                std::string cpu_text = "CPU: " + std::to_string(avg_usage) + "% @" + std::to_string(avg_freq) + "MHz";
+                lv_label_set_text(control_widgets_.cpu_label, cpu_text.c_str());
                 
                 // 使用黄色条块代表已使用的量
                 lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
@@ -139,7 +140,8 @@ void LVGLInterface::updateSystemStats() {
             // 验证GPU数据的有效性
             if (gpu_usage >= 0 && gpu_usage <= 100 && gpu_freq >= 0 && gpu_freq <= 10000) {
                 lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-                lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @%dMHz", gpu_usage, gpu_freq);
+                std::string gpu_text = "GPU: " + std::to_string(gpu_usage) + "% @" + std::to_string(gpu_freq) + "MHz";
+                lv_label_set_text(control_widgets_.gpu_label, gpu_text.c_str());
                 
                 // 使用黄色条块代表已使用的量
                 lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
@@ -168,9 +170,11 @@ void LVGLInterface::updateSystemStats() {
                 int lfb_blocks = std::max(0, stats.memory.lfb_blocks);
                 int lfb_size = std::max(0, stats.memory.lfb_size_mb);
                 
-                lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %d/%dMB (LFB:%dx%dMB)",
-                                     mem_percentage, stats.memory.ram_used_mb, stats.memory.ram_total_mb,
-                                     lfb_blocks, lfb_size);
+                std::string mem_text = "RAM: " + std::to_string(mem_percentage) + "% " +
+                                     std::to_string(stats.memory.ram_used_mb) + "/" +
+                                     std::to_string(stats.memory.ram_total_mb) + "MB (LFB:" +
+                                     std::to_string(lfb_blocks) + "x" + std::to_string(lfb_size) + "MB)";
+                lv_label_set_text(control_widgets_.mem_label, mem_text.c_str());
                 
                 // 使用黄色条块代表已使用的量
                 lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
@@ -254,7 +258,8 @@ void LVGLInterface::updateAIModelStats() {
     if (control_widgets_.ai_model_version_label) {
         const std::string& model_version = databridge_stats.ai_model.model_version;
         const char* version_text = model_version.empty() ? "Unknown Version" : model_version.c_str();
-        lv_label_set_text_fmt(control_widgets_.ai_model_version_label, "Model Version: %s", version_text);
+        std::string version_text_str = "Model Version: " + std::string(version_text);
+        lv_label_set_text(control_widgets_.ai_model_version_label, version_text_str.c_str());
     }
     
     // 更新推理时间 - 添加有效性检查和默认值
@@ -265,7 +270,8 @@ void LVGLInterface::updateAIModelStats() {
             lv_label_set_text(control_widgets_.ai_inference_time_label, "Inference Time: N/A");
             lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, lv_color_hex(0x8A92A1), 0);
         } else {
-            lv_label_set_text_fmt(control_widgets_.ai_inference_time_label, "Inference Time: %.1fms", inference_time);
+            std::string inference_text = "Inference Time: " + std::to_string(static_cast<int>(inference_time * 10) / 10.0) + "ms";
+            lv_label_set_text(control_widgets_.ai_inference_time_label, inference_text.c_str());
         
             // 根据推理时间设置颜色
             if (inference_time > 30.0f) {
@@ -285,7 +291,8 @@ void LVGLInterface::updateAIModelStats() {
             confidence_threshold = 0.5f;  // 默认值
             lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "Confidence Threshold: Default(0.50)");
         } else {
-            lv_label_set_text_fmt(control_widgets_.ai_confidence_threshold_label, "Confidence Threshold: %.2f", confidence_threshold);
+            std::string threshold_text = "Confidence Threshold: " + std::to_string(static_cast<int>(confidence_threshold * 100) / 100.0);
+            lv_label_set_text(control_widgets_.ai_confidence_threshold_label, threshold_text.c_str());
         }
     }
     
@@ -297,7 +304,8 @@ void LVGLInterface::updateAIModelStats() {
             lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "Detection Accuracy: N/A");
             lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, lv_color_hex(0x8A92A1), 0);
         } else {
-            lv_label_set_text_fmt(control_widgets_.ai_detection_accuracy_label, "Detection Accuracy: %.1f%%", detection_accuracy);
+            std::string accuracy_text = "Detection Accuracy: " + std::to_string(static_cast<int>(detection_accuracy * 10) / 10.0) + "%";
+            lv_label_set_text(control_widgets_.ai_detection_accuracy_label, accuracy_text.c_str());
         
             // 根据检测精度设置颜色
             if (detection_accuracy > 90.0f) {
@@ -316,7 +324,8 @@ void LVGLInterface::updateAIModelStats() {
         if (total_detections < 0) {
             total_detections = 0;  // 负值时使用0
         }
-        lv_label_set_text_fmt(control_widgets_.ai_total_detections_label, "Total Detections: %d", total_detections);
+        std::string total_text = "Total Detections: " + std::to_string(total_detections);
+        lv_label_set_text(control_widgets_.ai_total_detections_label, total_text.c_str());
     }
     
     // 更新今日检测数 - 添加有效性检查
@@ -325,7 +334,8 @@ void LVGLInterface::updateAIModelStats() {
         if (daily_detections < 0) {
             daily_detections = 0;  // 负值时使用0
         }
-        lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "Daily Detections: %d", daily_detections);
+        std::string daily_text = "Daily Detections: " + std::to_string(daily_detections);
+        lv_label_set_text(control_widgets_.ai_daily_detections_label, daily_text.c_str());
     }
     
     // 更新当前竹子检测状态
@@ -338,8 +348,9 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新竹子直径
     if (control_widgets_.bamboo_diameter_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_diameter_label, "- Diameter: %.1fmm",
-                                 bamboo_detection.diameter_mm);
+            std::string diameter_text = "- Diameter: " +
+                                      std::to_string(static_cast<int>(bamboo_detection.diameter_mm * 10) / 10.0) + "mm";
+            lv_label_set_text(control_widgets_.bamboo_diameter_label, diameter_text.c_str());
             
             // 根据直径设置颜色 (合理范围20-80mm)
             if (bamboo_detection.diameter_mm >= 20.0f && bamboo_detection.diameter_mm <= 80.0f) {
@@ -356,8 +367,8 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新竹子长度
     if (control_widgets_.bamboo_length_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_length_label, "- Length: %.0fmm",
-                                 bamboo_detection.length_mm);
+            std::string length_text = "- Length: " + std::to_string(static_cast<int>(bamboo_detection.length_mm)) + "mm";
+            lv_label_set_text(control_widgets_.bamboo_length_label, length_text.c_str());
             
             // 根据长度设置颜色 (合理范围1000-5000mm)
             if (bamboo_detection.length_mm >= 1000.0f && bamboo_detection.length_mm <= 5000.0f) {
@@ -393,8 +404,9 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新检测置信度
     if (control_widgets_.bamboo_confidence_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_confidence_label, "- Confidence: %.2f",
-                                 bamboo_detection.confidence);
+            std::string confidence_text = "- Confidence: " +
+                                        std::to_string(static_cast<int>(bamboo_detection.confidence * 100) / 100.0);
+            lv_label_set_text(control_widgets_.bamboo_confidence_label, confidence_text.c_str());
             
             // 根据置信度设置颜色
             if (bamboo_detection.confidence >= 0.9f) {
@@ -413,8 +425,9 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新检测耗时
     if (control_widgets_.bamboo_detection_time_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_detection_time_label, "- Detection Time: %.1fms",
-                                 bamboo_detection.detection_time_ms);
+            std::string detection_time_text = "- Detection Time: " +
+                                             std::to_string(static_cast<int>(bamboo_detection.detection_time_ms * 10) / 10.0) + "ms";
+            lv_label_set_text(control_widgets_.bamboo_detection_time_label, detection_time_text.c_str());
             
             // 根据检测时间设置颜色
             if (bamboo_detection.detection_time_ms <= 20.0f) {
@@ -481,10 +494,12 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
     
     if (status_label) {
         if (camera_info.is_online) {
-            lv_label_set_text_fmt(status_label, "Camera-%d: Online ✓", camera_id);
+            std::string status_text = "Camera-" + std::to_string(camera_id) + ": Online ✓";
+            lv_label_set_text(status_label, status_text.c_str());
             lv_obj_set_style_text_color(status_label, color_success_, 0);
         } else {
-            lv_label_set_text_fmt(status_label, "Camera-%d: Not Installed ✗", camera_id);
+            std::string status_text = "Camera-" + std::to_string(camera_id) + ": Not Installed ✗";
+            lv_label_set_text(status_label, status_text.c_str());
             lv_obj_set_style_text_color(status_label, color_error_, 0);
         }
     }
@@ -494,7 +509,8 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
             float fps = camera_info.fps;
             // 验证帧率数据的有效性
             if (fps >= 0.0f && fps <= 240.0f) {  // 合理的帧率范围
-                lv_label_set_text_fmt(fps_label, "  FPS: %.0f", fps);
+                std::string fps_text = "  FPS: " + std::to_string(static_cast<int>(fps));
+                lv_label_set_text(fps_label, fps_text.c_str());
                 lv_obj_set_style_text_color(fps_label, lv_color_hex(0xB0B8C1), 0);
             } else {
                 lv_label_set_text(fps_label, "  FPS: Invalid Data");
@@ -512,7 +528,8 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
             int height = camera_info.height;
             // 验证分辨率数据的有效性
             if (width > 0 && width <= 8192 && height > 0 && height <= 8192) {
-                lv_label_set_text_fmt(resolution_label, "  Resolution: %dx%d", width, height);
+                std::string resolution_text = "  Resolution: " + std::to_string(width) + "x" + std::to_string(height);
+                lv_label_set_text(resolution_label, resolution_text.c_str());
                 lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xB0B8C1), 0);
             } else {
                 lv_label_set_text(resolution_label, "  Resolution: Invalid Data");
@@ -528,7 +545,8 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
         if (camera_info.is_online) {
             const std::string& exposure_mode = camera_info.exposure_mode;
             if (!exposure_mode.empty()) {
-                lv_label_set_text_fmt(exposure_label, "  Exposure: %s", exposure_mode.c_str());
+                std::string exposure_text = "  Exposure: " + exposure_mode;
+                lv_label_set_text(exposure_label, exposure_text.c_str());
                 lv_obj_set_style_text_color(exposure_label, color_primary_, 0);
             } else {
                 lv_label_set_text(exposure_label, "  Exposure: Unknown Mode");
@@ -544,7 +562,8 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
         if (camera_info.is_online) {
             const std::string& lighting_quality = camera_info.lighting_quality;
             if (!lighting_quality.empty()) {
-                lv_label_set_text_fmt(lighting_label, "  Lighting Score: %s", lighting_quality.c_str());
+                std::string lighting_text = "  Lighting Score: " + lighting_quality;
+                lv_label_set_text(lighting_label, lighting_text.c_str());
                 
                 // 根据光照质量设置颜色
                 if (lighting_quality == "Good" || lighting_quality == "良好") {
@@ -574,7 +593,8 @@ void LVGLInterface::updateTemperatureStats(const utils::SystemStats& stats) {
     if (control_widgets_.cpu_temp_label) {
         float cpu_temp = stats.temperature.cpu_temp;
         if (cpu_temp >= -50.0f && cpu_temp <= 150.0f) {  // 合理的温度范围
-            lv_label_set_text_fmt(control_widgets_.cpu_temp_label, "CPU: %.1f°C", cpu_temp);
+            std::string cpu_temp_text = "CPU: " + std::to_string(static_cast<int>(cpu_temp * 10) / 10.0) + "°C";
+            lv_label_set_text(control_widgets_.cpu_temp_label, cpu_temp_text.c_str());
             
             // 根据温度设置颜色
             if (cpu_temp > 80.0f) {
@@ -594,7 +614,8 @@ void LVGLInterface::updateTemperatureStats(const utils::SystemStats& stats) {
     if (control_widgets_.gpu_temp_label) {
         float gpu_temp = stats.temperature.gpu_temp;
         if (gpu_temp >= -50.0f && gpu_temp <= 150.0f) {  // 合理的温度范围
-            lv_label_set_text_fmt(control_widgets_.gpu_temp_label, "GPU: %.1f°C", gpu_temp);
+            std::string gpu_temp_text = "GPU: " + std::to_string(static_cast<int>(gpu_temp * 10) / 10.0) + "°C";
+            lv_label_set_text(control_widgets_.gpu_temp_label, gpu_temp_text.c_str());
             
             // 根据温度设置颜色
             if (gpu_temp > 75.0f) {
@@ -614,7 +635,8 @@ void LVGLInterface::updateTemperatureStats(const utils::SystemStats& stats) {
     if (control_widgets_.soc_temp_label) {
         float soc_temp = stats.temperature.soc_temp;
         if (soc_temp >= -50.0f && soc_temp <= 150.0f) {
-            lv_label_set_text_fmt(control_widgets_.soc_temp_label, "SOC: %.1f°C", soc_temp);
+            std::string soc_temp_text = "SOC: " + std::to_string(static_cast<int>(soc_temp * 10) / 10.0) + "°C";
+            lv_label_set_text(control_widgets_.soc_temp_label, soc_temp_text.c_str());
         } else {
             lv_label_set_text(control_widgets_.soc_temp_label, "SOC: N/A");
         }
@@ -624,7 +646,8 @@ void LVGLInterface::updateTemperatureStats(const utils::SystemStats& stats) {
     if (control_widgets_.thermal_temp_label) {
         float thermal_temp = stats.temperature.thermal_temp;
         if (thermal_temp >= -50.0f && thermal_temp <= 150.0f) {
-            lv_label_set_text_fmt(control_widgets_.thermal_temp_label, "Thermal: %.1f°C", thermal_temp);
+            std::string thermal_temp_text = "Thermal: " + std::to_string(static_cast<int>(thermal_temp * 10) / 10.0) + "°C";
+            lv_label_set_text(control_widgets_.thermal_temp_label, thermal_temp_text.c_str());
         } else {
             lv_label_set_text(control_widgets_.thermal_temp_label, "Thermal: N/A");
         }
@@ -641,7 +664,8 @@ void LVGLInterface::updatePowerStats(const utils::SystemStats& stats) {
         
         // 验证电流和功率数据的有效性
         if (current_ma >= 0 && current_ma <= 50000 && power_mw >= 0 && power_mw <= 500000) {
-            lv_label_set_text_fmt(control_widgets_.power_in_label, "VDD_IN: %dmA/%dmW", current_ma, power_mw);
+            std::string power_in_text = "VDD_IN: " + std::to_string(current_ma) + "mA/" + std::to_string(power_mw) + "mW";
+            lv_label_set_text(control_widgets_.power_in_label, power_in_text.c_str());
         } else {
             lv_label_set_text(control_widgets_.power_in_label, "VDD_IN: N/A");
         }
@@ -654,7 +678,8 @@ void LVGLInterface::updatePowerStats(const utils::SystemStats& stats) {
         
         // 验证电流和功率数据的有效性
         if (current_ma >= 0 && current_ma <= 50000 && power_mw >= 0 && power_mw <= 500000) {
-            lv_label_set_text_fmt(control_widgets_.power_cpu_gpu_label, "CPU_GPU: %dmA/%dmW", current_ma, power_mw);
+            std::string power_cpu_gpu_text = "CPU_GPU: " + std::to_string(current_ma) + "mA/" + std::to_string(power_mw) + "mW";
+            lv_label_set_text(control_widgets_.power_cpu_gpu_label, power_cpu_gpu_text.c_str());
         } else {
             lv_label_set_text(control_widgets_.power_cpu_gpu_label, "CPU_GPU: N/A");
         }
@@ -667,7 +692,8 @@ void LVGLInterface::updatePowerStats(const utils::SystemStats& stats) {
         
         // 验证电流和功率数据的有效性
         if (current_ma >= 0 && current_ma <= 50000 && power_mw >= 0 && power_mw <= 500000) {
-            lv_label_set_text_fmt(control_widgets_.power_soc_label, "SOC: %dmA/%dmW", current_ma, power_mw);
+            std::string power_soc_text = "SOC: " + std::to_string(current_ma) + "mA/" + std::to_string(power_mw) + "mW";
+            lv_label_set_text(control_widgets_.power_soc_label, power_soc_text.c_str());
         } else {
             lv_label_set_text(control_widgets_.power_soc_label, "SOC: N/A");
         }
@@ -679,8 +705,8 @@ void LVGLInterface::updateSystemExtendedStats(const utils::SystemStats& stats) {
 #ifdef ENABLE_LVGL
     // 更新SWAP使用情况
     if (control_widgets_.swap_usage_label && stats.memory.swap_total_mb > 0) {
-        lv_label_set_text_fmt(control_widgets_.swap_usage_label, "SWAP: %d/%dMB",
-                             stats.memory.swap_used_mb, stats.memory.swap_total_mb);
+        std::string swap_text = "SWAP: " + std::to_string(stats.memory.swap_used_mb) + "/" + std::to_string(stats.memory.swap_total_mb) + "MB";
+        lv_label_set_text(control_widgets_.swap_usage_label, swap_text.c_str());
         
         // 根据SWAP使用率设置颜色
         int swap_percentage = (stats.memory.swap_used_mb * 100) / stats.memory.swap_total_mb;
@@ -695,14 +721,14 @@ void LVGLInterface::updateSystemExtendedStats(const utils::SystemStats& stats) {
     
     // 更新EMC频率信息
     if (control_widgets_.emc_freq_label) {
-        lv_label_set_text_fmt(control_widgets_.emc_freq_label, "EMC: %d%%@%dMHz",
-                             stats.other.emc_freq_percent, stats.other.emc_freq_mhz);
+        std::string emc_text = "EMC: " + std::to_string(stats.other.emc_freq_percent) + "%@" + std::to_string(stats.other.emc_freq_mhz) + "MHz";
+        lv_label_set_text(control_widgets_.emc_freq_label, emc_text.c_str());
     }
     
     // 更新VIC使用率
     if (control_widgets_.vic_usage_label) {
-        lv_label_set_text_fmt(control_widgets_.vic_usage_label, "VIC: %d%%@%dMHz",
-                             stats.other.vic_usage_percent, stats.other.vic_freq_mhz);
+        std::string vic_text = "VIC: " + std::to_string(stats.other.vic_usage_percent) + "%@" + std::to_string(stats.other.vic_freq_mhz) + "MHz";
+        lv_label_set_text(control_widgets_.vic_usage_label, vic_text.c_str());
     }
     
     // 更新风扇转速
