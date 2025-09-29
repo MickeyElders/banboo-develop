@@ -591,7 +591,7 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     lv_obj_set_style_text_font(control_widgets_.mem_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.mem_label, LV_ALIGN_TOP_RIGHT, 0, 48);
     
-    // === AI模型监控区域 ===
+    // === AI Model Monitoring Area ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
     lv_obj_set_size(ai_section, lv_pct(100), 110);
     lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x0F1419), 0);
@@ -602,36 +602,36 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* ai_title = lv_label_create(ai_section);
-    lv_label_set_text(ai_title, LV_SYMBOL_EYE_OPEN " AI 模型监控");
+    lv_label_set_text(ai_title, LV_SYMBOL_EYE_OPEN " AI Model Monitor");
     lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
     lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
     lv_obj_align(ai_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
     control_widgets_.ai_fps_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_fps_label, "推理FPS: 28.5");
+    lv_label_set_text(control_widgets_.ai_fps_label, "Inference FPS: 28.5");
     lv_obj_set_style_text_color(control_widgets_.ai_fps_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_fps_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.ai_fps_label, LV_ALIGN_TOP_LEFT, 0, 25);
     
     control_widgets_.ai_confidence_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_confidence_label, "置信度: 0.94");
+    lv_label_set_text(control_widgets_.ai_confidence_label, "Confidence: 0.94");
     lv_obj_set_style_text_color(control_widgets_.ai_confidence_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_confidence_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.ai_confidence_label, LV_ALIGN_TOP_LEFT, 0, 45);
     
     control_widgets_.ai_latency_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_latency_label, "延迟: 12ms");
+    lv_label_set_text(control_widgets_.ai_latency_label, "Latency: 12ms");
     lv_obj_set_style_text_color(control_widgets_.ai_latency_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_latency_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.ai_latency_label, LV_ALIGN_TOP_RIGHT, 0, 25);
     
     control_widgets_.ai_model_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_model_label, "模型: YOLOv8n");
+    lv_label_set_text(control_widgets_.ai_model_label, "Model: YOLOv8n");
     lv_obj_set_style_text_color(control_widgets_.ai_model_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.ai_model_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.ai_model_label, LV_ALIGN_TOP_RIGHT, 0, 45);
     
-    // === Modbus通信统计区域 ===
+    // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
     lv_obj_set_size(modbus_section, lv_pct(100), 110);
     lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x0F1419), 0);
@@ -642,31 +642,31 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* modbus_title = lv_label_create(modbus_section);
-    lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus 统计");
+    lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus Statistics");
     lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xE6A055), 0);
     lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_14, 0);
     lv_obj_align(modbus_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
     control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_connection_label, "连接时长: 02:15:32");
+    lv_label_set_text(control_widgets_.modbus_connection_label, "Connection: 02:15:32");
     lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 25);
     
     control_widgets_.modbus_packets_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_packets_label, "数据包: 1247");
+    lv_label_set_text(control_widgets_.modbus_packets_label, "Packets: 1247");
     lv_obj_set_style_text_color(control_widgets_.modbus_packets_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_packets_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 45);
     
     control_widgets_.modbus_errors_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_errors_label, "错误率: 0.02%");
+    lv_label_set_text(control_widgets_.modbus_errors_label, "Error Rate: 0.02%");
     lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_errors_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 25);
     
     control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "心跳: 正常");
+    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "Heartbeat: OK");
     lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
     lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 45);
@@ -701,12 +701,12 @@ lv_obj_t* LVGLInterface::createStatusPanel() {
     lv_obj_clear_flag(metrics_container, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* metrics_title = lv_label_create(metrics_container);
-    lv_label_set_text(metrics_title, LV_SYMBOL_SETTINGS " 系统指标");
+    lv_label_set_text(metrics_title, LV_SYMBOL_SETTINGS " System Metrics");
     lv_obj_set_style_text_color(metrics_title, color_primary_, 0);
     lv_obj_set_style_text_font(metrics_title, &lv_font_montserrat_14, 0);
     lv_obj_align(metrics_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    // 3列网格容器
+    // 3 Column Grid Container
     lv_obj_t* grid_container = lv_obj_create(metrics_container);
     lv_obj_set_size(grid_container, lv_pct(100), 80);
     lv_obj_align(grid_container, LV_ALIGN_TOP_LEFT, 0, 25);
@@ -717,12 +717,12 @@ lv_obj_t* LVGLInterface::createStatusPanel() {
     lv_obj_set_flex_align(grid_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_clear_flag(grid_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 12项系统指标数据
+    // 12 System Metrics Data
     const char* metric_names[] = {
-        "CPU频率", "GPU频率", "内存频率",
-        "CPU温度", "GPU温度", "系统温度",
-        "风扇转速", "电源电压", "电源电流",
-        "网络延迟", "存储读取", "存储写入"
+        "CPU Freq", "GPU Freq", "MEM Freq",
+        "CPU Temp", "GPU Temp", "SYS Temp",
+        "Fan Speed", "Power V", "Power A",
+        "Net Ping", "Disk Read", "Disk Write"
     };
     const char* metric_values[] = {
         "1.9GHz", "1.3GHz", "1600MHz",
@@ -773,7 +773,7 @@ lv_obj_t* LVGLInterface::createStatusPanel() {
     lv_obj_clear_flag(version_container, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* version_title = lv_label_create(version_container);
-    lv_label_set_text(version_title, LV_SYMBOL_LIST " 系统版本");
+    lv_label_set_text(version_title, LV_SYMBOL_LIST " System Version");
     lv_obj_set_style_text_color(version_title, lv_color_hex(0xE6A055), 0);
     lv_obj_set_style_text_font(version_title, &lv_font_montserrat_14, 0);
     lv_obj_align(version_title, LV_ALIGN_TOP_LEFT, 0, 0);
