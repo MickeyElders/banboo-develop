@@ -47,9 +47,38 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_set_flex_flow(canvas_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(canvas_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    // Canvas画布
+    // Canvas画布 - 设置缓冲区和大小
     camera_canvas_ = lv_canvas_create(canvas_container);
-    // 移除 lv_obj_center，使用Flex布局自动居中
+    
+    // 设置Canvas大小（根据1920x1080缩放到界面大小）
+    const int canvas_width = camera_widgets_.canvas_width;   // 640
+    const int canvas_height = camera_widgets_.canvas_height; // 360
+    
+    // 为Canvas分配缓冲区（使用类成员变量，避免静态分配）
+    camera_widgets_.canvas_buffer = (lv_color_t*)malloc(canvas_width * canvas_height * sizeof(lv_color_t));
+    if (!camera_widgets_.canvas_buffer) {
+        std::cout << "Failed to allocate canvas buffer" << std::endl;
+        return nullptr;
+    }
+    
+    // 设置Canvas缓冲区和大小
+    lv_canvas_set_buffer(camera_canvas_, camera_widgets_.canvas_buffer, canvas_width, canvas_height, LV_IMG_CF_TRUE_COLOR);
+    
+    // 设置Canvas对象的大小
+    lv_obj_set_width(camera_canvas_, canvas_width);
+    lv_obj_set_height(camera_canvas_, canvas_height);
+    
+    // 填充Canvas为深色背景，表示等待摄像头数据
+    lv_canvas_fill_bg(camera_canvas_, lv_color_hex(0x2D2D2D), LV_OPA_COVER);
+    
+    // 在Canvas上绘制等待文本
+    lv_draw_label_dsc_t label_dsc;
+    lv_draw_label_dsc_init(&label_dsc);
+    label_dsc.color = lv_color_white();
+    label_dsc.font = &lv_font_montserrat_16;
+    
+    lv_point_t text_pos = {canvas_width/2 - 60, canvas_height/2 - 8};
+    lv_canvas_draw_text(camera_canvas_, text_pos.x, text_pos.y, 120, &label_dsc, "等待摄像头数据...");
     
     // 信息覆盖层
     lv_obj_t* info_overlay = lv_obj_create(camera_panel_);

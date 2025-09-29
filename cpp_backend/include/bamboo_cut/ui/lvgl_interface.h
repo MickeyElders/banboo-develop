@@ -194,6 +194,11 @@ private:
      * @brief 更新摄像头画面
      */
     void updateCameraView();
+    
+    /**
+     * @brief 更新Canvas显示摄像头帧数据
+     */
+    void updateCanvasFrame(const cv::Mat& frame);
 
     /**
      * @brief 更新系统状态信息
@@ -380,6 +385,15 @@ private:
         lv_obj_t* coord_value;
         lv_obj_t* quality_value;
         lv_obj_t* blade_value;
+        
+        // Canvas缓冲区和大小
+        static const int canvas_width = 640;
+        static const int canvas_height = 360;
+#ifdef ENABLE_LVGL
+        lv_color_t* canvas_buffer;
+#else
+        void* canvas_buffer;
+#endif
     } camera_widgets_;
     
     struct {
