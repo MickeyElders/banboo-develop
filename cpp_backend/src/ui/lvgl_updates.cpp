@@ -820,31 +820,5 @@ void LVGLInterface::updateCameraView() {
 #endif
 }
 
-void LVGLInterface::updateModbusDisplay() {
-#ifdef ENABLE_LVGL
-    // 添加空指针保护 - 检查控制面板是否已初始化
-    if (!control_panel_) {
-        return;  // 静默跳过
-    }
-    
-    // 添加DataBridge空指针保护
-    if (!data_bridge_) {
-        return;  // 静默跳过，避免日志过多
-    }
-    
-    try {
-        // 获取Modbus统计数据，添加异常保护
-        core::SystemStats databridge_stats = data_bridge_->getStats();
-        
-        // 这里可以添加Modbus相关的显示更新逻辑
-        // 目前暂时跳过，避免崩溃
-        
-    } catch (const std::exception& e) {
-        // 静默处理异常，避免日志过多
-        return;
-    }
-#endif
-}
-
 } // namespace ui
 } // namespace bamboo_cut
