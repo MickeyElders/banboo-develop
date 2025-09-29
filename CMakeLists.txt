@@ -655,6 +655,10 @@ if(ENABLE_LVGL)
     elseif(TARGET lvgl::lvgl)
         target_link_libraries(bamboo_integrated lvgl::lvgl)
         message(STATUS "Linking LVGL namespace library to bamboo_integrated")
+    elseif(LVGL_FOUND AND LVGL_LIBRARIES)
+        # 使用pkg-config找到的LVGL库
+        target_link_libraries(bamboo_integrated ${LVGL_LIBRARIES})
+        message(STATUS "Linking pkg-config LVGL libraries: ${LVGL_LIBRARIES}")
     else()
         # 查找已安装的LVGL
         find_package(lvgl QUIET)
