@@ -191,19 +191,18 @@ build-lvgl-from-source:
 	@echo "$(BLUE)[INFO]$(NC) [3/8] 下载LVGL v9.1..."
 	@cd /tmp && rm -rf lvgl && git clone --depth 1 --branch release/v9.1 https://github.com/lvgl/lvgl.git
 	@echo "$(BLUE)[INFO]$(NC) [4/8] 创建配置文件..."
-	@cd /tmp/lvgl && cat > lv_conf.h << 'EOF'
-	#ifndef LV_CONF_H
-	#define LV_CONF_H
-	#define LV_COLOR_DEPTH 32
-	#define LV_FONT_MONTSERRAT_14 1
-	#define LV_FONT_MONTSERRAT_16 1
-	#define LV_FONT_MONTSERRAT_20 1
-	#define LV_FONT_MONTSERRAT_24 1
-	#define LV_USE_FREETYPE 0
-	#define LV_USE_LIBPNG 0
-	#define LV_USE_LIBJPEG_TURBO 0
-	#endif
-	EOF
+	@cd /tmp/lvgl && \
+	echo "#ifndef LV_CONF_H" > lv_conf.h && \
+	echo "#define LV_CONF_H" >> lv_conf.h && \
+	echo "#define LV_COLOR_DEPTH 32" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_14 1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_16 1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_20 1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_24 1" >> lv_conf.h && \
+	echo "#define LV_USE_FREETYPE 0" >> lv_conf.h && \
+	echo "#define LV_USE_LIBPNG 0" >> lv_conf.h && \
+	echo "#define LV_USE_LIBJPEG_TURBO 0" >> lv_conf.h && \
+	echo "#endif" >> lv_conf.h
 	@echo "$(BLUE)[INFO]$(NC) [5/8] 配置CMake..."
 	@cd /tmp/lvgl && mkdir -p build && cd build && \
 	cmake .. \
@@ -267,19 +266,18 @@ install-lvgl9-auto:
 	@echo "$(BLUE)[INFO]$(NC) [3/8] 下载LVGL v9.1..."
 	@cd /tmp && rm -rf lvgl && git clone --depth 1 --branch release/v9.1 https://github.com/lvgl/lvgl.git
 	@echo "$(BLUE)[INFO]$(NC) [4/8] 创建配置文件..."
-	@cd /tmp/lvgl && cat > lv_conf.h << 'EOF'
-	#ifndef LV_CONF_H
-	#define LV_CONF_H
-	#define LV_COLOR_DEPTH 32
-	#define LV_FONT_MONTSERRAT_14 1
-	#define LV_FONT_MONTSERRAT_16 1
-	#define LV_FONT_MONTSERRAT_20 1
-	#define LV_FONT_MONTSERRAT_24 1
-	#define LV_USE_FREETYPE 0
-	#define LV_USE_LIBPNG 0
-	#define LV_USE_LIBJPEG_TURBO 0
-	#endif
-	EOF
+	@cd /tmp/lvgl && \
+	echo "#ifndef LV_CONF_H" > lv_conf.h && \
+	echo "#define LV_CONF_H" >> lv_conf.h && \
+	echo "#define LV_COLOR_DEPTH 32" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_14 1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_16 1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_20 1" >> lv_conf.h && \
+	echo "#define LV_FONT_MONTSERRAT_24 1" >> lv_conf.h && \
+	echo "#define LV_USE_FREETYPE 0" >> lv_conf.h && \
+	echo "#define LV_USE_LIBPNG 0" >> lv_conf.h && \
+	echo "#define LV_USE_LIBJPEG_TURBO 0" >> lv_conf.h && \
+	echo "#endif" >> lv_conf.h
 	@echo "$(BLUE)[INFO]$(NC) [5/8] 配置CMake..."
 	@cd /tmp/lvgl && mkdir -p build && cd build && \
 	cmake .. \
@@ -297,18 +295,16 @@ install-lvgl9-auto:
 	@cd /tmp/lvgl && sudo cp lvgl.h /usr/local/include/lvgl/
 	@cd /tmp/lvgl && sudo cp lv_conf.h /usr/local/include/
 	@echo "$(BLUE)[INFO]$(NC) [8/8] 创建pkg-config文件..."
-	@sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null << 'EOF'
-	prefix=/usr/local
-	exec_prefix=$${prefix}
-	libdir=$${exec_prefix}/lib
-	includedir=$${prefix}/include
-	
-	Name: LVGL
-	Description: Light and Versatile Graphics Library
-	Version: 9.1.0
-	Libs: -L$${libdir} -llvgl
-	Cflags: -I$${includedir}/lvgl -I$${includedir}
-	EOF
+	@echo "prefix=/usr/local" | sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "exec_prefix=\$${prefix}" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "libdir=\$${exec_prefix}/lib" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "includedir=\$${prefix}/include" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Name: LVGL" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Description: Light and Versatile Graphics Library" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Version: 9.1.0" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Libs: -L\$${libdir} -llvgl" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Cflags: -I\$${includedir}/lvgl -I\$${includedir}" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
 	@sudo ldconfig
 	@echo ""
 	@echo "$(CYAN)[VERIFY]$(NC) === 验证安装 ==="
