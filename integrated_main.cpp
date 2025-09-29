@@ -364,25 +364,25 @@ void drm_flush_region(int x1, int y1, int x2, int y2, const uint8_t* color_data)
 #endif
 }
 
-// 颜色定义 - 按照参考界面的配色方案
+// 颜色定义 - 优化后的柔和配色方案
 struct Color {
     uint8_t b, g, r, a;
     Color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha = 255)
         : b(blue), g(green), r(red), a(alpha) {}
 };
 
-// 工业界面配色
-const Color BG_MAIN(30, 30, 30);          // #1E1E1E 主背景
-const Color BG_PANEL(45, 45, 45);         // #2D2D2D 面板背景
-const Color ACCENT(255, 107, 53);         // #FF6B35 橙色强调
-const Color SUCCESS(76, 175, 80);         // #4CAF50 成功绿色
-const Color WARNING(255, 193, 7);         // #FFC107 警告黄色
-const Color ERROR(244, 67, 54);           // #F44336 错误红色
-const Color TEXT_PRIMARY(255, 255, 255);  // #FFFFFF 主要文字
-const Color TEXT_SECONDARY(176, 176, 176); // #B0B0B0 次要文字
-const Color BORDER(64, 64, 64);           // #404040 边框
-const Color MODBUS_BLUE(33, 150, 243);    // #2196F3 Modbus蓝色
-const Color JETSON_GREEN(118, 185, 0);    // #76B900 Jetson绿色
+// 优化后的工业界面配色 - 更柔和舒适的色调
+const Color BG_MAIN(35, 40, 45);          // #232833 深蓝灰色主背景
+const Color BG_PANEL(50, 55, 60);         // #32373C 面板背景
+const Color ACCENT(64, 158, 255);         // #409EFF 柔和蓝色强调
+const Color SUCCESS(103, 194, 58);        // #67C23A 温和绿色
+const Color WARNING(230, 162, 60);        // #E6A23C 温和橙色
+const Color ERROR(245, 108, 108);         // #F56C6C 柔和红色
+const Color TEXT_PRIMARY(245, 245, 245);  // #F5F5F5 柔和白色
+const Color TEXT_SECONDARY(144, 147, 153); // #909399 柔和灰色
+const Color BORDER(75, 80, 85);           // #4B5055 柔和边框
+const Color MODBUS_BLUE(64, 158, 255);    // #409EFF 统一蓝色
+const Color JETSON_GREEN(103, 194, 58);   // #67C23A 统一绿色
 
 // DRM/KMS优化的矩形填充
 void draw_filled_rect(int x, int y, int w, int h, const Color& color) {
@@ -571,17 +571,25 @@ void draw_professional_ui() {
     draw_filled_rect(20, 15, 300, 30, ACCENT);
     draw_text(25, 22, "BAMBOO AI CUTTING SYSTEM V2.1", TEXT_PRIMARY, 1);
     
-    // 工作流程状态指示器
+    // 工作流程状态指示器 - 更紧凑和优雅的设计
     int workflow_x = 400;
     int workflow_y = 20;
     const char* workflow_steps[] = {"FEED", "DETECT", "COORD", "PREPARE", "CUT"};
     for (int i = 0; i < 5; i++) {
-        int step_x = workflow_x + i * 120;
-        Color step_color = (i == 0) ? ACCENT : BORDER;
-        draw_filled_rect(step_x, workflow_y, 100, 20, step_color);
-        draw_rect_border(step_x, workflow_y, 100, 20, 1, step_color);
+        int step_x = workflow_x + i * 100; // 更紧凑的间距
+        Color step_color = (i == 0) ? ACCENT : Color(60, 65, 70); // 更柔和的未激活颜色
+        
+        // 添加圆角效果（通过绘制更小的矩形实现）
+        draw_filled_rect(step_x + 2, workflow_y + 2, 86, 16, step_color);
+        draw_rect_border(step_x + 1, workflow_y + 1, 88, 18, 1, step_color);
+        
         // 添加步骤文字
-        draw_text(step_x + 5, workflow_y + 6, workflow_steps[i], TEXT_PRIMARY, 1);
+        draw_text(step_x + 8, workflow_y + 6, workflow_steps[i], TEXT_PRIMARY, 1);
+        
+        // 添加连接线（除了最后一个）
+        if (i < 4) {
+            draw_filled_rect(step_x + 90, workflow_y + 8, 8, 4, Color(75, 80, 85));
+        }
     }
     
     // 心跳监控区域
