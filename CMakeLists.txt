@@ -378,48 +378,64 @@ message(STATUS "Python绑定已禁用 - 使用纯C++一体化架构")
 # LVGL配置 - 使用系统安装的LVGL
 # ================================
 
-# 查找系统安装的LVGL
-find_package(lvgl QUIET)
-if(lvgl_FOUND)
-    message(STATUS "Found system LVGL package: ${lvgl_VERSION}")
+# 查找系统安装的LVGL - 优先使用pkg-config
+pkg_check_modules(LVGL QUIET lvgl)
+if(LVGL_FOUND)
+    message(STATUS "Found LVGL via pkg-config: ${LVGL_VERSION}")
     set(ENABLE_LVGL ON)
+    include_directories(${LVGL_INCLUDE_DIRS})
+    link_directories(${LVGL_LIBRARY_DIRS})
+    
+    # 创建导入的目标
+    add_library(lvgl SHARED IMPORTED)
+    set_target_properties(lvgl PROPERTIES
+        IMPORTED_LOCATION "${LVGL_LIBRARY_DIRS}/liblvgl.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${LVGL_INCLUDE_DIRS}"
+    )
 else()
-    # 手动查找系统安装的LVGL
-    find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
-        PATHS
-            /usr/local/include
-            /usr/include
-            /opt/lvgl/include
-        NO_DEFAULT_PATH)
-    
-    find_library(LVGL_LIBRARY lvgl
-        PATHS
-            /usr/local/lib
-            /usr/lib
-            /usr/lib/aarch64-linux-gnu
-            /usr/lib/x86_64-linux-gnu
-            /opt/lvgl/lib
-        NO_DEFAULT_PATH)
-    
-    if(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
-        message(STATUS "Found system LVGL manually:")
-        message(STATUS "  Include: ${LVGL_INCLUDE_DIR}")
-        message(STATUS "  Library: ${LVGL_LIBRARY}")
+    # 回退到find_package
+    find_package(lvgl QUIET)
+    if(lvgl_FOUND)
+        message(STATUS "Found system LVGL package: ${lvgl_VERSION}")
         set(ENABLE_LVGL ON)
-        set(LVGL_FOUND TRUE)
-        
-        # 创建导入的目标
-        add_library(lvgl SHARED IMPORTED)
-        set_target_properties(lvgl PROPERTIES
-            IMPORTED_LOCATION ${LVGL_LIBRARY}
-            INTERFACE_INCLUDE_DIRECTORIES ${LVGL_INCLUDE_DIR}
-        )
-        
-        include_directories(${LVGL_INCLUDE_DIR})
     else()
-        message(WARNING "System LVGL not found - LVGL功能将被禁用")
-        set(ENABLE_LVGL OFF)
-        set(LVGL_FOUND FALSE)
+        # 手动查找系统安装的LVGL
+        find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
+            PATHS
+                /usr/local/include
+                /usr/include
+                /opt/lvgl/include
+            NO_DEFAULT_PATH)
+        
+        find_library(LVGL_LIBRARY lvgl
+            PATHS
+                /usr/local/lib
+                /usr/lib
+                /usr/lib/aarch64-linux-gnu
+                /usr/lib/x86_64-linux-gnu
+                /opt/lvgl/lib
+            NO_DEFAULT_PATH)
+        
+        if(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
+            message(STATUS "Found system LVGL manually:")
+            message(STATUS "  Include: ${LVGL_INCLUDE_DIR}")
+            message(STATUS "  Library: ${LVGL_LIBRARY}")
+            set(ENABLE_LVGL ON)
+            set(LVGL_FOUND TRUE)
+            
+            # 创建导入的目标
+            add_library(lvgl SHARED IMPORTED)
+            set_target_properties(lvgl PROPERTIES
+                IMPORTED_LOCATION ${LVGL_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES ${LVGL_INCLUDE_DIR}
+            )
+            
+            include_directories(${LVGL_INCLUDE_DIR})
+        else()
+            message(WARNING "System LVGL not found - LVGL功能将被禁用")
+            set(ENABLE_LVGL OFF)
+            set(LVGL_FOUND FALSE)
+        endif()
     endif()
 endif()
 
