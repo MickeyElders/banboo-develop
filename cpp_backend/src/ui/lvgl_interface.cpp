@@ -758,19 +758,25 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === Jetson System Monitoring Area ===
     lv_obj_t* jetson_section = lv_obj_create(control_panel_);
-    lv_obj_set_width(jetson_section, lv_pct(100));  // 只设置宽度，高度自适应
+    lv_obj_set_width(jetson_section, lv_pct(100));
     lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(jetson_section, 12, 0);
     lv_obj_set_style_border_width(jetson_section, 1, 0);
     lv_obj_set_style_border_color(jetson_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(jetson_section, 12, 0);
     lv_obj_clear_flag(jetson_section, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_grow(jetson_section, 1);  // 在 flex 中自动扩展
-    
+    lv_obj_set_flex_grow(jetson_section, 1);
+
+    // **关键修复：设置为垂直Flex布局**
+    lv_obj_set_flex_flow(jetson_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(jetson_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(jetson_section, 6, 0);  // 组件间距6px
+
     lv_obj_t* jetson_label = lv_label_create(jetson_section);
     lv_label_set_text(jetson_label, LV_SYMBOL_CHARGE " Jetson Orin Nano");
     lv_obj_set_style_text_color(jetson_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(jetson_label, &lv_font_montserrat_14, 0);
+    // 移除 lv_obj_align 调用
     
     // === CPU信息行容器 ===
     lv_obj_t* cpu_row = lv_obj_create(jetson_section);
