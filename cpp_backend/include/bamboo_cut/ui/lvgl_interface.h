@@ -229,12 +229,42 @@ private:
     } camera_widgets_;
     
     struct {
+        // Jetson系统监控组件
+        lv_obj_t* cpu_bar;
+        lv_obj_t* cpu_label;
+        lv_obj_t* gpu_bar;
+        lv_obj_t* gpu_label;
+        lv_obj_t* mem_bar;
+        lv_obj_t* mem_label;
+        
+        // AI模型监控组件
+        lv_obj_t* ai_fps_label;
+        lv_obj_t* ai_confidence_label;
+        lv_obj_t* ai_latency_label;
+        lv_obj_t* ai_model_label;
+        
+        // Modbus通信统计组件
+        lv_obj_t* modbus_connection_label;
+        lv_obj_t* modbus_packets_label;
+        lv_obj_t* modbus_errors_label;
+        lv_obj_t* modbus_heartbeat_label;
+        
+        // 原有组件
         lv_obj_t* modbus_table;
-        lv_obj_t* plc_status_table;
-        lv_obj_t* jetson_stats_table;
-        lv_obj_t* ai_stats_table;
         std::vector<lv_obj_t*> blade_buttons;
     } control_widgets_;
+    
+    struct {
+        // 12项系统指标标签
+        std::vector<lv_obj_t*> metric_labels;
+        
+        // 版本信息标签
+        lv_obj_t* jetpack_version;
+        lv_obj_t* cuda_version;
+        lv_obj_t* tensorrt_version;
+        lv_obj_t* opencv_version;
+        lv_obj_t* ubuntu_version;
+    } status_widgets_;
     
     struct {
         lv_obj_t* start_btn;

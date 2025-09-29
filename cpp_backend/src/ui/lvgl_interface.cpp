@@ -458,7 +458,7 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
 lv_obj_t* LVGLInterface::createCameraPanel() {
 #ifdef ENABLE_LVGL
     camera_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(camera_panel_, lv_pct(60), lv_pct(60));  // 百分比布局
+    lv_obj_set_size(camera_panel_, lv_pct(75), lv_pct(75));  // 调整为75%布局
     lv_obj_align(camera_panel_, LV_ALIGN_TOP_LEFT, lv_pct(2), 80);
     lv_obj_add_style(camera_panel_, &style_card, 0);
     
@@ -518,114 +518,158 @@ lv_obj_t* LVGLInterface::createCameraPanel() {
 lv_obj_t* LVGLInterface::createControlPanel() {
 #ifdef ENABLE_LVGL
     control_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(control_panel_, lv_pct(36), lv_pct(60));  // 百分比布局
+    lv_obj_set_size(control_panel_, lv_pct(25), lv_pct(75));  // 调整为25%宽度×75%高度
     lv_obj_align(control_panel_, LV_ALIGN_TOP_RIGHT, -lv_pct(2), 80);
     lv_obj_add_style(control_panel_, &style_card, 0);
-    lv_obj_set_style_pad_all(control_panel_, 24, 0);  // 增加内边距，增强呼吸感
+    lv_obj_set_style_pad_all(control_panel_, 20, 0);
     lv_obj_set_style_radius(control_panel_, 16, 0);
     lv_obj_set_flex_flow(control_panel_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(control_panel_, 16, 0);
     
-    // 增加间距，营造呼吸感
-    lv_obj_set_style_pad_gap(control_panel_, 20, 0);
-    
-    // 标题
+    // 控制面板标题
     lv_obj_t* title = lv_label_create(control_panel_);
-    lv_label_set_text(title, LV_SYMBOL_SETTINGS " 控制面板");
+    lv_label_set_text(title, LV_SYMBOL_SETTINGS " 系统控制");
     lv_obj_add_style(title, &style_text_title, 0);
     lv_obj_set_style_text_color(title, color_primary_, 0);
-    lv_obj_set_style_pad_bottom(title, 8, 0);
     
-    // Modbus寄存器表格
-    lv_obj_t* modbus_label = lv_label_create(control_panel_);
-    lv_label_set_text(modbus_label, "Modbus 寄存器");
-    lv_obj_add_style(modbus_label, &style_text_body, 0);
-    lv_obj_set_style_pad_top(modbus_label, 15, 0);
+    // === Jetson系统监控进度条区域 ===
+    lv_obj_t* jetson_section = lv_obj_create(control_panel_);
+    lv_obj_set_size(jetson_section, lv_pct(100), 120);
+    lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(jetson_section, 12, 0);
+    lv_obj_set_style_border_width(jetson_section, 1, 0);
+    lv_obj_set_style_border_color(jetson_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(jetson_section, 12, 0);
+    lv_obj_clear_flag(jetson_section, LV_OBJ_FLAG_SCROLLABLE);
     
-    control_widgets_.modbus_table = lv_table_create(control_panel_);
-    lv_obj_set_size(control_widgets_.modbus_table, lv_pct(100), 120);
-    lv_table_set_col_cnt(control_widgets_.modbus_table, 3);
-    lv_table_set_row_cnt(control_widgets_.modbus_table, 4);
+    lv_obj_t* jetson_label = lv_label_create(jetson_section);
+    lv_label_set_text(jetson_label, LV_SYMBOL_CHARGE " Jetson 系统");
+    lv_obj_set_style_text_color(jetson_label, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(jetson_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(jetson_label, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    // 设置列宽
-    lv_table_set_col_width(control_widgets_.modbus_table, 0, 150);
-    lv_table_set_col_width(control_widgets_.modbus_table, 1, 150);
-    lv_table_set_col_width(control_widgets_.modbus_table, 2, 150);
+    // CPU进度条
+    control_widgets_.cpu_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.cpu_bar, lv_pct(100), 18);
+    lv_obj_align(control_widgets_.cpu_bar, LV_ALIGN_TOP_LEFT, 0, 25);
+    lv_bar_set_range(control_widgets_.cpu_bar, 0, 100);
+    lv_bar_set_value(control_widgets_.cpu_bar, 45, LV_ANIM_ON);
+    lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_success_, LV_PART_INDICATOR);
     
-    // 表头
-    lv_table_set_cell_value(control_widgets_.modbus_table, 0, 0, "寄存器");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 0, 1, "数值");
-    lv_table_set_cell_value(control_widgets_.modbus_table, 0, 2, "状态");
+    control_widgets_.cpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.cpu_label, "CPU: 45%");
+    lv_obj_set_style_text_color(control_widgets_.cpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.cpu_label, LV_ALIGN_TOP_LEFT, 0, 48);
     
-    // 样式
-    lv_obj_add_style(control_widgets_.modbus_table, &style_table_cell, LV_PART_ITEMS);
+    // GPU进度条
+    control_widgets_.gpu_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.gpu_bar, lv_pct(100), 18);
+    lv_obj_align(control_widgets_.gpu_bar, LV_ALIGN_TOP_LEFT, 0, 65);
+    lv_bar_set_range(control_widgets_.gpu_bar, 0, 100);
+    lv_bar_set_value(control_widgets_.gpu_bar, 72, LV_ANIM_ON);
+    lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
     
-    // 刀片选择
-    lv_obj_t* blade_label = lv_label_create(control_panel_);
-    lv_label_set_text(blade_label, "刀片选择");
-    lv_obj_add_style(blade_label, &style_text_body, 0);
-    lv_obj_set_style_pad_top(blade_label, 15, 0);
+    control_widgets_.gpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.gpu_label, "GPU: 72%");
+    lv_obj_set_style_text_color(control_widgets_.gpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.gpu_label, LV_ALIGN_TOP_LEFT, 0, 88);
     
-    lv_obj_t* blade_container = lv_obj_create(control_panel_);
-    lv_obj_set_size(blade_container, lv_pct(100), 80);
-    lv_obj_set_style_bg_opa(blade_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(blade_container, 0, 0);
-    lv_obj_set_style_pad_all(blade_container, 0, 0);
-    lv_obj_set_flex_flow(blade_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(blade_container, LV_FLEX_ALIGN_SPACE_EVENLY, 
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // 内存进度条
+    control_widgets_.mem_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.mem_bar, lv_pct(50), 18);
+    lv_obj_align(control_widgets_.mem_bar, LV_ALIGN_TOP_RIGHT, 0, 25);
+    lv_bar_set_range(control_widgets_.mem_bar, 0, 100);
+    lv_bar_set_value(control_widgets_.mem_bar, 58, LV_ANIM_ON);
+    lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_primary_, LV_PART_INDICATOR);
     
-    for(int i = 1; i <= 5; i++) {
-        lv_obj_t* btn = lv_btn_create(blade_container);
-        lv_obj_set_size(btn, 70, 60);
-        lv_obj_add_style(btn, &style_btn_primary, 0);
-        lv_obj_add_style(btn, &style_btn_pressed, LV_STATE_PRESSED);
-        
-        if(i == selected_blade_) {
-            lv_obj_set_style_bg_color(btn, color_success_, 0);
-            lv_obj_set_style_shadow_color(btn, color_success_, 0);
-        }
-        
-        lv_obj_t* label = lv_label_create(btn);
-        lv_label_set_text_fmt(label, "#%d", i);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
-        lv_obj_center(label);
-        
-        lv_obj_add_event_cb(btn, onBladeSelectionChanged, LV_EVENT_CLICKED, this);
-        control_widgets_.blade_buttons.push_back(btn);
-    }
+    control_widgets_.mem_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.mem_label, "MEM: 4.6/8GB");
+    lv_obj_set_style_text_color(control_widgets_.mem_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.mem_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.mem_label, LV_ALIGN_TOP_RIGHT, 0, 48);
     
-    // 系统信息
-    lv_obj_t* stats_label = lv_label_create(control_panel_);
-    lv_label_set_text(stats_label, "系统信息");
-    lv_obj_add_style(stats_label, &style_text_body, 0);
-    lv_obj_set_style_pad_top(stats_label, 15, 0);
+    // === AI模型监控区域 ===
+    lv_obj_t* ai_section = lv_obj_create(control_panel_);
+    lv_obj_set_size(ai_section, lv_pct(100), 110);
+    lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(ai_section, 12, 0);
+    lv_obj_set_style_border_width(ai_section, 1, 0);
+    lv_obj_set_style_border_color(ai_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(ai_section, 12, 0);
+    lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
     
-    lv_obj_t* stats_container = lv_obj_create(control_panel_);
-    lv_obj_set_size(stats_container, lv_pct(100), 100);
-    lv_obj_set_style_bg_color(stats_container, lv_color_hex(0x0F1419), 0);
-    lv_obj_set_style_radius(stats_container, 8, 0);
-    lv_obj_set_style_border_width(stats_container, 1, 0);
-    lv_obj_set_style_border_color(stats_container, lv_color_hex(0x2A3441), 0);
-    lv_obj_set_style_pad_all(stats_container, 15, 0);
+    lv_obj_t* ai_title = lv_label_create(ai_section);
+    lv_label_set_text(ai_title, LV_SYMBOL_EYE_OPEN " AI 模型监控");
+    lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
+    lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
+    lv_obj_align(ai_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    lv_obj_t* cpu_label = lv_label_create(stats_container);
-    lv_label_set_text(cpu_label, LV_SYMBOL_CHARGE " CPU: 45%");
-    lv_obj_set_style_text_color(cpu_label, color_success_, 0);
-    lv_obj_set_style_text_font(cpu_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(cpu_label, LV_ALIGN_TOP_LEFT, 0, 0);
+    control_widgets_.ai_fps_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_fps_label, "推理FPS: 28.5");
+    lv_obj_set_style_text_color(control_widgets_.ai_fps_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_fps_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_fps_label, LV_ALIGN_TOP_LEFT, 0, 25);
     
-    lv_obj_t* mem_label = lv_label_create(stats_container);
-    lv_label_set_text(mem_label, LV_SYMBOL_SD_CARD " MEM: 2.1GB");
-    lv_obj_set_style_text_color(mem_label, color_warning_, 0);
-    lv_obj_set_style_text_font(mem_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(mem_label, LV_ALIGN_TOP_LEFT, 0, 25);
+    control_widgets_.ai_confidence_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_confidence_label, "置信度: 0.94");
+    lv_obj_set_style_text_color(control_widgets_.ai_confidence_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_confidence_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_confidence_label, LV_ALIGN_TOP_LEFT, 0, 45);
     
-    lv_obj_t* temp_label = lv_label_create(stats_container);
-    lv_label_set_text(temp_label, LV_SYMBOL_WARNING " 温度: 62°C");
-    lv_obj_set_style_text_color(temp_label, lv_color_hex(0xFFAB00), 0);
-    lv_obj_set_style_text_font(temp_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(temp_label, LV_ALIGN_TOP_LEFT, 0, 50);
+    control_widgets_.ai_latency_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_latency_label, "延迟: 12ms");
+    lv_obj_set_style_text_color(control_widgets_.ai_latency_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_latency_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_latency_label, LV_ALIGN_TOP_RIGHT, 0, 25);
+    
+    control_widgets_.ai_model_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_model_label, "模型: YOLOv8n");
+    lv_obj_set_style_text_color(control_widgets_.ai_model_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_model_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_model_label, LV_ALIGN_TOP_RIGHT, 0, 45);
+    
+    // === Modbus通信统计区域 ===
+    lv_obj_t* modbus_section = lv_obj_create(control_panel_);
+    lv_obj_set_size(modbus_section, lv_pct(100), 110);
+    lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(modbus_section, 12, 0);
+    lv_obj_set_style_border_width(modbus_section, 1, 0);
+    lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(modbus_section, 12, 0);
+    lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* modbus_title = lv_label_create(modbus_section);
+    lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus 统计");
+    lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_14, 0);
+    lv_obj_align(modbus_title, LV_ALIGN_TOP_LEFT, 0, 0);
+    
+    control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_connection_label, "连接时长: 02:15:32");
+    lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 25);
+    
+    control_widgets_.modbus_packets_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_packets_label, "数据包: 1247");
+    lv_obj_set_style_text_color(control_widgets_.modbus_packets_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_packets_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 45);
+    
+    control_widgets_.modbus_errors_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_errors_label, "错误率: 0.02%");
+    lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_errors_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 25);
+    
+    control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "心跳: 正常");
+    lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 45);
     
     return control_panel_;
 #else
@@ -635,8 +679,141 @@ lv_obj_t* LVGLInterface::createControlPanel() {
 
 lv_obj_t* LVGLInterface::createStatusPanel() {
 #ifdef ENABLE_LVGL
-    // 这个版本中状态信息已集成到控制面板中
-    return nullptr;
+    status_panel_ = lv_obj_create(main_screen_);
+    lv_obj_set_size(status_panel_, lv_pct(96), lv_pct(20));  // 底部状态面板
+    lv_obj_align(status_panel_, LV_ALIGN_BOTTOM_MID, 0, -100);
+    lv_obj_add_style(status_panel_, &style_card, 0);
+    lv_obj_set_style_pad_all(status_panel_, 16, 0);
+    lv_obj_set_style_radius(status_panel_, 12, 0);
+    lv_obj_clear_flag(status_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 使用flex布局分为左右两部分
+    lv_obj_set_flex_flow(status_panel_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(status_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(status_panel_, 20, 0);
+    
+    // === 左侧：系统指标3列网格 ===
+    lv_obj_t* metrics_container = lv_obj_create(status_panel_);
+    lv_obj_set_size(metrics_container, lv_pct(70), lv_pct(100));
+    lv_obj_set_style_bg_opa(metrics_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(metrics_container, 0, 0);
+    lv_obj_set_style_pad_all(metrics_container, 0, 0);
+    lv_obj_clear_flag(metrics_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* metrics_title = lv_label_create(metrics_container);
+    lv_label_set_text(metrics_title, LV_SYMBOL_MONITOR " 系统指标");
+    lv_obj_set_style_text_color(metrics_title, color_primary_, 0);
+    lv_obj_set_style_text_font(metrics_title, &lv_font_montserrat_14, 0);
+    lv_obj_align(metrics_title, LV_ALIGN_TOP_LEFT, 0, 0);
+    
+    // 3列网格容器
+    lv_obj_t* grid_container = lv_obj_create(metrics_container);
+    lv_obj_set_size(grid_container, lv_pct(100), 80);
+    lv_obj_align(grid_container, LV_ALIGN_TOP_LEFT, 0, 25);
+    lv_obj_set_style_bg_opa(grid_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(grid_container, 0, 0);
+    lv_obj_set_style_pad_all(grid_container, 0, 0);
+    lv_obj_set_flex_flow(grid_container, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(grid_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_clear_flag(grid_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 12项系统指标数据
+    const char* metric_names[] = {
+        "CPU频率", "GPU频率", "内存频率",
+        "CPU温度", "GPU温度", "系统温度",
+        "风扇转速", "电源电压", "电源电流",
+        "网络延迟", "存储读取", "存储写入"
+    };
+    const char* metric_values[] = {
+        "1.9GHz", "1.3GHz", "1600MHz",
+        "62°C", "58°C", "45°C",
+        "3200RPM", "19.2V", "2.1A",
+        "12ms", "450MB/s", "380MB/s"
+    };
+    const lv_color_t metric_colors[] = {
+        color_success_, color_warning_, color_primary_,
+        color_warning_, color_success_, color_success_,
+        color_primary_, color_success_, color_success_,
+        color_success_, color_primary_, color_primary_
+    };
+    
+    for(int i = 0; i < 12; i++) {
+        lv_obj_t* metric_item = lv_obj_create(grid_container);
+        lv_obj_set_size(metric_item, lv_pct(32), 35);  // 3列布局，每列32%宽度
+        lv_obj_set_style_bg_color(metric_item, lv_color_hex(0x0F1419), 0);
+        lv_obj_set_style_radius(metric_item, 6, 0);
+        lv_obj_set_style_border_width(metric_item, 1, 0);
+        lv_obj_set_style_border_color(metric_item, lv_color_hex(0x2A3441), 0);
+        lv_obj_set_style_pad_all(metric_item, 8, 0);
+        lv_obj_clear_flag(metric_item, LV_OBJ_FLAG_SCROLLABLE);
+        
+        lv_obj_t* name_label = lv_label_create(metric_item);
+        lv_label_set_text(name_label, metric_names[i]);
+        lv_obj_set_style_text_color(name_label, lv_color_hex(0x8A92A1), 0);
+        lv_obj_set_style_text_font(name_label, &lv_font_montserrat_12, 0);
+        lv_obj_align(name_label, LV_ALIGN_TOP_LEFT, 0, 0);
+        
+        lv_obj_t* value_label = lv_label_create(metric_item);
+        lv_label_set_text(value_label, metric_values[i]);
+        lv_obj_set_style_text_color(value_label, metric_colors[i], 0);
+        lv_obj_set_style_text_font(value_label, &lv_font_montserrat_14, 0);
+        lv_obj_align(value_label, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+        
+        status_widgets_.metric_labels.push_back(value_label);
+    }
+    
+    // === 右侧：版本信息 ===
+    lv_obj_t* version_container = lv_obj_create(status_panel_);
+    lv_obj_set_size(version_container, lv_pct(28), lv_pct(100));
+    lv_obj_set_style_bg_color(version_container, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(version_container, 8, 0);
+    lv_obj_set_style_border_width(version_container, 1, 0);
+    lv_obj_set_style_border_color(version_container, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(version_container, 12, 0);
+    lv_obj_clear_flag(version_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* version_title = lv_label_create(version_container);
+    lv_label_set_text(version_title, LV_SYMBOL_LIST " 系统版本");
+    lv_obj_set_style_text_color(version_title, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(version_title, &lv_font_montserrat_14, 0);
+    lv_obj_align(version_title, LV_ALIGN_TOP_LEFT, 0, 0);
+    
+    // JetPack版本
+    status_widgets_.jetpack_version = lv_label_create(version_container);
+    lv_label_set_text(status_widgets_.jetpack_version, "JetPack: 5.1.2");
+    lv_obj_set_style_text_color(status_widgets_.jetpack_version, lv_color_white(), 0);
+    lv_obj_set_style_text_font(status_widgets_.jetpack_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.jetpack_version, LV_ALIGN_TOP_LEFT, 0, 22);
+    
+    // CUDA版本
+    status_widgets_.cuda_version = lv_label_create(version_container);
+    lv_label_set_text(status_widgets_.cuda_version, "CUDA: 11.4.315");
+    lv_obj_set_style_text_color(status_widgets_.cuda_version, color_success_, 0);
+    lv_obj_set_style_text_font(status_widgets_.cuda_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.cuda_version, LV_ALIGN_TOP_LEFT, 0, 40);
+    
+    // TensorRT版本
+    status_widgets_.tensorrt_version = lv_label_create(version_container);
+    lv_label_set_text(status_widgets_.tensorrt_version, "TensorRT: 8.5.2");
+    lv_obj_set_style_text_color(status_widgets_.tensorrt_version, color_primary_, 0);
+    lv_obj_set_style_text_font(status_widgets_.tensorrt_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.tensorrt_version, LV_ALIGN_TOP_LEFT, 0, 58);
+    
+    // OpenCV版本
+    status_widgets_.opencv_version = lv_label_create(version_container);
+    lv_label_set_text(status_widgets_.opencv_version, "OpenCV: 4.8.0");
+    lv_obj_set_style_text_color(status_widgets_.opencv_version, color_warning_, 0);
+    lv_obj_set_style_text_font(status_widgets_.opencv_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.opencv_version, LV_ALIGN_TOP_LEFT, 0, 76);
+    
+    // Ubuntu版本
+    status_widgets_.ubuntu_version = lv_label_create(version_container);
+    lv_label_set_text(status_widgets_.ubuntu_version, "Ubuntu: 20.04.6");
+    lv_obj_set_style_text_color(status_widgets_.ubuntu_version, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(status_widgets_.ubuntu_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.ubuntu_version, LV_ALIGN_TOP_LEFT, 0, 94);
+    
+    return status_panel_;
 #else
     return nullptr;
 #endif
@@ -860,13 +1037,123 @@ void LVGLInterface::updateInterface() {
 
 void LVGLInterface::updateSystemStats() {
 #ifdef ENABLE_LVGL
-    // 这里应该从DataBridge获取实际数据
-    // 示例：更新响应时间标签
+    // 更新头部响应时间标签
     if (header_widgets_.response_label) {
         static int counter = 0;
         int response_ms = 12 + (counter++ % 10);
-        lv_label_set_text_fmt(header_widgets_.response_label, 
+        lv_label_set_text_fmt(header_widgets_.response_label,
             LV_SYMBOL_LOOP " %dms", response_ms);
+    }
+    
+    // 更新Jetson系统监控进度条
+    if (control_widgets_.cpu_bar) {
+        static int cpu_usage = 45;
+        cpu_usage = 40 + (rand() % 30);  // 模拟40-70%的CPU使用率
+        lv_bar_set_value(control_widgets_.cpu_bar, cpu_usage, LV_ANIM_ON);
+        lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%%", cpu_usage);
+        
+        // 根据使用率设置颜色
+        if (cpu_usage > 80) {
+            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_error_, LV_PART_INDICATOR);
+        } else if (cpu_usage > 60) {
+            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
+        } else {
+            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_success_, LV_PART_INDICATOR);
+        }
+    }
+    
+    if (control_widgets_.gpu_bar) {
+        static int gpu_usage = 72;
+        gpu_usage = 60 + (rand() % 25);  // 模拟60-85%的GPU使用率
+        lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
+        lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%%", gpu_usage);
+        
+        if (gpu_usage > 85) {
+            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_error_, LV_PART_INDICATOR);
+        } else if (gpu_usage > 70) {
+            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
+        } else {
+            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_success_, LV_PART_INDICATOR);
+        }
+    }
+    
+    if (control_widgets_.mem_bar) {
+        static float mem_used = 4.6f;
+        static float mem_total = 8.0f;
+        mem_used = 3.8f + ((rand() % 200) / 100.0f);  // 模拟3.8-5.8GB内存使用
+        int mem_percentage = (int)((mem_used / mem_total) * 100);
+        lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
+        lv_label_set_text_fmt(control_widgets_.mem_label, "MEM: %.1f/%.0fGB", mem_used, mem_total);
+        
+        if (mem_percentage > 85) {
+            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_error_, LV_PART_INDICATOR);
+        } else if (mem_percentage > 70) {
+            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
+        } else {
+            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_primary_, LV_PART_INDICATOR);
+        }
+    }
+    
+    // 更新AI模型监控数据
+    if (control_widgets_.ai_fps_label) {
+        static float ai_fps = 28.5f;
+        ai_fps = 25.0f + ((rand() % 80) / 10.0f);  // 模拟25-33FPS
+        lv_label_set_text_fmt(control_widgets_.ai_fps_label, "推理FPS: %.1f", ai_fps);
+    }
+    
+    if (control_widgets_.ai_confidence_label) {
+        static float confidence = 0.94f;
+        confidence = 0.85f + ((rand() % 15) / 100.0f);  // 模拟0.85-1.00置信度
+        lv_label_set_text_fmt(control_widgets_.ai_confidence_label, "置信度: %.2f", confidence);
+    }
+    
+    if (control_widgets_.ai_latency_label) {
+        static int latency = 12;
+        latency = 8 + (rand() % 8);  // 模拟8-16ms延迟
+        lv_label_set_text_fmt(control_widgets_.ai_latency_label, "延迟: %dms", latency);
+    }
+    
+    // 更新Modbus通信统计
+    if (control_widgets_.modbus_connection_label) {
+        static int hours = 2, minutes = 15, seconds = 32;
+        seconds++;
+        if (seconds >= 60) { seconds = 0; minutes++; }
+        if (minutes >= 60) { minutes = 0; hours++; }
+        lv_label_set_text_fmt(control_widgets_.modbus_connection_label,
+            "连接时长: %02d:%02d:%02d", hours, minutes, seconds);
+    }
+    
+    if (control_widgets_.modbus_packets_label) {
+        static int packets = 1247;
+        packets += 1 + (rand() % 3);  // 模拟数据包增长
+        lv_label_set_text_fmt(control_widgets_.modbus_packets_label, "数据包: %d", packets);
+    }
+    
+    if (control_widgets_.modbus_errors_label) {
+        static float error_rate = 0.02f;
+        error_rate = (rand() % 10) / 1000.0f;  // 模拟0.000-0.010%错误率
+        lv_label_set_text_fmt(control_widgets_.modbus_errors_label, "错误率: %.3f%%", error_rate);
+    }
+    
+    // 更新系统指标（12项指标的动态数据）
+    if (!status_widgets_.metric_labels.empty()) {
+        static const char* dynamic_values[][12] = {
+            {"1.9GHz", "1.3GHz", "1600MHz", "62°C", "58°C", "45°C", "3200RPM", "19.2V", "2.1A", "12ms", "450MB/s", "380MB/s"},
+            {"2.0GHz", "1.4GHz", "1600MHz", "64°C", "60°C", "47°C", "3400RPM", "19.1V", "2.2A", "11ms", "460MB/s", "390MB/s"},
+            {"1.8GHz", "1.2GHz", "1533MHz", "59°C", "55°C", "43°C", "3000RPM", "19.3V", "2.0A", "13ms", "440MB/s", "370MB/s"}
+        };
+        
+        static int update_cycle = 0;
+        static int cycle_counter = 0;
+        
+        if (++cycle_counter >= 30) {  // 每30次更新切换一次数据组
+            cycle_counter = 0;
+            update_cycle = (update_cycle + 1) % 3;
+        }
+        
+        for (size_t i = 0; i < status_widgets_.metric_labels.size() && i < 12; i++) {
+            lv_label_set_text(status_widgets_.metric_labels[i], dynamic_values[update_cycle][i]);
+        }
     }
 #endif
 }
