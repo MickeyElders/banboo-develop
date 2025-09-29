@@ -273,30 +273,75 @@ install-lvgl9: build-lvgl-from-source
 
 # 自动检查和安装LVGL v9（编译前自动执行）
 install-lvgl9-auto:
-	@echo "$(CYAN)[AUTO-INSTALL]$(NC) 检查LVGL v9安装状态..."
-	@echo "$(BLUE)[INFO]$(NC) 清理可能的旧版本LVGL..."
-	@sudo apt-get remove -y liblvgl-dev 2>/dev/null || true
-	@sudo rm -rf /usr/include/lvgl 2>/dev/null || true
-	@sudo rm -rf /usr/lib/*/liblvgl* 2>/dev/null || true
+	@echo "$(CYAN)[AUTO-INSTALL]$(NC) === 完全手动安装LVGL v9 ==="
+	@echo "$(BLUE)[INFO]$(NC) [1/8] 清理旧文件..."
 	@sudo rm -rf /usr/local/include/lvgl 2>/dev/null || true
 	@sudo rm -rf /usr/local/lib/liblvgl* 2>/dev/null || true
 	@sudo rm -rf /usr/local/lib/pkgconfig/lvgl.pc 2>/dev/null || true
+	@sudo rm -rf /tmp/lvgl 2>/dev/null || true
 	@sudo ldconfig 2>/dev/null || true
-	@LVGL_VERSION=$$(pkg-config --modversion lvgl 2>/dev/null || echo "not_found"); \
-	if [ "$$LVGL_VERSION" = "not_found" ] || [ "$$(echo $$LVGL_VERSION | cut -d. -f1)" != "9" ]; then \
-		echo "$(BLUE)[INFO]$(NC) LVGL v9未找到，开始强制安装LVGL v9.3..."; \
-		$(MAKE) build-lvgl-from-source; \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3强制安装完成"; \
-	else \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9已安装 (版本: $$LVGL_VERSION)，跳过安装"; \
-	fi
-	@echo "$(CYAN)[VERIFY]$(NC) 验证LVGL v9安装..."
-	@if pkg-config --exists lvgl && [ "$$(pkg-config --modversion lvgl | cut -d. -f1)" = "9" ]; then \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9验证通过"; \
-	else \
-		echo "$(RED)[ERROR]$(NC) LVGL v9安装验证失败"; \
-		exit 1; \
-	fi
+	@echo "$(BLUE)[INFO]$(NC) [2/8] 安装依赖..."
+	@sudo apt-get update -qq
+	@sudo apt-get install -y git cmake build-essential
+	@echo "$(BLUE)[INFO]$(NC) [3/8] 下载LVGL v9.1..."
+	@cd /tmp && rm -rf lvgl && git clone --depth 1 --branch release/v9.1 https://github.com/lvgl/lvgl.git
+	@echo "$(BLUE)[INFO]$(NC) [4/8] 创建配置文件..."
+	@cd /tmp/lvgl && cat > lv_conf.h << 'EOF'
+	#ifndef LV_CONF_H
+	#define LV_CONF_H
+	#define LV_COLOR_DEPTH 32
+	#define LV_FONT_MONTSERRAT_14 1
+	#define LV_FONT_MONTSERRAT_16 1
+	#define LV_FONT_MONTSERRAT_20 1
+	#define LV_FONT_MONTSERRAT_24 1
+	#define LV_USE_FREETYPE 0
+	#define LV_USE_LIBPNG 0
+	#define LV_USE_LIBJPEG_TURBO 0
+	#endif
+	EOF
+	@echo "$(BLUE)[INFO]$(NC) [5/8] 配置CMake..."
+	@cd /tmp/lvgl && mkdir -p build && cd build && \
+	cmake .. \
+		-DCMAKE_INSTALL_PREFIX=/usr/local \
+		-DLV_CONF_PATH=../lv_conf.h \
+		-DBUILD_SHARED_LIBS=ON \
+		-DLV_USE_FREETYPE=OFF
+	@echo "$(BLUE)[INFO]$(NC) [6/8] 编译LVGL..."
+	@cd /tmp/lvgl/build && make -j4
+	@echo "$(BLUE)[INFO]$(NC) [7/8] 安装文件..."
+	@cd /tmp/lvgl/build && sudo make install
+	@echo "$(BLUE)[INFO]$(NC) 手动确保头文件安装..."
+	@sudo mkdir -p /usr/local/include/lvgl
+	@cd /tmp/lvgl && sudo cp -r src/* /usr/local/include/lvgl/
+	@cd /tmp/lvgl && sudo cp lvgl.h /usr/local/include/lvgl/
+	@cd /tmp/lvgl && sudo cp lv_conf.h /usr/local/include/
+	@echo "$(BLUE)[INFO]$(NC) [8/8] 创建pkg-config文件..."
+	@sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null << 'EOF'
+	prefix=/usr/local
+	exec_prefix=$${prefix}
+	libdir=$${exec_prefix}/lib
+	includedir=$${prefix}/include
+	
+	Name: LVGL
+	Description: Light and Versatile Graphics Library
+	Version: 9.1.0
+	Libs: -L$${libdir} -llvgl
+	Cflags: -I$${includedir}/lvgl -I$${includedir}
+	EOF
+	@sudo ldconfig
+	@echo ""
+	@echo "$(CYAN)[VERIFY]$(NC) === 验证安装 ==="
+	@echo -n "$(BLUE)[INFO]$(NC) 头文件: "
+	@ls /usr/local/include/lvgl/lvgl.h >/dev/null 2>&1 && echo "$(GREEN)✓$(NC)" || (echo "$(RED)✗ 失败$(NC)" && exit 1)
+	@echo -n "$(BLUE)[INFO]$(NC) 库文件: "
+	@ls /usr/local/lib/liblvgl.so* >/dev/null 2>&1 && echo "$(GREEN)✓$(NC)" || (echo "$(RED)✗ 失败$(NC)" && exit 1)
+	@echo -n "$(BLUE)[INFO]$(NC) pkg-config: "
+	@PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --exists lvgl && echo "$(GREEN)✓$(NC)" || (echo "$(RED)✗ 失败$(NC)" && exit 1)
+	@echo -n "$(BLUE)[INFO]$(NC) v9 API: "
+	@grep -q "lv_display_create" /usr/local/include/lvgl/lvgl.h && echo "$(GREEN)✓$(NC)" || (echo "$(RED)✗ 失败$(NC)" && exit 1)
+	@echo ""
+	@echo "$(GREEN)[SUCCESS]$(NC) === LVGL v9.1安装完成 ==="
+	@rm -rf /tmp/lvgl
 
 # === C++系统构建 ===
 build-system:
