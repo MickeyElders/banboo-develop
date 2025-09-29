@@ -151,7 +151,12 @@ install-system-deps:
 		libjson-c-dev \
 		libsystemd-dev \
 		libsdl2-dev \
-		libfreetype6-dev
+		libfreetype6-dev \
+		libpng-dev \
+		libjpeg-dev \
+		libfontconfig1-dev \
+		libharfbuzz-dev \
+		libdrm-dev
 	@if lspci | grep -i nvidia >/dev/null 2>&1; then \
 		echo "$(BLUE)[INFO]$(NC) 检测到NVIDIA GPU，检查CUDA环境..."; \
 		if [ -d "/usr/local/cuda" ]; then \
