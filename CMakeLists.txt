@@ -375,38 +375,49 @@ set(ENABLE_PYTHON OFF)
 message(STATUS "Python绑定已禁用 - 使用纯C++一体化架构")
 
 # ================================
-# LVGL配置
+# LVGL配置 - 使用FetchContent自动下载
 # ================================
-set(LVGL_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/lvgl)
 
-# 收集LVGL源文件
-if(EXISTS ${LVGL_DIR})
-    file(GLOB_RECURSE LVGL_SOURCES
-        ${LVGL_DIR}/src/*.c
-        ${LVGL_DIR}/src/*.h
-    )
-    
-    # 排除examples和demos目录
-    list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*/examples/.*")
-    list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*/demos/.*")
-    
-    # 创建LVGL库
-    add_library(lvgl STATIC ${LVGL_SOURCES})
-    
-    # LVGL头文件目录
-    target_include_directories(lvgl PUBLIC
-        ${LVGL_DIR}
-        ${LVGL_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-    
-    # 编译定义
-    target_compile_definitions(lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE=1)
-    
+# 使用FetchContent下载LVGL
+FetchContent_Declare(
+    lvgl
+    GIT_REPOSITORY https://github.com/lvgl/lvgl.git
+    GIT_TAG        release/v8.3
+)
+
+# 设置LVGL配置选项
+set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "Path to lv_conf.h")
+
+# 获取LVGL源码
+FetchContent_MakeAvailable(lvgl)
+
+# 检查LVGL是否成功获取
+FetchContent_GetProperties(lvgl)
+if(lvgl_POPULATED)
     set(ENABLE_LVGL ON)
-    message(STATUS "LVGL configured from: ${LVGL_DIR}")
+    message(STATUS "LVGL successfully fetched and configured")
+    
+    # 确保LVGL目标存在
+    if(TARGET lvgl)
+        # 添加LVGL包含目录
+        target_include_directories(lvgl PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+        
+        # 添加编译定义
+        target_compile_definitions(lvgl PUBLIC
+            LV_CONF_INCLUDE_SIMPLE=1
+            LV_USE_LINUX_DRM=1
+            LV_USE_EVDEV=1
+        )
+        
+        message(STATUS "LVGL target configured successfully")
+    else()
+        message(WARNING "LVGL target not found, creating fallback")
+        set(ENABLE_LVGL OFF)
+    endif()
 else()
-    message(WARNING "LVGL not found at ${LVGL_DIR} - 将在构建时自动下载")
+    message(WARNING "Failed to fetch LVGL, disabling LVGL support")
     set(ENABLE_LVGL OFF)
 endif()
 
@@ -550,10 +561,9 @@ endforeach()
 # ================================
 # 主程序 - 一体化可执行文件
 # ================================
-add_executable(bamboo_integrated 
+add_executable(bamboo_integrated
     integrated_main.cpp
     ${VALID_SOURCES}
-    ${LVGL_SOURCES}
 )
 
 # 编译定义
@@ -611,8 +621,11 @@ if(ENABLE_DRM)
 endif()
 
 # LVGL库
-if(ENABLE_LVGL)
+if(ENABLE_LVGL AND TARGET lvgl)
     target_link_libraries(bamboo_integrated lvgl)
+    message(STATUS "Linking LVGL library to bamboo_integrated")
+else()
+    message(WARNING "LVGL not available for linking")
 endif()
 
 
