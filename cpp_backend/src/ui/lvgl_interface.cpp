@@ -862,74 +862,102 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_border_width(separator2, 0, 0);
     lv_obj_clear_flag(separator2, LV_OBJ_FLAG_SCROLLABLE);
     
-    // === 摄像头系统状态 ===
+    // === 摄像头系统状态 - 使用Flex布局实现2列5行效果 ===
     lv_obj_t* camera_status_title = lv_label_create(ai_section);
     lv_label_set_text(camera_status_title, LV_SYMBOL_EYE_OPEN " 摄像头状态：");
     lv_obj_set_style_text_color(camera_status_title, color_primary_, 0);
     lv_obj_set_style_text_font(camera_status_title, &lv_font_montserrat_12, 0);
     lv_obj_set_pos(camera_status_title, 0, 215);
     
-    // === 摄像头-1状态 ===
-    control_widgets_.camera1_status_label = lv_label_create(ai_section);
+    // 摄像头状态容器 - 双摄像头并排显示
+    lv_obj_t* camera_container = lv_obj_create(ai_section);
+    lv_obj_set_size(camera_container, lv_pct(100), 80);
+    lv_obj_set_pos(camera_container, 0, 235);
+    lv_obj_set_style_bg_opa(camera_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(camera_container, 0, 0);
+    lv_obj_set_style_pad_all(camera_container, 0, 0);
+    lv_obj_clear_flag(camera_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置为Flex行布局，左右分布
+    lv_obj_set_flex_flow(camera_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(camera_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(camera_container, 10, 0);
+    
+    // === 摄像头-1信息列 ===
+    lv_obj_t* camera1_column = lv_obj_create(camera_container);
+    lv_obj_set_size(camera1_column, lv_pct(48), lv_pct(100));
+    lv_obj_set_style_bg_opa(camera1_column, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(camera1_column, 0, 0);
+    lv_obj_set_style_pad_all(camera1_column, 0, 0);
+    lv_obj_clear_flag(camera1_column, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置为Flex垂直布局
+    lv_obj_set_flex_flow(camera1_column, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(camera1_column, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(camera1_column, 2, 0);
+    
+    control_widgets_.camera1_status_label = lv_label_create(camera1_column);
     lv_label_set_text(control_widgets_.camera1_status_label, "摄像头-1：在线 ✓");
     lv_obj_set_style_text_color(control_widgets_.camera1_status_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_status_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.camera1_status_label, 0, 235);
     
-    control_widgets_.camera1_fps_label = lv_label_create(ai_section);
+    control_widgets_.camera1_fps_label = lv_label_create(camera1_column);
     lv_label_set_text(control_widgets_.camera1_fps_label, "  帧率：30 FPS");
     lv_obj_set_style_text_color(control_widgets_.camera1_fps_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_fps_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.camera1_fps_label, 0, 250);
     
-    control_widgets_.camera1_resolution_label = lv_label_create(ai_section);
+    control_widgets_.camera1_resolution_label = lv_label_create(camera1_column);
     lv_label_set_text(control_widgets_.camera1_resolution_label, "  分辨率：1920x1080");
     lv_obj_set_style_text_color(control_widgets_.camera1_resolution_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_resolution_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.camera1_resolution_label, 0, 265);
     
-    control_widgets_.camera1_exposure_label = lv_label_create(ai_section);
+    control_widgets_.camera1_exposure_label = lv_label_create(camera1_column);
     lv_label_set_text(control_widgets_.camera1_exposure_label, "  曝光：自动");
     lv_obj_set_style_text_color(control_widgets_.camera1_exposure_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_exposure_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.camera1_exposure_label, 0, 280);
     
-    control_widgets_.camera1_lighting_label = lv_label_create(ai_section);
+    control_widgets_.camera1_lighting_label = lv_label_create(camera1_column);
     lv_label_set_text(control_widgets_.camera1_lighting_label, "  光照评分：良好");
     lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_lighting_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.camera1_lighting_label, 0, 295);
     
-    // === 摄像头-2状态 ===
-    control_widgets_.camera2_status_label = lv_label_create(ai_section);
+    // === 摄像头-2信息列 ===
+    lv_obj_t* camera2_column = lv_obj_create(camera_container);
+    lv_obj_set_size(camera2_column, lv_pct(48), lv_pct(100));
+    lv_obj_set_style_bg_opa(camera2_column, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(camera2_column, 0, 0);
+    lv_obj_set_style_pad_all(camera2_column, 0, 0);
+    lv_obj_clear_flag(camera2_column, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置为Flex垂直布局
+    lv_obj_set_flex_flow(camera2_column, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(camera2_column, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(camera2_column, 2, 0);
+    
+    control_widgets_.camera2_status_label = lv_label_create(camera2_column);
     lv_label_set_text(control_widgets_.camera2_status_label, "摄像头-2：在线 ✓");
     lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_status_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.camera2_status_label, control_widgets_.camera1_status_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
-    control_widgets_.camera2_fps_label = lv_label_create(ai_section);
+    control_widgets_.camera2_fps_label = lv_label_create(camera2_column);
     lv_label_set_text(control_widgets_.camera2_fps_label, "  帧率：30 FPS");
     lv_obj_set_style_text_color(control_widgets_.camera2_fps_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_fps_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.camera2_fps_label, control_widgets_.camera1_fps_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
-    control_widgets_.camera2_resolution_label = lv_label_create(ai_section);
+    control_widgets_.camera2_resolution_label = lv_label_create(camera2_column);
     lv_label_set_text(control_widgets_.camera2_resolution_label, "  分辨率：1920x1080");
     lv_obj_set_style_text_color(control_widgets_.camera2_resolution_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_resolution_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.camera2_resolution_label, control_widgets_.camera1_resolution_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
-    control_widgets_.camera2_exposure_label = lv_label_create(ai_section);
+    control_widgets_.camera2_exposure_label = lv_label_create(camera2_column);
     lv_label_set_text(control_widgets_.camera2_exposure_label, "  曝光：自动");
     lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_exposure_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.camera2_exposure_label, control_widgets_.camera1_exposure_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
-    control_widgets_.camera2_lighting_label = lv_label_create(ai_section);
+    control_widgets_.camera2_lighting_label = lv_label_create(camera2_column);
     lv_label_set_text(control_widgets_.camera2_lighting_label, "  光照评分：良好");
     lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_lighting_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.camera2_lighting_label, control_widgets_.camera1_lighting_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
@@ -947,84 +975,107 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_12, 0);
     lv_obj_align(modbus_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    // 连接统计信息（第一行）
-    control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_connection_label, "连接: 02:15:32");
-    lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 18);
+    // 连接统计信息（第一行）- 使用简单Flex布局
+    lv_obj_t* modbus_stats_container = lv_obj_create(modbus_section);
+    lv_obj_set_size(modbus_stats_container, lv_pct(100), 30);
+    lv_obj_set_pos(modbus_stats_container, 0, 18);
+    lv_obj_set_style_bg_opa(modbus_stats_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(modbus_stats_container, 0, 0);
+    lv_obj_set_style_pad_all(modbus_stats_container, 0, 0);
+    lv_obj_clear_flag(modbus_stats_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    control_widgets_.modbus_packets_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_packets_label, "数据包: 1247");
-    lv_obj_set_style_text_color(control_widgets_.modbus_packets_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_packets_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 34);
+    // 设置为Flex行布局，均匀分布
+    lv_obj_set_flex_flow(modbus_stats_container, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(modbus_stats_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(modbus_stats_container, 5, 0);
     
-    control_widgets_.modbus_errors_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_errors_label, "错误率: 0.02%");
-    lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_errors_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 18);
+    // 创建4个统计信息项，每行2个
+    const char* modbus_stats_texts[] = {
+        "连接: 02:15:32", "错误率: 0.02%",
+        "数据包: 1247", "心跳: OK"
+    };
+    const lv_color_t modbus_stats_colors[] = {
+        color_success_, color_success_,
+        color_primary_, color_success_
+    };
     
-    control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "心跳: OK");
-    lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 34);
+    lv_obj_t* modbus_stats_labels[4];
+    for (int i = 0; i < 4; i++) {
+        lv_obj_t* stats_item = lv_obj_create(modbus_stats_container);
+        lv_obj_set_size(stats_item, lv_pct(48), 15);
+        lv_obj_set_style_bg_opa(stats_item, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(stats_item, 0, 0);
+        lv_obj_set_style_pad_all(stats_item, 0, 0);
+        lv_obj_clear_flag(stats_item, LV_OBJ_FLAG_SCROLLABLE);
+        
+        modbus_stats_labels[i] = lv_label_create(stats_item);
+        lv_label_set_text(modbus_stats_labels[i], modbus_stats_texts[i]);
+        lv_obj_set_style_text_color(modbus_stats_labels[i], modbus_stats_colors[i], 0);
+        lv_obj_set_style_text_font(modbus_stats_labels[i], &lv_font_montserrat_12, 0);
+        lv_obj_align(modbus_stats_labels[i], LV_ALIGN_LEFT_MID, 0, 0);
+    }
     
-    // === Modbus寄存器状态区域 ===
-    int reg_y_start = 55;
+    // 分配标签指针
+    control_widgets_.modbus_connection_label = modbus_stats_labels[0];
+    control_widgets_.modbus_errors_label = modbus_stats_labels[1];
+    control_widgets_.modbus_packets_label = modbus_stats_labels[2];
+    control_widgets_.modbus_heartbeat_label = modbus_stats_labels[3];
     
-    // 系统状态 (40001)
-    control_widgets_.modbus_system_status_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_system_status_label, "40001 系统状态: 运行");
-    lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_system_status_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_system_status_label, 0, reg_y_start);
+    // === Modbus寄存器状态区域 - 使用Flex垂直布局实现1列7行 ===
+    lv_obj_t* modbus_registers_container = lv_obj_create(modbus_section);
+    lv_obj_set_size(modbus_registers_container, lv_pct(100), 120);
+    lv_obj_set_pos(modbus_registers_container, 0, 55);
+    lv_obj_set_style_bg_opa(modbus_registers_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(modbus_registers_container, 0, 0);
+    lv_obj_set_style_pad_all(modbus_registers_container, 0, 0);
+    lv_obj_clear_flag(modbus_registers_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    // PLC命令 (40002)
-    control_widgets_.modbus_plc_command_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_plc_command_label, "40002 PLC命令: 无");
-    lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_plc_command_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_plc_command_label, 0, reg_y_start + 16);
+    // 设置为Flex垂直布局，整齐排列
+    lv_obj_set_flex_flow(modbus_registers_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(modbus_registers_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(modbus_registers_container, 2, 0);
     
-    // 坐标就绪 (40003)
-    control_widgets_.modbus_coord_ready_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_coord_ready_label, "40003 坐标就绪: 否");
-    lv_obj_set_style_text_color(control_widgets_.modbus_coord_ready_label, color_warning_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_coord_ready_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_coord_ready_label, 0, reg_y_start + 32);
+    // 创建7个寄存器状态项
+    const char* register_texts[] = {
+        "40001 系统状态: 运行",
+        "40002 PLC命令: 无",
+        "40003 坐标就绪: 否",
+        "40004 X坐标: 0.0mm",
+        "40006 切割质量: 正常",
+        "40009 刀片编号: 3",
+        "40010 健康状态: 正常"
+    };
+    const lv_color_t register_colors[] = {
+        color_success_, lv_color_hex(0xB0B8C1), color_warning_, color_primary_,
+        color_success_, color_warning_, color_success_
+    };
     
-    // X坐标 (40004-05)
-    control_widgets_.modbus_x_coordinate_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_x_coordinate_label, "40004 X坐标: 0.0mm");
-    lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_x_coordinate_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_x_coordinate_label, 0, reg_y_start + 48);
+    lv_obj_t* register_labels[7];
+    for (int i = 0; i < 7; i++) {
+        lv_obj_t* register_item = lv_obj_create(modbus_registers_container);
+        lv_obj_set_size(register_item, lv_pct(100), 16);
+        lv_obj_set_style_bg_opa(register_item, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(register_item, 0, 0);
+        lv_obj_set_style_pad_all(register_item, 0, 0);
+        lv_obj_clear_flag(register_item, LV_OBJ_FLAG_SCROLLABLE);
+        
+        register_labels[i] = lv_label_create(register_item);
+        lv_label_set_text(register_labels[i], register_texts[i]);
+        lv_obj_set_style_text_color(register_labels[i], register_colors[i], 0);
+        lv_obj_set_style_text_font(register_labels[i], &lv_font_montserrat_12, 0);
+        lv_obj_align(register_labels[i], LV_ALIGN_LEFT_MID, 0, 0);
+    }
     
-    // 切割质量 (40006)
-    control_widgets_.modbus_cut_quality_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_cut_quality_label, "40006 切割质量: 正常");
-    lv_obj_set_style_text_color(control_widgets_.modbus_cut_quality_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_cut_quality_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_cut_quality_label, 0, reg_y_start + 64);
+    // 分配寄存器标签指针
+    control_widgets_.modbus_system_status_label = register_labels[0];
+    control_widgets_.modbus_plc_command_label = register_labels[1];
+    control_widgets_.modbus_coord_ready_label = register_labels[2];
+    control_widgets_.modbus_x_coordinate_label = register_labels[3];
+    control_widgets_.modbus_cut_quality_label = register_labels[4];
+    control_widgets_.modbus_blade_number_label = register_labels[5];
+    control_widgets_.modbus_health_status_label = register_labels[6];
     
-    // 刀片编号 (40009)
-    control_widgets_.modbus_blade_number_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_blade_number_label, "40009 刀片编号: 3");
-    lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, color_warning_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_blade_number_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_blade_number_label, 0, reg_y_start + 80);
-    
-    // 健康状态 (40010)
-    control_widgets_.modbus_health_status_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_health_status_label, "40010 健康状态: 正常");
-    lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.modbus_health_status_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(control_widgets_.modbus_health_status_label, 0, reg_y_start + 96);
-    
-    // === 系统版本信息区域 - 添加到控制面板底部 ===
+    // === 系统版本信息区域 - 使用Flex垂直布局实现1列5行统一间距 ===
     lv_obj_t* version_section = lv_obj_create(control_panel_);
     lv_obj_set_size(version_section, lv_pct(100), 120);
     lv_obj_set_style_bg_color(version_section, lv_color_hex(0x0F1419), 0);
@@ -1040,40 +1091,55 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_font(version_title, &lv_font_montserrat_12, 0);
     lv_obj_align(version_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    // JetPack版本
-    status_widgets_.jetpack_version = lv_label_create(version_section);
-    lv_label_set_text(status_widgets_.jetpack_version, "JetPack: 5.1.2");
-    lv_obj_set_style_text_color(status_widgets_.jetpack_version, lv_color_white(), 0);
-    lv_obj_set_style_text_font(status_widgets_.jetpack_version, &lv_font_montserrat_12, 0);
-    lv_obj_align(status_widgets_.jetpack_version, LV_ALIGN_TOP_LEFT, 0, 18);
+    // 版本信息容器 - 使用Flex垂直布局统一间距
+    lv_obj_t* version_container = lv_obj_create(version_section);
+    lv_obj_set_size(version_container, lv_pct(100), 85);
+    lv_obj_set_pos(version_container, 0, 18);
+    lv_obj_set_style_bg_opa(version_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(version_container, 0, 0);
+    lv_obj_set_style_pad_all(version_container, 0, 0);
+    lv_obj_clear_flag(version_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    // CUDA版本
-    status_widgets_.cuda_version = lv_label_create(version_section);
-    lv_label_set_text(status_widgets_.cuda_version, "CUDA: 11.4.315");
-    lv_obj_set_style_text_color(status_widgets_.cuda_version, color_success_, 0);
-    lv_obj_set_style_text_font(status_widgets_.cuda_version, &lv_font_montserrat_12, 0);
-    lv_obj_align(status_widgets_.cuda_version, LV_ALIGN_TOP_LEFT, 0, 35);
+    // 设置为Flex垂直布局，统一间距对齐
+    lv_obj_set_flex_flow(version_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(version_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(version_container, 3, 0);  // 统一间距3px
     
-    // TensorRT版本
-    status_widgets_.tensorrt_version = lv_label_create(version_section);
-    lv_label_set_text(status_widgets_.tensorrt_version, "TensorRT: 8.5.2");
-    lv_obj_set_style_text_color(status_widgets_.tensorrt_version, color_primary_, 0);
-    lv_obj_set_style_text_font(status_widgets_.tensorrt_version, &lv_font_montserrat_12, 0);
-    lv_obj_align(status_widgets_.tensorrt_version, LV_ALIGN_TOP_LEFT, 0, 52);
+    // 创建5个版本信息项
+    const char* version_texts[] = {
+        "JetPack: 5.1.2",
+        "CUDA: 11.4.315",
+        "TensorRT: 8.5.2",
+        "OpenCV: 4.8.0",
+        "Ubuntu: 20.04.6"
+    };
+    const lv_color_t version_colors[] = {
+        lv_color_white(), color_success_, color_primary_,
+        color_warning_, lv_color_hex(0xB0B8C1)
+    };
     
-    // OpenCV版本
-    status_widgets_.opencv_version = lv_label_create(version_section);
-    lv_label_set_text(status_widgets_.opencv_version, "OpenCV: 4.8.0");
-    lv_obj_set_style_text_color(status_widgets_.opencv_version, color_warning_, 0);
-    lv_obj_set_style_text_font(status_widgets_.opencv_version, &lv_font_montserrat_12, 0);
-    lv_obj_align(status_widgets_.opencv_version, LV_ALIGN_TOP_LEFT, 0, 69);
+    lv_obj_t* version_labels[5];
+    for (int i = 0; i < 5; i++) {
+        lv_obj_t* version_item = lv_obj_create(version_container);
+        lv_obj_set_size(version_item, lv_pct(100), 16);
+        lv_obj_set_style_bg_opa(version_item, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(version_item, 0, 0);
+        lv_obj_set_style_pad_all(version_item, 0, 0);
+        lv_obj_clear_flag(version_item, LV_OBJ_FLAG_SCROLLABLE);
+        
+        version_labels[i] = lv_label_create(version_item);
+        lv_label_set_text(version_labels[i], version_texts[i]);
+        lv_obj_set_style_text_color(version_labels[i], version_colors[i], 0);
+        lv_obj_set_style_text_font(version_labels[i], &lv_font_montserrat_12, 0);
+        lv_obj_align(version_labels[i], LV_ALIGN_LEFT_MID, 0, 0);
+    }
     
-    // Ubuntu版本
-    status_widgets_.ubuntu_version = lv_label_create(version_section);
-    lv_label_set_text(status_widgets_.ubuntu_version, "Ubuntu: 20.04.6");
-    lv_obj_set_style_text_color(status_widgets_.ubuntu_version, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(status_widgets_.ubuntu_version, &lv_font_montserrat_12, 0);
-    lv_obj_align(status_widgets_.ubuntu_version, LV_ALIGN_TOP_LEFT, 0, 86);
+    // 分配版本标签指针
+    status_widgets_.jetpack_version = version_labels[0];
+    status_widgets_.cuda_version = version_labels[1];
+    status_widgets_.tensorrt_version = version_labels[2];
+    status_widgets_.opencv_version = version_labels[3];
+    status_widgets_.ubuntu_version = version_labels[4];
     
     return control_panel_;
 #else
