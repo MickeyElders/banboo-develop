@@ -12,8 +12,9 @@ namespace ui {
 lv_obj_t* LVGLInterface::createHeaderPanel() {
 #ifdef ENABLE_LVGL
     header_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(header_panel_, lv_pct(100), 70);  // 使用百分比并减少高度
-    lv_obj_align(header_panel_, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_width(header_panel_, lv_pct(100));
+    lv_obj_set_height(header_panel_, 70);
+    // 移除 lv_obj_align，使用父容器的Flex布局控制位置
     
     // 简洁的背景样式
     lv_obj_set_style_bg_color(header_panel_, color_surface_, 0);
@@ -93,29 +94,43 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
         header_widgets_.workflow_buttons.push_back(step);
     }
     
+    // Status container (使用Flex布局替代固定位置)
+    lv_obj_t* status_container = lv_obj_create(header_panel_);
+    lv_obj_set_size(status_container, LV_SIZE_CONTENT, 50);
+    lv_obj_set_style_bg_opa(status_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(status_container, 0, 0);
+    lv_obj_set_style_pad_all(status_container, 0, 0);
+    lv_obj_set_flex_flow(status_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(status_container, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(status_container, 10, 0);
+    lv_obj_clear_flag(status_container, LV_OBJ_FLAG_SCROLLABLE);
+    
     // Heartbeat Status
-    lv_obj_t* heartbeat_container = lv_obj_create(header_panel_);
+    lv_obj_t* heartbeat_container = lv_obj_create(status_container);
     lv_obj_set_size(heartbeat_container, 160, 50);
-    lv_obj_align(heartbeat_container, LV_ALIGN_RIGHT_MID, -180, 0);
     lv_obj_set_style_bg_color(heartbeat_container, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(heartbeat_container, 25, 0);
     lv_obj_set_style_border_width(heartbeat_container, 2, 0);
     lv_obj_set_style_border_color(heartbeat_container, color_success_, 0);
-    lv_obj_set_style_pad_all(heartbeat_container, 0, 0);
+    lv_obj_set_style_pad_all(heartbeat_container, 8, 0);
     lv_obj_clear_flag(heartbeat_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置heartbeat_container为Flex容器
+    lv_obj_set_flex_flow(heartbeat_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(heartbeat_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     header_widgets_.heartbeat_label = lv_label_create(heartbeat_container);
     lv_label_set_text(header_widgets_.heartbeat_label, LV_SYMBOL_REFRESH " Heartbeat OK");
     lv_obj_set_style_text_color(header_widgets_.heartbeat_label, color_success_, 0);
     lv_obj_set_style_text_font(header_widgets_.heartbeat_label, &lv_font_montserrat_14, 0);
-    lv_obj_center(header_widgets_.heartbeat_label);
+    // 移除 lv_obj_center，使用Flex布局自动居中
     
     // Response Time
-    header_widgets_.response_label = lv_label_create(header_panel_);
+    header_widgets_.response_label = lv_label_create(status_container);
     lv_label_set_text(header_widgets_.response_label, LV_SYMBOL_LOOP " 15ms");
     lv_obj_set_style_text_color(header_widgets_.response_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(header_widgets_.response_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(header_widgets_.response_label, LV_ALIGN_RIGHT_MID, -15, 0);
+    // 移除 lv_obj_align，使用Flex布局控制位置
     
     return header_panel_;
 #else
