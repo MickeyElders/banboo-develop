@@ -386,12 +386,18 @@ if(LVGL_FOUND)
     include_directories(${LVGL_INCLUDE_DIRS})
     link_directories(${LVGL_LIBRARY_DIRS})
     
-    # 创建导入的目标
-    add_library(lvgl SHARED IMPORTED)
-    set_target_properties(lvgl PROPERTIES
-        IMPORTED_LOCATION "${LVGL_LIBRARY_DIRS}/liblvgl.so"
-        INTERFACE_INCLUDE_DIRECTORIES "${LVGL_INCLUDE_DIRS}"
-    )
+    # 创建导入的目标 - 修复路径验证
+    if(EXISTS "${LVGL_INCLUDE_DIRS}")
+        add_library(lvgl SHARED IMPORTED)
+        set_target_properties(lvgl PROPERTIES
+            IMPORTED_LOCATION "${LVGL_LIBRARY_DIRS}/liblvgl.so"
+            INTERFACE_INCLUDE_DIRECTORIES "${LVGL_INCLUDE_DIRS}"
+        )
+    else()
+        message(WARNING "LVGL include directory does not exist: ${LVGL_INCLUDE_DIRS}")
+        # 尝试简单的包含目录设置
+        include_directories(${LVGL_INCLUDE_DIRS})
+    endif()
 else()
     # 回退到find_package
     find_package(lvgl QUIET)
