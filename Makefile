@@ -169,7 +169,7 @@ install-system-deps:
 
 install-lvgl:
 	@echo "$(CYAN)[LVGL]$(NC) 检查LVGL v9安装状态..."
-	@LVGL_VERSION=$$(pkg-config --modversion lvgl 2>/dev/null || echo "not_found"); \
+	@LVGL_VERSION=$$(PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --modversion lvgl 2>/dev/null || echo "not_found"); \
 	if [ "$$LVGL_VERSION" = "not_found" ] || [ "$$(echo $$LVGL_VERSION | cut -d. -f1)" != "9" ]; then \
 		echo "$(BLUE)[INFO]$(NC) LVGL v9未找到 (当前版本: $$LVGL_VERSION)，开始从源码编译安装..."; \
 		$(MAKE) build-lvgl-from-source; \
