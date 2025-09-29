@@ -38,6 +38,24 @@ struct DetectionResult {
 };
 
 /**
+ * @brief AI模型性能统计
+ */
+struct AIModelStats {
+    std::string model_version;      // 模型版本 (如 YOLOv8n)
+    float inference_time_ms;        // 推理时间(毫秒)
+    float confidence_threshold;     // 置信阈值
+    float detection_accuracy;       // 检测精度(%)
+    int total_detections;          // 总检测数
+    int daily_detections;          // 今日检测数
+    float average_confidence;       // 平均置信度
+    
+    AIModelStats() : model_version("YOLOv8n"), inference_time_ms(0),
+                    confidence_threshold(0.85f), detection_accuracy(0),
+                    total_detections(0), daily_detections(0),
+                    average_confidence(0) {}
+};
+
+/**
  * @brief 系统性能统计
  */
 struct SystemStats {
@@ -45,6 +63,9 @@ struct SystemStats {
     float inference_fps;        // 推理帧率
     int total_detections;       // 总检测数
     std::string system_status;  // 系统状态
+    
+    // AI模型统计信息
+    AIModelStats ai_model;
     
     // Jetson性能数据
     struct {

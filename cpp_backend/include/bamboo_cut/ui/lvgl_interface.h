@@ -257,10 +257,12 @@ private:
         lv_obj_t* swap_usage_label;
         
         // AI模型监控组件
-        lv_obj_t* ai_fps_label;
-        lv_obj_t* ai_confidence_label;
-        lv_obj_t* ai_latency_label;
-        lv_obj_t* ai_model_label;
+        lv_obj_t* ai_model_version_label;      // 模型版本
+        lv_obj_t* ai_inference_time_label;     // 推理时间
+        lv_obj_t* ai_confidence_threshold_label; // 置信阈值
+        lv_obj_t* ai_detection_accuracy_label;  // 检测精度
+        lv_obj_t* ai_total_detections_label;    // 总检测数
+        lv_obj_t* ai_daily_detections_label;    // 今日检测数
         
         // Modbus通信统计组件
         lv_obj_t* modbus_connection_label;

@@ -762,29 +762,47 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
     lv_obj_align(ai_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    control_widgets_.ai_fps_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_fps_label, "Inference FPS: 28.5");
-    lv_obj_set_style_text_color(control_widgets_.ai_fps_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.ai_fps_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_fps_label, LV_ALIGN_TOP_LEFT, 0, 25);
+    // 模型版本
+    control_widgets_.ai_model_version_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_model_version_label, "模型版本: YOLOv8n");
+    lv_obj_set_style_text_color(control_widgets_.ai_model_version_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_model_version_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_model_version_label, LV_ALIGN_TOP_LEFT, 0, 25);
     
-    control_widgets_.ai_confidence_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_confidence_label, "Confidence: 0.94");
-    lv_obj_set_style_text_color(control_widgets_.ai_confidence_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.ai_confidence_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_confidence_label, LV_ALIGN_TOP_LEFT, 0, 45);
+    // 推理时间
+    control_widgets_.ai_inference_time_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_inference_time_label, "推理时间: 18.3ms");
+    lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_inference_time_label, LV_ALIGN_TOP_LEFT, 0, 45);
     
-    control_widgets_.ai_latency_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_latency_label, "Latency: 12ms");
-    lv_obj_set_style_text_color(control_widgets_.ai_latency_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.ai_latency_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_latency_label, LV_ALIGN_TOP_RIGHT, 0, 25);
+    // 置信阈值
+    control_widgets_.ai_confidence_threshold_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "置信阈值: 0.85");
+    lv_obj_set_style_text_color(control_widgets_.ai_confidence_threshold_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_confidence_threshold_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_confidence_threshold_label, LV_ALIGN_TOP_LEFT, 0, 65);
     
-    control_widgets_.ai_model_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_model_label, "Model: YOLOv8n");
-    lv_obj_set_style_text_color(control_widgets_.ai_model_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.ai_model_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.ai_model_label, LV_ALIGN_TOP_RIGHT, 0, 45);
+    // 检测精度
+    control_widgets_.ai_detection_accuracy_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "检测精度: 94.2%");
+    lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_detection_accuracy_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_detection_accuracy_label, LV_ALIGN_TOP_RIGHT, 0, 25);
+    
+    // 总检测数
+    control_widgets_.ai_total_detections_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_total_detections_label, "总检测数: 15,432");
+    lv_obj_set_style_text_color(control_widgets_.ai_total_detections_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_total_detections_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_total_detections_label, LV_ALIGN_TOP_RIGHT, 0, 45);
+    
+    // 今日检测数
+    control_widgets_.ai_daily_detections_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_daily_detections_label, "今日检测: 89");
+    lv_obj_set_style_text_color(control_widgets_.ai_daily_detections_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_daily_detections_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(control_widgets_.ai_daily_detections_label, LV_ALIGN_TOP_RIGHT, 0, 65);
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
@@ -1331,23 +1349,61 @@ void LVGLInterface::updateSystemStats() {
             }
         }
         
-        // 更新AI模型监控数据（保持现有逻辑，因为这些不是从tegrastats获得的）
-        if (control_widgets_.ai_fps_label) {
-            static float ai_fps = 28.5f;
-            ai_fps = 25.0f + ((rand() % 80) / 10.0f);  // Simulate 25-33FPS
-            lv_label_set_text_fmt(control_widgets_.ai_fps_label, "Inference FPS: %.1f", ai_fps);
+        // 从DataBridge获取真实的AI模型统计数据
+        core::SystemStats databridge_stats = data_bridge_->getStats();
+        
+        // 更新AI模型版本
+        if (control_widgets_.ai_model_version_label) {
+            lv_label_set_text_fmt(control_widgets_.ai_model_version_label, "模型版本: %s",
+                                  databridge_stats.ai_model.model_version.c_str());
         }
         
-        if (control_widgets_.ai_confidence_label) {
-            static float confidence = 0.94f;
-            confidence = 0.85f + ((rand() % 15) / 100.0f);  // Simulate 0.85-1.00 confidence
-            lv_label_set_text_fmt(control_widgets_.ai_confidence_label, "Confidence: %.2f", confidence);
+        // 更新推理时间
+        if (control_widgets_.ai_inference_time_label) {
+            lv_label_set_text_fmt(control_widgets_.ai_inference_time_label, "推理时间: %.1fms",
+                                  databridge_stats.ai_model.inference_time_ms);
+            
+            // 根据推理时间设置颜色
+            if (databridge_stats.ai_model.inference_time_ms > 30.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_error_, 0);
+            } else if (databridge_stats.ai_model.inference_time_ms > 20.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
+            }
         }
         
-        if (control_widgets_.ai_latency_label) {
-            static int latency = 12;
-            latency = 8 + (rand() % 8);  // Simulate 8-16ms latency
-            lv_label_set_text_fmt(control_widgets_.ai_latency_label, "Latency: %dms", latency);
+        // 更新置信阈值
+        if (control_widgets_.ai_confidence_threshold_label) {
+            lv_label_set_text_fmt(control_widgets_.ai_confidence_threshold_label, "置信阈值: %.2f",
+                                  databridge_stats.ai_model.confidence_threshold);
+        }
+        
+        // 更新检测精度
+        if (control_widgets_.ai_detection_accuracy_label) {
+            lv_label_set_text_fmt(control_widgets_.ai_detection_accuracy_label, "检测精度: %.1f%%",
+                                  databridge_stats.ai_model.detection_accuracy);
+            
+            // 根据检测精度设置颜色
+            if (databridge_stats.ai_model.detection_accuracy > 90.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_success_, 0);
+            } else if (databridge_stats.ai_model.detection_accuracy > 80.0f) {
+                lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_error_, 0);
+            }
+        }
+        
+        // 更新总检测数
+        if (control_widgets_.ai_total_detections_label) {
+            lv_label_set_text_fmt(control_widgets_.ai_total_detections_label, "总检测数: %d",
+                                  databridge_stats.ai_model.total_detections);
+        }
+        
+        // 更新今日检测数
+        if (control_widgets_.ai_daily_detections_label) {
+            lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "今日检测: %d",
+                                  databridge_stats.ai_model.daily_detections);
         }
         
         // 更新温度信息
