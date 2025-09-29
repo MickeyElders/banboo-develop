@@ -785,7 +785,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.cpu_temp_label, "CPU: 62°C");
     lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_warning_, 0);
     lv_obj_set_style_text_font(control_widgets_.cpu_temp_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.cpu_temp_label, control_widgets_.cpu_bar, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    lv_obj_set_pos(control_widgets_.cpu_temp_label, lv_pct(55), y_pos);  // 使用相对位置替代align_to
     
     y_pos += 50;
     
@@ -809,7 +809,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.gpu_temp_label, "GPU: 58°C");
     lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.gpu_temp_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.gpu_temp_label, control_widgets_.gpu_bar, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    lv_obj_set_pos(control_widgets_.gpu_temp_label, lv_pct(55), y_pos);  // 使用相对位置替代align_to
     
     y_pos += 50;
     
@@ -833,7 +833,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.swap_usage_label, "SWAP: 0/3733MB");
     lv_obj_set_style_text_color(control_widgets_.swap_usage_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.swap_usage_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.swap_usage_label, control_widgets_.mem_bar, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    lv_obj_set_pos(control_widgets_.swap_usage_label, lv_pct(55), y_pos);  // 使用相对位置替代align_to
     
     y_pos += 50;
     
@@ -850,7 +850,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.thermal_temp_label, "Thermal: 50.2°C");
     lv_obj_set_style_text_color(control_widgets_.thermal_temp_label, color_warning_, 0);
     lv_obj_set_style_text_font(control_widgets_.thermal_temp_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.thermal_temp_label, control_widgets_.soc_temp_label, LV_ALIGN_OUT_RIGHT_MID, 25, 0);
+    lv_obj_set_pos(control_widgets_.thermal_temp_label, lv_pct(55), y_pos);  // 使用相对位置替代align_to
     
     y_pos += 25;
     
