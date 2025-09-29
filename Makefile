@@ -220,18 +220,16 @@ build-lvgl-from-source:
 	@cd /tmp/lvgl && sudo cp lvgl.h /usr/local/include/lvgl/
 	@cd /tmp/lvgl && sudo cp lv_conf.h /usr/local/include/
 	@echo "$(BLUE)[INFO]$(NC) [8/8] 创建pkg-config文件..."
-	@sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null << 'EOF'
-	prefix=/usr/local
-	exec_prefix=$${prefix}
-	libdir=$${exec_prefix}/lib
-	includedir=$${prefix}/include
-
-	Name: LVGL
-	Description: Light and Versatile Graphics Library
-	Version: 9.1.0
-	Libs: -L$${libdir} -llvgl
-	Cflags: -I$${includedir}/lvgl -I$${includedir}
-	EOF
+	@echo "prefix=/usr/local" | sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "exec_prefix=\$${prefix}" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "libdir=\$${exec_prefix}/lib" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "includedir=\$${prefix}/include" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Name: LVGL" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Description: Light and Versatile Graphics Library" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Version: 9.1.0" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Libs: -L\$${libdir} -llvgl" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Cflags: -I\$${includedir}/lvgl -I\$${includedir}" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
 	@sudo ldconfig
 	@echo ""
 	@echo "$(CYAN)[VERIFY]$(NC) === 验证安装 ==="
