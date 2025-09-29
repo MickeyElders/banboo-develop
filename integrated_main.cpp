@@ -248,7 +248,9 @@ static std::string log_file_path = "/var/log/bamboo-cut/camera_debug.log";
 // 温和的调试信息抑制函数
 void selective_debug_suppress() {
     // 只禁用特定的相机调试，保留显示相关的输出
-    system("echo 0 > /sys/kernel/debug/tracing/events/camera/enable 2>/dev/null || true");
+    if (system("echo 0 > /sys/kernel/debug/tracing/events/camera/enable 2>/dev/null || true") != 0) {
+        // 忽略系统调用失败，继续执行
+    }
     // 不要禁用DRM相关的调试信息
     
     // 设置环境变量抑制Tegra相机调试
@@ -302,11 +304,17 @@ void suppress_all_debug_output() {
     setenv("DMESG_RESTRICT", "1", 1);
     
     // 强制重定向内核消息到null
-    system("echo 0 > /proc/sys/kernel/printk 2>/dev/null || true");
-    system("dmesg -n 0 2>/dev/null || true");
+    if (system("echo 0 > /proc/sys/kernel/printk 2>/dev/null || true") != 0) {
+        // 忽略系统调用失败，继续执行
+    }
+    if (system("dmesg -n 0 2>/dev/null || true") != 0) {
+        // 忽略系统调用失败，继续执行
+    }
     
     // 抑制systemd journal输出到console
-    system("systemctl mask systemd-journald-dev-log.socket 2>/dev/null || true");
+    if (system("systemctl mask systemd-journald-dev-log.socket 2>/dev/null || true") != 0) {
+        // 忽略系统调用失败，继续执行
+    }
     
     // 2. 设置GStreamer静默模式
     setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0", 1);
@@ -314,7 +322,9 @@ void suppress_all_debug_output() {
     setenv("GST_REGISTRY_FORK", "no", 1);
     
     // 3. 创建日志目录（如果不存在）
-    system("mkdir -p /var/log/bamboo-cut");
+    if (system("mkdir -p /var/log/bamboo-cut") != 0) {
+        std::cout << "Warning: Failed to create log directory" << std::endl;
+    }
     
     // 4. 创建日志文件用于重定向调试信息
     log_fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
@@ -347,7 +357,9 @@ void suppress_all_debug_output() {
         timestamp.pop_back(); // 移除换行符
         
         std::string log_header = "\n=== Bamboo Cut Camera Debug Log - " + timestamp + " ===\n";
-        write(log_fd, log_header.c_str(), log_header.length());
+        if (write(log_fd, log_header.c_str(), log_header.length()) == -1) {
+            // 忽略写入失败，继续执行
+        }
     }
     
     std::cout << "Debug output suppression configured successfully" << std::endl;
@@ -362,7 +374,9 @@ void redirect_output_to_log() {
         
         // 写入重定向开始标记
         std::string start_msg = "[Camera Initialization Started]\n";
-        write(log_fd, start_msg.c_str(), start_msg.length());
+        if (write(log_fd, start_msg.c_str(), start_msg.length()) == -1) {
+            // 忽略写入失败，继续执行
+        }
     }
 }
 
@@ -372,7 +386,9 @@ void restore_output() {
         // 写入重定向结束标记
         if (log_fd >= 0) {
             std::string end_msg = "[Camera Initialization Completed]\n\n";
-            write(log_fd, end_msg.c_str(), end_msg.length());
+            if (write(log_fd, end_msg.c_str(), end_msg.length()) == -1) {
+                // 忽略写入失败，继续执行
+            }
         }
         
         // 恢复原始输出
@@ -394,7 +410,9 @@ void cleanup_output_redirection() {
     if (log_fd >= 0) {
         // 写入日志文件结束标记
         std::string final_msg = "=== Log Session Ended ===\n\n";
-        write(log_fd, final_msg.c_str(), final_msg.length());
+        if (write(log_fd, final_msg.c_str(), final_msg.length()) == -1) {
+            // 忽略写入失败，继续执行
+        }
         close(log_fd);
         log_fd = -1;
     }
@@ -1091,9 +1109,6 @@ public:
             inference_worker_->stop();
         }
         
-        // 清理DRM/KMS资源
-        cleanup_drm_display();
-        
         // 清理输出重定向资源
         cleanup_output_redirection();
         
@@ -1131,7 +1146,9 @@ int main(int argc, char* argv[]) {
         if (!system.initialize()) {
             // 临时恢复stdout显示错误信息
             if (!verbose_mode) {
-                freopen("/dev/tty", "w", stdout);
+                if (freopen("/dev/tty", "w", stdout) == nullptr) {
+                    // 忽略恢复失败，继续执行
+                }
             }
             std::cout << "System initialization failed" << std::endl;
             return -1;
@@ -1146,7 +1163,9 @@ int main(int argc, char* argv[]) {
         
     } catch (const std::exception& e) {
         // 临时恢复stdout显示异常信息
-        freopen("/dev/tty", "w", stdout);
+        if (freopen("/dev/tty", "w", stdout) == nullptr) {
+            // 忽略恢复失败，继续执行
+        }
         std::cout << "System exception: " << e.what() << std::endl;
         return -1;
     }
