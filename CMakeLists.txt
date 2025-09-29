@@ -571,15 +571,13 @@ endforeach()
 # ================================
 # 主程序 - 一体化可执行文件
 # ================================
-# 确保只构建我们的主程序，不构建LVGL示例
-if(TARGET lvgl_examples)
-    set_target_properties(lvgl_examples PROPERTIES EXCLUDE_FROM_ALL TRUE)
-endif()
-
 add_executable(bamboo_integrated
     integrated_main.cpp
     ${VALID_SOURCES}
 )
+
+# 确保只有我们的主程序是默认构建目标
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bamboo_integrated)
 
 # 编译定义
 target_compile_definitions(bamboo_integrated PRIVATE
