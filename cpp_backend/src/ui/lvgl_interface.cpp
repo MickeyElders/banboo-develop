@@ -16,6 +16,8 @@
 #include <sys/mman.h>
 #include <cstring>
 #include <cerrno>
+#include <chrono>
+#include <thread>
 
 #ifdef ENABLE_LVGL
 #include <lvgl/lvgl.h>
@@ -432,6 +434,33 @@ void LVGLInterface::createMainInterface() {
     
     main_screen_ = lv_scr_act();
     
+    // === 主界面初始化增强 - 修复白屏问题 ===
+    
+    // 1. 设置主屏幕背景色为可见颜色（避免全透明或全白）
+    lv_obj_set_style_bg_color(main_screen_, color_background_, 0);
+    lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
+    std::cout << "[LVGLInterface] 设置主屏幕背景色为: 0x" << std::hex << lv_color_to32(color_background_) << std::dec << std::endl;
+    
+    // 2. 创建测试标签验证屏幕可见性
+    lv_obj_t* test_label = lv_label_create(main_screen_);
+    lv_label_set_text(test_label, "BAMBOO SYSTEM INITIALIZING...");
+    lv_obj_set_style_text_color(test_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(test_label, &lv_font_montserrat_24, 0);
+    lv_obj_center(test_label);
+    std::cout << "[LVGLInterface] 创建初始化测试标签" << std::endl;
+    
+    // 3. 强制刷新主屏幕，确保背景色和测试内容可见
+    lv_obj_invalidate(main_screen_);
+    lv_refr_now(NULL);  // 立即强制刷新
+    std::cout << "[LVGLInterface] 执行强制屏幕刷新" << std::endl;
+    
+    // 4. 延迟以确保测试内容显示
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    
+    // 5. 移除测试标签，开始创建正常界面
+    lv_obj_del(test_label);
+    std::cout << "[LVGLInterface] 移除测试标签，开始创建正常界面" << std::endl;
+    
     // 创建头部面板
     createHeaderPanel();
     
@@ -456,7 +485,12 @@ void LVGLInterface::createMainInterface() {
     // 创建底部面板
     createFooterPanel();
     
-    std::cout << "[LVGLInterface] 主界面创建完成" << std::endl;
+    // 6. 最终强制刷新确保所有界面元素可见
+    lv_obj_invalidate(main_screen_);
+    lv_refr_now(NULL);
+    std::cout << "[LVGLInterface] 执行最终界面刷新" << std::endl;
+    
+    std::cout << "[LVGLInterface] 主界面创建完成，包含白屏修复增强" << std::endl;
 #endif
 }
 
