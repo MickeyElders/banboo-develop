@@ -250,12 +250,12 @@ private:
     /**
      * @brief 设置LVGL显示缓冲区
      */
-    void setupLVGLDisplayBuffer();
+    bool setupLVGLDisplayBuffer(uint32_t buf_size);
 
     /**
      * @brief 创建LVGL显示驱动
      */
-    lv_display_t* createLVGLDisplay();
+    bool createLVGLDisplay(uint32_t buf_size);
 
     // === 辅助更新函数 ===
     
