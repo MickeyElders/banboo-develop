@@ -194,10 +194,22 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
-    // 初始化显示缓冲区 (LVGL v9 API) - 使用与DRM匹配的格式
+    // 初始化显示缓冲区 (LVGL v9 API) - 使用与DRM匹配的格式，增加诊断信息
+    std::cout << "[LVGLInterface] 初始化显示缓冲区: " << config_.screen_width << "x" << config_.screen_height
+              << " 格式:XRGB8888 步长:" << (config_.screen_width * 4)
+              << " 缓冲区大小:" << (buf_size * sizeof(lv_color_t)) << " bytes" << std::endl;
+              
     lv_draw_buf_init(&draw_buf_, config_.screen_width, config_.screen_height,
                      LV_COLOR_FORMAT_XRGB8888, config_.screen_width * 4,
                      disp_buf1_, buf_size * sizeof(lv_color_t));
+                     
+    // 验证缓冲区初始化
+    if (draw_buf_.data == nullptr) {
+        std::cerr << "[LVGLInterface] 显示缓冲区数据指针为空" << std::endl;
+        return false;
+    }
+    
+    std::cout << "[LVGLInterface] 显示缓冲区初始化成功，数据指针: " << draw_buf_.data << std::endl;
     
     // 创建显示器 - 添加异常保护和验证
     try {
@@ -216,22 +228,46 @@ bool LVGLInterface::initializeDisplay() {
             return false;
         }
         
-        // 设置显示缓冲区 - 添加缓冲区验证
+        // 设置显示缓冲区 - 添加缓冲区验证和详细诊断
         if (!disp_buf1_ || buf_size == 0) {
-            std::cerr << "[LVGLInterface] 显示缓冲区无效" << std::endl;
+            std::cerr << "[LVGLInterface] 显示缓冲区无效: disp_buf1_=" << disp_buf1_ << " buf_size=" << buf_size << std::endl;
             return false;
         }
         
+        std::cout << "[LVGLInterface] 设置显示缓冲区: buf1=" << disp_buf1_ << " buf2=" << disp_buf2_
+                  << " size=" << (buf_size * sizeof(lv_color_t)) << " mode=PARTIAL" << std::endl;
+                  
         lv_display_set_buffers(display_, disp_buf1_, disp_buf2_, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+        
+        // 验证缓冲区设置
+        void* actual_buf1 = nullptr;
+        void* actual_buf2 = nullptr;
+        uint32_t actual_size = 0;
+        lv_display_render_mode_t actual_mode = lv_display_get_buffers(display_, &actual_buf1, &actual_buf2, &actual_size);
+        
+        std::cout << "[LVGLInterface] 缓冲区验证: actual_buf1=" << actual_buf1 << " actual_buf2=" << actual_buf2
+                  << " actual_size=" << actual_size << " actual_mode=" << (int)actual_mode << std::endl;
         
         // 设置刷新回调函数
         lv_display_set_flush_cb(display_, display_flush_cb);
+        std::cout << "[LVGLInterface] 显示刷新回调函数已设置" << std::endl;
+        
+        // 初始化缓冲区为可见内容（避免全黑屏）
+        std::cout << "[LVGLInterface] 初始化缓冲区内容为测试图案" << std::endl;
+        lv_color_t* test_buf = (lv_color_t*)disp_buf1_;
+        for (uint32_t i = 0; i < buf_size; i++) {
+            // 创建渐变测试图案
+            uint8_t intensity = (i % 256);
+            test_buf[i] = lv_color_make(intensity, intensity/2, 255-intensity);
+        }
         
         // 强制刷新一次以验证显示系统工作正常
+        std::cout << "[LVGLInterface] 执行强制刷新验证显示系统" << std::endl;
         lv_obj_invalidate(lv_scr_act());
         lv_timer_handler();
         
-        std::cout << "[LVGLInterface] 显示器创建和验证成功" << std::endl;
+        // 再次验证回调是否被调用
+        std::cout << "[LVGLInterface] 显示器创建和验证完成" << std::endl;
         
     } catch (const std::exception& e) {
         std::cerr << "[LVGLInterface] 显示器创建异常: " << e.what() << std::endl;
@@ -2451,7 +2487,7 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
 
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 #ifdef ENABLE_LVGL
-    // 安全的DRM显示刷新实现 - 修复段错误问题
+    // 全面的DRM显示刷新实现 - 修复白屏问题
     static int drm_fd = -1;
     static uint32_t fb_id = 0;
     static drmModeCrtc* crtc = nullptr;
@@ -2459,22 +2495,36 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
     static uint32_t* framebuffer = nullptr;
     static uint32_t fb_handle = 0;
     static bool drm_initialized = false;
-    static bool drm_init_failed = false;  // 新增：标记初始化失败状态
-    static int init_attempt_count = 0;    // 新增：初始化尝试计数
+    static bool drm_init_failed = false;
+    static int init_attempt_count = 0;
     static uint32_t drm_width = 0;
     static uint32_t drm_height = 0;
     static uint32_t stride = 0;
     static uint32_t buffer_size = 0;
+    static uint32_t flush_count = 0;  // 新增：刷新计数器
+    
+    flush_count++;
+    
+    // 详细的调试信息
+    if (flush_count <= 5 || flush_count % 60 == 0) {  // 前5次和每60次刷新输出调试信息
+        std::cout << "[DRM] flush_cb调用 #" << flush_count
+                  << " area(" << (area ? area->x1 : -1) << "," << (area ? area->y1 : -1)
+                  << " to " << (area ? area->x2 : -1) << "," << (area ? area->y2 : -1)
+                  << ") px_map=" << (px_map ? "valid" : "null") << std::endl;
+    }
     
     // 严格的参数验证
     if (!disp || !area || !px_map) {
-        std::cerr << "[DRM] Invalid parameters in display_flush_cb" << std::endl;
+        std::cerr << "[DRM] flush_cb参数无效: disp=" << disp << " area=" << area << " px_map=" << px_map << std::endl;
         if (disp) lv_display_flush_ready(disp);
         return;
     }
     
     // 如果DRM初始化已经失败，直接返回避免重复尝试
     if (drm_init_failed) {
+        if (flush_count <= 5) {
+            std::cerr << "[DRM] DRM初始化已失败，跳过刷新" << std::endl;
+        }
         lv_display_flush_ready(disp);
         return;
     }
