@@ -524,6 +524,40 @@ void LVGLInterface::createModbusSection(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.modbus_message_count_label, "Daily: 1,523");
     lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_message_count_label, &lv_font_montserrat_12, 0);
+    
+    // 验证所有Modbus控件是否正确初始化
+    bool all_modbus_widgets_valid = true;
+    
+    if (!control_widgets_.modbus_connection_label) {
+        std::cerr << "[Control Panel] Modbus连接状态标签初始化失败" << std::endl;
+        all_modbus_widgets_valid = false;
+    }
+    if (!control_widgets_.modbus_address_label) {
+        std::cerr << "[Control Panel] Modbus地址标签初始化失败" << std::endl;
+        all_modbus_widgets_valid = false;
+    }
+    if (!control_widgets_.modbus_latency_label) {
+        std::cerr << "[Control Panel] Modbus延迟标签初始化失败" << std::endl;
+        all_modbus_widgets_valid = false;
+    }
+    if (!control_widgets_.modbus_last_success_label) {
+        std::cerr << "[Control Panel] Modbus最后成功标签初始化失败" << std::endl;
+        all_modbus_widgets_valid = false;
+    }
+    if (!control_widgets_.modbus_error_count_label) {
+        std::cerr << "[Control Panel] Modbus错误计数标签初始化失败" << std::endl;
+        all_modbus_widgets_valid = false;
+    }
+    if (!control_widgets_.modbus_message_count_label) {
+        std::cerr << "[Control Panel] Modbus消息计数标签初始化失败" << std::endl;
+        all_modbus_widgets_valid = false;
+    }
+    
+    if (all_modbus_widgets_valid) {
+        std::cout << "[Control Panel] 所有Modbus控件初始化成功" << std::endl;
+    } else {
+        std::cerr << "[Control Panel] 部分Modbus控件初始化失败" << std::endl;
+    }
 #endif
 }
 

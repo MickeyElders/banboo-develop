@@ -90,6 +90,15 @@ LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> data_bridge)
     , selected_blade_(1)
 {
     std::cout << "[LVGLInterface] 构造函数调用" << std::endl;
+    
+    // 初始化所有控件指针为nullptr - 防止野指针问题
+    std::memset(&header_widgets_, 0, sizeof(header_widgets_));
+    std::memset(&camera_widgets_, 0, sizeof(camera_widgets_));
+    std::memset(&control_widgets_, 0, sizeof(control_widgets_));
+    std::memset(&status_widgets_, 0, sizeof(status_widgets_));
+    std::memset(&footer_widgets_, 0, sizeof(footer_widgets_));
+    
+    std::cout << "[LVGLInterface] 控件结构体初始化完成" << std::endl;
 }
 
 LVGLInterface::~LVGLInterface() {
