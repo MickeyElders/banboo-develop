@@ -54,20 +54,30 @@ void LVGLInterface::updateInterface() {
 
 void LVGLInterface::updateSystemStats() {
 #ifdef ENABLE_LVGL
-    // Add null pointer protection - check if key components are initialized
+    // Add comprehensive null pointer protection
     if (!header_panel_ || !control_panel_) {
-        return;  // Silent skip to avoid too many logs
+        std::cout << "[LVGLInterface] Key panels not initialized, skipping system stats update" << std::endl;
+        return;
     }
     
-    // Update header response time label - add null pointer check and range limit
-    if (header_widgets_.response_label) {
-        static int counter = 0;
-        int response_ms = 12 + (counter++ % 10);
+    // Add additional safety check for widget structures
+    if (!header_widgets_.response_label) {
+        std::cout << "[LVGLInterface] Header widgets not initialized, skipping system stats update" << std::endl;
+        return;
+    }
+    
+    // Update header response time label with safe counter initialization
+    try {
+        static int response_counter = 0;
+        response_counter++;
+        int response_ms = 12 + (response_counter % 10);
         // Ensure response time is within reasonable range
-        if (response_ms < 1) response_ms = 1;
-        if (response_ms > 999) response_ms = 999;
+        response_ms = std::max(1, std::min(999, response_ms));
         lv_label_set_text_fmt(header_widgets_.response_label,
             LV_SYMBOL_LOOP " %dms", response_ms);
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] Exception in response time update: " << e.what() << std::endl;
+        return;
     }
     
     // 获取真实的Jetson系统状态
