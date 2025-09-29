@@ -1,6 +1,6 @@
 /**
  * @file status_panel.cpp
- * @brief LVGL状态面板实现
+ * @brief LVGL status panel implementation
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"

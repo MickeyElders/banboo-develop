@@ -1,6 +1,6 @@
 /**
  * @file footer_panel.cpp
- * @brief LVGL底部面板实现
+ * @brief LVGL footer panel implementation
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"

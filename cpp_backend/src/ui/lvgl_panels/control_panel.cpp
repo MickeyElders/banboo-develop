@@ -496,12 +496,12 @@ void LVGLInterface::createModbusSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     control_widgets_.modbus_latency_label = lv_label_create(row2);
-    lv_label_set_text(control_widgets_.modbus_latency_label, "延迟: 8ms");
+    lv_label_set_text(control_widgets_.modbus_latency_label, "Latency: 8ms");
     lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_latency_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.modbus_last_success_label = lv_label_create(row2);
-    lv_label_set_text(control_widgets_.modbus_last_success_label, "2秒前");
+    lv_label_set_text(control_widgets_.modbus_last_success_label, "2s ago");
     lv_obj_set_style_text_color(control_widgets_.modbus_last_success_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_last_success_label, &lv_font_montserrat_12, 0);
     
@@ -516,12 +516,12 @@ void LVGLInterface::createModbusSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(row3, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     control_widgets_.modbus_error_count_label = lv_label_create(row3);
-    lv_label_set_text(control_widgets_.modbus_error_count_label, "错误: 0");
+    lv_label_set_text(control_widgets_.modbus_error_count_label, "Errors: 0");
     lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_error_count_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.modbus_message_count_label = lv_label_create(row3);
-    lv_label_set_text(control_widgets_.modbus_message_count_label, "今日: 1,523");
+    lv_label_set_text(control_widgets_.modbus_message_count_label, "Daily: 1,523");
     lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_message_count_label, &lv_font_montserrat_12, 0);
 #endif
@@ -544,7 +544,7 @@ void LVGLInterface::createVersionSection(lv_obj_t* parent) {
 
     // 标题
     lv_obj_t* version_label = lv_label_create(version_section);
-    lv_label_set_text(version_label, LV_SYMBOL_SETTINGS " 系统版本信息");
+    lv_label_set_text(version_label, LV_SYMBOL_SETTINGS " System Version Info");
     lv_obj_set_style_text_color(version_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(version_label, &lv_font_montserrat_14, 0);
     
@@ -570,7 +570,7 @@ void LVGLInterface::createVersionSection(lv_obj_t* parent) {
     
     // === 第2行：编译时间（单独一行，因为内容较长）===
     control_widgets_.build_time_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.build_time_label, "编译: 2024-12-21 14:30");
+    lv_label_set_text(control_widgets_.build_time_label, "Build: 2024-12-21 14:30");
     lv_obj_set_style_text_color(control_widgets_.build_time_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.build_time_label, &lv_font_montserrat_12, 0);
     

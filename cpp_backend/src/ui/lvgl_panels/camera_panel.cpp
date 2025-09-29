@@ -1,6 +1,6 @@
 /**
  * @file camera_panel.cpp
- * @brief LVGL摄像头面板实现
+ * @brief LVGL camera panel implementation
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"

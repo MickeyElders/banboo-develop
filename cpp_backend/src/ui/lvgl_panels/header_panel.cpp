@@ -1,6 +1,6 @@
 /**
  * @file header_panel.cpp
- * @brief LVGL头部面板实现
+ * @brief LVGL header panel implementation
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"
