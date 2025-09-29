@@ -15,27 +15,26 @@ namespace bamboo_cut {
 namespace utils {
 
 JetsonMonitor::JetsonMonitor() {
-    std::cout << "[JetsonMonitor] 构造函数调用" << std::endl;
+    // 静默初始化，避免干扰推理日志
 }
 
 JetsonMonitor::~JetsonMonitor() {
-    std::cout << "[JetsonMonitor] 析构函数调用" << std::endl;
+    // 静默析构，避免干扰推理日志
     stop();
 }
 
 bool JetsonMonitor::start() {
     if (running_.load()) {
-        std::cerr << "[JetsonMonitor] 监控线程已在运行" << std::endl;
+        // 静默处理重复启动，避免干扰推理日志
         return false;
     }
     
-    std::cout << "[JetsonMonitor] 启动系统监控线程..." << std::endl;
+    // 静默启动系统监控线程
     should_stop_.store(false);
     running_.store(true);
     
     monitor_thread_ = std::thread(&JetsonMonitor::monitorLoop, this);
     
-    std::cout << "[JetsonMonitor] 系统监控线程启动成功" << std::endl;
     return true;
 }
 
@@ -44,7 +43,7 @@ void JetsonMonitor::stop() {
         return;
     }
     
-    std::cout << "[JetsonMonitor] 停止系统监控线程..." << std::endl;
+    // 静默停止系统监控线程
     should_stop_.store(true);
     
     if (monitor_thread_.joinable()) {
@@ -52,7 +51,6 @@ void JetsonMonitor::stop() {
     }
     
     running_.store(false);
-    std::cout << "[JetsonMonitor] 系统监控线程已停止" << std::endl;
 }
 
 SystemStats JetsonMonitor::getLatestStats() const {
@@ -61,7 +59,7 @@ SystemStats JetsonMonitor::getLatestStats() const {
 }
 
 void JetsonMonitor::monitorLoop() {
-    std::cout << "[JetsonMonitor] 系统监控主循环开始" << std::endl;
+    // 静默运行系统监控主循环，避免干扰推理日志
     
     while (!should_stop_.load()) {
         try {
@@ -79,16 +77,24 @@ void JetsonMonitor::monitorLoop() {
                 }
             }
         } catch (const std::exception& e) {
-            std::cerr << "[JetsonMonitor] 监控循环异常: " << e.what() << std::endl;
+            // 保留错误输出，但减少频率
+            static int error_count = 0;
+            if (++error_count % 10 == 1) { // 每10次错误只输出一次
+                std::cerr << "[JetsonMonitor] 监控循环异常: " << e.what() << std::endl;
+            }
         } catch (...) {
-            std::cerr << "[JetsonMonitor] 监控循环未知异常" << std::endl;
+            // 保留严重未知异常的输出
+            static int unknown_error_count = 0;
+            if (++unknown_error_count % 10 == 1) { // 每10次错误只输出一次
+                std::cerr << "[JetsonMonitor] 监控循环未知异常" << std::endl;
+            }
         }
         
         // 等待下次监控
         std::this_thread::sleep_for(std::chrono::seconds(MONITOR_INTERVAL_SEC));
     }
     
-    std::cout << "[JetsonMonitor] 系统监控主循环结束" << std::endl;
+    // 静默结束监控循环
 }
 
 std::string JetsonMonitor::executeTegrastats() {
@@ -98,7 +104,11 @@ std::string JetsonMonitor::executeTegrastats() {
             popen("timeout 3s tegrastats --interval 1000", "r"), pclose);
         
         if (!pipe) {
-            std::cerr << "[JetsonMonitor] 无法执行tegrastats命令" << std::endl;
+            // 保留关键错误信息，但不频繁输出
+            static int cmd_error_count = 0;
+            if (++cmd_error_count % 20 == 1) { // 每20次错误只输出一次
+                std::cerr << "[JetsonMonitor] 无法执行tegrastats命令" << std::endl;
+            }
             return "";
         }
         
@@ -113,7 +123,7 @@ std::string JetsonMonitor::executeTegrastats() {
         return result;
         
     } catch (const std::exception& e) {
-        std::cerr << "[JetsonMonitor] 执行tegrastats异常: " << e.what() << std::endl;
+        // 静默处理tegrastats执行异常，避免干扰推理日志
         return "";
     }
 }
@@ -128,7 +138,8 @@ SystemStats JetsonMonitor::parseTegrastatsOutput(const std::string& output) {
         // MSENC OFF NVENC OFF NVJPG OFF NVDEC1 OFF NVDEC OFF OFA OFF VDD_IN 5336/4970 VDD_CPU_GPU_CV 2617/2336 VDD_SOC 1478/1318 
         // CV0@-256C GPU@49.2C PMIC@50.0C AO@48.5C thermal@50.187C POM_5V_IN 5336/4970 POM_5V_GPU 1040/936 POM_5V_CPU 847/758
 
-        std::cout << "[JetsonMonitor] 解析tegrastats输出: " << output.substr(0, 100) << "..." << std::endl;
+        // 静默解析tegrastats输出，避免干扰推理日志
+        // DEBUG: std::cout << "[JetsonMonitor] 解析tegrastats输出: " << output.substr(0, 100) << "..." << std::endl;
 
         // 解析RAM信息
         std::regex ram_regex(R"(RAM\s+(\d+)/(\d+)MB\s+\(lfb\s+(\d+)x(\d+)MB\))");
@@ -240,7 +251,7 @@ SystemStats JetsonMonitor::parseTegrastatsOutput(const std::string& output) {
         }
 
     } catch (const std::exception& e) {
-        std::cerr << "[JetsonMonitor] 解析tegrastats输出异常: " << e.what() << std::endl;
+        // 静默处理解析异常，避免干扰推理日志
     }
     
     return stats;
