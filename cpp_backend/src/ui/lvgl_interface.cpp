@@ -217,22 +217,36 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
-    // 初始化显示缓冲区 (LVGL v9 API) - 使用与DRM匹配的格式，增加诊断信息
+    // 初始化显示缓冲区 (LVGL v9 API) - 修复空指针问题
     std::cout << "[LVGLInterface] 初始化显示缓冲区: " << config_.screen_width << "x" << config_.screen_height
               << " 格式:XRGB8888 步长:" << (config_.screen_width * 4)
               << " 缓冲区大小:" << (buf_size * sizeof(lv_color_t)) << " bytes" << std::endl;
-              
+    
+    // LVGL v9 正确的缓冲区初始化方式 - 使用像素数而非字节数
     lv_draw_buf_init(&draw_buf_, config_.screen_width, config_.screen_height,
                      LV_COLOR_FORMAT_XRGB8888, config_.screen_width * 4,
-                     disp_buf1_, buf_size * sizeof(lv_color_t));
+                     disp_buf1_, buf_size);  // 使用像素数量，不是字节数
                      
     // 验证缓冲区初始化
     if (draw_buf_.data == nullptr) {
-        std::cerr << "[LVGLInterface] 显示缓冲区数据指针为空" << std::endl;
-        return false;
+        std::cerr << "[LVGLInterface] 显示缓冲区数据指针为空，尝试替代方案" << std::endl;
+        
+        // 使用替代的缓冲区设置方法
+        draw_buf_.data = disp_buf1_;
+        draw_buf_.data_size = buf_size * sizeof(lv_color_t);
+        draw_buf_.header.w = config_.screen_width;
+        draw_buf_.header.h = config_.screen_height;
+        draw_buf_.header.cf = LV_COLOR_FORMAT_XRGB8888;
+        draw_buf_.header.stride = config_.screen_width * 4;
+        
+        if (draw_buf_.data == nullptr) {
+            std::cerr << "[LVGLInterface] 替代方案也失败" << std::endl;
+            return false;
+        }
+        std::cout << "[LVGLInterface] 使用替代缓冲区设置成功" << std::endl;
+    } else {
+        std::cout << "[LVGLInterface] 显示缓冲区初始化成功，数据指针: " << draw_buf_.data << std::endl;
     }
-    
-    std::cout << "[LVGLInterface] 显示缓冲区初始化成功，数据指针: " << draw_buf_.data << std::endl;
     
     // 创建显示器 - 添加异常保护和验证
     try {
