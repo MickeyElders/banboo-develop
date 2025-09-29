@@ -245,13 +245,28 @@ install-lvgl9: build-lvgl-from-source
 # 自动检查和安装LVGL v9（编译前自动执行）
 install-lvgl9-auto:
 	@echo "$(CYAN)[AUTO-INSTALL]$(NC) 检查LVGL v9安装状态..."
+	@echo "$(BLUE)[INFO]$(NC) 清理可能的旧版本LVGL..."
+	@sudo apt-get remove -y liblvgl-dev 2>/dev/null || true
+	@sudo rm -rf /usr/include/lvgl 2>/dev/null || true
+	@sudo rm -rf /usr/lib/*/liblvgl* 2>/dev/null || true
+	@sudo rm -rf /usr/local/include/lvgl 2>/dev/null || true
+	@sudo rm -rf /usr/local/lib/liblvgl* 2>/dev/null || true
+	@sudo rm -rf /usr/local/lib/pkgconfig/lvgl.pc 2>/dev/null || true
+	@sudo ldconfig 2>/dev/null || true
 	@LVGL_VERSION=$$(pkg-config --modversion lvgl 2>/dev/null || echo "not_found"); \
 	if [ "$$LVGL_VERSION" = "not_found" ] || [ "$$(echo $$LVGL_VERSION | cut -d. -f1)" != "9" ]; then \
-		echo "$(BLUE)[INFO]$(NC) LVGL v9未找到 (当前版本: $$LVGL_VERSION)，开始自动安装..."; \
+		echo "$(BLUE)[INFO]$(NC) LVGL v9未找到，开始强制安装LVGL v9.3..."; \
 		$(MAKE) build-lvgl-from-source; \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3自动安装完成"; \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3强制安装完成"; \
 	else \
 		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9已安装 (版本: $$LVGL_VERSION)，跳过安装"; \
+	fi
+	@echo "$(CYAN)[VERIFY]$(NC) 验证LVGL v9安装..."
+	@if pkg-config --exists lvgl && [ "$$(pkg-config --modversion lvgl | cut -d. -f1)" = "9" ]; then \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9验证通过"; \
+	else \
+		echo "$(RED)[ERROR]$(NC) LVGL v9安装验证失败"; \
+		exit 1; \
 	fi
 
 # === C++系统构建 ===
