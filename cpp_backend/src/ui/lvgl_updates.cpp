@@ -217,11 +217,19 @@ void LVGLInterface::updateSystemStats() {
         
     } else {
         // 如果Jetson监控不可用，回退到模拟数据
-        updateSimulatedStats();
+        try {
+            updateSimulatedStats();
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Exception in updateSimulatedStats: " << e.what() << std::endl;
+        }
     }
     
-    // 更新系统指标（12项指标的动态数据）
-    updateMetricLabels();
+    // 更新系统指标（12项指标的动态数据） - 添加异常保护
+    try {
+        updateMetricLabels();
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] Exception in updateMetricLabels: " << e.what() << std::endl;
+    }
 #endif
 }
 
