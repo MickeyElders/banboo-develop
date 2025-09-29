@@ -734,7 +734,8 @@ void LVGLInterface::updateSystemExtendedStats(const utils::SystemStats& stats) {
     // 更新风扇转速
     if (control_widgets_.fan_speed_label) {
         if (stats.other.fan_rpm > 0) {
-            lv_label_set_text_fmt(control_widgets_.fan_speed_label, "FAN: %dRPM", stats.other.fan_rpm);
+            std::string fan_text = "FAN: " + std::to_string(stats.other.fan_rpm) + "RPM";
+            lv_label_set_text(control_widgets_.fan_speed_label, fan_text.c_str());
             lv_obj_set_style_text_color(control_widgets_.fan_speed_label, color_primary_, 0);
         } else {
             lv_label_set_text(control_widgets_.fan_speed_label, "FAN: N/A");
@@ -751,14 +752,16 @@ void LVGLInterface::updateSimulatedStats() {
         static int cpu_usage = 45;
         cpu_usage = 40 + (rand() % 30);  // 模拟40-70%的CPU使用率
         lv_bar_set_value(control_widgets_.cpu_bar, cpu_usage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @1.9GHz (Simulated)", cpu_usage);
+        std::string cpu_sim_text = "CPU: " + std::to_string(cpu_usage) + "% @1.9GHz (Simulated)";
+        lv_label_set_text(control_widgets_.cpu_label, cpu_sim_text.c_str());
     }
     
     if (control_widgets_.gpu_bar) {
         static int gpu_usage = 72;
         gpu_usage = 60 + (rand() % 25);  // 模拟60-85%的GPU使用率
         lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @624MHz (Simulated)", gpu_usage);
+        std::string gpu_sim_text = "GPU: " + std::to_string(gpu_usage) + "% @624MHz (Simulated)";
+        lv_label_set_text(control_widgets_.gpu_label, gpu_sim_text.c_str());
     }
     
     if (control_widgets_.mem_bar) {
@@ -767,7 +770,10 @@ void LVGLInterface::updateSimulatedStats() {
         mem_used = 3.8f + ((rand() % 200) / 100.0f);  // 模拟3.8-5.8GB内存使用
         int mem_percentage = (int)((mem_used / mem_total) * 100);
         lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %.1f/%.0fGB (Simulated)", mem_percentage, mem_used, mem_total);
+        std::string mem_sim_text = "RAM: " + std::to_string(mem_percentage) + "% " +
+                                 std::to_string(static_cast<int>(mem_used * 10) / 10.0) + "/" +
+                                 std::to_string(static_cast<int>(mem_total)) + "GB (Simulated)";
+        lv_label_set_text(control_widgets_.mem_label, mem_sim_text.c_str());
     }
 #endif
 }
@@ -840,8 +846,11 @@ void LVGLInterface::updateCameraView() {
     if (camera_widgets_.coord_value) {
         static float x = 0.0f;
         x += 0.1f;
-        lv_label_set_text_fmt(camera_widgets_.coord_value,
-            LV_SYMBOL_GPS " X: %.2f Y: %.2f Z: %.2f", x, x*0.8f, x*0.5f);
+        std::string coord_text = LV_SYMBOL_GPS " X: " +
+                               std::to_string(static_cast<int>(x * 100) / 100.0) + " Y: " +
+                               std::to_string(static_cast<int>((x*0.8f) * 100) / 100.0) + " Z: " +
+                               std::to_string(static_cast<int>((x*0.5f) * 100) / 100.0);
+        lv_label_set_text(camera_widgets_.coord_value, coord_text.c_str());
     }
 #endif
 }
