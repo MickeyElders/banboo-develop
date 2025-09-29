@@ -222,30 +222,40 @@ bool LVGLInterface::initializeDisplay() {
               << " 格式:XRGB8888 步长:" << (config_.screen_width * 4)
               << " 缓冲区大小:" << (buf_size * sizeof(lv_color_t)) << " bytes" << std::endl;
     
-    // LVGL v9 正确的缓冲区初始化方式 - 使用像素数而非字节数
+    // 修复缓冲区大小计算问题 - 确保与实际分配大小一致
+    uint32_t actual_buffer_size = buf_size * 4;  // 实际分配的字节数 (uint32_t)
+    
+    std::cout << "[LVGLInterface] 缓冲区大小验证:" << std::endl;
+    std::cout << "  - 像素数量: " << buf_size << std::endl;
+    std::cout << "  - sizeof(lv_color_t): " << sizeof(lv_color_t) << " bytes" << std::endl;
+    std::cout << "  - 实际分配大小: " << actual_buffer_size << " bytes" << std::endl;
+    std::cout << "  - LVGL期望大小: " << (buf_size * sizeof(lv_color_t)) << " bytes" << std::endl;
+    
+    // LVGL v9 缓冲区初始化 - 使用实际分配的字节大小
     lv_draw_buf_init(&draw_buf_, config_.screen_width, config_.screen_height,
                      LV_COLOR_FORMAT_XRGB8888, config_.screen_width * 4,
-                     disp_buf1_, buf_size);  // 使用像素数量，不是字节数
+                     disp_buf1_, actual_buffer_size);  // 使用实际分配的字节数
                      
     // 验证缓冲区初始化
     if (draw_buf_.data == nullptr) {
-        std::cerr << "[LVGLInterface] 显示缓冲区数据指针为空，尝试替代方案" << std::endl;
+        std::cerr << "[LVGLInterface] lv_draw_buf_init失败，使用手动设置" << std::endl;
         
-        // 使用替代的缓冲区设置方法
+        // 手动设置缓冲区结构体 - 完全绕过 lv_draw_buf_init
+        std::memset(&draw_buf_, 0, sizeof(draw_buf_));
         draw_buf_.data = disp_buf1_;
-        draw_buf_.data_size = buf_size * sizeof(lv_color_t);
+        draw_buf_.data_size = actual_buffer_size;
         draw_buf_.header.w = config_.screen_width;
         draw_buf_.header.h = config_.screen_height;
         draw_buf_.header.cf = LV_COLOR_FORMAT_XRGB8888;
         draw_buf_.header.stride = config_.screen_width * 4;
         
         if (draw_buf_.data == nullptr) {
-            std::cerr << "[LVGLInterface] 替代方案也失败" << std::endl;
+            std::cerr << "[LVGLInterface] 手动缓冲区设置也失败" << std::endl;
             return false;
         }
-        std::cout << "[LVGLInterface] 使用替代缓冲区设置成功" << std::endl;
+        std::cout << "[LVGLInterface] 手动缓冲区设置成功，绕过lv_draw_buf_init" << std::endl;
     } else {
-        std::cout << "[LVGLInterface] 显示缓冲区初始化成功，数据指针: " << draw_buf_.data << std::endl;
+        std::cout << "[LVGLInterface] lv_draw_buf_init成功，数据指针: " << draw_buf_.data << std::endl;
     }
     
     // 创建显示器 - 添加异常保护和验证
