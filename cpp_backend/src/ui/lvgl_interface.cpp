@@ -61,6 +61,15 @@ char style_table_header[64];
 char style_table_cell[64];
 #endif
 
+// 类的静态成员变量定义
+#ifdef ENABLE_LVGL
+lv_style_t LVGLInterface::style_card;
+lv_style_t LVGLInterface::style_text_title;
+#else
+char LVGLInterface::style_card[64];
+char LVGLInterface::style_text_title[64];
+#endif
+
 LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> data_bridge)
     : data_bridge_(data_bridge)
     , jetson_monitor_(std::make_shared<utils::JetsonMonitor>())
