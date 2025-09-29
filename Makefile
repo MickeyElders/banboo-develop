@@ -173,11 +173,11 @@ install-lvgl:
 	fi
 
 build-lvgl-from-source:
-	@echo "$(CYAN)[LVGL]$(NC) 开始编译安装LVGL v9.0..."
+	@echo "$(CYAN)[LVGL]$(NC) 开始编译安装LVGL v9.3..."
 	@mkdir -p /tmp/lvgl_build
 	@cd /tmp/lvgl_build && \
 	if [ ! -d "lvgl" ]; then \
-		git clone --depth 1 --branch release/v9.0 https://github.com/lvgl/lvgl.git; \
+		git clone --depth 1 --branch release/v9.3 https://github.com/lvgl/lvgl.git; \
 	fi
 	@echo "$(BLUE)[INFO]$(NC) 创建LVGL v9配置文件..."
 	@cd /tmp/lvgl_build/lvgl && \
