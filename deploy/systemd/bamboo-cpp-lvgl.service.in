@@ -32,21 +32,18 @@ LimitNOFILE=65536
 LimitNPROC=4096
 OOMScoreAdjust=-100
 
+# 启动前检查和清理
+ExecStartPre=-/bin/sh -c 'pkill -f bamboo_cu || true'
+ExecStartPre=-/bin/sh -c 'pkill -f bamboo_integrated || true'
+ExecStartPre=-/bin/sh -c 'fuser -k /dev/video0 2>/dev/null || true'
+ExecStartPre=/bin/sleep 2
+
 # 重启策略
 Restart=always
 RestartSec=15
 TimeoutStartSec=120
 TimeoutStopSec=60
 KillMode=mixed
-KillSignal=SIGTERM
-SendSIGKILL=yes
-FinalKillSignal=SIGKILL
-
-# 启动前检查和清理
-ExecStartPre=/bin/sh -c 'pkill -f bamboo_cu || true'
-ExecStartPre=/bin/sh -c 'pkill -f bamboo_integrated || true'
-ExecStartPre=/bin/sh -c 'fuser -k /dev/video0 2>/dev/null || true'
-ExecStartPre=/bin/sleep 2
 
 # 安全设置（允许访问硬件设备）
 NoNewPrivileges=false
