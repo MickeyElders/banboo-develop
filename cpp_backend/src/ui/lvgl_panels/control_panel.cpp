@@ -27,7 +27,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // Control Panel Title
     lv_obj_t* title = lv_label_create(control_panel_);
-    lv_label_set_text(title, LV_SYMBOL_SETTINGS " System Control");
+    lv_label_set_text(title, LV_SYMBOL_SETTINGS " System Info");
     lv_obj_add_style(title, &style_text_title, 0);
     lv_obj_set_style_text_color(title, color_primary_, 0);
     
