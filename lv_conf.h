@@ -49,14 +49,14 @@
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_BUILTIN
 
 /*Size of the memory available for `lv_malloc()` in bytes (>= 2kB)*/
-#define LV_MEM_SIZE (256U * 1024U)          /*[bytes]*/
+#define LV_MEM_SIZE (512U * 1024U)          /*[bytes] - 增加内存池大小*/
 
 /*Set an address for the memory pool instead of allocating it as a normal array. Can be in external SRAM too.*/
 #define LV_MEM_ADR 0     /*0: unused*/
 
 /*Number of the intermediate memory buffer used during rendering and other internal processing.
  *You will see an error log message if there wasn't enough buffers. */
-#define LV_MEM_BUF_MAX_NUM 16
+#define LV_MEM_BUF_MAX_NUM 32
 
 /*Use the standard `memcpy` and `memset` instead of LVGL's own functions. (Might or might not be faster).*/
 #define LV_MEMCPY_MEMSET_STD 1
@@ -66,10 +66,10 @@
  *====================*/
 
 /*Default display refresh period. LVG will redraw changed areas with this period time*/
-#define LV_DEF_REFR_PERIOD 30      /*[ms]*/
+#define LV_DEF_REFR_PERIOD 16      /*[ms] - 60fps目标*/
 
 /*Input device read period in milliseconds*/
-#define LV_INDEV_DEF_READ_PERIOD 30     /*[ms]*/
+#define LV_INDEV_DEF_READ_PERIOD 16     /*[ms] - 匹配显示刷新率*/
 
 /*Use a custom tick source that tells the elapsed time in milliseconds.
  *It removes the need to manually update the tick with `lv_tick_inc()`) */

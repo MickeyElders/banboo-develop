@@ -982,16 +982,22 @@ public:
             config.enable_touch = true;
             config.touch_device = "/dev/input/event0";
             
+            std::cout << "正在初始化LVGL界面..." << std::endl;
             if (!lvgl_interface_->initialize(config)) {
                 std::cout << "LVGL interface initialization failed" << std::endl;
                 return false;
             }
             
+            std::cout << "LVGL界面初始化成功，正在启动界面线程..." << std::endl;
             // 启动界面线程
             if (!lvgl_interface_->start()) {
                 std::cout << "LVGL interface start failed" << std::endl;
                 return false;
             }
+            
+            // 给界面线程一些时间来稳定启动
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::cout << "LVGL界面线程启动完成" << std::endl;
             
             std::cout << "Optimized LVGL interface created successfully" << std::endl;
         } catch (const std::exception& e) {

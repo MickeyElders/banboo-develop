@@ -151,13 +151,40 @@ bool LVGLInterface::initializeDisplay() {
 #ifdef ENABLE_LVGL
     std::cout << "[LVGLInterface] 初始化DRM显示驱动..." << std::endl;
     
-    // 分配显示缓冲区
-    uint32_t buf_size = config_.screen_width * config_.screen_height;
-    disp_buf1_ = new lv_color_t[buf_size];
-    disp_buf2_ = new lv_color_t[buf_size];
+    // 验证屏幕尺寸
+    if (config_.screen_width <= 0 || config_.screen_height <= 0 ||
+        config_.screen_width > 4096 || config_.screen_height > 4096) {
+        std::cerr << "[LVGLInterface] 无效的屏幕尺寸: " << config_.screen_width
+                  << "x" << config_.screen_height << std::endl;
+        return false;
+    }
     
-    if (!disp_buf1_ || !disp_buf2_) {
-        std::cerr << "[LVGLInterface] 显示缓冲区分配失败" << std::endl;
+    // 安全分配显示缓冲区
+    uint32_t buf_size = config_.screen_width * config_.screen_height;
+    
+    // 检查缓冲区大小是否合理（不超过64MB）
+    if (buf_size > 16 * 1024 * 1024) {
+        std::cerr << "[LVGLInterface] 缓冲区大小过大: " << buf_size << " 像素" << std::endl;
+        return false;
+    }
+    
+    try {
+        disp_buf1_ = new(std::nothrow) lv_color_t[buf_size];
+        disp_buf2_ = new(std::nothrow) lv_color_t[buf_size];
+        
+        if (!disp_buf1_ || !disp_buf2_) {
+            std::cerr << "[LVGLInterface] 显示缓冲区分配失败" << std::endl;
+            if (disp_buf1_) { delete[] disp_buf1_; disp_buf1_ = nullptr; }
+            if (disp_buf2_) { delete[] disp_buf2_; disp_buf2_ = nullptr; }
+            return false;
+        }
+        
+        // 初始化缓冲区为黑色
+        memset(disp_buf1_, 0, buf_size * sizeof(lv_color_t));
+        memset(disp_buf2_, 0, buf_size * sizeof(lv_color_t));
+        
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "[LVGLInterface] 内存分配异常: " << e.what() << std::endl;
         return false;
     }
     
@@ -988,29 +1015,42 @@ void LVGLInterface::uiLoop() {
     auto last_frame_time = std::chrono::high_resolution_clock::now();
     frame_count_ = 0;
     
-    while (!should_stop_.load()) {
-        auto current_time = std::chrono::high_resolution_clock::now();
-        
-        // 处理LVGL任务
-        uint32_t time_till_next = lv_timer_handler();
-        
-        // 更新界面数据
-        updateInterface();
-        
-        // 计算FPS
-        frame_count_++;
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            current_time - last_frame_time).count();
-        
-        if (elapsed >= 1000) {
-            ui_fps_ = frame_count_ * 1000.0f / elapsed;
-            frame_count_ = 0;
-            last_frame_time = current_time;
+    try {
+        while (!should_stop_.load()) {
+            auto current_time = std::chrono::high_resolution_clock::now();
+            
+            try {
+                // 处理LVGL任务 - 添加异常保护
+                uint32_t time_till_next = lv_timer_handler();
+                
+                // 更新界面数据
+                updateInterface();
+                
+                // 计算FPS
+                frame_count_++;
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    current_time - last_frame_time).count();
+                
+                if (elapsed >= 1000) {
+                    ui_fps_ = frame_count_ * 1000.0f / elapsed;
+                    frame_count_ = 0;
+                    last_frame_time = current_time;
+                }
+                
+                // 控制刷新率 - 限制最小间隔
+                uint32_t sleep_time = std::max(std::min(time_till_next, 16u), 1u);
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
+                
+            } catch (const std::exception& e) {
+                std::cerr << "[LVGLInterface] UI循环异常: " << e.what() << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 错误恢复延迟
+            } catch (...) {
+                std::cerr << "[LVGLInterface] UI循环未知异常" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 错误恢复延迟
+            }
         }
-        
-        // 控制刷新率
-        std::this_thread::sleep_for(std::chrono::milliseconds(
-            std::min(time_till_next, 16u))); // 最少16ms (60fps)
+    } catch (...) {
+        std::cerr << "[LVGLInterface] UI主循环致命异常" << std::endl;
     }
     
     std::cout << "[LVGLInterface] UI主循环结束" << std::endl;
@@ -1406,7 +1446,7 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
 
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 #ifdef ENABLE_LVGL
-    // 优化的DRM显示刷新实现 - 修复渲染质量问题
+    // 安全的DRM显示刷新实现 - 修复段错误问题
     static int drm_fd = -1;
     static uint32_t fb_id = 0;
     static drmModeCrtc* crtc = nullptr;
@@ -1418,6 +1458,13 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
     static uint32_t drm_height = 0;
     static uint32_t stride = 0;
     static uint32_t buffer_size = 0;
+    
+    // 严格的参数验证
+    if (!disp || !area || !px_map) {
+        std::cerr << "[DRM] Invalid parameters in display_flush_cb" << std::endl;
+        if (disp) lv_display_flush_ready(disp);
+        return;
+    }
     
     // 初始化DRM设备 (只初始化一次)
     if (!drm_initialized) {
@@ -1540,60 +1587,87 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
         }
     }
     
-    // 优化的像素数据复制 - 修复颜色显示问题
+    // 安全的像素数据复制 - 修复段错误和内存访问问题
     if (drm_initialized && framebuffer && drm_width > 0 && drm_height > 0 && stride > 0) {
+        // 严格的区域边界检查
+        if (area->x1 < 0 || area->y1 < 0 ||
+            area->x2 >= (int32_t)drm_width || area->y2 >= (int32_t)drm_height ||
+            area->x1 > area->x2 || area->y1 > area->y2) {
+            std::cerr << "[DRM] Invalid area bounds: (" << area->x1 << "," << area->y1
+                      << ") to (" << area->x2 << "," << area->y2 << ")" << std::endl;
+            lv_display_flush_ready(disp);
+            return;
+        }
+        
         uint32_t area_width = area->x2 - area->x1 + 1;
         uint32_t area_height = area->y2 - area->y1 + 1;
+        uint32_t pixels_per_row = stride / 4; // stride是字节数，除以4得到uint32_t数量
         
-        // 边界检查
-        if (area->x1 >= 0 && area->y1 >= 0 &&
-            area->x2 < (int32_t)drm_width && area->y2 < (int32_t)drm_height) {
-            
-            // 按行复制像素数据 - 考虑stride对齐
+        // 验证缓冲区大小
+        uint32_t total_area_pixels = area_width * area_height;
+        if (total_area_pixels == 0) {
+            lv_display_flush_ready(disp);
+            return;
+        }
+        
+        try {
+            // 安全的按行复制像素数据
             for (uint32_t y = 0; y < area_height; y++) {
                 uint32_t dst_row = area->y1 + y;
-                uint32_t src_row_offset = y * area_width;
-                uint32_t dst_row_offset = dst_row * (stride / 4); // stride是字节数，除以4得到uint32_t数量
+                uint32_t dst_row_offset = dst_row * pixels_per_row;
+                
+                // 检查目标行是否在有效范围内
+                if (dst_row >= drm_height || dst_row_offset >= (buffer_size / 4)) {
+                    continue;
+                }
                 
                 for (uint32_t x = 0; x < area_width; x++) {
                     uint32_t dst_col = area->x1 + x;
-                    uint32_t src_idx = src_row_offset + x;
                     uint32_t dst_idx = dst_row_offset + dst_col;
+                    uint32_t src_idx = y * area_width + x;
                     
-                    // LVGL v9像素格式转换 - 修复颜色问题
-                    // LVGL可能使用RGB565或RGB888格式，需要正确转换
-                    lv_color_t src_pixel;
+                    // 检查目标和源索引的有效性
+                    if (dst_col >= drm_width || dst_idx >= (buffer_size / 4) ||
+                        src_idx >= total_area_pixels) {
+                        continue;
+                    }
                     
-                    // 根据LVGL配置确定像素格式
+                    // 简化的像素格式转换 - 使用32位ARGB8888
+                    uint32_t pixel = 0x00000000; // 默认黑色
+                    
                     #if LV_COLOR_DEPTH == 32
-                        // 32位ARGB8888格式
+                        // 32位ARGB8888格式 - 直接复制
                         uint32_t* src_pixels = (uint32_t*)px_map;
-                        uint32_t src_value = src_pixels[src_idx];
-                        src_pixel.red = (src_value >> 16) & 0xFF;
-                        src_pixel.green = (src_value >> 8) & 0xFF;
-                        src_pixel.blue = src_value & 0xFF;
+                        if (src_idx < total_area_pixels) {
+                            pixel = src_pixels[src_idx];
+                        }
                     #elif LV_COLOR_DEPTH == 16
-                        // 16位RGB565格式
+                        // 16位RGB565格式转换
                         uint16_t* src_pixels = (uint16_t*)px_map;
-                        uint16_t src_value = src_pixels[src_idx];
-                        src_pixel.red = ((src_value >> 11) & 0x1F) * 255 / 31;   // 5位红色
-                        src_pixel.green = ((src_value >> 5) & 0x3F) * 255 / 63;   // 6位绿色
-                        src_pixel.blue = (src_value & 0x1F) * 255 / 31;          // 5位蓝色
+                        if (src_idx < total_area_pixels) {
+                            uint16_t src_value = src_pixels[src_idx];
+                            uint8_t r = ((src_value >> 11) & 0x1F) * 255 / 31;
+                            uint8_t g = ((src_value >> 5) & 0x3F) * 255 / 63;
+                            uint8_t b = (src_value & 0x1F) * 255 / 31;
+                            pixel = (r << 16) | (g << 8) | b;
+                        }
                     #else
-                        // 默认24位RGB888格式
-                        lv_color_t* src_pixels = (lv_color_t*)px_map;
-                        src_pixel = src_pixels[src_idx];
+                        // 24位RGB888格式
+                        uint8_t* src_pixels = (uint8_t*)px_map;
+                        uint32_t byte_idx = src_idx * 3;
+                        if (byte_idx + 2 < total_area_pixels * 3) {
+                            uint8_t r = src_pixels[byte_idx + 2]; // BGR -> RGB
+                            uint8_t g = src_pixels[byte_idx + 1];
+                            uint8_t b = src_pixels[byte_idx + 0];
+                            pixel = (r << 16) | (g << 8) | b;
+                        }
                     #endif
-                    
-                    // 转换为DRM标准的XRGB8888格式 (X=未使用,R=红色,G=绿色,B=蓝色)
-                    uint32_t pixel = 0x00000000 |                    // 最高8位未使用
-                                    ((uint32_t)src_pixel.red << 16) |   // 红色通道
-                                    ((uint32_t)src_pixel.green << 8) |  // 绿色通道
-                                    ((uint32_t)src_pixel.blue);         // 蓝色通道
                     
                     framebuffer[dst_idx] = pixel;
                 }
             }
+        } catch (...) {
+            std::cerr << "[DRM] Exception during pixel copy" << std::endl;
         }
     }
     
