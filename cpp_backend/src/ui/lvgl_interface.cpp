@@ -1175,12 +1175,13 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus通信状态");
     lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xE6A055), 0);
     lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_12, 0);
-    lv_obj_set_pos(modbus_title, 0, 0);
+    // ✅ 移除 lv_obj_set_pos，让 Flex 布局自动处理
     
     // 连接统计信息（第一行）- 使用简单Flex布局
     lv_obj_t* modbus_stats_container = lv_obj_create(modbus_section);
-    lv_obj_set_size(modbus_stats_container, lv_pct(100), 30);
-    lv_obj_set_pos(modbus_stats_container, 0, 18);
+    lv_obj_set_width(modbus_stats_container, lv_pct(100));
+    lv_obj_set_height(modbus_stats_container, LV_SIZE_CONTENT);  // ✅ 改为内容自适应高度
+    // ✅ 移除 lv_obj_set_pos，让 Flex 布局自动处理
     lv_obj_set_style_bg_opa(modbus_stats_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(modbus_stats_container, 0, 0);
     lv_obj_set_style_pad_all(modbus_stats_container, 0, 0);
@@ -1225,8 +1226,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === Modbus寄存器状态区域 - 使用Flex垂直布局实现1列7行 ===
     lv_obj_t* modbus_registers_container = lv_obj_create(modbus_section);
-    lv_obj_set_size(modbus_registers_container, lv_pct(100), 120);
-    lv_obj_set_pos(modbus_registers_container, 0, 55);
+    lv_obj_set_width(modbus_registers_container, lv_pct(100));
+    lv_obj_set_height(modbus_registers_container, LV_SIZE_CONTENT);  // ✅ 改为内容自适应高度
+    // ✅ 移除 lv_obj_set_pos，让 Flex 布局自动处理
     lv_obj_set_style_bg_opa(modbus_registers_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(modbus_registers_container, 0, 0);
     lv_obj_set_style_pad_all(modbus_registers_container, 0, 0);
