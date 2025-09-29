@@ -2426,6 +2426,8 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
     static uint32_t* framebuffer = nullptr;
     static uint32_t fb_handle = 0;
     static bool drm_initialized = false;
+    static bool drm_init_failed = false;  // 新增：标记初始化失败状态
+    static int init_attempt_count = 0;    // 新增：初始化尝试计数
     static uint32_t drm_width = 0;
     static uint32_t drm_height = 0;
     static uint32_t stride = 0;
@@ -2438,14 +2440,34 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
         return;
     }
     
-    // 初始化DRM设备 (只初始化一次)
-    if (!drm_initialized) {
+    // 如果DRM初始化已经失败，直接返回避免重复尝试
+    if (drm_init_failed) {
+        lv_display_flush_ready(disp);
+        return;
+    }
+    
+    // 初始化DRM设备 (只初始化一次，限制重试次数)
+    if (!drm_initialized && !drm_init_failed) {
+        init_attempt_count++;
+        
+        // 限制初始化尝试次数，避免无限重试
+        if (init_attempt_count > 3) {
+            std::cerr << "[DRM] 超过最大初始化尝试次数，标记为失败" << std::endl;
+            drm_init_failed = true;
+            lv_display_flush_ready(disp);
+            return;
+        }
+        
+        std::cout << "[DRM] 开始DRM初始化尝试 #" << init_attempt_count << std::endl;
+        
         const char* drm_devices[] = {"/dev/dri/card1", "/dev/dri/card0", "/dev/dri/card2"};
+        bool device_opened = false;
         
         for (const char* device_path : drm_devices) {
             drm_fd = open(device_path, O_RDWR);
             if (drm_fd >= 0) {
                 std::cout << "[DRM] 成功打开设备: " << device_path << std::endl;
+                device_opened = true;
                 
                 // 获取DRM资源
                 drmModeRes* resources = drmModeGetResources(drm_fd);
@@ -2547,15 +2569,48 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
                 if (drm_initialized) {
                     break;
                 } else {
+                    // 完善的资源清理
+                    if (framebuffer && framebuffer != MAP_FAILED) {
+                        munmap(framebuffer, buffer_size);
+                        framebuffer = nullptr;
+                    }
+                    if (fb_id) {
+                        drmModeRmFB(drm_fd, fb_id);
+                        fb_id = 0;
+                    }
+                    if (fb_handle) {
+                        struct drm_mode_destroy_dumb destroy_req = {};
+                        destroy_req.handle = fb_handle;
+                        drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_req);
+                        fb_handle = 0;
+                    }
+                    if (crtc) {
+                        drmModeFreeCrtc(crtc);
+                        crtc = nullptr;
+                    }
+                    if (connector) {
+                        drmModeFreeConnector(connector);
+                        connector = nullptr;
+                    }
                     close(drm_fd);
                     drm_fd = -1;
                 }
             }
         }
         
+        // 根据初始化结果设置状态
         if (!drm_initialized) {
-            std::cerr << "[DRM] 无法初始化任何DRM设备" << std::endl;
-            drm_initialized = true; // 避免重复尝试
+            if (!device_opened) {
+                std::cerr << "[DRM] 无法打开任何DRM设备" << std::endl;
+            } else {
+                std::cerr << "[DRM] DRM设备打开成功但初始化失败" << std::endl;
+            }
+            
+            // 如果所有设备都尝试过且仍未成功，标记为失败
+            if (init_attempt_count >= 3) {
+                drm_init_failed = true;
+                std::cerr << "[DRM] 标记DRM初始化为永久失败状态" << std::endl;
+            }
         }
     }
     
