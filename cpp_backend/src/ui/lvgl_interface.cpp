@@ -281,14 +281,24 @@ bool LVGLInterface::initializeDisplay() {
         lv_display_set_flush_cb(display_, display_flush_cb);
         std::cout << "[LVGLInterface] 显示刷新回调函数已设置" << std::endl;
         
-        // 初始化缓冲区为可见内容（避免全黑屏）
-        std::cout << "[LVGLInterface] 初始化缓冲区内容为测试图案" << std::endl;
-        lv_color_t* test_buf = (lv_color_t*)disp_buf1_;
+        // === 修复测试图案创建错误 ===
+        // 直接使用uint32_t指针，避免lv_color_make类型转换问题
+        std::cout << "[LVGLInterface] 初始化缓冲区内容为测试图案（修复版）" << std::endl;
+        uint32_t* test_buf_32 = reinterpret_cast<uint32_t*>(disp_buf1_);
+        
         for (uint32_t i = 0; i < buf_size; i++) {
-            // 创建渐变测试图案
+            // 创建渐变测试图案 - 直接使用32位ARGB8888格式
             uint8_t intensity = (i % 256);
-            test_buf[i] = lv_color_make(intensity, intensity/2, 255-intensity);
+            uint8_t r = intensity;
+            uint8_t g = intensity / 2;
+            uint8_t b = 255 - intensity;
+            uint8_t a = 0xFF; // 完全不透明
+            
+            // 直接构造32位ARGB8888像素：0xAARRGGBB
+            test_buf_32[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
+        
+        std::cout << "[LVGLInterface] 测试图案创建完成，使用直接32位像素格式" << std::endl;
         
         // 强制刷新一次以验证显示系统工作正常
         std::cout << "[LVGLInterface] 执行强制刷新验证显示系统" << std::endl;
