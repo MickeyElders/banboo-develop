@@ -287,7 +287,7 @@ private:
     /**
      * @brief 更新单个摄像头状态
      */
-    void updateSingleCameraStats(int camera_id, const core::CameraInfo& camera_info,
+    void updateSingleCameraStats(int camera_id, const core::CameraStatus& camera_info,
                                 lv_obj_t* status_label, lv_obj_t* fps_label, lv_obj_t* resolution_label,
                                 lv_obj_t* exposure_label, lv_obj_t* lighting_label);
 
