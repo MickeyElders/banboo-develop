@@ -67,6 +67,7 @@ static char style_table_cell[64];
 
 LVGLInterface::LVGLInterface(std::shared_ptr<core::DataBridge> data_bridge)
     : data_bridge_(data_bridge)
+    , jetson_monitor_(std::make_shared<utils::JetsonMonitor>())
     , main_screen_(nullptr)
     , header_panel_(nullptr)
     , camera_panel_(nullptr)
@@ -138,6 +139,11 @@ bool LVGLInterface::initialize(const LVGLConfig& config) {
     
     // 创建主界面
     createMainInterface();
+    
+    // 启动Jetson系统监控
+    if (jetson_monitor_) {
+        jetson_monitor_->start();
+    }
     
     std::cout << "[LVGLInterface] 界面系统初始化成功" << std::endl;
     return true;
@@ -1071,6 +1077,11 @@ void LVGLInterface::stop() {
     std::cout << "[LVGLInterface] 停止界面线程..." << std::endl;
     should_stop_.store(true);
     
+    // 停止Jetson系统监控
+    if (jetson_monitor_) {
+        jetson_monitor_->stop();
+    }
+    
     if (ui_thread_.joinable()) {
         ui_thread_.join();
     }
@@ -1157,52 +1168,113 @@ void LVGLInterface::updateSystemStats() {
             LV_SYMBOL_LOOP " %dms", response_ms);
     }
     
-    // 更新Jetson系统监控进度条
-    if (control_widgets_.cpu_bar) {
-        static int cpu_usage = 45;
-        cpu_usage = 40 + (rand() % 30);  // 模拟40-70%的CPU使用率
-        lv_bar_set_value(control_widgets_.cpu_bar, cpu_usage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%%", cpu_usage);
+    // 获取真实的Jetson系统状态
+    if (jetson_monitor_ && jetson_monitor_->isRunning()) {
+        utils::SystemStats stats = jetson_monitor_->getLatestStats();
         
-        // 根据使用率设置颜色
-        if (cpu_usage > 80) {
-            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_error_, LV_PART_INDICATOR);
-        } else if (cpu_usage > 60) {
-            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
-        } else {
-            lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_success_, LV_PART_INDICATOR);
+        // 更新CPU信息
+        if (control_widgets_.cpu_bar && !stats.cpu_cores.empty()) {
+            // 计算平均CPU使用率
+            int total_usage = 0;
+            int total_freq = 0;
+            for (const auto& core : stats.cpu_cores) {
+                total_usage += core.usage_percent;
+                total_freq += core.frequency_mhz;
+            }
+            int avg_usage = total_usage / stats.cpu_cores.size();
+            int avg_freq = total_freq / stats.cpu_cores.size();
+            
+            lv_bar_set_value(control_widgets_.cpu_bar, avg_usage, LV_ANIM_ON);
+            lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @%dMHz", avg_usage, avg_freq);
+            
+            // 根据使用率设置颜色
+            if (avg_usage > 80) {
+                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_error_, LV_PART_INDICATOR);
+            } else if (avg_usage > 60) {
+                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
+            } else {
+                lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_success_, LV_PART_INDICATOR);
+            }
         }
-    }
-    
-    if (control_widgets_.gpu_bar) {
-        static int gpu_usage = 72;
-        gpu_usage = 60 + (rand() % 25);  // 模拟60-85%的GPU使用率
-        lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%%", gpu_usage);
         
-        if (gpu_usage > 85) {
-            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_error_, LV_PART_INDICATOR);
-        } else if (gpu_usage > 70) {
-            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
-        } else {
-            lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_success_, LV_PART_INDICATOR);
+        // 更新GPU信息
+        if (control_widgets_.gpu_bar) {
+            int gpu_usage = stats.gpu.usage_percent;
+            lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
+            lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @%dMHz",
+                                 gpu_usage, stats.gpu.frequency_mhz);
+            
+            if (gpu_usage > 85) {
+                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_error_, LV_PART_INDICATOR);
+            } else if (gpu_usage > 70) {
+                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
+            } else {
+                lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_success_, LV_PART_INDICATOR);
+            }
         }
-    }
-    
-    if (control_widgets_.mem_bar) {
-        static float mem_used = 4.6f;
-        static float mem_total = 8.0f;
-        mem_used = 3.8f + ((rand() % 200) / 100.0f);  // 模拟3.8-5.8GB内存使用
-        int mem_percentage = (int)((mem_used / mem_total) * 100);
-        lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.mem_label, "MEM: %.1f/%.0fGB", mem_used, mem_total);
         
-        if (mem_percentage > 85) {
-            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_error_, LV_PART_INDICATOR);
-        } else if (mem_percentage > 70) {
-            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
-        } else {
-            lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_primary_, LV_PART_INDICATOR);
+        // 更新内存信息
+        if (control_widgets_.mem_bar && stats.memory.ram_total_mb > 0) {
+            int mem_percentage = (stats.memory.ram_used_mb * 100) / stats.memory.ram_total_mb;
+            lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
+            lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d/%dMB (LFB:%dx%dMB)",
+                                 stats.memory.ram_used_mb, stats.memory.ram_total_mb,
+                                 stats.memory.lfb_blocks, stats.memory.lfb_size_mb);
+            
+            if (mem_percentage > 85) {
+                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_error_, LV_PART_INDICATOR);
+            } else if (mem_percentage > 70) {
+                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
+            } else {
+                lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_primary_, LV_PART_INDICATOR);
+            }
+        }
+        
+        // 更新AI模型监控数据（保持现有逻辑，因为这些不是从tegrastats获得的）
+        if (control_widgets_.ai_fps_label) {
+            static float ai_fps = 28.5f;
+            ai_fps = 25.0f + ((rand() % 80) / 10.0f);  // Simulate 25-33FPS
+            lv_label_set_text_fmt(control_widgets_.ai_fps_label, "Inference FPS: %.1f", ai_fps);
+        }
+        
+        if (control_widgets_.ai_confidence_label) {
+            static float confidence = 0.94f;
+            confidence = 0.85f + ((rand() % 15) / 100.0f);  // Simulate 0.85-1.00 confidence
+            lv_label_set_text_fmt(control_widgets_.ai_confidence_label, "Confidence: %.2f", confidence);
+        }
+        
+        if (control_widgets_.ai_latency_label) {
+            static int latency = 12;
+            latency = 8 + (rand() % 8);  // Simulate 8-16ms latency
+            lv_label_set_text_fmt(control_widgets_.ai_latency_label, "Latency: %dms", latency);
+        }
+        
+        // 更新温度和电源信息（如果界面组件存在）
+        // TODO: 这里可以添加更多详细的系统信息显示
+        
+    } else {
+        // 如果Jetson监控不可用，回退到模拟数据
+        if (control_widgets_.cpu_bar) {
+            static int cpu_usage = 45;
+            cpu_usage = 40 + (rand() % 30);  // 模拟40-70%的CPU使用率
+            lv_bar_set_value(control_widgets_.cpu_bar, cpu_usage, LV_ANIM_ON);
+            lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% (模拟)", cpu_usage);
+        }
+        
+        if (control_widgets_.gpu_bar) {
+            static int gpu_usage = 72;
+            gpu_usage = 60 + (rand() % 25);  // 模拟60-85%的GPU使用率
+            lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
+            lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% (模拟)", gpu_usage);
+        }
+        
+        if (control_widgets_.mem_bar) {
+            static float mem_used = 4.6f;
+            static float mem_total = 8.0f;
+            mem_used = 3.8f + ((rand() % 200) / 100.0f);  // 模拟3.8-5.8GB内存使用
+            int mem_percentage = (int)((mem_used / mem_total) * 100);
+            lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
+            lv_label_set_text_fmt(control_widgets_.mem_label, "MEM: %.1f/%.0fGB (模拟)", mem_used, mem_total);
         }
     }
     

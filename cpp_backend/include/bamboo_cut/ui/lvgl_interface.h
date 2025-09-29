@@ -28,6 +28,7 @@ typedef void* lv_indev_data_t;
 #include <atomic>
 #include <chrono>
 #include "bamboo_cut/core/data_bridge.h"
+#include "bamboo_cut/utils/jetson_monitor.h"
 
 namespace bamboo_cut {
 namespace ui {
@@ -198,6 +199,7 @@ private:
 
 private:
     std::shared_ptr<core::DataBridge> data_bridge_;
+    std::shared_ptr<utils::JetsonMonitor> jetson_monitor_;
     LVGLConfig config_;
     
     std::thread ui_thread_;

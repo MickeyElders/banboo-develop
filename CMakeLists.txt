@@ -501,6 +501,7 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/ui/lvgl_interface.cpp
     cpp_backend/src/utils/config_loader.cpp
     cpp_backend/src/utils/system_monitor.cpp
+    cpp_backend/src/utils/jetson_monitor.cpp
 )
 
 # 条件包含CUDA相关文件
