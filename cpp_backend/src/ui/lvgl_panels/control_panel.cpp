@@ -400,7 +400,7 @@ void LVGLInterface::createAIModelSection(lv_obj_t* parent) {
     
     // === 摄像头2行组（结构同上） ===
     control_widgets_.camera2_status_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera2_status_label, "CAM-2: 在线✓");
+    lv_label_set_text(control_widgets_.camera2_status_label, "CAM-2: Online✓");
     lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_status_label, &lv_font_montserrat_12, 0);
     
@@ -433,12 +433,12 @@ void LVGLInterface::createAIModelSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(cam2_row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     control_widgets_.camera2_exposure_label = lv_label_create(cam2_row2);
-    lv_label_set_text(control_widgets_.camera2_exposure_label, "  自动曝光");
+    lv_label_set_text(control_widgets_.camera2_exposure_label, "  Auto Exposure");
     lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_exposure_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera2_lighting_label = lv_label_create(cam2_row2);
-    lv_label_set_text(control_widgets_.camera2_lighting_label, "光照良好");
+    lv_label_set_text(control_widgets_.camera2_lighting_label, "Good Lighting");
     lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_lighting_label, &lv_font_montserrat_12, 0);
 #endif
@@ -461,7 +461,7 @@ void LVGLInterface::createModbusSection(lv_obj_t* parent) {
 
     // 标题
     lv_obj_t* modbus_label = lv_label_create(modbus_section);
-    lv_label_set_text(modbus_label, LV_SYMBOL_WIFI " Modbus通讯状态");
+    lv_label_set_text(modbus_label, LV_SYMBOL_WIFI " Modbus Communication");
     lv_obj_set_style_text_color(modbus_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(modbus_label, &lv_font_montserrat_14, 0);
     
@@ -476,7 +476,7 @@ void LVGLInterface::createModbusSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     control_widgets_.modbus_connection_label = lv_label_create(row1);
-    lv_label_set_text(control_widgets_.modbus_connection_label, "在线✓");
+    lv_label_set_text(control_widgets_.modbus_connection_label, "Online✓");
     lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
     
