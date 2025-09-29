@@ -1094,45 +1094,45 @@ void LVGLInterface::updateSystemStats() {
         }
     }
     
-    // 更新AI模型监控数据
+    // Update AI Model Monitoring Data
     if (control_widgets_.ai_fps_label) {
         static float ai_fps = 28.5f;
-        ai_fps = 25.0f + ((rand() % 80) / 10.0f);  // 模拟25-33FPS
-        lv_label_set_text_fmt(control_widgets_.ai_fps_label, "推理FPS: %.1f", ai_fps);
+        ai_fps = 25.0f + ((rand() % 80) / 10.0f);  // Simulate 25-33FPS
+        lv_label_set_text_fmt(control_widgets_.ai_fps_label, "Inference FPS: %.1f", ai_fps);
     }
     
     if (control_widgets_.ai_confidence_label) {
         static float confidence = 0.94f;
-        confidence = 0.85f + ((rand() % 15) / 100.0f);  // 模拟0.85-1.00置信度
-        lv_label_set_text_fmt(control_widgets_.ai_confidence_label, "置信度: %.2f", confidence);
+        confidence = 0.85f + ((rand() % 15) / 100.0f);  // Simulate 0.85-1.00 confidence
+        lv_label_set_text_fmt(control_widgets_.ai_confidence_label, "Confidence: %.2f", confidence);
     }
     
     if (control_widgets_.ai_latency_label) {
         static int latency = 12;
-        latency = 8 + (rand() % 8);  // 模拟8-16ms延迟
-        lv_label_set_text_fmt(control_widgets_.ai_latency_label, "延迟: %dms", latency);
+        latency = 8 + (rand() % 8);  // Simulate 8-16ms latency
+        lv_label_set_text_fmt(control_widgets_.ai_latency_label, "Latency: %dms", latency);
     }
     
-    // 更新Modbus通信统计
+    // Update Modbus Communication Statistics
     if (control_widgets_.modbus_connection_label) {
         static int hours = 2, minutes = 15, seconds = 32;
         seconds++;
         if (seconds >= 60) { seconds = 0; minutes++; }
         if (minutes >= 60) { minutes = 0; hours++; }
         lv_label_set_text_fmt(control_widgets_.modbus_connection_label,
-            "连接时长: %02d:%02d:%02d", hours, minutes, seconds);
+            "Connection: %02d:%02d:%02d", hours, minutes, seconds);
     }
     
     if (control_widgets_.modbus_packets_label) {
         static int packets = 1247;
-        packets += 1 + (rand() % 3);  // 模拟数据包增长
-        lv_label_set_text_fmt(control_widgets_.modbus_packets_label, "数据包: %d", packets);
+        packets += 1 + (rand() % 3);  // Simulate packet growth
+        lv_label_set_text_fmt(control_widgets_.modbus_packets_label, "Packets: %d", packets);
     }
     
     if (control_widgets_.modbus_errors_label) {
         static float error_rate = 0.02f;
-        error_rate = (rand() % 10) / 1000.0f;  // 模拟0.000-0.010%错误率
-        lv_label_set_text_fmt(control_widgets_.modbus_errors_label, "错误率: %.3f%%", error_rate);
+        error_rate = (rand() % 10) / 1000.0f;  // Simulate 0.000-0.010% error rate
+        lv_label_set_text_fmt(control_widgets_.modbus_errors_label, "Error Rate: %.3f%%", error_rate);
     }
     
     // 更新系统指标（12项指标的动态数据）
