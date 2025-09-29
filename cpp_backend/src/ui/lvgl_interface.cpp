@@ -524,17 +524,21 @@ void LVGLInterface::createMainInterface() {
     
     // 创建中间内容容器（使用Flex布局管理左右面板）
     lv_obj_t* content_container = lv_obj_create(main_screen_);
-    lv_obj_set_size(content_container, lv_pct(98), lv_pct(85));
+    lv_obj_set_size(content_container, lv_pct(100), LV_SIZE_CONTENT);  // ✅ 宽度填满，高度自适应
+    lv_obj_align(content_container, LV_ALIGN_TOP_MID, 0, 75);  // ✅ 距离顶部75px（header高度70px + 5px间距）
     lv_obj_set_style_bg_opa(content_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(content_container, 0, 0);
-    lv_obj_set_style_pad_all(content_container, 5, 0);
-    lv_obj_set_style_pad_top(content_container, 80, 0);  // 替代align的top偏移
+    lv_obj_set_style_pad_all(content_container, 5, 0);  // 减少padding
     lv_obj_clear_flag(content_container, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置Flex布局：水平排列，左右分布
     lv_obj_set_flex_flow(content_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(content_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(content_container, 10, 0);
+    
+    // ✅ 计算容器实际可用高度（屏幕高度 - header - footer - 间距）
+    int32_t available_height = config_.screen_height - 70 - 90 - 15;  // header(70) + footer(80+10) + gaps(15)
+    lv_obj_set_height(content_container, available_height);  // ✅ 设置精确高度
     
     // 在容器内创建左右面板
     createCameraPanel(content_container);
@@ -671,8 +675,10 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_t* container = parent ? parent : main_screen_;
     
     camera_panel_ = lv_obj_create(container);
-    lv_obj_set_size(camera_panel_, lv_pct(73), lv_pct(100));  // 在容器内占73%宽度，100%高度
-    lv_obj_set_flex_grow(camera_panel_, 3);  // 占据更多空间
+    // ✅ 移除固定宽度，只用 flex_grow 控制比例
+    lv_obj_set_width(camera_panel_, LV_SIZE_CONTENT);  // 或者直接不设置宽度
+    lv_obj_set_height(camera_panel_, lv_pct(100));  // 高度填满父容器
+    lv_obj_set_flex_grow(camera_panel_, 3);  // ✅ 现在会生效，占3/4空间
     lv_obj_add_style(camera_panel_, &style_card, 0);
     
     // 简洁优雅的边框
@@ -733,8 +739,10 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_t* container = parent ? parent : main_screen_;
     
     control_panel_ = lv_obj_create(container);
-    lv_obj_set_size(control_panel_, lv_pct(25), lv_pct(100));  // 在容器内占25%宽度，100%高度
-    lv_obj_set_flex_grow(control_panel_, 1);  // 占据较少空间
+    // ✅ 移除固定宽度，只用 flex_grow 控制比例
+    lv_obj_set_width(control_panel_, LV_SIZE_CONTENT);  // 或者直接不设置宽度
+    lv_obj_set_height(control_panel_, lv_pct(100));  // 高度填满父容器
+    lv_obj_set_flex_grow(control_panel_, 1);  // ✅ 现在会生效，占1/4空间
     lv_obj_add_style(control_panel_, &style_card, 0);
     lv_obj_set_style_pad_all(control_panel_, 15, 0);  // 减少内边距以容纳更多内容
     lv_obj_set_style_radius(control_panel_, 16, 0);
@@ -1434,8 +1442,8 @@ lv_obj_t* LVGLInterface::createStatusPanel() {
 lv_obj_t* LVGLInterface::createFooterPanel() {
 #ifdef ENABLE_LVGL
     footer_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(footer_panel_, lv_pct(96), 70);  // 适应新布局，减小高度
-    lv_obj_align(footer_panel_, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_set_size(footer_panel_, lv_pct(100), 80);  // ✅ 宽度填满
+    lv_obj_align(footer_panel_, LV_ALIGN_BOTTOM_MID, 0, 0);  // ✅ 紧贴底部，移除-10偏移
     
     // 现代简洁的背景样式
     lv_obj_set_style_bg_color(footer_panel_, color_surface_, 0);
