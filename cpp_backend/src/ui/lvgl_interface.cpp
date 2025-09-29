@@ -1012,7 +1012,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：16.8ms");
     lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_warning_, 0);
     lv_obj_set_style_text_font(control_widgets_.bamboo_detection_time_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.bamboo_detection_time_label, control_widgets_.bamboo_confidence_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    lv_obj_set_pos(control_widgets_.bamboo_detection_time_label, lv_pct(55), 180);  // 使用相对位置替代align_to
     
     // === 第二分隔线 ===
     lv_obj_t* separator2 = lv_obj_create(ai_section);
