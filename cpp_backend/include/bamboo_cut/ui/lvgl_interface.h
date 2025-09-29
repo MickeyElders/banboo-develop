@@ -551,14 +551,15 @@ void input_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
  */
 bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
                         drmModeConnector*& connector, uint32_t*& framebuffer,
-                        uint32_t& fb_handle, int& drm_width, uint32_t& drm_height,
-                        uint32_t& stride, uint32_t& buffer_size, uint32_t& buf_size);
+                        uint32_t& fb_handle, int& init_attempt_count,
+                        uint32_t& drm_width, uint32_t& drm_height,
+                        uint32_t& stride, uint32_t& buffer_size);
 
 /**
  * @brief 复制像素数据
  */
 void copyPixelData(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
-                  int drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
+                  uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
 
 /**
  * @brief 设置DRM显示
