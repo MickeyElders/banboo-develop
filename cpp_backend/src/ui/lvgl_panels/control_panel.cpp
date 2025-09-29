@@ -468,16 +468,16 @@ void LVGLInterface::createVersionSection(lv_obj_t* parent) {
     lv_obj_set_style_text_font(control_widgets_.git_commit_label, &lv_font_montserrat_12, 0);
     
     // JetPack版本
-    control_widgets_.jetpack_version_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.jetpack_version_label, "JetPack: 5.1.2");
-    lv_obj_set_style_text_color(control_widgets_.jetpack_version_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.jetpack_version_label, &lv_font_montserrat_12, 0);
+    status_widgets_.jetpack_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.jetpack_version, "JetPack: 5.1.2");
+    lv_obj_set_style_text_color(status_widgets_.jetpack_version, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(status_widgets_.jetpack_version, &lv_font_montserrat_12, 0);
     
     // CUDA版本
-    control_widgets_.cuda_version_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.cuda_version_label, "CUDA: 11.4");
-    lv_obj_set_style_text_color(control_widgets_.cuda_version_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.cuda_version_label, &lv_font_montserrat_12, 0);
+    status_widgets_.cuda_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.cuda_version, "CUDA: 11.4");
+    lv_obj_set_style_text_color(status_widgets_.cuda_version, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(status_widgets_.cuda_version, &lv_font_montserrat_12, 0);
 #endif
 }
 
