@@ -357,10 +357,28 @@ void LVGLInterface::createMainInterface() {
     
     main_screen_ = lv_scr_act();
     
-    // 创建各个面板 - 新布局：左侧摄像头，右侧系统信息
+    // 创建头部面板
     createHeaderPanel();
-    createCameraPanel();
-    createControlPanel();  // 现在包含所有系统信息
+    
+    // 创建中间内容容器（使用Flex布局管理左右面板）
+    lv_obj_t* content_container = lv_obj_create(main_screen_);
+    lv_obj_set_size(content_container, lv_pct(98), lv_pct(85));
+    lv_obj_align(content_container, LV_ALIGN_TOP_MID, 0, 80);
+    lv_obj_set_style_bg_opa(content_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(content_container, 0, 0);
+    lv_obj_set_style_pad_all(content_container, 5, 0);
+    lv_obj_clear_flag(content_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置Flex布局：水平排列，左右分布
+    lv_obj_set_flex_flow(content_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(content_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(content_container, 10, 0);
+    
+    // 在容器内创建左右面板
+    createCameraPanel(content_container);
+    createControlPanel(content_container);
+    
+    // 创建底部面板
     createFooterPanel();
     
     std::cout << "[LVGLInterface] 主界面创建完成" << std::endl;
@@ -481,11 +499,13 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
 #endif
 }
 
-lv_obj_t* LVGLInterface::createCameraPanel() {
+lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
 #ifdef ENABLE_LVGL
-    camera_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(camera_panel_, lv_pct(73), lv_pct(85));  // 左侧73%区域，高度85%
-    lv_obj_align(camera_panel_, LV_ALIGN_TOP_LEFT, lv_pct(1), 80);
+    lv_obj_t* container = parent ? parent : main_screen_;
+    
+    camera_panel_ = lv_obj_create(container);
+    lv_obj_set_size(camera_panel_, lv_pct(73), lv_pct(100));  // 在容器内占73%宽度，100%高度
+    lv_obj_set_flex_grow(camera_panel_, 3);  // 占据更多空间
     lv_obj_add_style(camera_panel_, &style_card, 0);
     
     // 简洁优雅的边框
@@ -541,11 +561,13 @@ lv_obj_t* LVGLInterface::createCameraPanel() {
 #endif
 }
 
-lv_obj_t* LVGLInterface::createControlPanel() {
+lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
 #ifdef ENABLE_LVGL
-    control_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(control_panel_, lv_pct(25), lv_pct(85));  // 右侧25%宽度×85%高度
-    lv_obj_align(control_panel_, LV_ALIGN_TOP_RIGHT, -lv_pct(1), 80);
+    lv_obj_t* container = parent ? parent : main_screen_;
+    
+    control_panel_ = lv_obj_create(container);
+    lv_obj_set_size(control_panel_, lv_pct(25), lv_pct(100));  // 在容器内占25%宽度，100%高度
+    lv_obj_set_flex_grow(control_panel_, 1);  // 占据较少空间
     lv_obj_add_style(control_panel_, &style_card, 0);
     lv_obj_set_style_pad_all(control_panel_, 15, 0);  // 减少内边距以容纳更多内容
     lv_obj_set_style_radius(control_panel_, 16, 0);

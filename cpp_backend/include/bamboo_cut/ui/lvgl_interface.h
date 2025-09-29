@@ -116,12 +116,12 @@ private:
     /**
      * @brief 创建摄像头显示区域
      */
-    lv_obj_t* createCameraPanel();
+    lv_obj_t* createCameraPanel(lv_obj_t* parent = nullptr);
 
     /**
      * @brief 创建控制面板
      */
-    lv_obj_t* createControlPanel();
+    lv_obj_t* createControlPanel(lv_obj_t* parent = nullptr);
 
     /**
      * @brief 创建状态面板
