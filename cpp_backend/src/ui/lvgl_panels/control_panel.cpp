@@ -279,31 +279,31 @@ void LVGLInterface::createAIModelSection(lv_obj_t* parent) {
     control_widgets_.bamboo_diameter_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.bamboo_diameter_label, "- 直径：45.2mm");
     lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.bamboo_diameter_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_diameter_label, &lv_font_montserrat_12, 0);
     
     // 竹子长度
     control_widgets_.bamboo_length_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.bamboo_length_label, "- 长度：2850mm");
     lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.bamboo_length_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_length_label, &lv_font_montserrat_12, 0);
     
     // 预切位置
     control_widgets_.bamboo_cut_positions_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "- 预切位置：[950mm, 1900mm]");
     lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.bamboo_cut_positions_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_cut_positions_label, &lv_font_montserrat_12, 0);
     
     // 检测置信度
     control_widgets_.bamboo_confidence_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.bamboo_confidence_label, "- 置信度：0.92");
     lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.bamboo_confidence_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_confidence_label, &lv_font_montserrat_12, 0);
     
     // 检测耗时
     control_widgets_.bamboo_detection_time_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：16.8ms");
     lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.bamboo_detection_time_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_detection_time_label, &lv_font_montserrat_12, 0);
     
     // === 摄像头状态 ===
     lv_obj_t* camera_status_label = lv_label_create(ai_section);
@@ -315,53 +315,53 @@ void LVGLInterface::createAIModelSection(lv_obj_t* parent) {
     control_widgets_.camera1_status_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera1_status_label, "摄像头-1：在线 ✓");
     lv_obj_set_style_text_color(control_widgets_.camera1_status_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.camera1_status_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_status_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera1_fps_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera1_fps_label, "  帧率：30 FPS");
     lv_obj_set_style_text_color(control_widgets_.camera1_fps_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.camera1_fps_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_fps_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera1_resolution_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera1_resolution_label, "  分辨率：1920x1080");
     lv_obj_set_style_text_color(control_widgets_.camera1_resolution_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.camera1_resolution_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_resolution_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera1_exposure_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera1_exposure_label, "  曝光：自动");
     lv_obj_set_style_text_color(control_widgets_.camera1_exposure_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.camera1_exposure_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_exposure_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera1_lighting_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera1_lighting_label, "  光照评分：良好");
     lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.camera1_lighting_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_lighting_label, &lv_font_montserrat_12, 0);
     
     // 摄像头2状态
     control_widgets_.camera2_status_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera2_status_label, "摄像头-2：在线 ✓");
     lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.camera2_status_label, &lv_font_montserrat_11, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_status_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera2_fps_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera2_fps_label, "  帧率：30 FPS");
     lv_obj_set_style_text_color(control_widgets_.camera2_fps_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.camera2_fps_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_fps_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera2_resolution_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera2_resolution_label, "  分辨率：1920x1080");
     lv_obj_set_style_text_color(control_widgets_.camera2_resolution_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.camera2_resolution_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_resolution_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera2_exposure_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera2_exposure_label, "  曝光：自动");
     lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, color_primary_, 0);
-    lv_obj_set_style_text_font(control_widgets_.camera2_exposure_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_exposure_label, &lv_font_montserrat_12, 0);
     
     control_widgets_.camera2_lighting_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.camera2_lighting_label, "  光照评分：良好");
     lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.camera2_lighting_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_lighting_label, &lv_font_montserrat_12, 0);
 #endif
 }
 
