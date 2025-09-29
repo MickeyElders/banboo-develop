@@ -223,6 +223,7 @@ build-lvgl-from-source:
 	echo "#define LV_USE_OS               LV_OS_NONE" >> lv_conf.h && \
 	echo "" >> lv_conf.h && \
 	echo "#endif /*LV_CONF_H*/" >> lv_conf.h
+	@echo "$(BLUE)[INFO]$(NC) 配置CMake构建..."
 	@cd /tmp/lvgl_build/lvgl && \
 	mkdir -p build && cd build && \
 	cmake .. \
@@ -232,10 +233,25 @@ build-lvgl-from-source:
 		-DBUILD_SHARED_LIBS=ON \
 		-DLV_BUILD_EXAMPLES=OFF \
 		-DLV_USE_DEMO_WIDGETS=OFF
+	@echo "$(BLUE)[INFO]$(NC) 编译LVGL..."
 	@cd /tmp/lvgl_build/lvgl/build && make -j$(shell nproc)
+	@echo "$(BLUE)[INFO]$(NC) 安装LVGL到系统..."
 	@cd /tmp/lvgl_build/lvgl/build && sudo make install
+	@echo "$(BLUE)[INFO]$(NC) 创建pkg-config文件..."
+	@sudo mkdir -p /usr/local/lib/pkgconfig
+	@echo "prefix=/usr/local" | sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "exec_prefix=\$${prefix}" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "libdir=\$${exec_prefix}/lib" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "includedir=\$${prefix}/include" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Name: LVGL" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Description: Light and Versatile Graphics Library" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Version: 9.3.0" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Libs: -L\$${libdir} -llvgl" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
+	@echo "Cflags: -I\$${includedir} -I\$${includedir}/lvgl" | sudo tee -a /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
 	@sudo ldconfig
-	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.0编译安装完成"
+	@sudo updatedb 2>/dev/null || true
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.3编译安装完成"
 	@rm -rf /tmp/lvgl_build
 
 # 安装LVGL v9的快速命令
