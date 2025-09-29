@@ -53,6 +53,34 @@ struct BambooDetection {
 };
 
 /**
+ * @brief 摄像头状态信息
+ */
+struct CameraStatus {
+    bool is_online;                     // 摄像头是否在线
+    float fps;                          // 帧率
+    int width;                          // 分辨率宽度
+    int height;                         // 分辨率高度
+    std::string exposure_mode;          // 曝光模式 (auto/manual)
+    std::string lighting_quality;      // 光照评分 (良好/一般/差)
+    std::string device_path;            // 设备路径
+    
+    CameraStatus() : is_online(false), fps(0), width(0), height(0),
+                    exposure_mode("auto"), lighting_quality("未知"),
+                    device_path("") {}
+};
+
+/**
+ * @brief 双摄像头系统状态
+ */
+struct CameraSystemStatus {
+    CameraStatus camera1;               // 摄像头-1状态
+    CameraStatus camera2;               // 摄像头-2状态
+    bool system_ready;                  // 摄像头系统就绪状态
+    
+    CameraSystemStatus() : system_ready(false) {}
+};
+
+/**
  * @brief AI模型性能统计
  */
 struct AIModelStats {
@@ -66,6 +94,9 @@ struct AIModelStats {
     
     // 当前竹子检测状态
     BambooDetection current_bamboo;
+    
+    // 摄像头系统状态
+    CameraSystemStatus camera_system;
     
     AIModelStats() : model_version("YOLOv8n"), inference_time_ms(0),
                     confidence_threshold(0.85f), detection_accuracy(0),

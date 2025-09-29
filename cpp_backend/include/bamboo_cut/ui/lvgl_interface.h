@@ -271,6 +271,18 @@ private:
         lv_obj_t* bamboo_confidence_label;     // 检测置信度
         lv_obj_t* bamboo_detection_time_label; // 检测耗时
         
+        // 摄像头状态组件
+        lv_obj_t* camera1_status_label;        // 摄像头-1在线状态
+        lv_obj_t* camera1_fps_label;           // 摄像头-1帧率
+        lv_obj_t* camera1_resolution_label;    // 摄像头-1分辨率
+        lv_obj_t* camera1_exposure_label;      // 摄像头-1曝光模式
+        lv_obj_t* camera1_lighting_label;      // 摄像头-1光照评分
+        lv_obj_t* camera2_status_label;        // 摄像头-2在线状态
+        lv_obj_t* camera2_fps_label;           // 摄像头-2帧率
+        lv_obj_t* camera2_resolution_label;    // 摄像头-2分辨率
+        lv_obj_t* camera2_exposure_label;      // 摄像头-2曝光模式
+        lv_obj_t* camera2_lighting_label;      // 摄像头-2光照评分
+        
         // Modbus通信统计组件
         lv_obj_t* modbus_connection_label;
         lv_obj_t* modbus_packets_label;

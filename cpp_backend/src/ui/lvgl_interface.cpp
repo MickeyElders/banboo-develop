@@ -748,7 +748,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === AI Model Monitoring Area ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(ai_section, lv_pct(100), 220);  // 增加高度以容纳更多信息
+    lv_obj_set_size(ai_section, lv_pct(100), 340);  // 增加高度以容纳摄像头状态信息
     lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(ai_section, 12, 0);
     lv_obj_set_style_border_width(ai_section, 1, 0);
@@ -853,6 +853,83 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_warning_, 0);
     lv_obj_set_style_text_font(control_widgets_.bamboo_detection_time_label, &lv_font_montserrat_12, 0);
     lv_obj_align_to(control_widgets_.bamboo_detection_time_label, control_widgets_.bamboo_confidence_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    
+    // === 第二分隔线 ===
+    lv_obj_t* separator2 = lv_obj_create(ai_section);
+    lv_obj_set_size(separator2, lv_pct(100), 1);
+    lv_obj_set_pos(separator2, 0, 205);
+    lv_obj_set_style_bg_color(separator2, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_border_width(separator2, 0, 0);
+    lv_obj_clear_flag(separator2, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // === 摄像头系统状态 ===
+    lv_obj_t* camera_status_title = lv_label_create(ai_section);
+    lv_label_set_text(camera_status_title, LV_SYMBOL_EYE_OPEN " 摄像头状态：");
+    lv_obj_set_style_text_color(camera_status_title, color_primary_, 0);
+    lv_obj_set_style_text_font(camera_status_title, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(camera_status_title, 0, 215);
+    
+    // === 摄像头-1状态 ===
+    control_widgets_.camera1_status_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera1_status_label, "摄像头-1：在线 ✓");
+    lv_obj_set_style_text_color(control_widgets_.camera1_status_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_status_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.camera1_status_label, 0, 235);
+    
+    control_widgets_.camera1_fps_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera1_fps_label, "  帧率：30 FPS");
+    lv_obj_set_style_text_color(control_widgets_.camera1_fps_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_fps_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.camera1_fps_label, 0, 250);
+    
+    control_widgets_.camera1_resolution_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera1_resolution_label, "  分辨率：1920x1080");
+    lv_obj_set_style_text_color(control_widgets_.camera1_resolution_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_resolution_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.camera1_resolution_label, 0, 265);
+    
+    control_widgets_.camera1_exposure_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera1_exposure_label, "  曝光：自动");
+    lv_obj_set_style_text_color(control_widgets_.camera1_exposure_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_exposure_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.camera1_exposure_label, 0, 280);
+    
+    control_widgets_.camera1_lighting_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera1_lighting_label, "  光照评分：良好");
+    lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera1_lighting_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_pos(control_widgets_.camera1_lighting_label, 0, 295);
+    
+    // === 摄像头-2状态 ===
+    control_widgets_.camera2_status_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera2_status_label, "摄像头-2：在线 ✓");
+    lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_status_label, &lv_font_montserrat_12, 0);
+    lv_obj_align_to(control_widgets_.camera2_status_label, control_widgets_.camera1_status_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    
+    control_widgets_.camera2_fps_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera2_fps_label, "  帧率：30 FPS");
+    lv_obj_set_style_text_color(control_widgets_.camera2_fps_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_fps_label, &lv_font_montserrat_12, 0);
+    lv_obj_align_to(control_widgets_.camera2_fps_label, control_widgets_.camera1_fps_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    
+    control_widgets_.camera2_resolution_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera2_resolution_label, "  分辨率：1920x1080");
+    lv_obj_set_style_text_color(control_widgets_.camera2_resolution_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_resolution_label, &lv_font_montserrat_12, 0);
+    lv_obj_align_to(control_widgets_.camera2_resolution_label, control_widgets_.camera1_resolution_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    
+    control_widgets_.camera2_exposure_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera2_exposure_label, "  曝光：自动");
+    lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_exposure_label, &lv_font_montserrat_12, 0);
+    lv_obj_align_to(control_widgets_.camera2_exposure_label, control_widgets_.camera1_exposure_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    
+    control_widgets_.camera2_lighting_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.camera2_lighting_label, "  光照评分：良好");
+    lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera2_lighting_label, &lv_font_montserrat_12, 0);
+    lv_obj_align_to(control_widgets_.camera2_lighting_label, control_widgets_.camera1_lighting_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
@@ -1604,6 +1681,137 @@ void LVGLInterface::updateSystemStats() {
             } else {
                 lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：N/A");
                 lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        // === 更新摄像头系统状态 ===
+        const auto& camera_system = databridge_stats.ai_model.camera_system;
+        
+        // 更新摄像头-1状态
+        if (control_widgets_.camera1_status_label) {
+            if (camera_system.camera1.is_online) {
+                lv_label_set_text(control_widgets_.camera1_status_label, "摄像头-1：在线 ✓");
+                lv_obj_set_style_text_color(control_widgets_.camera1_status_label, color_success_, 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera1_status_label, "摄像头-1：未安装 ✗");
+                lv_obj_set_style_text_color(control_widgets_.camera1_status_label, color_error_, 0);
+            }
+        }
+        
+        if (control_widgets_.camera1_fps_label) {
+            if (camera_system.camera1.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera1_fps_label, "  帧率：%.0f FPS", camera_system.camera1.fps);
+                lv_obj_set_style_text_color(control_widgets_.camera1_fps_label, lv_color_hex(0xB0B8C1), 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera1_fps_label, "  帧率：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera1_fps_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        if (control_widgets_.camera1_resolution_label) {
+            if (camera_system.camera1.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera1_resolution_label, "  分辨率：%dx%d",
+                                     camera_system.camera1.width, camera_system.camera1.height);
+                lv_obj_set_style_text_color(control_widgets_.camera1_resolution_label, lv_color_hex(0xB0B8C1), 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera1_resolution_label, "  分辨率：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera1_resolution_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        if (control_widgets_.camera1_exposure_label) {
+            if (camera_system.camera1.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera1_exposure_label, "  曝光：%s",
+                                     camera_system.camera1.exposure_mode.c_str());
+                lv_obj_set_style_text_color(control_widgets_.camera1_exposure_label, color_primary_, 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera1_exposure_label, "  曝光：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera1_exposure_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        if (control_widgets_.camera1_lighting_label) {
+            if (camera_system.camera1.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera1_lighting_label, "  光照评分：%s",
+                                     camera_system.camera1.lighting_quality.c_str());
+                
+                // 根据光照质量设置颜色
+                if (camera_system.camera1.lighting_quality == "良好") {
+                    lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_success_, 0);
+                } else if (camera_system.camera1.lighting_quality == "一般") {
+                    lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_warning_, 0);
+                } else if (camera_system.camera1.lighting_quality == "差") {
+                    lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_error_, 0);
+                } else {
+                    lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_primary_, 0);
+                }
+            } else {
+                lv_label_set_text(control_widgets_.camera1_lighting_label, "  光照评分：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        // 更新摄像头-2状态
+        if (control_widgets_.camera2_status_label) {
+            if (camera_system.camera2.is_online) {
+                lv_label_set_text(control_widgets_.camera2_status_label, "摄像头-2：在线 ✓");
+                lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_success_, 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera2_status_label, "摄像头-2：未安装 ✗");
+                lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_error_, 0);
+            }
+        }
+        
+        if (control_widgets_.camera2_fps_label) {
+            if (camera_system.camera2.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera2_fps_label, "  帧率：%.0f FPS", camera_system.camera2.fps);
+                lv_obj_set_style_text_color(control_widgets_.camera2_fps_label, lv_color_hex(0xB0B8C1), 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera2_fps_label, "  帧率：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera2_fps_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        if (control_widgets_.camera2_resolution_label) {
+            if (camera_system.camera2.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera2_resolution_label, "  分辨率：%dx%d",
+                                     camera_system.camera2.width, camera_system.camera2.height);
+                lv_obj_set_style_text_color(control_widgets_.camera2_resolution_label, lv_color_hex(0xB0B8C1), 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera2_resolution_label, "  分辨率：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera2_resolution_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        if (control_widgets_.camera2_exposure_label) {
+            if (camera_system.camera2.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera2_exposure_label, "  曝光：%s",
+                                     camera_system.camera2.exposure_mode.c_str());
+                lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, color_primary_, 0);
+            } else {
+                lv_label_set_text(control_widgets_.camera2_exposure_label, "  曝光：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, lv_color_hex(0x8A92A1), 0);
+            }
+        }
+        
+        if (control_widgets_.camera2_lighting_label) {
+            if (camera_system.camera2.is_online) {
+                lv_label_set_text_fmt(control_widgets_.camera2_lighting_label, "  光照评分：%s",
+                                     camera_system.camera2.lighting_quality.c_str());
+                
+                // 根据光照质量设置颜色
+                if (camera_system.camera2.lighting_quality == "良好") {
+                    lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_success_, 0);
+                } else if (camera_system.camera2.lighting_quality == "一般") {
+                    lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_warning_, 0);
+                } else if (camera_system.camera2.lighting_quality == "差") {
+                    lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_error_, 0);
+                } else {
+                    lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_primary_, 0);
+                }
+            } else {
+                lv_label_set_text(control_widgets_.camera2_lighting_label, "  光照评分：N/A");
+                lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, lv_color_hex(0x8A92A1), 0);
             }
         }
         
