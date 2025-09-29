@@ -357,11 +357,10 @@ void LVGLInterface::createMainInterface() {
     
     main_screen_ = lv_scr_act();
     
-    // 创建各个面板
+    // 创建各个面板 - 新布局：左侧摄像头，右侧系统信息
     createHeaderPanel();
     createCameraPanel();
-    createControlPanel();
-    createStatusPanel();
+    createControlPanel();  // 现在包含所有系统信息
     createFooterPanel();
     
     std::cout << "[LVGLInterface] 主界面创建完成" << std::endl;
@@ -485,8 +484,8 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
 lv_obj_t* LVGLInterface::createCameraPanel() {
 #ifdef ENABLE_LVGL
     camera_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(camera_panel_, lv_pct(75), lv_pct(75));  // 调整为75%布局
-    lv_obj_align(camera_panel_, LV_ALIGN_TOP_LEFT, lv_pct(2), 80);
+    lv_obj_set_size(camera_panel_, lv_pct(73), lv_pct(85));  // 左侧73%区域，高度85%
+    lv_obj_align(camera_panel_, LV_ALIGN_TOP_LEFT, lv_pct(1), 80);
     lv_obj_add_style(camera_panel_, &style_card, 0);
     
     // 简洁优雅的边框
@@ -545,14 +544,14 @@ lv_obj_t* LVGLInterface::createCameraPanel() {
 lv_obj_t* LVGLInterface::createControlPanel() {
 #ifdef ENABLE_LVGL
     control_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(control_panel_, lv_pct(25), lv_pct(75));  // 调整为25%宽度×75%高度
-    lv_obj_align(control_panel_, LV_ALIGN_TOP_RIGHT, -lv_pct(2), 80);
+    lv_obj_set_size(control_panel_, lv_pct(25), lv_pct(85));  // 右侧25%宽度×85%高度
+    lv_obj_align(control_panel_, LV_ALIGN_TOP_RIGHT, -lv_pct(1), 80);
     lv_obj_add_style(control_panel_, &style_card, 0);
-    lv_obj_set_style_pad_all(control_panel_, 20, 0);
+    lv_obj_set_style_pad_all(control_panel_, 15, 0);  // 减少内边距以容纳更多内容
     lv_obj_set_style_radius(control_panel_, 16, 0);
     lv_obj_set_flex_flow(control_panel_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_gap(control_panel_, 16, 0);
+    lv_obj_set_style_pad_gap(control_panel_, 12, 0);  // 减少组件间距
     
     // Control Panel Title
     lv_obj_t* title = lv_label_create(control_panel_);
@@ -660,43 +659,94 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(modbus_section, lv_pct(100), 110);
+    lv_obj_set_size(modbus_section, lv_pct(100), 90);  // 减小高度
     lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(modbus_section, 12, 0);
     lv_obj_set_style_border_width(modbus_section, 1, 0);
     lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x2A3441), 0);
-    lv_obj_set_style_pad_all(modbus_section, 12, 0);
+    lv_obj_set_style_pad_all(modbus_section, 10, 0);  // 减小内边距
     lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* modbus_title = lv_label_create(modbus_section);
     lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus Statistics");
     lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xE6A055), 0);
-    lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_12, 0);  // 使用较小字体
     lv_obj_align(modbus_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
     control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
     lv_label_set_text(control_widgets_.modbus_connection_label, "Connection: 02:15:32");
     lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 25);
+    lv_obj_align(control_widgets_.modbus_connection_label, LV_ALIGN_TOP_LEFT, 0, 20);
     
     control_widgets_.modbus_packets_label = lv_label_create(modbus_section);
     lv_label_set_text(control_widgets_.modbus_packets_label, "Packets: 1247");
     lv_obj_set_style_text_color(control_widgets_.modbus_packets_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_packets_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 45);
+    lv_obj_align(control_widgets_.modbus_packets_label, LV_ALIGN_TOP_LEFT, 0, 38);
     
     control_widgets_.modbus_errors_label = lv_label_create(modbus_section);
     lv_label_set_text(control_widgets_.modbus_errors_label, "Error Rate: 0.02%");
     lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_errors_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 25);
+    lv_obj_align(control_widgets_.modbus_errors_label, LV_ALIGN_TOP_RIGHT, 0, 20);
     
     control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
     lv_label_set_text(control_widgets_.modbus_heartbeat_label, "Heartbeat: OK");
     lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 45);
+    lv_obj_align(control_widgets_.modbus_heartbeat_label, LV_ALIGN_TOP_RIGHT, 0, 38);
+    
+    // === 系统版本信息区域 - 添加到控制面板底部 ===
+    lv_obj_t* version_section = lv_obj_create(control_panel_);
+    lv_obj_set_size(version_section, lv_pct(100), 120);
+    lv_obj_set_style_bg_color(version_section, lv_color_hex(0x0F1419), 0);
+    lv_obj_set_style_radius(version_section, 12, 0);
+    lv_obj_set_style_border_width(version_section, 1, 0);
+    lv_obj_set_style_border_color(version_section, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_pad_all(version_section, 10, 0);
+    lv_obj_clear_flag(version_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* version_title = lv_label_create(version_section);
+    lv_label_set_text(version_title, LV_SYMBOL_LIST " System Version");
+    lv_obj_set_style_text_color(version_title, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(version_title, &lv_font_montserrat_12, 0);
+    lv_obj_align(version_title, LV_ALIGN_TOP_LEFT, 0, 0);
+    
+    // JetPack版本
+    status_widgets_.jetpack_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.jetpack_version, "JetPack: 5.1.2");
+    lv_obj_set_style_text_color(status_widgets_.jetpack_version, lv_color_white(), 0);
+    lv_obj_set_style_text_font(status_widgets_.jetpack_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.jetpack_version, LV_ALIGN_TOP_LEFT, 0, 18);
+    
+    // CUDA版本
+    status_widgets_.cuda_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.cuda_version, "CUDA: 11.4.315");
+    lv_obj_set_style_text_color(status_widgets_.cuda_version, color_success_, 0);
+    lv_obj_set_style_text_font(status_widgets_.cuda_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.cuda_version, LV_ALIGN_TOP_LEFT, 0, 35);
+    
+    // TensorRT版本
+    status_widgets_.tensorrt_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.tensorrt_version, "TensorRT: 8.5.2");
+    lv_obj_set_style_text_color(status_widgets_.tensorrt_version, color_primary_, 0);
+    lv_obj_set_style_text_font(status_widgets_.tensorrt_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.tensorrt_version, LV_ALIGN_TOP_LEFT, 0, 52);
+    
+    // OpenCV版本
+    status_widgets_.opencv_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.opencv_version, "OpenCV: 4.8.0");
+    lv_obj_set_style_text_color(status_widgets_.opencv_version, color_warning_, 0);
+    lv_obj_set_style_text_font(status_widgets_.opencv_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.opencv_version, LV_ALIGN_TOP_LEFT, 0, 69);
+    
+    // Ubuntu版本
+    status_widgets_.ubuntu_version = lv_label_create(version_section);
+    lv_label_set_text(status_widgets_.ubuntu_version, "Ubuntu: 20.04.6");
+    lv_obj_set_style_text_color(status_widgets_.ubuntu_version, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(status_widgets_.ubuntu_version, &lv_font_montserrat_12, 0);
+    lv_obj_align(status_widgets_.ubuntu_version, LV_ALIGN_TOP_LEFT, 0, 86);
     
     return control_panel_;
 #else
@@ -849,8 +899,8 @@ lv_obj_t* LVGLInterface::createStatusPanel() {
 lv_obj_t* LVGLInterface::createFooterPanel() {
 #ifdef ENABLE_LVGL
     footer_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(footer_panel_, lv_pct(96), 80);  // 使用百分比，降低高度
-    lv_obj_align(footer_panel_, LV_ALIGN_BOTTOM_MID, 0, -12);
+    lv_obj_set_size(footer_panel_, lv_pct(96), 70);  // 适应新布局，减小高度
+    lv_obj_align(footer_panel_, LV_ALIGN_BOTTOM_MID, 0, -10);
     
     // 现代简洁的背景样式
     lv_obj_set_style_bg_color(footer_panel_, color_surface_, 0);
