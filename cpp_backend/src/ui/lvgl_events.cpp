@@ -121,55 +121,98 @@ void LVGLInterface::showMessageDialog(const std::string& title, const std::strin
 
 void LVGLInterface::updateModbusDisplay() {
 #ifdef ENABLE_LVGL
-    if (!data_bridge_) return;
+    if (!data_bridge_) {
+        std::cout << "[LVGLInterface] DataBridge not initialized, skipping Modbus display update" << std::endl;
+        return;
+    }
     
-    // 添加空指针保护 - 检查控制面板是否已初始化
+    // 添加控制面板空指针保护
     if (!control_panel_) {
-        return;  // 静默跳过，避免日志过多
+        std::cout << "[LVGLInterface] Control panel not initialized, skipping Modbus display update" << std::endl;
+        return;
+    }
+    
+    // 检查所有关键的Modbus控件是否已正确初始化
+    if (!control_widgets_.modbus_connection_label ||
+        !control_widgets_.modbus_address_label ||
+        !control_widgets_.modbus_latency_label ||
+        !control_widgets_.modbus_last_success_label ||
+        !control_widgets_.modbus_error_count_label ||
+        !control_widgets_.modbus_message_count_label) {
+        std::cout << "[LVGLInterface] Modbus widgets not properly initialized, skipping update" << std::endl;
+        return;
+    }
+    
+    // 检查Modbus寄存器相关控件
+    if (!control_widgets_.modbus_system_status_label ||
+        !control_widgets_.modbus_plc_command_label ||
+        !control_widgets_.modbus_coord_ready_label ||
+        !control_widgets_.modbus_x_coordinate_label ||
+        !control_widgets_.modbus_cut_quality_label ||
+        !control_widgets_.modbus_blade_number_label ||
+        !control_widgets_.modbus_health_status_label) {
+        std::cout << "[LVGLInterface] Modbus register widgets not properly initialized, skipping register update" << std::endl;
+        // 只跳过寄存器更新，基本状态信息仍可更新
     }
     
     // 从DataBridge获取真实的Modbus寄存器数据
     core::ModbusRegisters modbus_registers = data_bridge_->getModbusRegisters();
     
-    // 更新连接状态信息（使用模拟数据）
-    if (control_widgets_.modbus_connection_label) {
-        bool is_connected = (modbus_registers.heartbeat > 0);
-        std::string connection_text = "PLC连接: " + std::string(is_connected ? "在线 ✓" : "离线 ✗");
-        lv_label_set_text(control_widgets_.modbus_connection_label, connection_text.c_str());
-        lv_obj_set_style_text_color(control_widgets_.modbus_connection_label,
-            is_connected ? color_success_ : color_error_, 0);
-    }
-    
-    // 更新Modbus地址信息
-    if (control_widgets_.modbus_address_label) {
-        lv_label_set_text(control_widgets_.modbus_address_label, "地址: 192.168.1.100:502");
-        lv_obj_set_style_text_color(control_widgets_.modbus_address_label, lv_color_hex(0xB0B8C1), 0);
-    }
-    
-    // 更新通讯延迟
-    if (control_widgets_.modbus_latency_label) {
-        static int latency_ms = 8;
-        latency_ms = 5 + (rand() % 10);  // 模拟5-15ms延迟
-        std::string latency_text = "通讯延迟: " + std::to_string(latency_ms) + "ms";
-        lv_label_set_text(control_widgets_.modbus_latency_label, latency_text.c_str());
-        
-        // 根据延迟设置颜色
-        if (latency_ms <= 10) {
-            lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_success_, 0);
-        } else if (latency_ms <= 20) {
-            lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_warning_, 0);
-        } else {
-            lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_error_, 0);
+    // 更新连接状态信息（使用模拟数据） - 添加控件有效性检查
+    if (control_widgets_.modbus_connection_label && lv_obj_is_valid(control_widgets_.modbus_connection_label)) {
+        try {
+            bool is_connected = (modbus_registers.heartbeat > 0);
+            std::string connection_text = "PLC连接: " + std::string(is_connected ? "在线 ✓" : "离线 ✗");
+            lv_label_set_text(control_widgets_.modbus_connection_label, connection_text.c_str());
+            lv_obj_set_style_text_color(control_widgets_.modbus_connection_label,
+                is_connected ? color_success_ : color_error_, 0);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus connection label: " << e.what() << std::endl;
         }
     }
     
-    // 更新最后通讯时间
-    if (control_widgets_.modbus_last_success_label) {
-        static int last_comm_seconds = 2;
-        last_comm_seconds = (rand() % 5) + 1;  // 模拟1-5秒前
-        std::string last_success_text = "最后通讯: " + std::to_string(last_comm_seconds) + "秒前";
-        lv_label_set_text(control_widgets_.modbus_last_success_label, last_success_text.c_str());
-        lv_obj_set_style_text_color(control_widgets_.modbus_last_success_label, color_primary_, 0);
+    // 更新Modbus地址信息 - 添加控件有效性检查
+    if (control_widgets_.modbus_address_label && lv_obj_is_valid(control_widgets_.modbus_address_label)) {
+        try {
+            lv_label_set_text(control_widgets_.modbus_address_label, "地址: 192.168.1.100:502");
+            lv_obj_set_style_text_color(control_widgets_.modbus_address_label, lv_color_hex(0xB0B8C1), 0);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus address label: " << e.what() << std::endl;
+        }
+    }
+    
+    // 更新通讯延迟 - 添加控件有效性检查
+    if (control_widgets_.modbus_latency_label && lv_obj_is_valid(control_widgets_.modbus_latency_label)) {
+        try {
+            static int latency_ms = 8;
+            latency_ms = 5 + (rand() % 10);  // 模拟5-15ms延迟
+            std::string latency_text = "通讯延迟: " + std::to_string(latency_ms) + "ms";
+            lv_label_set_text(control_widgets_.modbus_latency_label, latency_text.c_str());
+            
+            // 根据延迟设置颜色
+            if (latency_ms <= 10) {
+                lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_success_, 0);
+            } else if (latency_ms <= 20) {
+                lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_error_, 0);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus latency label: " << e.what() << std::endl;
+        }
+    }
+    
+    // 更新最后通讯时间 - 添加控件有效性检查
+    if (control_widgets_.modbus_last_success_label && lv_obj_is_valid(control_widgets_.modbus_last_success_label)) {
+        try {
+            static int last_comm_seconds = 2;
+            last_comm_seconds = (rand() % 5) + 1;  // 模拟1-5秒前
+            std::string last_success_text = "最后通讯: " + std::to_string(last_comm_seconds) + "秒前";
+            lv_label_set_text(control_widgets_.modbus_last_success_label, last_success_text.c_str());
+            lv_obj_set_style_text_color(control_widgets_.modbus_last_success_label, color_primary_, 0);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus last success label: " << e.what() << std::endl;
+        }
     }
     
     // 更新错误计数
