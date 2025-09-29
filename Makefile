@@ -214,7 +214,7 @@ build-lvgl-from-source:
 	echo "#define LV_USE_BMP              1" >> lv_conf.h && \
 	echo "#define LV_USE_JPG              1" >> lv_conf.h && \
 	echo "#define LV_USE_GIF              1" >> lv_conf.h && \
-	echo "#define LV_USE_FREETYPE         1" >> lv_conf.h && \
+	echo "#define LV_USE_FREETYPE         0" >> lv_conf.h && \
 	echo "" >> lv_conf.h && \
 	echo "// LVGL v9特定配置" >> lv_conf.h && \
 	echo "#define LV_USE_DRAW_SW          1" >> lv_conf.h && \
