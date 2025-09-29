@@ -94,14 +94,16 @@ LVGLInterface::~LVGLInterface() {
     stop();
     
 #ifdef ENABLE_LVGL
+    // 修复内存释放：使用与分配匹配的delete方式
     if (disp_buf1_) {
-        delete[] disp_buf1_;
+        delete[] reinterpret_cast<uint32_t*>(disp_buf1_);
         disp_buf1_ = nullptr;
     }
     if (disp_buf2_) {
-        delete[] disp_buf2_;
+        delete[] reinterpret_cast<uint32_t*>(disp_buf2_);
         disp_buf2_ = nullptr;
     }
+    std::cout << "[LVGLInterface] 显示缓冲区内存已释放" << std::endl;
 #endif
 }
 
@@ -478,13 +480,22 @@ void LVGLInterface::createMainInterface() {
     lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
     std::cout << "[LVGLInterface] 设置主屏幕背景色为: 0x" << std::hex << lv_color_to32(color_background_) << std::dec << std::endl;
     
-    // 2. 创建测试标签验证屏幕可见性
+    // 2. 创建测试标签验证屏幕可见性（修复版）
     lv_obj_t* test_label = lv_label_create(main_screen_);
     lv_label_set_text(test_label, "BAMBOO SYSTEM INITIALIZING...");
-    lv_obj_set_style_text_color(test_label, lv_color_white(), 0);
+    
+    // 使用32位颜色值，避免lv_color_white()的类型转换问题
+    lv_color_t white_color;
+    #if LV_COLOR_DEPTH == 32
+        white_color = lv_color_hex(0xFFFFFF);  // 直接使用32位白色
+    #else
+        white_color = lv_color_white();
+    #endif
+    
+    lv_obj_set_style_text_color(test_label, white_color, 0);
     lv_obj_set_style_text_font(test_label, &lv_font_montserrat_24, 0);
     lv_obj_center(test_label);
-    std::cout << "[LVGLInterface] 创建初始化测试标签" << std::endl;
+    std::cout << "[LVGLInterface] 创建初始化测试标签（32位颜色格式）" << std::endl;
     
     // 3. 强制刷新主屏幕，确保背景色和测试内容可见
     lv_obj_invalidate(main_screen_);
