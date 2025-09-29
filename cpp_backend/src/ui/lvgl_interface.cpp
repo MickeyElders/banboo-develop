@@ -167,7 +167,8 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
-    // 安全分配显示缓冲区
+    // === 修复像素格式不匹配问题 ===
+    
     uint32_t buf_size = config_.screen_width * config_.screen_height;
     
     // 检查缓冲区大小是否合理（不超过64MB）
@@ -176,20 +177,46 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
+    // 强制验证LVGL颜色深度配置
+    std::cout << "[LVGLInterface] LVGL配置验证: LV_COLOR_DEPTH=" << LV_COLOR_DEPTH
+              << " sizeof(lv_color_t)=" << sizeof(lv_color_t) << " bytes" << std::endl;
+              
+    // 确保LVGL使用32位颜色深度，与DRM framebuffer匹配
+    if (LV_COLOR_DEPTH != 32 || sizeof(lv_color_t) != 4) {
+        std::cerr << "[LVGLInterface] 错误：LVGL颜色深度不匹配DRM要求" << std::endl;
+        std::cerr << "[LVGLInterface] 需要：LV_COLOR_DEPTH=32, sizeof(lv_color_t)=4" << std::endl;
+        std::cerr << "[LVGLInterface] 当前：LV_COLOR_DEPTH=" << LV_COLOR_DEPTH
+                  << ", sizeof(lv_color_t)=" << sizeof(lv_color_t) << std::endl;
+        return false;
+    }
+    
     try {
-        disp_buf1_ = new(std::nothrow) lv_color_t[buf_size];
-        disp_buf2_ = new(std::nothrow) lv_color_t[buf_size];
+        // 使用uint32_t分配，确保与DRM framebuffer完全一致
+        disp_buf1_ = reinterpret_cast<lv_color_t*>(new(std::nothrow) uint32_t[buf_size]);
+        disp_buf2_ = reinterpret_cast<lv_color_t*>(new(std::nothrow) uint32_t[buf_size]);
         
         if (!disp_buf1_ || !disp_buf2_) {
             std::cerr << "[LVGLInterface] 显示缓冲区分配失败" << std::endl;
-            if (disp_buf1_) { delete[] disp_buf1_; disp_buf1_ = nullptr; }
-            if (disp_buf2_) { delete[] disp_buf2_; disp_buf2_ = nullptr; }
+            if (disp_buf1_) { delete[] reinterpret_cast<uint32_t*>(disp_buf1_); disp_buf1_ = nullptr; }
+            if (disp_buf2_) { delete[] reinterpret_cast<uint32_t*>(disp_buf2_); disp_buf2_ = nullptr; }
             return false;
         }
         
-        // 初始化缓冲区为黑色
-        memset(disp_buf1_, 0, buf_size * sizeof(lv_color_t));
-        memset(disp_buf2_, 0, buf_size * sizeof(lv_color_t));
+        std::cout << "[LVGLInterface] 缓冲区分配成功: buf1=" << disp_buf1_ << " buf2=" << disp_buf2_
+                  << " 大小=" << (buf_size * sizeof(uint32_t)) << " bytes" << std::endl;
+        
+        // 使用uint32_t指针初始化，避免类型错位
+        uint32_t* buf1_32 = reinterpret_cast<uint32_t*>(disp_buf1_);
+        uint32_t* buf2_32 = reinterpret_cast<uint32_t*>(disp_buf2_);
+        
+        // 初始化为深色背景，而非全黑（提供可见测试图案）
+        uint32_t test_color = 0xFF1A1F26; // 与color_background_匹配的深色
+        for (uint32_t i = 0; i < buf_size; i++) {
+            buf1_32[i] = test_color;
+            buf2_32[i] = test_color;
+        }
+        
+        std::cout << "[LVGLInterface] 缓冲区初始化为测试颜色: 0x" << std::hex << test_color << std::dec << std::endl;
         
     } catch (const std::bad_alloc& e) {
         std::cerr << "[LVGLInterface] 内存分配异常: " << e.what() << std::endl;
