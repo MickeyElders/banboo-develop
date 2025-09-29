@@ -6,6 +6,9 @@
 #include "bamboo_cut/vision/stereo_vision.h"
 #include <iostream>
 #include <fstream>
+#include <thread>
+#include <chrono>
+#include <cstdlib>
 
 namespace bamboo_cut {
 namespace vision {
@@ -101,17 +104,47 @@ bool StereoVision::load_calibration() {
 }
 
 bool StereoVision::initialize_cameras() {
+    // 检测和释放被占用的摄像头设备
+    std::cout << "检测摄像头设备占用情况..." << std::endl;
+    
+    // 尝试释放可能被占用的设备
+    std::vector<int> camera_ids = {config_.left_camera_id, config_.right_camera_id};
+    for (int id : camera_ids) {
+        std::string device_path = "/dev/video" + std::to_string(id);
+        std::string cmd = "fuser -k " + device_path + " 2>/dev/null || true";
+        if (system(cmd.c_str()) == 0) {
+            std::cout << "已释放被占用的设备: " << device_path << std::endl;
+        }
+        // 等待设备释放
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    
     std::cout << "初始化左摄像头 (ID: " << config_.left_camera_id << ")..." << std::endl;
+    
+    // 确保摄像头完全释放
+    if (left_camera_.isOpened()) {
+        left_camera_.release();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    
     left_camera_.open(config_.left_camera_id);
     if (!left_camera_.isOpened()) {
-        std::cout << "无法打开左摄像头" << std::endl;
+        std::cout << "无法打开左摄像头，设备可能被占用" << std::endl;
         return false;
     }
     
     std::cout << "初始化右摄像头 (ID: " << config_.right_camera_id << ")..." << std::endl;
+    
+    // 确保摄像头完全释放
+    if (right_camera_.isOpened()) {
+        right_camera_.release();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    
     right_camera_.open(config_.right_camera_id);
     if (!right_camera_.isOpened()) {
-        std::cout << "无法打开右摄像头" << std::endl;
+        std::cout << "无法打开右摄像头，设备可能被占用" << std::endl;
+        left_camera_.release(); // 释放已打开的左摄像头
         return false;
     }
     
