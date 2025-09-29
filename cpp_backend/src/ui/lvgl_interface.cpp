@@ -472,7 +472,7 @@ void LVGLInterface::createMainInterface() {
     // 1. 设置主屏幕背景色为可见颜色（避免全透明或全白）
     lv_obj_set_style_bg_color(main_screen_, color_background_, 0);
     lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
-    std::cout << "[LVGLInterface] 设置主屏幕背景色为: 0x" << std::hex << lv_color_to_32(color_background_) << std::dec << std::endl;
+    std::cout << "[LVGLInterface] 设置主屏幕背景色完成" << std::endl;
     
     // 2. 创建测试标签验证屏幕可见性（修复版）
     lv_obj_t* test_label = lv_label_create(main_screen_);
