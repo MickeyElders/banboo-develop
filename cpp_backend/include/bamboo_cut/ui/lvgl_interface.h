@@ -494,6 +494,15 @@ private:
     lv_color_t color_error_;
     lv_color_t color_background_;
     lv_color_t color_surface_;
+
+    // === LVGL样式对象 ===
+#ifdef ENABLE_LVGL
+    static lv_style_t style_card;
+    static lv_style_t style_text_title;
+#else
+    static char style_card[64];     // 占位符
+    static char style_text_title[64]; // 占位符
+#endif
     
     // Grid布局已完全移除，使用安全的Flex布局替代
 };
