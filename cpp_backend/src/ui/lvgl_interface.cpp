@@ -161,9 +161,9 @@ bool LVGLInterface::initializeDisplay() {
         return false;
     }
     
-    // 初始化显示缓冲区 (LVGL v9 API)
+    // 初始化显示缓冲区 (LVGL v9 API) - 使用与DRM匹配的格式
     lv_draw_buf_init(&draw_buf_, config_.screen_width, config_.screen_height,
-                     LV_COLOR_FORMAT_RGB888, config_.screen_width * 4,
+                     LV_COLOR_FORMAT_XRGB8888, config_.screen_width * 4,
                      disp_buf1_, buf_size * sizeof(lv_color_t));
     
     // 创建显示器
@@ -1119,7 +1119,7 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
 
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 #ifdef ENABLE_LVGL
-    // 实际的DRM显示刷新实现
+    // 优化的DRM显示刷新实现 - 修复渲染质量问题
     static int drm_fd = -1;
     static uint32_t fb_id = 0;
     static drmModeCrtc* crtc = nullptr;
@@ -1129,6 +1129,8 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
     static bool drm_initialized = false;
     static uint32_t drm_width = 0;
     static uint32_t drm_height = 0;
+    static uint32_t stride = 0;
+    static uint32_t buffer_size = 0;
     
     // 初始化DRM设备 (只初始化一次)
     if (!drm_initialized) {
@@ -1146,59 +1148,91 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
                     for (int i = 0; i < resources->count_connectors; i++) {
                         connector = drmModeGetConnector(drm_fd, resources->connectors[i]);
                         if (connector && connector->connection == DRM_MODE_CONNECTED && connector->count_modes > 0) {
-                            // 找到CRTC
-                            if (connector->encoder_id) {
-                                drmModeEncoder* encoder = drmModeGetEncoder(drm_fd, connector->encoder_id);
-                                if (encoder && encoder->crtc_id) {
-                                    crtc = drmModeGetCrtc(drm_fd, encoder->crtc_id);
-                                    if (crtc) {
-                                        drm_width = crtc->width;
-                                        drm_height = crtc->height;
-                                        std::cout << "[DRM] 找到CRTC: " << drm_width << "x" << drm_height << std::endl;
+                            
+                            // 选择最佳显示模式 (通常是第一个，也是首选模式)
+                            drmModeModeInfo* mode = &connector->modes[0];
+                            drm_width = mode->hdisplay;
+                            drm_height = mode->vdisplay;
+                            
+                            std::cout << "[DRM] 显示器模式: " << drm_width << "x" << drm_height
+                                      << " @" << mode->vrefresh << "Hz" << std::endl;
+                            std::cout << "[DRM] 模式名称: " << mode->name << std::endl;
+                            
+                            // 查找合适的CRTC
+                            for (int j = 0; j < resources->count_crtcs; j++) {
+                                // 检查这个CRTC是否可以驱动这个连接器
+                                if (connector->encoder_id) {
+                                    drmModeEncoder* encoder = drmModeGetEncoder(drm_fd, connector->encoder_id);
+                                    if (encoder && (encoder->possible_crtcs & (1 << j))) {
+                                        crtc = drmModeGetCrtc(drm_fd, resources->crtcs[j]);
+                                        if (crtc) {
+                                            std::cout << "[DRM] 找到合适的CRTC: " << crtc->crtc_id << std::endl;
+                                            drmModeFreeEncoder(encoder);
+                                            break;
+                                        }
                                     }
-                                    drmModeFreeEncoder(encoder);
-                                    break;
+                                    if (encoder) drmModeFreeEncoder(encoder);
                                 }
                             }
+                            
+                            if (crtc) break;
                         }
                     }
                     
-                    // 创建dumb buffer
+                    // 创建优化的dumb buffer
                     if (crtc && connector && drm_width > 0 && drm_height > 0) {
                         struct drm_mode_create_dumb create_req = {};
                         create_req.width = drm_width;
                         create_req.height = drm_height;
-                        create_req.bpp = 32;
+                        create_req.bpp = 32; // 确保使用32位颜色深度
                         
                         if (drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_req) == 0) {
                             fb_handle = create_req.handle;
-                            uint32_t stride = create_req.pitch;
-                            uint32_t size = create_req.size;
+                            stride = create_req.pitch;
+                            buffer_size = create_req.size;
                             
-                            // 创建framebuffer对象
-                            if (drmModeAddFB(drm_fd, drm_width, drm_height, 24, 32, stride, fb_handle, &fb_id) == 0) {
-                                // 映射framebuffer
+                            std::cout << "[DRM] 创建buffer: " << drm_width << "x" << drm_height
+                                      << ", stride: " << stride << ", size: " << buffer_size << std::endl;
+                            
+                            // 创建framebuffer对象 - 使用正确的格式
+                            uint32_t depth = 24; // 颜色深度
+                            uint32_t bpp = 32;   // 每像素位数
+                            
+                            if (drmModeAddFB(drm_fd, drm_width, drm_height, depth, bpp, stride, fb_handle, &fb_id) == 0) {
+                                // 映射framebuffer到用户空间
                                 struct drm_mode_map_dumb map_req = {};
                                 map_req.handle = fb_handle;
                                 
                                 if (drmIoctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) == 0) {
-                                    framebuffer = (uint32_t*)mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, map_req.offset);
+                                    framebuffer = (uint32_t*)mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, map_req.offset);
                                     if (framebuffer != MAP_FAILED) {
-                                        // 设置CRTC使用我们的framebuffer
-                                        int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0, &connector->connector_id, 1, &connector->modes[0]);
+                                        // 设置CRTC使用我们的framebuffer - 使用正确的模式
+                                        drmModeModeInfo* best_mode = &connector->modes[0];
+                                        int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0,
+                                                               &connector->connector_id, 1, best_mode);
                                         if (ret == 0) {
                                             drm_initialized = true;
-                                            std::cout << "[DRM] DRM framebuffer初始化成功: " << drm_width << "x" << drm_height << std::endl;
-                                            // 清空framebuffer (黑色背景)
-                                            memset(framebuffer, 0, size);
+                                            std::cout << "[DRM] DRM framebuffer初始化成功" << std::endl;
+                                            
+                                            // 清空framebuffer (深色背景)
+                                            memset(framebuffer, 0x00, buffer_size);
+                                            
+                                            // 强制刷新显示
+                                            drmModePageFlip(drm_fd, crtc->crtc_id, fb_id, 0, nullptr);
                                         } else {
-                                            std::cerr << "[DRM] drmModeSetCrtc失败: " << ret << std::endl;
+                                            std::cerr << "[DRM] drmModeSetCrtc失败: " << ret << " (" << strerror(-ret) << ")" << std::endl;
                                         }
                                     } else {
-                                        std::cerr << "[DRM] framebuffer映射失败" << std::endl;
+                                        std::cerr << "[DRM] framebuffer映射失败: " << strerror(errno) << std::endl;
                                     }
+                                } else {
+                                    std::cerr << "[DRM] map dumb buffer失败" << std::endl;
                                 }
+                            } else {
+                                std::cerr << "[DRM] 创建framebuffer失败" << std::endl;
                             }
+                        } else {
+                            std::cerr << "[DRM] 创建dumb buffer失败" << std::endl;
                         }
                     }
                     drmModeFreeResources(resources);
@@ -1219,33 +1253,56 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
         }
     }
     
-    // 将LVGL像素数据复制到DRM framebuffer
-    if (drm_initialized && framebuffer && drm_width > 0 && drm_height > 0) {
+    // 优化的像素数据复制 - 修复颜色显示问题
+    if (drm_initialized && framebuffer && drm_width > 0 && drm_height > 0 && stride > 0) {
         uint32_t area_width = area->x2 - area->x1 + 1;
         uint32_t area_height = area->y2 - area->y1 + 1;
         
-        // 确保坐标在有效范围内
+        // 边界检查
         if (area->x1 >= 0 && area->y1 >= 0 &&
-            area->x1 < (int32_t)drm_width && area->y1 < (int32_t)drm_height) {
+            area->x2 < (int32_t)drm_width && area->y2 < (int32_t)drm_height) {
             
+            // 按行复制像素数据 - 考虑stride对齐
             for (uint32_t y = 0; y < area_height; y++) {
-                if ((area->y1 + y) >= (int32_t)drm_height) break;
+                uint32_t dst_row = area->y1 + y;
+                uint32_t src_row_offset = y * area_width;
+                uint32_t dst_row_offset = dst_row * (stride / 4); // stride是字节数，除以4得到uint32_t数量
                 
                 for (uint32_t x = 0; x < area_width; x++) {
-                    if ((area->x1 + x) >= (int32_t)drm_width) break;
+                    uint32_t dst_col = area->x1 + x;
+                    uint32_t src_idx = src_row_offset + x;
+                    uint32_t dst_idx = dst_row_offset + dst_col;
                     
-                    // 计算源像素和目标像素位置
-                    uint32_t src_idx = (y * area_width + x);
-                    uint32_t dst_idx = (area->y1 + y) * drm_width + (area->x1 + x);
+                    // LVGL v9像素格式转换 - 修复颜色问题
+                    // LVGL可能使用RGB565或RGB888格式，需要正确转换
+                    lv_color_t src_pixel;
                     
-                    // LVGL使用lv_color_t格式，需要转换为DRM格式
-                    lv_color_t* src_color = (lv_color_t*)px_map + src_idx;
+                    // 根据LVGL配置确定像素格式
+                    #if LV_COLOR_DEPTH == 32
+                        // 32位ARGB8888格式
+                        uint32_t* src_pixels = (uint32_t*)px_map;
+                        uint32_t src_value = src_pixels[src_idx];
+                        src_pixel.red = (src_value >> 16) & 0xFF;
+                        src_pixel.green = (src_value >> 8) & 0xFF;
+                        src_pixel.blue = src_value & 0xFF;
+                    #elif LV_COLOR_DEPTH == 16
+                        // 16位RGB565格式
+                        uint16_t* src_pixels = (uint16_t*)px_map;
+                        uint16_t src_value = src_pixels[src_idx];
+                        src_pixel.red = ((src_value >> 11) & 0x1F) * 255 / 31;   // 5位红色
+                        src_pixel.green = ((src_value >> 5) & 0x3F) * 255 / 63;   // 6位绿色
+                        src_pixel.blue = (src_value & 0x1F) * 255 / 31;          // 5位蓝色
+                    #else
+                        // 默认24位RGB888格式
+                        lv_color_t* src_pixels = (lv_color_t*)px_map;
+                        src_pixel = src_pixels[src_idx];
+                    #endif
                     
-                    // 转换为32位ARGB格式 (DRM格式)
-                    uint32_t pixel = 0xFF000000 | // Alpha = 255 (不透明)
-                                    (src_color->red << 16) |
-                                    (src_color->green << 8) |
-                                    (src_color->blue);
+                    // 转换为DRM标准的XRGB8888格式 (X=未使用,R=红色,G=绿色,B=蓝色)
+                    uint32_t pixel = 0x00000000 |                    // 最高8位未使用
+                                    ((uint32_t)src_pixel.red << 16) |   // 红色通道
+                                    ((uint32_t)src_pixel.green << 8) |  // 绿色通道
+                                    ((uint32_t)src_pixel.blue);         // 蓝色通道
                     
                     framebuffer[dst_idx] = pixel;
                 }
