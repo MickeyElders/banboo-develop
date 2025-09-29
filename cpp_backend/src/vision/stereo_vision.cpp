@@ -106,25 +106,47 @@ bool StereoVision::load_calibration() {
 bool StereoVision::initialize_cameras() {
     std::cout << "初始化 Jetson CSI 双摄像头系统..." << std::endl;
     
-    // 确保任何已打开的摄像头被释放
+    // 确保任何已打开的摄像头被完全释放
     if (left_camera_.isOpened()) {
         left_camera_.release();
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     if (right_camera_.isOpened()) {
         right_camera_.release();
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
+    
+    // 给 nvargus-daemon 一些时间来稳定
+    std::cout << "等待 nvargus-daemon 稳定..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     
     // 优先使用 GStreamer 管道（nvarguscamerasrc）
     if (config_.use_gstreamer && !config_.left_camera_pipeline.empty() && !config_.right_camera_pipeline.empty()) {
         std::cout << "使用 nvarguscamerasrc 访问 CSI 摄像头..." << std::endl;
         
-        // 初始化左摄像头 (nvarguscamerasrc)
+        // 序列化初始化摄像头，避免资源竞争
         std::cout << "初始化左摄像头 (nvarguscamerasrc sensor-id=0)..." << std::endl;
         left_camera_.open(config_.left_camera_pipeline, cv::CAP_GSTREAMER);
         if (!left_camera_.isOpened()) {
             std::cout << "无法打开左摄像头 nvarguscamerasrc 管道" << std::endl;
+            return false;
+        }
+        
+        // 等待左摄像头完全初始化，避免资源竞争
+        std::cout << "等待左摄像头稳定..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        
+        // 测试左摄像头是否真的可用
+        cv::Mat test_left;
+        for (int i = 0; i < 3; i++) {
+            if (left_camera_.read(test_left) && !test_left.empty()) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (test_left.empty()) {
+            std::cout << "左摄像头无法读取帧" << std::endl;
+            left_camera_.release();
             return false;
         }
         
@@ -137,7 +159,28 @@ bool StereoVision::initialize_cameras() {
             return false;
         }
         
+        // 等待右摄像头完全初始化
+        std::cout << "等待右摄像头稳定..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        
+        // 测试右摄像头是否真的可用
+        cv::Mat test_right;
+        for (int i = 0; i < 3; i++) {
+            if (right_camera_.read(test_right) && !test_right.empty()) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (test_right.empty()) {
+            std::cout << "右摄像头无法读取帧" << std::endl;
+            left_camera_.release();
+            right_camera_.release();
+            return false;
+        }
+        
         std::cout << "nvarguscamerasrc 双摄像头初始化成功" << std::endl;
+        std::cout << "左摄像头分辨率: " << test_left.size() << std::endl;
+        std::cout << "右摄像头分辨率: " << test_right.size() << std::endl;
     } else {
         // 回退到传统 V4L2 方式，但只释放 video0（避免影响 nvargus-daemon 的 video1）
         std::cout << "回退到 V4L2 方式访问摄像头..." << std::endl;
@@ -146,7 +189,7 @@ bool StereoVision::initialize_cameras() {
         if (config_.left_camera_id == 0) {
             std::string cmd = "fuser -k /dev/video0 2>/dev/null || true";
             system(cmd.c_str());
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         
         std::cout << "初始化左摄像头 (ID: " << config_.left_camera_id << ")..." << std::endl;
@@ -156,41 +199,34 @@ bool StereoVision::initialize_cameras() {
             return false;
         }
         
-        std::cout << "初始化右摄像头 (ID: " << config_.right_camera_id << ")..." << std::endl;
-        right_camera_.open(config_.right_camera_id);
-        if (!right_camera_.isOpened()) {
-            std::cout << "无法打开右摄像头，nvargus-daemon 可能正在使用该设备" << std::endl;
+        // V4L2 模式下不尝试打开右摄像头，因为它被 nvargus-daemon 占用
+        std::cout << "V4L2 模式：跳过右摄像头（被 nvargus-daemon 占用）" << std::endl;
+        std::cout << "建议切换到 nvarguscamerasrc 模式以支持双摄像头" << std::endl;
+        
+        // 测试左摄像头
+        cv::Mat test_frame;
+        if (!left_camera_.read(test_frame) || test_frame.empty()) {
+            std::cout << "左摄像头无法读取帧" << std::endl;
             left_camera_.release();
             return false;
         }
         
-        std::cout << "V4L2 双摄像头初始化成功" << std::endl;
+        std::cout << "V4L2 单摄像头初始化成功" << std::endl;
+        std::cout << "左摄像头分辨率: " << test_frame.size() << std::endl;
     }
     
-    // 设置摄像头参数
-    left_camera_.set(cv::CAP_PROP_FRAME_WIDTH, config_.frame_size.width);
-    left_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, config_.frame_size.height);
-    left_camera_.set(cv::CAP_PROP_FPS, config_.fps);
-    
-    right_camera_.set(cv::CAP_PROP_FRAME_WIDTH, config_.frame_size.width);
-    right_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, config_.frame_size.height);
-    right_camera_.set(cv::CAP_PROP_FPS, config_.fps);
-    
-    // 测试读取帧
-    cv::Mat test_left, test_right;
-    if (!left_camera_.read(test_left) || test_left.empty()) {
-        std::cout << "左摄像头无法读取帧" << std::endl;
-        return false;
+    // 设置摄像头参数（仅在 V4L2 模式下有效，GStreamer 模式参数在管道中设置）
+    if (!config_.use_gstreamer) {
+        left_camera_.set(cv::CAP_PROP_FRAME_WIDTH, config_.frame_size.width);
+        left_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, config_.frame_size.height);
+        left_camera_.set(cv::CAP_PROP_FPS, config_.fps);
+        
+        if (right_camera_.isOpened()) {
+            right_camera_.set(cv::CAP_PROP_FRAME_WIDTH, config_.frame_size.width);
+            right_camera_.set(cv::CAP_PROP_FRAME_HEIGHT, config_.frame_size.height);
+            right_camera_.set(cv::CAP_PROP_FPS, config_.fps);
+        }
     }
-    
-    if (!right_camera_.read(test_right) || test_right.empty()) {
-        std::cout << "右摄像头无法读取帧" << std::endl;
-        return false;
-    }
-    
-    std::cout << "双摄像头初始化成功" << std::endl;
-    std::cout << "左摄像头分辨率: " << test_left.size() << std::endl;
-    std::cout << "右摄像头分辨率: " << test_right.size() << std::endl;
     
     return true;
 }
