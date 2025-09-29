@@ -1463,38 +1463,51 @@ void LVGLInterface::uiLoop() {
     auto last_frame_time = std::chrono::high_resolution_clock::now();
     frame_count_ = 0;
     
+    // 添加初始化延迟，确保所有组件就绪
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    std::cout << "[LVGLInterface] UI主循环初始化延迟完成" << std::endl;
+    
     try {
         while (!should_stop_.load()) {
             auto current_time = std::chrono::high_resolution_clock::now();
             
             try {
-                // 处理LVGL任务 - 添加异常保护
-                uint32_t time_till_next = lv_timer_handler();
-                
-                // 更新界面数据
-                updateInterface();
-                
-                // 计算FPS
-                frame_count_++;
-                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    current_time - last_frame_time).count();
-                
-                if (elapsed >= 1000) {
-                    ui_fps_ = frame_count_ * 1000.0f / elapsed;
-                    frame_count_ = 0;
-                    last_frame_time = current_time;
+                // 处理LVGL任务 - 添加异常保护和空指针检查
+                if (display_ && main_screen_) {
+                    uint32_t time_till_next = lv_timer_handler();
+                    
+                    // 更新界面数据 - 添加频率限制
+                    static int update_counter = 0;
+                    if (++update_counter >= 3) {  // 每3次循环更新一次界面数据
+                        update_counter = 0;
+                        updateInterface();
+                    }
+                    
+                    // 计算FPS
+                    frame_count_++;
+                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_frame_time).count();
+                    
+                    if (elapsed >= 1000) {
+                        ui_fps_ = frame_count_ * 1000.0f / elapsed;
+                        frame_count_ = 0;
+                        last_frame_time = current_time;
+                    }
+                    
+                    // 控制刷新率 - 增加最小延迟以降低CPU占用
+                    uint32_t sleep_time = std::max(std::min(time_till_next, 33u), 16u);  // 限制在30-60FPS
+                    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
+                } else {
+                    std::cerr << "[LVGLInterface] 显示器或主屏幕未初始化，跳过本次循环" << std::endl;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
-                
-                // 控制刷新率 - 限制最小间隔
-                uint32_t sleep_time = std::max(std::min(time_till_next, 16u), 1u);
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
                 
             } catch (const std::exception& e) {
                 std::cerr << "[LVGLInterface] UI循环异常: " << e.what() << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 错误恢复延迟
+                std::this_thread::sleep_for(std::chrono::milliseconds(200)); // 增加错误恢复延迟
             } catch (...) {
                 std::cerr << "[LVGLInterface] UI循环未知异常" << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 错误恢复延迟
+                std::this_thread::sleep_for(std::chrono::milliseconds(200)); // 增加错误恢复延迟
             }
         }
     } catch (...) {
