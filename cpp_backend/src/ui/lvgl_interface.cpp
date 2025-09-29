@@ -431,11 +431,14 @@ void LVGLInterface::uiLoop() {
                 if (display_ && main_screen_) {
                     uint32_t time_till_next = lv_timer_handler();
                     
-                    // 更新界面数据 - 添加频率限制
+                    // 暂时禁用界面数据更新，避免空指针访问
+                    // 等所有控件完全初始化后再启用
                     static int update_counter = 0;
                     if (++update_counter >= 3) {  // 每3次循环更新一次界面数据
                         update_counter = 0;
-                        updateInterface();
+                        // TODO: 只有在所有控件都初始化完成后才调用updateInterface()
+                        // updateInterface();
+                        std::cout << "[LVGLInterface] 跳过界面数据更新，避免空指针访问" << std::endl;
                     }
                     
                     // 计算FPS
