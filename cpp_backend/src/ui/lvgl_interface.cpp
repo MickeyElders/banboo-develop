@@ -765,7 +765,8 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_border_color(jetson_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(jetson_section, 12, 0);
     lv_obj_clear_flag(jetson_section, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_grow(jetson_section, 1);
+    // ✅ 移除flex_grow，改用内容自适应高度
+    lv_obj_set_height(jetson_section, LV_SIZE_CONTENT);
 
     // **关键修复：设置为垂直Flex布局**
     lv_obj_set_flex_flow(jetson_section, LV_FLEX_FLOW_COLUMN);
@@ -926,7 +927,8 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_border_color(ai_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(ai_section, 12, 0);
     lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_grow(ai_section, 2);  // 在 flex 中占据更多空间
+    // ✅ 移除flex_grow，改用内容自适应高度
+    lv_obj_set_height(ai_section, LV_SIZE_CONTENT);
     
     // 设置 AI 区域为垂直 Flex 布局
     lv_obj_set_flex_flow(ai_section, LV_FLEX_FLOW_COLUMN);
@@ -1141,7 +1143,8 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(modbus_section, 10, 0);
     lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_grow(modbus_section, 1);  // 在 flex 中自动扩展
+    // ✅ 移除flex_grow，改用内容自适应高度
+    lv_obj_set_height(modbus_section, LV_SIZE_CONTENT);
     
     // 设置 Modbus 区域为垂直 Flex 布局
     lv_obj_set_flex_flow(modbus_section, LV_FLEX_FLOW_COLUMN);
@@ -1256,7 +1259,8 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_border_color(version_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(version_section, 10, 0);
     lv_obj_clear_flag(version_section, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_grow(version_section, 1);  // 在 flex 中自动扩展
+    // ✅ 移除flex_grow，改用内容自适应高度
+    lv_obj_set_height(version_section, LV_SIZE_CONTENT);
     
     // 设置版本区域为垂直 Flex 布局
     lv_obj_set_flex_flow(version_section, LV_FLEX_FLOW_COLUMN);
