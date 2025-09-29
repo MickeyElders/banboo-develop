@@ -248,6 +248,50 @@ private:
      */
     lv_display_t* createLVGLDisplay();
 
+    // === 辅助更新函数 ===
+    
+    /**
+     * @brief 更新Modbus寄存器状态
+     */
+    void updateModbusRegisters(const core::ModbusRegisters& modbus_registers);
+
+    /**
+     * @brief 更新竹子检测状态数据（带参数版本）
+     */
+    void updateBambooDetectionStats(const core::BambooDetection& bamboo_detection);
+
+    /**
+     * @brief 更新温度监控数据
+     */
+    void updateTemperatureStats(const utils::SystemStats& stats);
+
+    /**
+     * @brief 更新电源监控数据
+     */
+    void updatePowerStats(const utils::SystemStats& stats);
+
+    /**
+     * @brief 更新扩展系统统计数据
+     */
+    void updateSystemExtendedStats(const utils::SystemStats& stats);
+
+    /**
+     * @brief 更新单个摄像头状态
+     */
+    void updateSingleCameraStats(int camera_id, const core::CameraInfo& camera_info,
+                                lv_obj_t* status_label, lv_obj_t* fps_label, lv_obj_t* resolution_label,
+                                lv_obj_t* exposure_label, lv_obj_t* lighting_label);
+
+    /**
+     * @brief 更新模拟统计数据
+     */
+    void updateSimulatedStats();
+
+    /**
+     * @brief 更新指标标签
+     */
+    void updateMetricLabels();
+
     /**
      * @brief 查找可用的DRM设备
      */
