@@ -60,7 +60,9 @@ help:
 	@echo ""
 	@echo "$(GREEN)快速部署命令:$(NC)"
 	@echo "  deploy           - 首次完整部署(构建+安装+启动服务)"
-	@echo "  redeploy         - 代码修改后快速重新部署"
+	@echo "  redeploy         - 代码修改后快速重新部署(跳过依赖检查)"
+	@echo "  smart-redeploy   - 智能重新部署(仅在必要时安装依赖)"
+	@echo "  full-redeploy    - 完整重新部署(包括依赖检查)"
 	@echo "  backup           - 创建当前系统备份"
 	@echo "  test-system      - 测试模式运行系统"
 	@echo ""
@@ -427,8 +429,35 @@ backup:
 		--exclude=backup; \
 	echo "$(GREEN)[SUCCESS]$(NC) 备份已创建: /opt/backup/$$BACKUP_NAME.tar.gz"
 
-redeploy: stop install-deps build-system install-system restart
+# 快速重新部署（跳过依赖检查）
+redeploy: stop build-system install-system restart
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统重新部署完成！"
+
+# 完整重新部署（包括依赖检查）
+full-redeploy: stop install-deps build-system install-system restart
+	@echo "$(GREEN)[SUCCESS]$(NC) 系统完整重新部署完成！"
+
+# 智能重新部署（仅在必要时安装依赖）
+smart-redeploy: stop check-deps-if-needed build-system install-system restart
+	@echo "$(GREEN)[SUCCESS]$(NC) 智能重新部署完成！"
+
+# 检查依赖是否需要重新安装
+check-deps-if-needed:
+	@echo "$(BLUE)[INFO]$(NC) 检查是否需要重新安装依赖..."
+	@NEED_DEPS=false; \
+	if ! PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --exists lvgl 2>/dev/null; then \
+		echo "$(YELLOW)[WARNING]$(NC) LVGL未找到，需要安装依赖"; \
+		NEED_DEPS=true; \
+	elif [ "$$(PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --modversion lvgl 2>/dev/null | cut -d. -f1)" != "9" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) LVGL版本不是v9，需要更新"; \
+		NEED_DEPS=true; \
+	else \
+		echo "$(GREEN)[SUCCESS]$(NC) 依赖已满足，跳过安装步骤"; \
+	fi; \
+	if [ "$$NEED_DEPS" = "true" ]; then \
+		echo "$(CYAN)[INSTALL]$(NC) 安装缺失的依赖..."; \
+		$(MAKE) install-deps; \
+	fi
 
 # === 清理 ===
 clean:
