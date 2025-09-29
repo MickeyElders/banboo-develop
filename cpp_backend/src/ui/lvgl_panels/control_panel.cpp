@@ -32,16 +32,16 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_color(title, color_primary_, 0);
     
     // === Jetson System Monitoring Area ===
-    createJetsonMonitoringSection();
+    createJetsonMonitoringSection(control_panel_);
     
     // === AI Model Monitoring Area ===
-    createAIModelSection();
+    createAIModelSection(control_panel_);
     
     // === Modbus Communication Statistics Area ===
-    createModbusSection();
+    createModbusSection(control_panel_);
     
     // === System Version Information Area ===
-    createVersionSection();
+    createVersionSection(control_panel_);
     
     return control_panel_;
 #else
@@ -49,9 +49,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
 #endif
 }
 
-void LVGLInterface::createJetsonMonitoringSection() {
+void LVGLInterface::createJetsonMonitoringSection(lv_obj_t* parent) {
 #ifdef ENABLE_LVGL
-    lv_obj_t* jetson_section = lv_obj_create(control_panel_);
+    lv_obj_t* jetson_section = lv_obj_create(parent);
     lv_obj_set_width(jetson_section, lv_pct(100));
     lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(jetson_section, 12, 0);
