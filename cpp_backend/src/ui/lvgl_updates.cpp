@@ -54,7 +54,13 @@ void LVGLInterface::updateInterface() {
 
 void LVGLInterface::updateSystemStats() {
 #ifdef ENABLE_LVGL
-    // 更新头部响应时间标签
+    // 添加空指针保护 - 检查关键组件是否已初始化
+    if (!header_panel_ || !control_panel_) {
+        std::cout << "[LVGLInterface] 面板未初始化，跳过系统状态更新" << std::endl;
+        return;
+    }
+    
+    // 更新头部响应时间标签 - 添加空指针检查
     if (header_widgets_.response_label) {
         static int counter = 0;
         int response_ms = 12 + (counter++ % 10);
@@ -538,9 +544,15 @@ void LVGLInterface::updateMetricLabels() {
 
 void LVGLInterface::updateWorkflowStatus() {
 #ifdef ENABLE_LVGL
-    // 更新工作流程步骤指示器
+    // 添加空指针保护 - 检查头部面板是否已初始化
+    if (!header_panel_ || header_widgets_.workflow_buttons.empty()) {
+        return;  // 静默跳过，避免日志过多
+    }
+    
+    // 更新工作流程步骤指示器 - 添加空指针检查
     for(size_t i = 0; i < header_widgets_.workflow_buttons.size(); i++) {
         lv_obj_t* step = header_widgets_.workflow_buttons[i];
+        if (!step) continue;  // 跳过空指针
         
         bool is_active = (i == (size_t)current_step_ - 1);
         bool is_completed = (i < (size_t)current_step_ - 1);
@@ -561,10 +573,15 @@ void LVGLInterface::updateWorkflowStatus() {
 
 void LVGLInterface::updateCameraView() {
 #ifdef ENABLE_LVGL
+    // 添加空指针保护 - 检查摄像头面板是否已初始化
+    if (!camera_panel_) {
+        return;  // 静默跳过
+    }
+    
     // 这里应该更新canvas内容
     // 从DataBridge获取最新图像并绘制到canvas上
     
-    // 示例：更新信息标签
+    // 示例：更新信息标签 - 添加空指针检查
     if (camera_widgets_.coord_value) {
         static float x = 0.0f;
         x += 0.1f;

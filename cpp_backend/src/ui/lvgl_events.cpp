@@ -123,6 +123,11 @@ void LVGLInterface::updateModbusDisplay() {
 #ifdef ENABLE_LVGL
     if (!data_bridge_) return;
     
+    // 添加空指针保护 - 检查控制面板是否已初始化
+    if (!control_panel_) {
+        return;  // 静默跳过，避免日志过多
+    }
+    
     // 从DataBridge获取真实的Modbus寄存器数据
     core::ModbusRegisters modbus_registers = data_bridge_->getModbusRegisters();
     
