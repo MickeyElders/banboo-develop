@@ -383,7 +383,7 @@ backup:
 		--exclude=backup; \
 	echo "$(GREEN)[SUCCESS]$(NC) 备份已创建: /opt/backup/$$BACKUP_NAME.tar.gz"
 
-redeploy: stop build-system install-system restart
+redeploy: stop install-deps build-system install-system restart
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统重新部署完成！"
 
 # === 清理 ===
