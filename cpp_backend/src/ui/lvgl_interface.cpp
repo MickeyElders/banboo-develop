@@ -525,10 +525,10 @@ void LVGLInterface::createMainInterface() {
     // 创建中间内容容器（使用Flex布局管理左右面板）
     lv_obj_t* content_container = lv_obj_create(main_screen_);
     lv_obj_set_size(content_container, lv_pct(98), lv_pct(85));
-    lv_obj_align(content_container, LV_ALIGN_TOP_MID, 0, 80);
     lv_obj_set_style_bg_opa(content_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(content_container, 0, 0);
     lv_obj_set_style_pad_all(content_container, 5, 0);
+    lv_obj_set_style_pad_top(content_container, 80, 0);  // 替代align的top偏移
     lv_obj_clear_flag(content_container, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置Flex布局：水平排列，左右分布
@@ -762,7 +762,6 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(jetson_label, LV_SYMBOL_CHARGE " Jetson Orin Nano");
     lv_obj_set_style_text_color(jetson_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(jetson_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(jetson_label, LV_ALIGN_TOP_LEFT, 0, 0);
     
     int y_pos = 25;
     
