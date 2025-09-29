@@ -12,8 +12,9 @@ namespace ui {
 lv_obj_t* LVGLInterface::createFooterPanel() {
 #ifdef ENABLE_LVGL
     footer_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(footer_panel_, lv_pct(100), 80);  // ✅ 宽度填满
-    lv_obj_align(footer_panel_, LV_ALIGN_BOTTOM_MID, 0, 0);  // ✅ 紧贴底部，移除-10偏移
+    lv_obj_set_width(footer_panel_, lv_pct(100));
+    lv_obj_set_height(footer_panel_, 80);
+    // 移除 lv_obj_align，使用父容器的Flex布局控制位置
     
     // 现代简洁的背景样式
     lv_obj_set_style_bg_color(footer_panel_, color_surface_, 0);
@@ -90,17 +91,21 @@ lv_obj_t* LVGLInterface::createFooterPanel() {
     lv_obj_set_style_border_width(danger_zone, 0, 0);
     lv_obj_set_style_pad_all(danger_zone, 0, 0);
     
+    // 设置危险操作区域为Flex容器
+    lv_obj_set_flex_flow(danger_zone, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(danger_zone, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
     // 急停按钮（独立突出）
     footer_widgets_.emergency_btn = lv_btn_create(danger_zone);
     lv_obj_set_size(footer_widgets_.emergency_btn, 60, 60);
     lv_obj_add_style(footer_widgets_.emergency_btn, &style_btn_danger, 0);
     lv_obj_add_style(footer_widgets_.emergency_btn, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_center(footer_widgets_.emergency_btn);
+    // 移除 lv_obj_center，使用Flex布局自动居中
     
     lv_obj_t* emergency_label = lv_label_create(footer_widgets_.emergency_btn);
     lv_label_set_text(emergency_label, LV_SYMBOL_WARNING);
     lv_obj_set_style_text_font(emergency_label, &lv_font_montserrat_24, 0);
-    lv_obj_center(emergency_label);
+    // 移除 lv_obj_center，使用Flex布局自动居中
     lv_obj_add_event_cb(footer_widgets_.emergency_btn, onEmergencyButtonClicked,
                         LV_EVENT_CLICKED, this);
     
@@ -123,7 +128,7 @@ lv_obj_t* LVGLInterface::createFooterPanel() {
     lv_obj_t* power_label = lv_label_create(footer_widgets_.power_btn);
     lv_label_set_text(power_label, LV_SYMBOL_SETTINGS);
     lv_obj_set_style_text_font(power_label, &lv_font_montserrat_16, 0);
-    lv_obj_center(power_label);
+    // 移除 lv_obj_center，按钮内的标签会自动居中
     lv_obj_add_event_cb(footer_widgets_.power_btn, onSettingsButtonClicked,
                         LV_EVENT_CLICKED, this);
     
