@@ -1,6 +1,6 @@
 /**
  * @file lvgl_updates.cpp
- * @brief LVGL界面数据更新逻辑实现
+ * @brief LVGL interface data update logic implementation
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"
@@ -13,57 +13,57 @@ namespace ui {
 void LVGLInterface::updateInterface() {
 #ifdef ENABLE_LVGL
     if (!data_bridge_) {
-        std::cout << "[LVGLInterface] DataBridge未初始化，跳过数据更新" << std::endl;
+        std::cout << "[LVGLInterface] DataBridge not initialized, skipping data update" << std::endl;
         return;
     }
     
-    // 添加静态计数器，确保界面完全初始化后才开始更新
+    // Add static counter to ensure UI is fully initialized before starting updates
     static bool first_update_done = false;
     static int safe_update_counter = 0;
     
     if (!first_update_done) {
         safe_update_counter++;
-        if (safe_update_counter < 10) {  // 前10次调用跳过，确保界面稳定
-            std::cout << "[LVGLInterface] 界面初始化期间，跳过数据更新 (" << safe_update_counter << "/10)" << std::endl;
+        if (safe_update_counter < 10) {  // Skip first 10 calls to ensure UI stability
+            std::cout << "[LVGLInterface] UI initialization in progress, skipping data update (" << safe_update_counter << "/10)" << std::endl;
             return;
         }
         first_update_done = true;
-        std::cout << "[LVGLInterface] 界面初始化完成，开始正常数据更新" << std::endl;
+        std::cout << "[LVGLInterface] UI initialization completed, starting normal data updates" << std::endl;
     }
     
     try {
-        // 更新系统状态 - 添加异常保护
+        // Update system stats - add exception protection
         updateSystemStats();
         
-        // 更新Modbus显示 - 添加异常保护
+        // Update Modbus display - add exception protection
         updateModbusDisplay();
         
-        // 更新工作流程 - 添加异常保护
+        // Update workflow - add exception protection
         updateWorkflowStatus();
         
-        // 更新摄像头 - 添加异常保护
+        // Update camera view - add exception protection
         updateCameraView();
         
     } catch (const std::exception& e) {
-        std::cerr << "[LVGLInterface] 数据更新异常: " << e.what() << std::endl;
+        std::cerr << "[LVGLInterface] Data update exception: " << e.what() << std::endl;
     } catch (...) {
-        std::cerr << "[LVGLInterface] 数据更新未知异常" << std::endl;
+        std::cerr << "[LVGLInterface] Data update unknown exception" << std::endl;
     }
 #endif
 }
 
 void LVGLInterface::updateSystemStats() {
 #ifdef ENABLE_LVGL
-    // 添加空指针保护 - 检查关键组件是否已初始化
+    // Add null pointer protection - check if key components are initialized
     if (!header_panel_ || !control_panel_) {
-        return;  // 静默跳过，避免日志过多
+        return;  // Silent skip to avoid too many logs
     }
     
-    // 更新头部响应时间标签 - 添加空指针检查和范围限制
+    // Update header response time label - add null pointer check and range limit
     if (header_widgets_.response_label) {
         static int counter = 0;
         int response_ms = 12 + (counter++ % 10);
-        // 确保响应时间在合理范围内
+        // Ensure response time is within reasonable range
         if (response_ms < 1) response_ms = 1;
         if (response_ms > 999) response_ms = 999;
         lv_label_set_text_fmt(header_widgets_.response_label,
@@ -111,7 +111,7 @@ void LVGLInterface::updateSystemStats() {
             }
         } else if (control_widgets_.cpu_label) {
             // CPU栏不可用时的回退显示
-            lv_label_set_text(control_widgets_.cpu_label, "CPU: 未检测到");
+            lv_label_set_text(control_widgets_.cpu_label, "CPU: Not Detected");
         }
         
         // 更新GPU信息 - 添加完善的空指针检查和数据验证
@@ -129,11 +129,11 @@ void LVGLInterface::updateSystemStats() {
             } else {
                 // 数据无效时显示默认值
                 lv_bar_set_value(control_widgets_.gpu_bar, 0, LV_ANIM_ON);
-                lv_label_set_text(control_widgets_.gpu_label, "GPU: 数据无效");
+                lv_label_set_text(control_widgets_.gpu_label, "GPU: Invalid Data");
             }
         } else if (control_widgets_.gpu_label) {
             // GPU栏不可用时的回退显示
-            lv_label_set_text(control_widgets_.gpu_label, "GPU: 未检测到");
+            lv_label_set_text(control_widgets_.gpu_label, "GPU: Not Detected");
         }
         
         // 更新内存信息 - 添加完善的空指针检查和数据验证
@@ -160,11 +160,11 @@ void LVGLInterface::updateSystemStats() {
             } else {
                 // 内存数据无效时显示默认值
                 lv_bar_set_value(control_widgets_.mem_bar, 0, LV_ANIM_ON);
-                lv_label_set_text(control_widgets_.mem_label, "RAM: 数据无效");
+                lv_label_set_text(control_widgets_.mem_label, "RAM: Invalid Data");
             }
         } else if (control_widgets_.mem_label) {
             // 内存栏不可用时的回退显示
-            lv_label_set_text(control_widgets_.mem_label, "RAM: 未检测到");
+            lv_label_set_text(control_widgets_.mem_label, "RAM: Not Detected");
         }
         
         updateAIModelStats();
@@ -203,8 +203,8 @@ void LVGLInterface::updateAIModelStats() {
     // 更新AI模型版本 - 添加默认值处理
     if (control_widgets_.ai_model_version_label) {
         const std::string& model_version = databridge_stats.ai_model.model_version;
-        const char* version_text = model_version.empty() ? "未知版本" : model_version.c_str();
-        lv_label_set_text_fmt(control_widgets_.ai_model_version_label, "模型版本: %s", version_text);
+        const char* version_text = model_version.empty() ? "Unknown Version" : model_version.c_str();
+        lv_label_set_text_fmt(control_widgets_.ai_model_version_label, "Model Version: %s", version_text);
     }
     
     // 更新推理时间 - 添加有效性检查和默认值
@@ -212,10 +212,10 @@ void LVGLInterface::updateAIModelStats() {
         float inference_time = databridge_stats.ai_model.inference_time_ms;
         if (inference_time < 0.0f || inference_time > 1000.0f) {
             inference_time = 0.0f;  // 无效值时使用默认值
-            lv_label_set_text(control_widgets_.ai_inference_time_label, "推理时间: N/A");
+            lv_label_set_text(control_widgets_.ai_inference_time_label, "Inference Time: N/A");
             lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, lv_color_hex(0x8A92A1), 0);
         } else {
-            lv_label_set_text_fmt(control_widgets_.ai_inference_time_label, "推理时间: %.1fms", inference_time);
+            lv_label_set_text_fmt(control_widgets_.ai_inference_time_label, "Inference Time: %.1fms", inference_time);
         
             // 根据推理时间设置颜色
             if (inference_time > 30.0f) {
@@ -233,9 +233,9 @@ void LVGLInterface::updateAIModelStats() {
         float confidence_threshold = databridge_stats.ai_model.confidence_threshold;
         if (confidence_threshold < 0.0f || confidence_threshold > 1.0f) {
             confidence_threshold = 0.5f;  // 默认值
-            lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "置信阈值: 默认(0.50)");
+            lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "Confidence Threshold: Default(0.50)");
         } else {
-            lv_label_set_text_fmt(control_widgets_.ai_confidence_threshold_label, "置信阈值: %.2f", confidence_threshold);
+            lv_label_set_text_fmt(control_widgets_.ai_confidence_threshold_label, "Confidence Threshold: %.2f", confidence_threshold);
         }
     }
     
@@ -244,10 +244,10 @@ void LVGLInterface::updateAIModelStats() {
         float detection_accuracy = databridge_stats.ai_model.detection_accuracy;
         if (detection_accuracy < 0.0f || detection_accuracy > 100.0f) {
             detection_accuracy = 0.0f;  // 无效值时使用0
-            lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "检测精度: N/A");
+            lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "Detection Accuracy: N/A");
             lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, lv_color_hex(0x8A92A1), 0);
         } else {
-            lv_label_set_text_fmt(control_widgets_.ai_detection_accuracy_label, "检测精度: %.1f%%", detection_accuracy);
+            lv_label_set_text_fmt(control_widgets_.ai_detection_accuracy_label, "Detection Accuracy: %.1f%%", detection_accuracy);
         
             // 根据检测精度设置颜色
             if (detection_accuracy > 90.0f) {
@@ -266,7 +266,7 @@ void LVGLInterface::updateAIModelStats() {
         if (total_detections < 0) {
             total_detections = 0;  // 负值时使用0
         }
-        lv_label_set_text_fmt(control_widgets_.ai_total_detections_label, "总检测数: %d", total_detections);
+        lv_label_set_text_fmt(control_widgets_.ai_total_detections_label, "Total Detections: %d", total_detections);
     }
     
     // 更新今日检测数 - 添加有效性检查
@@ -275,7 +275,7 @@ void LVGLInterface::updateAIModelStats() {
         if (daily_detections < 0) {
             daily_detections = 0;  // 负值时使用0
         }
-        lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "今日检测: %d", daily_detections);
+        lv_label_set_text_fmt(control_widgets_.ai_daily_detections_label, "Daily Detections: %d", daily_detections);
     }
     
     // 更新当前竹子检测状态
@@ -288,7 +288,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新竹子直径
     if (control_widgets_.bamboo_diameter_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_diameter_label, "- 直径：%.1fmm",
+            lv_label_set_text_fmt(control_widgets_.bamboo_diameter_label, "- Diameter: %.1fmm",
                                  bamboo_detection.diameter_mm);
             
             // 根据直径设置颜色 (合理范围20-80mm)
@@ -298,7 +298,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
                 lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, color_warning_, 0);
             }
         } else {
-            lv_label_set_text(control_widgets_.bamboo_diameter_label, "- 直径：无检测");
+            lv_label_set_text(control_widgets_.bamboo_diameter_label, "- Diameter: No Detection");
             lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -306,7 +306,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新竹子长度
     if (control_widgets_.bamboo_length_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_length_label, "- 长度：%.0fmm",
+            lv_label_set_text_fmt(control_widgets_.bamboo_length_label, "- Length: %.0fmm",
                                  bamboo_detection.length_mm);
             
             // 根据长度设置颜色 (合理范围1000-5000mm)
@@ -316,7 +316,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
                 lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, color_warning_, 0);
             }
         } else {
-            lv_label_set_text(control_widgets_.bamboo_length_label, "- 长度：无检测");
+            lv_label_set_text(control_widgets_.bamboo_length_label, "- Length: No Detection");
             lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -325,7 +325,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     if (control_widgets_.bamboo_cut_positions_label) {
         if (bamboo_detection.has_bamboo && !bamboo_detection.cut_positions.empty()) {
             // 构建预切位置字符串
-            std::string positions_str = "- 预切位置：[";
+            std::string positions_str = "- Cut Positions: [";
             for (size_t i = 0; i < bamboo_detection.cut_positions.size(); i++) {
                 if (i > 0) positions_str += ", ";
                 positions_str += std::to_string(static_cast<int>(bamboo_detection.cut_positions[i])) + "mm";
@@ -335,7 +335,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
             lv_label_set_text(control_widgets_.bamboo_cut_positions_label, positions_str.c_str());
             lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, color_success_, 0);
         } else {
-            lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "- 预切位置：无数据");
+            lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "- Cut Positions: No Data");
             lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -343,7 +343,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新检测置信度
     if (control_widgets_.bamboo_confidence_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_confidence_label, "- 置信度：%.2f",
+            lv_label_set_text_fmt(control_widgets_.bamboo_confidence_label, "- Confidence: %.2f",
                                  bamboo_detection.confidence);
             
             // 根据置信度设置颜色
@@ -355,7 +355,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
                 lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_error_, 0);
             }
         } else {
-            lv_label_set_text(control_widgets_.bamboo_confidence_label, "- 置信度：N/A");
+            lv_label_set_text(control_widgets_.bamboo_confidence_label, "- Confidence: N/A");
             lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -363,7 +363,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
     // 更新检测耗时
     if (control_widgets_.bamboo_detection_time_label) {
         if (bamboo_detection.has_bamboo) {
-            lv_label_set_text_fmt(control_widgets_.bamboo_detection_time_label, "- 检测耗时：%.1fms",
+            lv_label_set_text_fmt(control_widgets_.bamboo_detection_time_label, "- Detection Time: %.1fms",
                                  bamboo_detection.detection_time_ms);
             
             // 根据检测时间设置颜色
@@ -375,7 +375,7 @@ void LVGLInterface::updateBambooDetectionStats(const core::BambooDetection& bamb
                 lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_error_, 0);
             }
         } else {
-            lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：N/A");
+            lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- Detection Time: N/A");
             lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -431,10 +431,10 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
     
     if (status_label) {
         if (camera_info.is_online) {
-            lv_label_set_text_fmt(status_label, "摄像头-%d：在线 ✓", camera_id);
+            lv_label_set_text_fmt(status_label, "Camera-%d: Online ✓", camera_id);
             lv_obj_set_style_text_color(status_label, color_success_, 0);
         } else {
-            lv_label_set_text_fmt(status_label, "摄像头-%d：未安装 ✗", camera_id);
+            lv_label_set_text_fmt(status_label, "Camera-%d: Not Installed ✗", camera_id);
             lv_obj_set_style_text_color(status_label, color_error_, 0);
         }
     }
@@ -444,14 +444,14 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
             float fps = camera_info.fps;
             // 验证帧率数据的有效性
             if (fps >= 0.0f && fps <= 240.0f) {  // 合理的帧率范围
-                lv_label_set_text_fmt(fps_label, "  帧率：%.0f FPS", fps);
+                lv_label_set_text_fmt(fps_label, "  FPS: %.0f", fps);
                 lv_obj_set_style_text_color(fps_label, lv_color_hex(0xB0B8C1), 0);
             } else {
-                lv_label_set_text(fps_label, "  帧率：数据无效");
+                lv_label_set_text(fps_label, "  FPS: Invalid Data");
                 lv_obj_set_style_text_color(fps_label, lv_color_hex(0x8A92A1), 0);
             }
         } else {
-            lv_label_set_text(fps_label, "  帧率：N/A");
+            lv_label_set_text(fps_label, "  FPS: N/A");
             lv_obj_set_style_text_color(fps_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -462,14 +462,14 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
             int height = camera_info.height;
             // 验证分辨率数据的有效性
             if (width > 0 && width <= 8192 && height > 0 && height <= 8192) {
-                lv_label_set_text_fmt(resolution_label, "  分辨率：%dx%d", width, height);
+                lv_label_set_text_fmt(resolution_label, "  Resolution: %dx%d", width, height);
                 lv_obj_set_style_text_color(resolution_label, lv_color_hex(0xB0B8C1), 0);
             } else {
-                lv_label_set_text(resolution_label, "  分辨率：数据无效");
+                lv_label_set_text(resolution_label, "  Resolution: Invalid Data");
                 lv_obj_set_style_text_color(resolution_label, lv_color_hex(0x8A92A1), 0);
             }
         } else {
-            lv_label_set_text(resolution_label, "  分辨率：N/A");
+            lv_label_set_text(resolution_label, "  Resolution: N/A");
             lv_obj_set_style_text_color(resolution_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -478,14 +478,14 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
         if (camera_info.is_online) {
             const std::string& exposure_mode = camera_info.exposure_mode;
             if (!exposure_mode.empty()) {
-                lv_label_set_text_fmt(exposure_label, "  曝光：%s", exposure_mode.c_str());
+                lv_label_set_text_fmt(exposure_label, "  Exposure: %s", exposure_mode.c_str());
                 lv_obj_set_style_text_color(exposure_label, color_primary_, 0);
             } else {
-                lv_label_set_text(exposure_label, "  曝光：未知模式");
+                lv_label_set_text(exposure_label, "  Exposure: Unknown Mode");
                 lv_obj_set_style_text_color(exposure_label, lv_color_hex(0x8A92A1), 0);
             }
         } else {
-            lv_label_set_text(exposure_label, "  曝光：N/A");
+            lv_label_set_text(exposure_label, "  Exposure: N/A");
             lv_obj_set_style_text_color(exposure_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -494,24 +494,24 @@ void LVGLInterface::updateSingleCameraStats(int camera_id, const core::CameraSta
         if (camera_info.is_online) {
             const std::string& lighting_quality = camera_info.lighting_quality;
             if (!lighting_quality.empty()) {
-                lv_label_set_text_fmt(lighting_label, "  光照评分：%s", lighting_quality.c_str());
+                lv_label_set_text_fmt(lighting_label, "  Lighting Score: %s", lighting_quality.c_str());
                 
                 // 根据光照质量设置颜色
-                if (lighting_quality == "良好") {
+                if (lighting_quality == "Good" || lighting_quality == "良好") {
                     lv_obj_set_style_text_color(lighting_label, color_success_, 0);
-                } else if (lighting_quality == "一般") {
+                } else if (lighting_quality == "Fair" || lighting_quality == "一般") {
                     lv_obj_set_style_text_color(lighting_label, color_warning_, 0);
-                } else if (lighting_quality == "差") {
+                } else if (lighting_quality == "Poor" || lighting_quality == "差") {
                     lv_obj_set_style_text_color(lighting_label, color_error_, 0);
                 } else {
                     lv_obj_set_style_text_color(lighting_label, color_primary_, 0);
                 }
             } else {
-                lv_label_set_text(lighting_label, "  光照评分：未知");
+                lv_label_set_text(lighting_label, "  Lighting Score: Unknown");
                 lv_obj_set_style_text_color(lighting_label, lv_color_hex(0x8A92A1), 0);
             }
         } else {
-            lv_label_set_text(lighting_label, "  光照评分：N/A");
+            lv_label_set_text(lighting_label, "  Lighting Score: N/A");
             lv_obj_set_style_text_color(lighting_label, lv_color_hex(0x8A92A1), 0);
         }
     }
@@ -675,14 +675,14 @@ void LVGLInterface::updateSimulatedStats() {
         static int cpu_usage = 45;
         cpu_usage = 40 + (rand() % 30);  // 模拟40-70%的CPU使用率
         lv_bar_set_value(control_widgets_.cpu_bar, cpu_usage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @1.9GHz (模拟)", cpu_usage);
+        lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @1.9GHz (Simulated)", cpu_usage);
     }
     
     if (control_widgets_.gpu_bar) {
         static int gpu_usage = 72;
         gpu_usage = 60 + (rand() % 25);  // 模拟60-85%的GPU使用率
         lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @624MHz (模拟)", gpu_usage);
+        lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @624MHz (Simulated)", gpu_usage);
     }
     
     if (control_widgets_.mem_bar) {
@@ -691,7 +691,7 @@ void LVGLInterface::updateSimulatedStats() {
         mem_used = 3.8f + ((rand() % 200) / 100.0f);  // 模拟3.8-5.8GB内存使用
         int mem_percentage = (int)((mem_used / mem_total) * 100);
         lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-        lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %.1f/%.0fGB (模拟)", mem_percentage, mem_used, mem_total);
+        lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %.1f/%.0fGB (Simulated)", mem_percentage, mem_used, mem_total);
     }
 #endif
 }

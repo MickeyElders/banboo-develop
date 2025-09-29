@@ -1,6 +1,6 @@
 /**
  * @file control_panel.cpp
- * @brief LVGL控制面板实现
+ * @brief LVGL control panel implementation
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"
@@ -228,138 +228,217 @@ void LVGLInterface::createAIModelSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(ai_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(ai_section, 6, 0);
 
+    // 标题
     lv_obj_t* ai_label = lv_label_create(ai_section);
-    lv_label_set_text(ai_label, LV_SYMBOL_EYE_OPEN " AI模型监控");
+    lv_label_set_text(ai_label, LV_SYMBOL_EYE_OPEN " AI Model Monitoring");
     lv_obj_set_style_text_color(ai_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(ai_label, &lv_font_montserrat_14, 0);
     
-    // AI模型版本
-    control_widgets_.ai_model_version_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_model_version_label, "模型版本: YOLOv8s-2.1.3");
+    // === 第1行：模型版本 | 推理时间 ===
+    lv_obj_t* row1 = lv_obj_create(ai_section);
+    lv_obj_set_width(row1, lv_pct(100));
+    lv_obj_set_height(row1, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row1, 0, 0);
+    lv_obj_set_style_pad_all(row1, 0, 0);
+    lv_obj_set_flex_flow(row1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.ai_model_version_label = lv_label_create(row1);
+    lv_label_set_text(control_widgets_.ai_model_version_label, "YOLOv8s-2.1.3");
     lv_obj_set_style_text_color(control_widgets_.ai_model_version_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(control_widgets_.ai_model_version_label, &lv_font_montserrat_12, 0);
     
-    // 推理时间
-    control_widgets_.ai_inference_time_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_inference_time_label, "推理时间: 18.5ms");
+    control_widgets_.ai_inference_time_label = lv_label_create(row1);
+    lv_label_set_text(control_widgets_.ai_inference_time_label, "Inference: 18.5ms");
     lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
     
-    // 置信阈值
-    control_widgets_.ai_confidence_threshold_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "置信阈值: 0.75");
+    // === 第2行：置信阈值 | 检测精度 ===
+    lv_obj_t* row2 = lv_obj_create(ai_section);
+    lv_obj_set_width(row2, lv_pct(100));
+    lv_obj_set_height(row2, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row2, 0, 0);
+    lv_obj_set_style_pad_all(row2, 0, 0);
+    lv_obj_set_flex_flow(row2, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.ai_confidence_threshold_label = lv_label_create(row2);
+    lv_label_set_text(control_widgets_.ai_confidence_threshold_label, "Confidence: 0.75");
     lv_obj_set_style_text_color(control_widgets_.ai_confidence_threshold_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_confidence_threshold_label, &lv_font_montserrat_12, 0);
     
-    // 检测精度
-    control_widgets_.ai_detection_accuracy_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "检测精度: 94.2%");
+    control_widgets_.ai_detection_accuracy_label = lv_label_create(row2);
+    lv_label_set_text(control_widgets_.ai_detection_accuracy_label, "Accuracy: 94.2%");
     lv_obj_set_style_text_color(control_widgets_.ai_detection_accuracy_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_detection_accuracy_label, &lv_font_montserrat_12, 0);
     
-    // 总检测数
-    control_widgets_.ai_total_detections_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_total_detections_label, "总检测数: 1,247");
+    // === 第3行：总检测数 | 今日检测 ===
+    lv_obj_t* row3 = lv_obj_create(ai_section);
+    lv_obj_set_width(row3, lv_pct(100));
+    lv_obj_set_height(row3, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row3, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row3, 0, 0);
+    lv_obj_set_style_pad_all(row3, 0, 0);
+    lv_obj_set_flex_flow(row3, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row3, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.ai_total_detections_label = lv_label_create(row3);
+    lv_label_set_text(control_widgets_.ai_total_detections_label, "Total: 1,247");
     lv_obj_set_style_text_color(control_widgets_.ai_total_detections_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.ai_total_detections_label, &lv_font_montserrat_12, 0);
     
-    // 今日检测数
-    control_widgets_.ai_daily_detections_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.ai_daily_detections_label, "今日检测: 89");
+    control_widgets_.ai_daily_detections_label = lv_label_create(row3);
+    lv_label_set_text(control_widgets_.ai_daily_detections_label, "Daily: 89");
     lv_obj_set_style_text_color(control_widgets_.ai_daily_detections_label, color_warning_, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_daily_detections_label, &lv_font_montserrat_12, 0);
     
-    // === 当前竹子检测状态 ===
+    // === 当前竹子检测状态（子标题） ===
     lv_obj_t* bamboo_status_label = lv_label_create(ai_section);
-    lv_label_set_text(bamboo_status_label, "当前竹子检测:");
+    lv_label_set_text(bamboo_status_label, "Current Bamboo Detection:");
     lv_obj_set_style_text_color(bamboo_status_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(bamboo_status_label, &lv_font_montserrat_12, 0);
     
-    // 竹子直径
-    control_widgets_.bamboo_diameter_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.bamboo_diameter_label, "- 直径：45.2mm");
+    // === 第4行：直径 | 长度 ===
+    lv_obj_t* row4 = lv_obj_create(ai_section);
+    lv_obj_set_width(row4, lv_pct(100));
+    lv_obj_set_height(row4, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row4, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row4, 0, 0);
+    lv_obj_set_style_pad_all(row4, 0, 0);
+    lv_obj_set_flex_flow(row4, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row4, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.bamboo_diameter_label = lv_label_create(row4);
+    lv_label_set_text(control_widgets_.bamboo_diameter_label, "Ø45.2mm");
     lv_obj_set_style_text_color(control_widgets_.bamboo_diameter_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.bamboo_diameter_label, &lv_font_montserrat_12, 0);
     
-    // 竹子长度
-    control_widgets_.bamboo_length_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.bamboo_length_label, "- 长度：2850mm");
+    control_widgets_.bamboo_length_label = lv_label_create(row4);
+    lv_label_set_text(control_widgets_.bamboo_length_label, "L2850mm");
     lv_obj_set_style_text_color(control_widgets_.bamboo_length_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.bamboo_length_label, &lv_font_montserrat_12, 0);
     
-    // 预切位置
-    control_widgets_.bamboo_cut_positions_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "- 预切位置：[950mm, 1900mm]");
-    lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, color_success_, 0);
-    lv_obj_set_style_text_font(control_widgets_.bamboo_cut_positions_label, &lv_font_montserrat_12, 0);
+    // === 第5行：置信度 | 检测耗时 ===
+    lv_obj_t* row5 = lv_obj_create(ai_section);
+    lv_obj_set_width(row5, lv_pct(100));
+    lv_obj_set_height(row5, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row5, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row5, 0, 0);
+    lv_obj_set_style_pad_all(row5, 0, 0);
+    lv_obj_set_flex_flow(row5, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row5, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    // 检测置信度
-    control_widgets_.bamboo_confidence_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.bamboo_confidence_label, "- 置信度：0.92");
+    control_widgets_.bamboo_confidence_label = lv_label_create(row5);
+    lv_label_set_text(control_widgets_.bamboo_confidence_label, "Confidence: 0.92");
     lv_obj_set_style_text_color(control_widgets_.bamboo_confidence_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.bamboo_confidence_label, &lv_font_montserrat_12, 0);
     
-    // 检测耗时
-    control_widgets_.bamboo_detection_time_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.bamboo_detection_time_label, "- 检测耗时：16.8ms");
+    control_widgets_.bamboo_detection_time_label = lv_label_create(row5);
+    lv_label_set_text(control_widgets_.bamboo_detection_time_label, "Time: 16.8ms");
     lv_obj_set_style_text_color(control_widgets_.bamboo_detection_time_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.bamboo_detection_time_label, &lv_font_montserrat_12, 0);
     
-    // === 摄像头状态 ===
+    // 预切位置（单独一行，因为内容较长）
+    control_widgets_.bamboo_cut_positions_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.bamboo_cut_positions_label, "Cut Positions: [950, 1900]mm");
+    lv_obj_set_style_text_color(control_widgets_.bamboo_cut_positions_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.bamboo_cut_positions_label, &lv_font_montserrat_12, 0);
+    
+    // === 摄像头状态（子标题） ===
     lv_obj_t* camera_status_label = lv_label_create(ai_section);
-    lv_label_set_text(camera_status_label, "摄像头状态:");
+    lv_label_set_text(camera_status_label, "Camera Status:");
     lv_obj_set_style_text_color(camera_status_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(camera_status_label, &lv_font_montserrat_12, 0);
     
-    // 摄像头1状态
+    // === 摄像头1行组 ===
     control_widgets_.camera1_status_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera1_status_label, "摄像头-1：在线 ✓");
+    lv_label_set_text(control_widgets_.camera1_status_label, "CAM-1: Online✓");
     lv_obj_set_style_text_color(control_widgets_.camera1_status_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_status_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera1_fps_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera1_fps_label, "  帧率：30 FPS");
+    // 摄像头1详细信息行：帧率 | 分辨率
+    lv_obj_t* cam1_row1 = lv_obj_create(ai_section);
+    lv_obj_set_width(cam1_row1, lv_pct(100));
+    lv_obj_set_height(cam1_row1, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(cam1_row1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cam1_row1, 0, 0);
+    lv_obj_set_style_pad_all(cam1_row1, 0, 0);
+    lv_obj_set_flex_flow(cam1_row1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cam1_row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.camera1_fps_label = lv_label_create(cam1_row1);
+    lv_label_set_text(control_widgets_.camera1_fps_label, "  30fps");
     lv_obj_set_style_text_color(control_widgets_.camera1_fps_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_fps_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera1_resolution_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera1_resolution_label, "  分辨率：1920x1080");
+    control_widgets_.camera1_resolution_label = lv_label_create(cam1_row1);
+    lv_label_set_text(control_widgets_.camera1_resolution_label, "1920x1080");
     lv_obj_set_style_text_color(control_widgets_.camera1_resolution_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_resolution_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera1_exposure_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera1_exposure_label, "  曝光：自动");
+    // 摄像头1详细信息行：曝光 | 光照
+    lv_obj_t* cam1_row2 = lv_obj_create(ai_section);
+    lv_obj_set_width(cam1_row2, lv_pct(100));
+    lv_obj_set_height(cam1_row2, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(cam1_row2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cam1_row2, 0, 0);
+    lv_obj_set_style_pad_all(cam1_row2, 0, 0);
+    lv_obj_set_flex_flow(cam1_row2, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cam1_row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.camera1_exposure_label = lv_label_create(cam1_row2);
+    lv_label_set_text(control_widgets_.camera1_exposure_label, "  Auto Exposure");
     lv_obj_set_style_text_color(control_widgets_.camera1_exposure_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_exposure_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera1_lighting_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera1_lighting_label, "  光照评分：良好");
+    control_widgets_.camera1_lighting_label = lv_label_create(cam1_row2);
+    lv_label_set_text(control_widgets_.camera1_lighting_label, "Good Lighting");
     lv_obj_set_style_text_color(control_widgets_.camera1_lighting_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera1_lighting_label, &lv_font_montserrat_12, 0);
     
-    // 摄像头2状态
+    // === 摄像头2行组（结构同上） ===
     control_widgets_.camera2_status_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera2_status_label, "摄像头-2：在线 ✓");
+    lv_label_set_text(control_widgets_.camera2_status_label, "CAM-2: 在线✓");
     lv_obj_set_style_text_color(control_widgets_.camera2_status_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_status_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera2_fps_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera2_fps_label, "  帧率：30 FPS");
+    lv_obj_t* cam2_row1 = lv_obj_create(ai_section);
+    lv_obj_set_width(cam2_row1, lv_pct(100));
+    lv_obj_set_height(cam2_row1, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(cam2_row1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cam2_row1, 0, 0);
+    lv_obj_set_style_pad_all(cam2_row1, 0, 0);
+    lv_obj_set_flex_flow(cam2_row1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cam2_row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.camera2_fps_label = lv_label_create(cam2_row1);
+    lv_label_set_text(control_widgets_.camera2_fps_label, "  30fps");
     lv_obj_set_style_text_color(control_widgets_.camera2_fps_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_fps_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera2_resolution_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera2_resolution_label, "  分辨率：1920x1080");
+    control_widgets_.camera2_resolution_label = lv_label_create(cam2_row1);
+    lv_label_set_text(control_widgets_.camera2_resolution_label, "1920x1080");
     lv_obj_set_style_text_color(control_widgets_.camera2_resolution_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_resolution_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera2_exposure_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera2_exposure_label, "  曝光：自动");
+    lv_obj_t* cam2_row2 = lv_obj_create(ai_section);
+    lv_obj_set_width(cam2_row2, lv_pct(100));
+    lv_obj_set_height(cam2_row2, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(cam2_row2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cam2_row2, 0, 0);
+    lv_obj_set_style_pad_all(cam2_row2, 0, 0);
+    lv_obj_set_flex_flow(cam2_row2, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cam2_row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.camera2_exposure_label = lv_label_create(cam2_row2);
+    lv_label_set_text(control_widgets_.camera2_exposure_label, "  自动曝光");
     lv_obj_set_style_text_color(control_widgets_.camera2_exposure_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_exposure_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.camera2_lighting_label = lv_label_create(ai_section);
-    lv_label_set_text(control_widgets_.camera2_lighting_label, "  光照评分：良好");
+    control_widgets_.camera2_lighting_label = lv_label_create(cam2_row2);
+    lv_label_set_text(control_widgets_.camera2_lighting_label, "光照良好");
     lv_obj_set_style_text_color(control_widgets_.camera2_lighting_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.camera2_lighting_label, &lv_font_montserrat_12, 0);
 #endif
@@ -380,44 +459,69 @@ void LVGLInterface::createModbusSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(modbus_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(modbus_section, 6, 0);
 
+    // 标题
     lv_obj_t* modbus_label = lv_label_create(modbus_section);
     lv_label_set_text(modbus_label, LV_SYMBOL_WIFI " Modbus通讯状态");
     lv_obj_set_style_text_color(modbus_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(modbus_label, &lv_font_montserrat_14, 0);
     
-    // PLC连接状态
-    control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_connection_label, "PLC连接: 在线 ✓");
+    // === 第1行：PLC连接状态 | 地址 ===
+    lv_obj_t* row1 = lv_obj_create(modbus_section);
+    lv_obj_set_width(row1, lv_pct(100));
+    lv_obj_set_height(row1, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row1, 0, 0);
+    lv_obj_set_style_pad_all(row1, 0, 0);
+    lv_obj_set_flex_flow(row1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.modbus_connection_label = lv_label_create(row1);
+    lv_label_set_text(control_widgets_.modbus_connection_label, "在线✓");
     lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
     
-    // 连接地址和端口
-    control_widgets_.modbus_address_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_address_label, "地址: 192.168.1.100:502");
+    control_widgets_.modbus_address_label = lv_label_create(row1);
+    lv_label_set_text(control_widgets_.modbus_address_label, "192.168.1.100:502");
     lv_obj_set_style_text_color(control_widgets_.modbus_address_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_address_label, &lv_font_montserrat_12, 0);
     
-    // 通讯延迟
-    control_widgets_.modbus_latency_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_latency_label, "通讯延迟: 8ms");
+    // === 第2行：通讯延迟 | 最后通讯时间 ===
+    lv_obj_t* row2 = lv_obj_create(modbus_section);
+    lv_obj_set_width(row2, lv_pct(100));
+    lv_obj_set_height(row2, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row2, 0, 0);
+    lv_obj_set_style_pad_all(row2, 0, 0);
+    lv_obj_set_flex_flow(row2, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.modbus_latency_label = lv_label_create(row2);
+    lv_label_set_text(control_widgets_.modbus_latency_label, "延迟: 8ms");
     lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_latency_label, &lv_font_montserrat_12, 0);
     
-    // 最后成功通讯时间
-    control_widgets_.modbus_last_success_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_last_success_label, "最后通讯: 2秒前");
+    control_widgets_.modbus_last_success_label = lv_label_create(row2);
+    lv_label_set_text(control_widgets_.modbus_last_success_label, "2秒前");
     lv_obj_set_style_text_color(control_widgets_.modbus_last_success_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_last_success_label, &lv_font_montserrat_12, 0);
     
-    // 错误计数
-    control_widgets_.modbus_error_count_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_error_count_label, "错误计数: 0");
+    // === 第3行：错误计数 | 今日消息数 ===
+    lv_obj_t* row3 = lv_obj_create(modbus_section);
+    lv_obj_set_width(row3, lv_pct(100));
+    lv_obj_set_height(row3, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row3, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row3, 0, 0);
+    lv_obj_set_style_pad_all(row3, 0, 0);
+    lv_obj_set_flex_flow(row3, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row3, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.modbus_error_count_label = lv_label_create(row3);
+    lv_label_set_text(control_widgets_.modbus_error_count_label, "错误: 0");
     lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_error_count_label, &lv_font_montserrat_12, 0);
     
-    // 今日消息数
-    control_widgets_.modbus_message_count_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_message_count_label, "今日消息: 1,523");
+    control_widgets_.modbus_message_count_label = lv_label_create(row3);
+    lv_label_set_text(control_widgets_.modbus_message_count_label, "今日: 1,523");
     lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_message_count_label, &lv_font_montserrat_12, 0);
 #endif
@@ -438,48 +542,64 @@ void LVGLInterface::createVersionSection(lv_obj_t* parent) {
     lv_obj_set_flex_align(version_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(version_section, 6, 0);
 
+    // 标题
     lv_obj_t* version_label = lv_label_create(version_section);
     lv_label_set_text(version_label, LV_SYMBOL_SETTINGS " 系统版本信息");
     lv_obj_set_style_text_color(version_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(version_label, &lv_font_montserrat_14, 0);
     
-    // 系统版本
-    control_widgets_.system_version_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.system_version_label, "系统版本: v2.1.3-beta");
+    // === 第1行：系统版本 | LVGL版本 ===
+    lv_obj_t* row1 = lv_obj_create(version_section);
+    lv_obj_set_width(row1, lv_pct(100));
+    lv_obj_set_height(row1, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row1, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row1, 0, 0);
+    lv_obj_set_style_pad_all(row1, 0, 0);
+    lv_obj_set_flex_flow(row1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row1, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.system_version_label = lv_label_create(row1);
+    lv_label_set_text(control_widgets_.system_version_label, "v2.1.3-beta");
     lv_obj_set_style_text_color(control_widgets_.system_version_label, color_primary_, 0);
     lv_obj_set_style_text_font(control_widgets_.system_version_label, &lv_font_montserrat_12, 0);
     
-    // LVGL版本
-    control_widgets_.lvgl_version_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.lvgl_version_label, "LVGL版本: v9.1.0");
+    control_widgets_.lvgl_version_label = lv_label_create(row1);
+    lv_label_set_text(control_widgets_.lvgl_version_label, "LVGL v9.1.0");
     lv_obj_set_style_text_color(control_widgets_.lvgl_version_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.lvgl_version_label, &lv_font_montserrat_12, 0);
     
-    // 编译时间
+    // === 第2行：编译时间（单独一行，因为内容较长）===
     control_widgets_.build_time_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.build_time_label, "编译时间: 2024-12-21 14:30");
+    lv_label_set_text(control_widgets_.build_time_label, "编译: 2024-12-21 14:30");
     lv_obj_set_style_text_color(control_widgets_.build_time_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.build_time_label, &lv_font_montserrat_12, 0);
     
-    // Git提交
-    control_widgets_.git_commit_label = lv_label_create(version_section);
-    lv_label_set_text(control_widgets_.git_commit_label, "Git提交: 2939c00");
+    // === 第3行：Git提交 | JetPack版本 ===
+    lv_obj_t* row3 = lv_obj_create(version_section);
+    lv_obj_set_width(row3, lv_pct(100));
+    lv_obj_set_height(row3, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(row3, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row3, 0, 0);
+    lv_obj_set_style_pad_all(row3, 0, 0);
+    lv_obj_set_flex_flow(row3, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row3, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    control_widgets_.git_commit_label = lv_label_create(row3);
+    lv_label_set_text(control_widgets_.git_commit_label, "Git: 2939c00");
     lv_obj_set_style_text_color(control_widgets_.git_commit_label, color_success_, 0);
     lv_obj_set_style_text_font(control_widgets_.git_commit_label, &lv_font_montserrat_12, 0);
     
-    // JetPack版本
-    status_widgets_.jetpack_version = lv_label_create(version_section);
-    lv_label_set_text(status_widgets_.jetpack_version, "JetPack: 5.1.2");
+    status_widgets_.jetpack_version = lv_label_create(row3);
+    lv_label_set_text(status_widgets_.jetpack_version, "JetPack 5.1.2");
     lv_obj_set_style_text_color(status_widgets_.jetpack_version, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(status_widgets_.jetpack_version, &lv_font_montserrat_12, 0);
     
-    // CUDA版本
+    // === 第4行：CUDA版本（单独一行）===
     status_widgets_.cuda_version = lv_label_create(version_section);
     lv_label_set_text(status_widgets_.cuda_version, "CUDA: 11.4");
     lv_obj_set_style_text_color(status_widgets_.cuda_version, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(status_widgets_.cuda_version, &lv_font_montserrat_12, 0);
 #endif
 }
-
 } // namespace ui
 } // namespace bamboo_cut
