@@ -895,7 +895,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(control_widgets_.vic_usage_label, "VIC: 0%@115MHz");
     lv_obj_set_style_text_color(control_widgets_.vic_usage_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.vic_usage_label, &lv_font_montserrat_12, 0);
-    lv_obj_align_to(control_widgets_.vic_usage_label, control_widgets_.emc_freq_label, LV_ALIGN_OUT_RIGHT_MID, 20, 0);
+    lv_obj_set_pos(control_widgets_.vic_usage_label, lv_pct(55), y_pos);  // 使用相对位置替代align_to
     
     y_pos += 20;
     
