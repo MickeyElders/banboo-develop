@@ -245,21 +245,41 @@ void LVGLInterface::updateAIModelStats() {
         return;
     }
     
-    // 获取AI模型统计数据，添加异常保护
+    // 获取AI模型统计数据，添加异常保护和数据有效性检查
     core::SystemStats databridge_stats;
     try {
         databridge_stats = data_bridge_->getStats();
+        
+        // 验证数据结构的基本有效性
+        if (!databridge_stats.ai_model.model_version.data()) {
+            std::cerr << "[LVGLInterface] AI模型数据结构无效，使用默认值" << std::endl;
+            return;  // 数据结构不安全，直接返回
+        }
+        
     } catch (const std::exception& e) {
         std::cerr << "[LVGLInterface] 获取AI模型统计数据异常: " << e.what() << std::endl;
         return;
+    } catch (...) {
+        std::cerr << "[LVGLInterface] 获取AI模型统计数据未知异常" << std::endl;
+        return;
     }
     
-    // 更新AI模型版本 - 添加默认值处理
+    // 更新AI模型版本 - 添加字符串安全检查
     if (control_widgets_.ai_model_version_label) {
-        const std::string& model_version = databridge_stats.ai_model.model_version;
-        const char* version_text = model_version.empty() ? "Unknown Version" : model_version.c_str();
-        std::string version_text_str = "Model Version: " + std::string(version_text);
-        lv_label_set_text(control_widgets_.ai_model_version_label, version_text_str.c_str());
+        try {
+            const std::string& model_version = databridge_stats.ai_model.model_version;
+            // 检查字符串是否已正确初始化且安全
+            std::string safe_version;
+            if (model_version.data() && !model_version.empty() && model_version.length() < 256) {
+                safe_version = model_version;
+            } else {
+                safe_version = "Unknown Version";
+            }
+            std::string version_text_str = "Model Version: " + safe_version;
+            lv_label_set_text(control_widgets_.ai_model_version_label, version_text_str.c_str());
+        } catch (const std::exception& e) {
+            lv_label_set_text(control_widgets_.ai_model_version_label, "Model Version: Error");
+        }
     }
     
     // 更新推理时间 - 添加有效性检查和默认值
