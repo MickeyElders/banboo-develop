@@ -151,8 +151,8 @@ void LVGLInterface::updateModbusDisplay() {
         !control_widgets_.modbus_cut_quality_label ||
         !control_widgets_.modbus_blade_number_label ||
         !control_widgets_.modbus_health_status_label) {
-        std::cout << "[LVGLInterface] Modbus register widgets not properly initialized, skipping register update" << std::endl;
-        // 只跳过寄存器更新，基本状态信息仍可更新
+        // 寄存器控件未创建，直接返回（不打印日志避免刷屏）
+        return;  // ← 添加这一行
     }
     
     // 从DataBridge获取真实的Modbus寄存器数据
