@@ -415,8 +415,6 @@ if(lvgl_POPULATED)
         # 添加编译定义
         target_compile_definitions(lvgl PUBLIC
             LV_CONF_INCLUDE_SIMPLE=1
-            LV_USE_LINUX_DRM=1
-            LV_USE_EVDEV=1
         )
         
         message(STATUS "LVGL target configured successfully")
@@ -628,10 +626,25 @@ if(ENABLE_DRM)
     target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
 endif()
 
-# LVGL库
-if(ENABLE_LVGL AND TARGET lvgl)
-    target_link_libraries(bamboo_integrated lvgl)
-    message(STATUS "Linking LVGL library to bamboo_integrated")
+# LVGL库 - 确保正确链接
+if(ENABLE_LVGL)
+    if(TARGET lvgl)
+        target_link_libraries(bamboo_integrated lvgl)
+        message(STATUS "Linking LVGL library to bamboo_integrated")
+    elseif(TARGET lvgl::lvgl)
+        target_link_libraries(bamboo_integrated lvgl::lvgl)
+        message(STATUS "Linking LVGL namespace library to bamboo_integrated")
+    else()
+        # 查找已安装的LVGL
+        find_package(lvgl QUIET)
+        if(lvgl_FOUND)
+            target_link_libraries(bamboo_integrated lvgl::lvgl)
+            message(STATUS "Linking system LVGL library to bamboo_integrated")
+        else()
+            message(WARNING "LVGL library not found for linking")
+            set(ENABLE_LVGL OFF)
+        endif()
+    endif()
 else()
     message(WARNING "LVGL not available for linking")
 endif()
