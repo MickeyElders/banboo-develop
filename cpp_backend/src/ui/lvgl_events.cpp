@@ -215,58 +215,82 @@ void LVGLInterface::updateModbusDisplay() {
         }
     }
     
-    // 更新错误计数
-    if (control_widgets_.modbus_error_count_label) {
-        static int error_count = 0;
-        if (rand() % 100 == 0) error_count++;  // 偶尔增加错误计数
-        std::string error_count_text = "错误计数: " + std::to_string(error_count);
-        lv_label_set_text(control_widgets_.modbus_error_count_label, error_count_text.c_str());
-        lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label,
-            error_count == 0 ? color_success_ : color_warning_, 0);
-    }
-    
-    // 更新消息计数
-    if (control_widgets_.modbus_message_count_label) {
-        static int message_count = 1523;
-        message_count += 1 + (rand() % 3);  // 模拟消息增长
-        std::string message_count_text = "今日消息: " + std::to_string(message_count);
-        lv_label_set_text(control_widgets_.modbus_message_count_label, message_count_text.c_str());
-        lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
-    }
-    
-    if (control_widgets_.modbus_packets_label) {
-        static int packets = 1247;
-        packets += 1 + (rand() % 3);  // 模拟数据包增长
-        std::string packets_text = "数据包: " + std::to_string(packets);
-        lv_label_set_text(control_widgets_.modbus_packets_label, packets_text.c_str());
-    }
-    
-    if (control_widgets_.modbus_errors_label) {
-        static float error_rate = 0.02f;
-        error_rate = (rand() % 10) / 1000.0f;  // 模拟0.000-0.010%错误率
-        std::string error_rate_text = "错误率: " + std::to_string(static_cast<int>(error_rate * 1000) / 1000.0) + "%%";
-        lv_label_set_text(control_widgets_.modbus_errors_label, error_rate_text.c_str());
-        
-        // 根据错误率设置颜色
-        if (error_rate > 1.0f) {
-            lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_error_, 0);
-        } else if (error_rate > 0.1f) {
-            lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_warning_, 0);
-        } else {
-            lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
+    // 更新错误计数 - 添加控件有效性检查
+    if (control_widgets_.modbus_error_count_label && lv_obj_is_valid(control_widgets_.modbus_error_count_label)) {
+        try {
+            static int error_count = 0;
+            if (rand() % 100 == 0) error_count++;  // 偶尔增加错误计数
+            std::string error_count_text = "错误计数: " + std::to_string(error_count);
+            lv_label_set_text(control_widgets_.modbus_error_count_label, error_count_text.c_str());
+            lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label,
+                error_count == 0 ? color_success_ : color_warning_, 0);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus error count label: " << e.what() << std::endl;
         }
     }
     
-    if (control_widgets_.modbus_heartbeat_label) {
-        bool heartbeat_ok = (modbus_registers.heartbeat > 0);
-        lv_label_set_text(control_widgets_.modbus_heartbeat_label,
-            heartbeat_ok ? "心跳: OK" : "心跳: 超时");
-        lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label,
-            heartbeat_ok ? color_success_ : color_error_, 0);
+    // 更新消息计数 - 添加控件有效性检查
+    if (control_widgets_.modbus_message_count_label && lv_obj_is_valid(control_widgets_.modbus_message_count_label)) {
+        try {
+            static int message_count = 1523;
+            message_count += 1 + (rand() % 3);  // 模拟消息增长
+            std::string message_count_text = "今日消息: " + std::to_string(message_count);
+            lv_label_set_text(control_widgets_.modbus_message_count_label, message_count_text.c_str());
+            lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus message count label: " << e.what() << std::endl;
+        }
     }
     
-    // === 更新Modbus寄存器状态信息 ===
-    updateModbusRegisters(modbus_registers);
+    if (control_widgets_.modbus_packets_label && lv_obj_is_valid(control_widgets_.modbus_packets_label)) {
+        try {
+            static int packets = 1247;
+            packets += 1 + (rand() % 3);  // 模拟数据包增长
+            std::string packets_text = "数据包: " + std::to_string(packets);
+            lv_label_set_text(control_widgets_.modbus_packets_label, packets_text.c_str());
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus packets label: " << e.what() << std::endl;
+        }
+    }
+    
+    if (control_widgets_.modbus_errors_label && lv_obj_is_valid(control_widgets_.modbus_errors_label)) {
+        try {
+            static float error_rate = 0.02f;
+            error_rate = (rand() % 10) / 1000.0f;  // 模拟0.000-0.010%错误率
+            std::string error_rate_text = "错误率: " + std::to_string(static_cast<int>(error_rate * 1000) / 1000.0) + "%%";
+            lv_label_set_text(control_widgets_.modbus_errors_label, error_rate_text.c_str());
+            
+            // 根据错误率设置颜色
+            if (error_rate > 1.0f) {
+                lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_error_, 0);
+            } else if (error_rate > 0.1f) {
+                lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_warning_, 0);
+            } else {
+                lv_obj_set_style_text_color(control_widgets_.modbus_errors_label, color_success_, 0);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus errors label: " << e.what() << std::endl;
+        }
+    }
+    
+    if (control_widgets_.modbus_heartbeat_label && lv_obj_is_valid(control_widgets_.modbus_heartbeat_label)) {
+        try {
+            bool heartbeat_ok = (modbus_registers.heartbeat > 0);
+            lv_label_set_text(control_widgets_.modbus_heartbeat_label,
+                heartbeat_ok ? "心跳: OK" : "心跳: 超时");
+            lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label,
+                heartbeat_ok ? color_success_ : color_error_, 0);
+        } catch (const std::exception& e) {
+            std::cerr << "[LVGLInterface] Error updating modbus heartbeat label: " << e.what() << std::endl;
+        }
+    }
+    
+    // === 更新Modbus寄存器状态信息 === - 添加安全检查
+    try {
+        updateModbusRegisters(modbus_registers);
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] Error updating modbus registers: " << e.what() << std::endl;
+    }
 #endif
 }
 
