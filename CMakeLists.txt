@@ -375,72 +375,58 @@ set(ENABLE_PYTHON OFF)
 message(STATUS "Python绑定已禁用 - 使用纯C++一体化架构")
 
 # ================================
-# LVGL配置 - 使用FetchContent自动下载
+# LVGL配置 - 使用系统安装的LVGL
 # ================================
 
-# 使用FetchContent下载LVGL v9
-FetchContent_Declare(
-    lvgl
-    GIT_REPOSITORY https://github.com/lvgl/lvgl.git
-    GIT_TAG        release/v9.0
-)
-
-# ⭐ 关键：在Populate之前设置这些变量
-set(LV_CONF_BUILD_DISABLE_EXAMPLES 1 CACHE INTERNAL "")
-set(LV_CONF_BUILD_DISABLE_DEMOS 1 CACHE INTERNAL "")
-set(BUILD_EXAMPLES OFF CACHE INTERNAL "")
-set(BUILD_DEMOS OFF CACHE INTERNAL "")
-
-# 设置LVGL配置选项
-set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "Path to lv_conf.h")
-
-# 完全禁用LVGL示例和演示
-set(LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_WIDGETS OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_KEYPAD_AND_ENCODER OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_BENCHMARK OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_STRESS OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_MUSIC OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_FLEX_LAYOUT OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_MULTILANG OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_TRANSFORM OFF CACHE BOOL "" FORCE)
-set(LV_USE_DEMO_SCROLL OFF CACHE BOOL "" FORCE)
-
-# 手动获取LVGL源码
-FetchContent_GetProperties(lvgl)
-if(NOT lvgl_POPULATED)
-    FetchContent_Populate(lvgl)
-    
-    # ⭐ 关键：只添加src目录，跳过examples
-    add_library(lvgl STATIC)
-    
-    # 添加LVGL核心源文件
-    file(GLOB_RECURSE LVGL_SOURCES 
-        "${lvgl_SOURCE_DIR}/src/*.c"
-    )
-    
-    # 排除examples相关文件
-    list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*examples.*")
-    list(FILTER LVGL_SOURCES EXCLUDE REGEX ".*demos.*")
-    
-    target_sources(lvgl PRIVATE ${LVGL_SOURCES})
-    
-    # 设置包含目录
-    target_include_directories(lvgl PUBLIC
-        ${lvgl_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-    
-    # 添加编译定义
-    target_compile_definitions(lvgl PUBLIC
-        LV_CONF_INCLUDE_SIMPLE=1
-    )
-    
-    message(STATUS "LVGL core library configured (examples disabled)")
+# 查找系统安装的LVGL
+find_package(lvgl QUIET)
+if(lvgl_FOUND)
+    message(STATUS "Found system LVGL package: ${lvgl_VERSION}")
     set(ENABLE_LVGL ON)
 else()
-    message(WARNING "Failed to fetch LVGL")
-    set(ENABLE_LVGL OFF)
+    # 手动查找系统安装的LVGL
+    find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
+        PATHS
+            /usr/local/include
+            /usr/include
+            /opt/lvgl/include
+        NO_DEFAULT_PATH)
+    
+    find_library(LVGL_LIBRARY lvgl
+        PATHS
+            /usr/local/lib
+            /usr/lib
+            /usr/lib/aarch64-linux-gnu
+            /usr/lib/x86_64-linux-gnu
+            /opt/lvgl/lib
+        NO_DEFAULT_PATH)
+    
+    if(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
+        message(STATUS "Found system LVGL manually:")
+        message(STATUS "  Include: ${LVGL_INCLUDE_DIR}")
+        message(STATUS "  Library: ${LVGL_LIBRARY}")
+        set(ENABLE_LVGL ON)
+        set(LVGL_FOUND TRUE)
+        
+        # 创建导入的目标
+        add_library(lvgl SHARED IMPORTED)
+        set_target_properties(lvgl PROPERTIES
+            IMPORTED_LOCATION ${LVGL_LIBRARY}
+            INTERFACE_INCLUDE_DIRECTORIES ${LVGL_INCLUDE_DIR}
+        )
+        
+        include_directories(${LVGL_INCLUDE_DIR})
+    else()
+        message(WARNING "System LVGL not found - LVGL功能将被禁用")
+        set(ENABLE_LVGL OFF)
+        set(LVGL_FOUND FALSE)
+    endif()
+endif()
+
+# 设置LVGL配置文件路径
+if(ENABLE_LVGL)
+    set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "Path to lv_conf.h")
+    message(STATUS "Using lv_conf.h from: ${LV_CONF_PATH}")
 endif()
 
 # ================================
