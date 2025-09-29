@@ -254,7 +254,7 @@ void LVGLInterface::initializeTheme() {
     lv_style_set_bg_color(&style_btn_success, color_success_);
     lv_style_set_shadow_width(&style_btn_success, 8);
     lv_style_set_shadow_color(&style_btn_success, lv_color_black());
-    lv_style_set_shadow_opa(&style_btn_success, LV_OPA_15);
+    lv_style_set_shadow_opa(&style_btn_success, LV_OPA_10);
     lv_style_set_text_color(&style_btn_success, lv_color_white());
     lv_style_set_border_width(&style_btn_success, 0);
     lv_style_set_pad_all(&style_btn_success, 16);
@@ -264,7 +264,7 @@ void LVGLInterface::initializeTheme() {
     lv_style_set_radius(&style_btn_warning, 12);
     lv_style_set_bg_color(&style_btn_warning, color_warning_);
     lv_style_set_shadow_width(&style_btn_warning, 8);
-    lv_style_set_shadow_opa(&style_btn_warning, LV_OPA_15);
+    lv_style_set_shadow_opa(&style_btn_warning, LV_OPA_10);
     lv_style_set_shadow_color(&style_btn_warning, lv_color_black());
     lv_style_set_text_color(&style_btn_warning, lv_color_white());
     lv_style_set_border_width(&style_btn_warning, 0);
