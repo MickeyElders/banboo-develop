@@ -358,8 +358,30 @@ void LVGLInterface::updateAIModelStats() {
         lv_label_set_text(control_widgets_.ai_daily_detections_label, daily_text.c_str());
     }
     
-    // 更新当前竹子检测状态
-    updateBambooDetectionStats(databridge_stats.ai_model.current_bamboo);
+    // 更新当前竹子检测状态 - 添加安全性检查
+    try {
+        const auto& bamboo_detection = databridge_stats.ai_model.current_bamboo;
+        // 验证竹子检测数据的基本有效性
+        if (bamboo_detection.cut_positions.data() == nullptr) {
+            // vector未正确初始化，创建安全的默认数据
+            core::BambooDetection safe_bamboo = {};
+            safe_bamboo.has_bamboo = false;
+            safe_bamboo.diameter_mm = 0.0f;
+            safe_bamboo.length_mm = 0.0f;
+            safe_bamboo.confidence = 0.0f;
+            safe_bamboo.detection_time_ms = 0.0f;
+            // cut_positions默认为空vector，这是安全的
+            updateBambooDetectionStats(safe_bamboo);
+        } else {
+            updateBambooDetectionStats(bamboo_detection);
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] 更新竹子检测状态异常: " << e.what() << std::endl;
+        // 使用安全的默认数据
+        core::BambooDetection safe_bamboo = {};
+        safe_bamboo.has_bamboo = false;
+        updateBambooDetectionStats(safe_bamboo);
+    }
 #endif
 }
 
