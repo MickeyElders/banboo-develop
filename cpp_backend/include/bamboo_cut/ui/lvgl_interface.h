@@ -526,5 +526,55 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
  */
 void input_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
 
+// === DRM辅助函数声明 ===
+
+/**
+ * @brief 初始化DRM设备
+ */
+bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
+                        drmModeConnector*& connector, uint32_t*& framebuffer,
+                        uint32_t& fb_handle, int& drm_width, uint32_t& drm_height,
+                        uint32_t& stride, uint32_t& buffer_size, uint32_t& buf_size);
+
+/**
+ * @brief 复制像素数据
+ */
+void copyPixelData(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
+                  int drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
+
+/**
+ * @brief 设置DRM显示
+ */
+bool setupDRMDisplay(int drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
+                    drmModeConnector*& connector, uint32_t*& framebuffer,
+                    uint32_t& fb_handle, uint32_t& drm_width, uint32_t& drm_height,
+                    uint32_t& stride, uint32_t& buffer_size);
+
+/**
+ * @brief 清理DRM资源
+ */
+void cleanupDRMResources(int drm_fd, uint32_t fb_id, drmModeCrtc* crtc,
+                        drmModeConnector* connector, uint32_t* framebuffer,
+                        uint32_t fb_handle, uint32_t buffer_size);
+
+/**
+ * @brief 查找合适的CRTC
+ */
+bool findSuitableCRTC(int drm_fd, drmModeRes* resources, drmModeConnector* connector,
+                     drmModeCrtc*& crtc);
+
+/**
+ * @brief 创建帧缓冲区
+ */
+bool createFramebuffer(int drm_fd, uint32_t drm_width, uint32_t drm_height,
+                      uint32_t& fb_id, uint32_t& fb_handle, uint32_t*& framebuffer,
+                      uint32_t& stride, uint32_t& buffer_size);
+
+/**
+ * @brief 设置CRTC模式
+ */
+bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
+                drmModeConnector* connector, drmModeModeInfo* mode);
+
 } // namespace ui
 } // namespace bamboo_cut
