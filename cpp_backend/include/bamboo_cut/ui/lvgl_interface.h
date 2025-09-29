@@ -359,6 +359,18 @@ private:
     lv_color_t color_error_;
     lv_color_t color_background_;
     lv_color_t color_surface_;
+    
+    // Grid布局描述符 (静态成员，避免野指针问题)
+#ifdef ENABLE_LVGL
+    static lv_coord_t ai_model_grid_col_dsc_[];
+    static lv_coord_t ai_model_grid_row_dsc_[];
+    static lv_coord_t modbus_grid_col_dsc_[];
+    static lv_coord_t modbus_grid_row_dsc_[];
+    static lv_coord_t version_grid_col_dsc_[];
+    static lv_coord_t version_grid_row_dsc_[];
+    static lv_coord_t camera_grid_col_dsc_[];
+    static lv_coord_t camera_grid_row_dsc_[];
+#endif
 };
 
 /**
