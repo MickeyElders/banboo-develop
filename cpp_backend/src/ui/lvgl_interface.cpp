@@ -1439,8 +1439,8 @@ void LVGLInterface::updateSystemStats() {
         if (control_widgets_.mem_bar && stats.memory.ram_total_mb > 0) {
             int mem_percentage = (stats.memory.ram_used_mb * 100) / stats.memory.ram_total_mb;
             lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d/%dMB (LFB:%dx%dMB)",
-                                 stats.memory.ram_used_mb, stats.memory.ram_total_mb,
+            lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %d/%dMB (LFB:%dx%dMB)",
+                                 mem_percentage, stats.memory.ram_used_mb, stats.memory.ram_total_mb,
                                  stats.memory.lfb_blocks, stats.memory.lfb_size_mb);
             
             if (mem_percentage > 85) {
@@ -1703,14 +1703,14 @@ void LVGLInterface::updateSystemStats() {
             static int cpu_usage = 45;
             cpu_usage = 40 + (rand() % 30);  // 模拟40-70%的CPU使用率
             lv_bar_set_value(control_widgets_.cpu_bar, cpu_usage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% (模拟)", cpu_usage);
+            lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @1.9GHz (模拟)", cpu_usage);
         }
         
         if (control_widgets_.gpu_bar) {
             static int gpu_usage = 72;
             gpu_usage = 60 + (rand() % 25);  // 模拟60-85%的GPU使用率
             lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% (模拟)", gpu_usage);
+            lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @624MHz (模拟)", gpu_usage);
         }
         
         if (control_widgets_.mem_bar) {
@@ -1719,7 +1719,7 @@ void LVGLInterface::updateSystemStats() {
             mem_used = 3.8f + ((rand() % 200) / 100.0f);  // 模拟3.8-5.8GB内存使用
             int mem_percentage = (int)((mem_used / mem_total) * 100);
             lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-            lv_label_set_text_fmt(control_widgets_.mem_label, "MEM: %.1f/%.0fGB (模拟)", mem_used, mem_total);
+            lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %.1f/%.0fGB (模拟)", mem_percentage, mem_used, mem_total);
         }
     }
     
