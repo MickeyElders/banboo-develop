@@ -363,16 +363,16 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
     lv_obj_set_flex_align(header_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    // 系统标题
+    // System Title
     header_widgets_.system_title = lv_label_create(header_panel_);
     lv_label_set_text(header_widgets_.system_title,
-        LV_SYMBOL_IMAGE " 竹子智能切割系统");
+        LV_SYMBOL_IMAGE " Bamboo Intelligent Cutting");
     lv_obj_add_style(header_widgets_.system_title, &style_text_title, 0);
     lv_obj_set_style_text_color(header_widgets_.system_title, color_primary_, 0);
     
-    // 紧凑的工作流程指示器容器
+    // Compact workflow indicator container
     lv_obj_t* workflow_container = lv_obj_create(header_panel_);
-    lv_obj_set_size(workflow_container, 350, 50);  // 更紧凑
+    lv_obj_set_size(workflow_container, 350, 50);  // More compact
     lv_obj_set_style_bg_opa(workflow_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(workflow_container, 0, 0);
     lv_obj_set_style_pad_all(workflow_container, 8, 0);
@@ -381,7 +381,7 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(workflow_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    const char* steps[] = {"进料", "识别", "传输", "准备", "切割"};
+    const char* steps[] = {"Feed", "Detect", "Transfer", "Prepare", "Cut"};
     const char* icons[] = {
         LV_SYMBOL_UPLOAD, LV_SYMBOL_EYE_OPEN, LV_SYMBOL_GPS,
         LV_SYMBOL_SETTINGS, LV_SYMBOL_CUT
@@ -425,7 +425,7 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
         header_widgets_.workflow_buttons.push_back(step);
     }
     
-    // 心跳状态
+    // Heartbeat Status
     lv_obj_t* heartbeat_container = lv_obj_create(header_panel_);
     lv_obj_set_size(heartbeat_container, 160, 50);
     lv_obj_align(heartbeat_container, LV_ALIGN_RIGHT_MID, -180, 0);
@@ -437,12 +437,12 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
     lv_obj_clear_flag(heartbeat_container, LV_OBJ_FLAG_SCROLLABLE);
     
     header_widgets_.heartbeat_label = lv_label_create(heartbeat_container);
-    lv_label_set_text(header_widgets_.heartbeat_label, LV_SYMBOL_REFRESH " 心跳正常");
+    lv_label_set_text(header_widgets_.heartbeat_label, LV_SYMBOL_REFRESH " Heartbeat OK");
     lv_obj_set_style_text_color(header_widgets_.heartbeat_label, color_success_, 0);
     lv_obj_set_style_text_font(header_widgets_.heartbeat_label, &lv_font_montserrat_14, 0);
     lv_obj_center(header_widgets_.heartbeat_label);
     
-    // 响应时间
+    // Response Time
     header_widgets_.response_label = lv_label_create(header_panel_);
     lv_label_set_text(header_widgets_.response_label, LV_SYMBOL_LOOP " 15ms");
     lv_obj_set_style_text_color(header_widgets_.response_label, lv_color_hex(0xB0B8C1), 0);
@@ -488,23 +488,23 @@ lv_obj_t* LVGLInterface::createCameraPanel() {
     lv_obj_set_style_pad_all(info_overlay, 10, 0);
     lv_obj_clear_flag(info_overlay, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 坐标信息
+    // Coordinate Information
     camera_widgets_.coord_value = lv_label_create(info_overlay);
     lv_label_set_text(camera_widgets_.coord_value, LV_SYMBOL_GPS " X: 0.00 Y: 0.00 Z: 0.00");
     lv_obj_set_style_text_color(camera_widgets_.coord_value, color_primary_, 0);
     lv_obj_set_style_text_font(camera_widgets_.coord_value, &lv_font_montserrat_14, 0);
     lv_obj_align(camera_widgets_.coord_value, LV_ALIGN_LEFT_MID, 10, 0);
     
-    // 质量评分
+    // Quality Score
     camera_widgets_.quality_value = lv_label_create(info_overlay);
-    lv_label_set_text(camera_widgets_.quality_value, LV_SYMBOL_IMAGE " 质量: 95%");
+    lv_label_set_text(camera_widgets_.quality_value, LV_SYMBOL_IMAGE " Quality: 95%");
     lv_obj_set_style_text_color(camera_widgets_.quality_value, color_success_, 0);
     lv_obj_set_style_text_font(camera_widgets_.quality_value, &lv_font_montserrat_14, 0);
     lv_obj_align(camera_widgets_.quality_value, LV_ALIGN_CENTER, 0, 0);
     
-    // 刀片信息
+    // Blade Information
     camera_widgets_.blade_value = lv_label_create(info_overlay);
-    lv_label_set_text(camera_widgets_.blade_value, LV_SYMBOL_SETTINGS " 刀片: #3");
+    lv_label_set_text(camera_widgets_.blade_value, LV_SYMBOL_SETTINGS " Blade: #3");
     lv_obj_set_style_text_color(camera_widgets_.blade_value, color_warning_, 0);
     lv_obj_set_style_text_font(camera_widgets_.blade_value, &lv_font_montserrat_14, 0);
     lv_obj_align(camera_widgets_.blade_value, LV_ALIGN_RIGHT_MID, -10, 0);
@@ -527,13 +527,13 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_gap(control_panel_, 16, 0);
     
-    // 控制面板标题
+    // Control Panel Title
     lv_obj_t* title = lv_label_create(control_panel_);
-    lv_label_set_text(title, LV_SYMBOL_SETTINGS " 系统控制");
+    lv_label_set_text(title, LV_SYMBOL_SETTINGS " System Control");
     lv_obj_add_style(title, &style_text_title, 0);
     lv_obj_set_style_text_color(title, color_primary_, 0);
     
-    // === Jetson系统监控进度条区域 ===
+    // === Jetson System Monitoring Progress Bar Area ===
     lv_obj_t* jetson_section = lv_obj_create(control_panel_);
     lv_obj_set_size(jetson_section, lv_pct(100), 120);
     lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x0F1419), 0);
@@ -544,7 +544,7 @@ lv_obj_t* LVGLInterface::createControlPanel() {
     lv_obj_clear_flag(jetson_section, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* jetson_label = lv_label_create(jetson_section);
-    lv_label_set_text(jetson_label, LV_SYMBOL_CHARGE " Jetson 系统");
+    lv_label_set_text(jetson_label, LV_SYMBOL_CHARGE " Jetson System");
     lv_obj_set_style_text_color(jetson_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(jetson_label, &lv_font_montserrat_14, 0);
     lv_obj_align(jetson_label, LV_ALIGN_TOP_LEFT, 0, 0);
@@ -701,7 +701,7 @@ lv_obj_t* LVGLInterface::createStatusPanel() {
     lv_obj_clear_flag(metrics_container, LV_OBJ_FLAG_SCROLLABLE);
     
     lv_obj_t* metrics_title = lv_label_create(metrics_container);
-    lv_label_set_text(metrics_title, LV_SYMBOL_MONITOR " 系统指标");
+    lv_label_set_text(metrics_title, LV_SYMBOL_SETTINGS " 系统指标");
     lv_obj_set_style_text_color(metrics_title, color_primary_, 0);
     lv_obj_set_style_text_font(metrics_title, &lv_font_montserrat_14, 0);
     lv_obj_align(metrics_title, LV_ALIGN_TOP_LEFT, 0, 0);
