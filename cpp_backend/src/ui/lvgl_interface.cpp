@@ -1133,7 +1133,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus通信状态");
     lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xE6A055), 0);
     lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_12, 0);
-    lv_obj_align(modbus_title, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_pos(modbus_title, 0, 0);
     
     // 连接统计信息（第一行）- 使用简单Flex布局
     lv_obj_t* modbus_stats_container = lv_obj_create(modbus_section);
@@ -1172,7 +1172,7 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
         lv_label_set_text(modbus_stats_labels[i], modbus_stats_texts[i]);
         lv_obj_set_style_text_color(modbus_stats_labels[i], modbus_stats_colors[i], 0);
         lv_obj_set_style_text_font(modbus_stats_labels[i], &lv_font_montserrat_12, 0);
-        lv_obj_align(modbus_stats_labels[i], LV_ALIGN_LEFT_MID, 0, 0);
+        // 移除 lv_obj_align 调用，让 Flex 布局自动处理位置
     }
     
     // 分配标签指针
