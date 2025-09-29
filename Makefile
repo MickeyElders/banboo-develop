@@ -237,6 +237,10 @@ build-lvgl-from-source:
 	@cd /tmp/lvgl_build/lvgl/build && make -j$(shell nproc)
 	@echo "$(BLUE)[INFO]$(NC) 安装LVGL到系统..."
 	@cd /tmp/lvgl_build/lvgl/build && sudo make install
+	@echo "$(BLUE)[INFO]$(NC) 手动复制缺失的私有头文件..."
+	@sudo mkdir -p /usr/local/include/lvgl/src/misc/cache
+	@sudo cp -r /tmp/lvgl_build/lvgl/src/misc/cache/* /usr/local/include/lvgl/src/misc/cache/ 2>/dev/null || true
+	@sudo find /tmp/lvgl_build/lvgl/src -name "*.h" -exec sudo cp --parents {} /usr/local/include/lvgl/ \; 2>/dev/null || true
 	@echo "$(BLUE)[INFO]$(NC) 创建pkg-config文件..."
 	@sudo mkdir -p /usr/local/lib/pkgconfig
 	@echo "prefix=/usr/local" | sudo tee /usr/local/lib/pkgconfig/lvgl.pc > /dev/null
