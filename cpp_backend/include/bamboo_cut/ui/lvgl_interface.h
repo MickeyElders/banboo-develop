@@ -45,9 +45,19 @@ namespace ui {
 #ifdef ENABLE_LVGL
 extern lv_style_t style_card;
 extern lv_style_t style_text_title;
+extern lv_style_t style_btn_primary;
+extern lv_style_t style_btn_success;
+extern lv_style_t style_btn_warning;
+extern lv_style_t style_btn_danger;
+extern lv_style_t style_btn_pressed;
 #else
 extern char style_card[64];
 extern char style_text_title[64];
+extern char style_btn_primary[64];
+extern char style_btn_success[64];
+extern char style_btn_warning[64];
+extern char style_btn_danger[64];
+extern char style_btn_pressed[64];
 #endif
 
 /**
