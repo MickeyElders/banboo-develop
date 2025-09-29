@@ -163,22 +163,23 @@ install-system-deps:
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统依赖安装完成"
 
 install-lvgl:
-	@echo "$(CYAN)[LVGL]$(NC) 检查LVGL安装状态..."
-	@if [ ! -f "/usr/local/include/lvgl/lvgl.h" ] && [ ! -f "/usr/include/lvgl/lvgl.h" ]; then \
-		echo "$(BLUE)[INFO]$(NC) LVGL未找到，开始从源码编译安装..."; \
+	@echo "$(CYAN)[LVGL]$(NC) 检查LVGL v9安装状态..."
+	@LVGL_VERSION=$$(pkg-config --modversion lvgl 2>/dev/null || echo "not_found"); \
+	if [ "$$LVGL_VERSION" = "not_found" ] || [ "$$(echo $$LVGL_VERSION | cut -d. -f1)" != "9" ]; then \
+		echo "$(BLUE)[INFO]$(NC) LVGL v9未找到 (当前版本: $$LVGL_VERSION)，开始从源码编译安装..."; \
 		$(MAKE) build-lvgl-from-source; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL已安装"; \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL v9已安装 (版本: $$LVGL_VERSION)"; \
 	fi
 
 build-lvgl-from-source:
-	@echo "$(CYAN)[LVGL]$(NC) 开始编译LVGL v9.2.0..."
+	@echo "$(CYAN)[LVGL]$(NC) 开始编译安装LVGL v9.0..."
 	@mkdir -p /tmp/lvgl_build
 	@cd /tmp/lvgl_build && \
 	if [ ! -d "lvgl" ]; then \
-		git clone --depth 1 --branch v9.2.0 https://github.com/lvgl/lvgl.git; \
+		git clone --depth 1 --branch release/v9.0 https://github.com/lvgl/lvgl.git; \
 	fi
-	@echo "$(BLUE)[INFO]$(NC) 创建LVGL配置文件..."
+	@echo "$(BLUE)[INFO]$(NC) 创建LVGL v9配置文件..."
 	@cd /tmp/lvgl_build/lvgl && \
 	echo "#ifndef LV_CONF_H" > lv_conf.h && \
 	echo "#define LV_CONF_H" >> lv_conf.h && \
@@ -187,7 +188,7 @@ build-lvgl-from-source:
 	echo "#define LV_USE_STDLIB_STRING    1" >> lv_conf.h && \
 	echo "#define LV_USE_STDLIB_SPRINTF   1" >> lv_conf.h && \
 	echo "#define LV_COLOR_DEPTH          32" >> lv_conf.h && \
-	echo "#define LV_MEM_SIZE             (128U * 1024U)" >> lv_conf.h && \
+	echo "#define LV_MEM_SIZE             (256U * 1024U)" >> lv_conf.h && \
 	echo "#define LV_USE_PERF_MONITOR     1" >> lv_conf.h && \
 	echo "#define LV_USE_MEM_MONITOR      1" >> lv_conf.h && \
 	echo "#define LV_USE_LOG              1" >> lv_conf.h && \
@@ -210,6 +211,12 @@ build-lvgl-from-source:
 	echo "#define LV_USE_GIF              1" >> lv_conf.h && \
 	echo "#define LV_USE_FREETYPE         1" >> lv_conf.h && \
 	echo "" >> lv_conf.h && \
+	echo "// LVGL v9特定配置" >> lv_conf.h && \
+	echo "#define LV_USE_DRAW_SW          1" >> lv_conf.h && \
+	echo "#define LV_USE_DRAW_VGLITE      0" >> lv_conf.h && \
+	echo "#define LV_USE_DRAW_PXP         0" >> lv_conf.h && \
+	echo "#define LV_USE_OS               LV_OS_NONE" >> lv_conf.h && \
+	echo "" >> lv_conf.h && \
 	echo "#endif /*LV_CONF_H*/" >> lv_conf.h
 	@cd /tmp/lvgl_build/lvgl && \
 	mkdir -p build && cd build && \
@@ -217,12 +224,18 @@ build-lvgl-from-source:
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr/local \
 		-DLV_CONF_PATH=/tmp/lvgl_build/lvgl/lv_conf.h \
-		-DBUILD_SHARED_LIBS=ON
+		-DBUILD_SHARED_LIBS=ON \
+		-DLV_BUILD_EXAMPLES=OFF \
+		-DLV_USE_DEMO_WIDGETS=OFF
 	@cd /tmp/lvgl_build/lvgl/build && make -j$(shell nproc)
 	@cd /tmp/lvgl_build/lvgl/build && sudo make install
 	@sudo ldconfig
-	@echo "$(GREEN)[SUCCESS]$(NC) LVGL编译安装完成"
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.0编译安装完成"
 	@rm -rf /tmp/lvgl_build
+
+# 安装LVGL v9的快速命令
+install-lvgl9: build-lvgl-from-source
+	@echo "$(GREEN)[SUCCESS]$(NC) LVGL v9.0安装完成，系统已准备就绪"
 
 # === C++系统构建 ===
 build-system:
