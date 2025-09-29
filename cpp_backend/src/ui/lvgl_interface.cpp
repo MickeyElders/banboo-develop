@@ -587,9 +587,9 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_add_style(title, &style_text_title, 0);
     lv_obj_set_style_text_color(title, color_primary_, 0);
     
-    // === Jetson System Monitoring Area - 使用表格对象 ===
+    // === Jetson System Monitoring Area ===
     lv_obj_t* jetson_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(jetson_section, lv_pct(100), 320);
+    lv_obj_set_size(jetson_section, lv_pct(100), 320);  // 增加高度以容纳更多信息
     lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(jetson_section, 12, 0);
     lv_obj_set_style_border_width(jetson_section, 1, 0);
@@ -603,176 +603,320 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_font(jetson_label, &lv_font_montserrat_14, 0);
     lv_obj_align(jetson_label, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    // === 系统信息表格 ===
-    lv_obj_t* system_table = lv_table_create(jetson_section);
-    lv_obj_set_size(system_table, lv_pct(100), 280);
-    lv_obj_set_pos(system_table, 0, 25);
+    int y_pos = 25;
     
-    // 设置表格样式
-    lv_obj_add_style(system_table, &style_table_cell, LV_PART_ITEMS);
-    lv_obj_set_style_bg_color(system_table, lv_color_hex(0x0F1419), 0);
-    lv_obj_set_style_border_width(system_table, 0, 0);
-    lv_obj_set_style_pad_all(system_table, 2, 0);
+    // === CPU信息区域 - 表格式布局 ===
+    // CPU标签行容器
+    lv_obj_t* cpu_label_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(cpu_label_row, lv_pct(100), 18);
+    lv_obj_set_pos(cpu_label_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(cpu_label_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cpu_label_row, 0, 0);
+    lv_obj_set_style_pad_all(cpu_label_row, 0, 0);
+    lv_obj_clear_flag(cpu_label_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(cpu_label_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cpu_label_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    // 设置表格行列数
-    lv_table_set_column_count(system_table, 2);
-    lv_table_set_row_count(system_table, 12);
+    // CPU标签 (左对齐)
+    lv_obj_t* cpu_name_label = lv_label_create(cpu_label_row);
+    lv_label_set_text(cpu_name_label, "CPU:");
+    lv_obj_set_style_text_color(cpu_name_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(cpu_name_label, &lv_font_montserrat_12, 0);
     
-    // 设置列宽：标签列40%，数值列60%
-    lv_table_set_column_width(system_table, 0, 100);  // 标签列
-    lv_table_set_column_width(system_table, 1, 180);  // 数值列
-    
-    // 添加系统信息行
-    int row = 0;
-    
-    // CPU信息
-    lv_table_set_cell_value(system_table, row, 0, "CPU:");
-    lv_table_set_cell_value(system_table, row, 1, "45%@1.9GHz  62°C");
-    row++;
-    
-    // GPU信息
-    lv_table_set_cell_value(system_table, row, 0, "GPU:");
-    lv_table_set_cell_value(system_table, row, 1, "72%@624MHz  58°C");
-    row++;
-    
-    // 内存信息
-    lv_table_set_cell_value(system_table, row, 0, "RAM:");
-    lv_table_set_cell_value(system_table, row, 1, "3347/7467MB  58%");
-    row++;
-    
-    // SWAP信息
-    lv_table_set_cell_value(system_table, row, 0, "SWAP:");
-    lv_table_set_cell_value(system_table, row, 1, "0/3733MB");
-    row++;
-    
-    // 温度信息
-    lv_table_set_cell_value(system_table, row, 0, "SOC:");
-    lv_table_set_cell_value(system_table, row, 1, "48.5°C");
-    row++;
-    
-    lv_table_set_cell_value(system_table, row, 0, "Thermal:");
-    lv_table_set_cell_value(system_table, row, 1, "50.2°C");
-    row++;
-    
-    // 电源信息
-    lv_table_set_cell_value(system_table, row, 0, "VDD_IN:");
-    lv_table_set_cell_value(system_table, row, 1, "5336mA/4970mW");
-    row++;
-    
-    lv_table_set_cell_value(system_table, row, 0, "CPU_GPU:");
-    lv_table_set_cell_value(system_table, row, 1, "2617mA/2336mW");
-    row++;
-    
-    lv_table_set_cell_value(system_table, row, 0, "SOC:");
-    lv_table_set_cell_value(system_table, row, 1, "1478mA/1318mW");
-    row++;
-    
-    // 其他信息
-    lv_table_set_cell_value(system_table, row, 0, "EMC:");
-    lv_table_set_cell_value(system_table, row, 1, "13%@2133MHz");
-    row++;
-    
-    lv_table_set_cell_value(system_table, row, 0, "VIC:");
-    lv_table_set_cell_value(system_table, row, 1, "0%@115MHz");
-    row++;
-    
-    lv_table_set_cell_value(system_table, row, 0, "FAN:");
-    lv_table_set_cell_value(system_table, row, 1, "N/A");
-    
-    // 保存表格引用以便更新数据
-    control_widgets_.system_table = system_table;
-    
-    // 为了保持兼容性，我们仍然需要保留进度条组件
-    // 将进度条放在表格之外，单独显示
-    lv_obj_t* progress_container = lv_obj_create(jetson_section);
-    lv_obj_set_size(progress_container, lv_pct(100), 60);
-    lv_obj_set_pos(progress_container, 0, 250);
-    lv_obj_set_style_bg_opa(progress_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(progress_container, 0, 0);
-    lv_obj_set_style_pad_all(progress_container, 0, 0);
-    lv_obj_clear_flag(progress_container, LV_OBJ_FLAG_SCROLLABLE);
-    
-    // CPU进度条
-    control_widgets_.cpu_bar = lv_bar_create(progress_container);
-    lv_obj_set_size(control_widgets_.cpu_bar, lv_pct(30), 12);
-    lv_obj_set_pos(control_widgets_.cpu_bar, 0, 0);
+    // CPU进度条 (右对齐)
+    control_widgets_.cpu_bar = lv_bar_create(cpu_label_row);
+    lv_obj_set_size(control_widgets_.cpu_bar, 120, 16);
     lv_bar_set_range(control_widgets_.cpu_bar, 0, 100);
     lv_bar_set_value(control_widgets_.cpu_bar, 45, LV_ANIM_ON);
+    // 设置进度条主体背景（未使用部分）
     lv_obj_set_style_bg_color(control_widgets_.cpu_bar, lv_color_hex(0x2A3441), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(control_widgets_.cpu_bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(control_widgets_.cpu_bar, 6, LV_PART_MAIN);
+    lv_obj_set_style_radius(control_widgets_.cpu_bar, 8, LV_PART_MAIN);
+    // 设置进度条指示器（已使用部分）为黄色
     lv_obj_set_style_bg_color(control_widgets_.cpu_bar, color_warning_, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(control_widgets_.cpu_bar, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(control_widgets_.cpu_bar, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(control_widgets_.cpu_bar, 8, LV_PART_INDICATOR);
     
-    // GPU进度条
-    control_widgets_.gpu_bar = lv_bar_create(progress_container);
-    lv_obj_set_size(control_widgets_.gpu_bar, lv_pct(30), 12);
-    lv_obj_set_pos(control_widgets_.gpu_bar, lv_pct(35), 0);
+    // CPU数值行容器
+    lv_obj_t* cpu_value_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(cpu_value_row, lv_pct(100), 18);
+    lv_obj_set_pos(cpu_value_row, 0, y_pos + 22);
+    lv_obj_set_style_bg_opa(cpu_value_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cpu_value_row, 0, 0);
+    lv_obj_set_style_pad_all(cpu_value_row, 0, 0);
+    lv_obj_clear_flag(cpu_value_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(cpu_value_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(cpu_value_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // CPU数值 (左侧)
+    control_widgets_.cpu_label = lv_label_create(cpu_value_row);
+    lv_label_set_text(control_widgets_.cpu_label, "45%@1.9GHz");
+    lv_obj_set_style_text_color(control_widgets_.cpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_label, &lv_font_montserrat_12, 0);
+    
+    // CPU温度 (右侧)
+    control_widgets_.cpu_temp_label = lv_label_create(cpu_value_row);
+    lv_label_set_text(control_widgets_.cpu_temp_label, "62°C");
+    lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_temp_label, &lv_font_montserrat_12, 0);
+    
+    y_pos += 54;
+    
+    // === GPU信息区域 - 表格式布局 ===
+    // GPU标签行容器
+    lv_obj_t* gpu_label_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(gpu_label_row, lv_pct(100), 18);
+    lv_obj_set_pos(gpu_label_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(gpu_label_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(gpu_label_row, 0, 0);
+    lv_obj_set_style_pad_all(gpu_label_row, 0, 0);
+    lv_obj_clear_flag(gpu_label_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(gpu_label_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gpu_label_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // GPU标签 (左对齐)
+    lv_obj_t* gpu_name_label = lv_label_create(gpu_label_row);
+    lv_label_set_text(gpu_name_label, "GPU:");
+    lv_obj_set_style_text_color(gpu_name_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(gpu_name_label, &lv_font_montserrat_12, 0);
+    
+    // GPU进度条 (右对齐)
+    control_widgets_.gpu_bar = lv_bar_create(gpu_label_row);
+    lv_obj_set_size(control_widgets_.gpu_bar, 120, 16);
     lv_bar_set_range(control_widgets_.gpu_bar, 0, 100);
     lv_bar_set_value(control_widgets_.gpu_bar, 72, LV_ANIM_ON);
+    // 设置进度条主体背景（未使用部分）
     lv_obj_set_style_bg_color(control_widgets_.gpu_bar, lv_color_hex(0x2A3441), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(control_widgets_.gpu_bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(control_widgets_.gpu_bar, 6, LV_PART_MAIN);
+    lv_obj_set_style_radius(control_widgets_.gpu_bar, 8, LV_PART_MAIN);
+    // 设置进度条指示器（已使用部分）为黄色
     lv_obj_set_style_bg_color(control_widgets_.gpu_bar, color_warning_, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(control_widgets_.gpu_bar, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(control_widgets_.gpu_bar, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(control_widgets_.gpu_bar, 8, LV_PART_INDICATOR);
     
-    // RAM进度条
-    control_widgets_.mem_bar = lv_bar_create(progress_container);
-    lv_obj_set_size(control_widgets_.mem_bar, lv_pct(30), 12);
-    lv_obj_set_pos(control_widgets_.mem_bar, lv_pct(70), 0);
+    // GPU数值行容器
+    lv_obj_t* gpu_value_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(gpu_value_row, lv_pct(100), 18);
+    lv_obj_set_pos(gpu_value_row, 0, y_pos + 22);
+    lv_obj_set_style_bg_opa(gpu_value_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(gpu_value_row, 0, 0);
+    lv_obj_set_style_pad_all(gpu_value_row, 0, 0);
+    lv_obj_clear_flag(gpu_value_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(gpu_value_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gpu_value_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // GPU数值 (左侧)
+    control_widgets_.gpu_label = lv_label_create(gpu_value_row);
+    lv_label_set_text(control_widgets_.gpu_label, "72%@624MHz");
+    lv_obj_set_style_text_color(control_widgets_.gpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_label, &lv_font_montserrat_12, 0);
+    
+    // GPU温度 (右侧)
+    control_widgets_.gpu_temp_label = lv_label_create(gpu_value_row);
+    lv_label_set_text(control_widgets_.gpu_temp_label, "58°C");
+    lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_temp_label, &lv_font_montserrat_12, 0);
+    
+    y_pos += 54;
+    
+    // === 内存信息区域 - 表格式布局 ===
+    // 内存标签行容器
+    lv_obj_t* mem_label_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(mem_label_row, lv_pct(100), 18);
+    lv_obj_set_pos(mem_label_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(mem_label_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(mem_label_row, 0, 0);
+    lv_obj_set_style_pad_all(mem_label_row, 0, 0);
+    lv_obj_clear_flag(mem_label_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(mem_label_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(mem_label_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // 内存标签 (左对齐)
+    lv_obj_t* mem_name_label = lv_label_create(mem_label_row);
+    lv_label_set_text(mem_name_label, "RAM:");
+    lv_obj_set_style_text_color(mem_name_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(mem_name_label, &lv_font_montserrat_12, 0);
+    
+    // 内存进度条 (右对齐)
+    control_widgets_.mem_bar = lv_bar_create(mem_label_row);
+    lv_obj_set_size(control_widgets_.mem_bar, 120, 16);
     lv_bar_set_range(control_widgets_.mem_bar, 0, 100);
     lv_bar_set_value(control_widgets_.mem_bar, 58, LV_ANIM_ON);
+    // 设置进度条主体背景（未使用部分）
     lv_obj_set_style_bg_color(control_widgets_.mem_bar, lv_color_hex(0x2A3441), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(control_widgets_.mem_bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(control_widgets_.mem_bar, 6, LV_PART_MAIN);
+    lv_obj_set_style_radius(control_widgets_.mem_bar, 8, LV_PART_MAIN);
+    // 设置进度条指示器（已使用部分）为黄色
     lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(control_widgets_.mem_bar, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(control_widgets_.mem_bar, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(control_widgets_.mem_bar, 8, LV_PART_INDICATOR);
     
-    // 为了更新兼容性，保留旧的标签引用但隐藏它们
-    control_widgets_.cpu_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.cpu_label, LV_OBJ_FLAG_HIDDEN);
+    // 内存数值行容器
+    lv_obj_t* mem_value_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(mem_value_row, lv_pct(100), 18);
+    lv_obj_set_pos(mem_value_row, 0, y_pos + 22);
+    lv_obj_set_style_bg_opa(mem_value_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(mem_value_row, 0, 0);
+    lv_obj_set_style_pad_all(mem_value_row, 0, 0);
+    lv_obj_clear_flag(mem_value_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(mem_value_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(mem_value_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    control_widgets_.gpu_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.gpu_label, LV_OBJ_FLAG_HIDDEN);
+    // 内存数值 (左侧)
+    control_widgets_.mem_label = lv_label_create(mem_value_row);
+    lv_label_set_text(control_widgets_.mem_label, "3347/7467MB");
+    lv_obj_set_style_text_color(control_widgets_.mem_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.mem_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.mem_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.mem_label, LV_OBJ_FLAG_HIDDEN);
+    // SWAP使用情况 (右侧)
+    control_widgets_.swap_usage_label = lv_label_create(mem_value_row);
+    lv_label_set_text(control_widgets_.swap_usage_label, "SWAP: 0/3733MB");
+    lv_obj_set_style_text_color(control_widgets_.swap_usage_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.swap_usage_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.cpu_temp_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.cpu_temp_label, LV_OBJ_FLAG_HIDDEN);
+    y_pos += 54;
     
-    control_widgets_.gpu_temp_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.gpu_temp_label, LV_OBJ_FLAG_HIDDEN);
+    // === 温度信息区域 - 表格式布局 ===
+    lv_obj_t* temp_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(temp_row, lv_pct(100), 18);
+    lv_obj_set_pos(temp_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(temp_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(temp_row, 0, 0);
+    lv_obj_set_style_pad_all(temp_row, 0, 0);
+    lv_obj_clear_flag(temp_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(temp_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(temp_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    control_widgets_.swap_usage_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.swap_usage_label, LV_OBJ_FLAG_HIDDEN);
+    // SOC温度 (左侧)
+    control_widgets_.soc_temp_label = lv_label_create(temp_row);
+    lv_label_set_text(control_widgets_.soc_temp_label, "SOC: 48.5°C");
+    lv_obj_set_style_text_color(control_widgets_.soc_temp_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.soc_temp_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.soc_temp_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.soc_temp_label, LV_OBJ_FLAG_HIDDEN);
+    // 热区温度 (右侧)
+    control_widgets_.thermal_temp_label = lv_label_create(temp_row);
+    lv_label_set_text(control_widgets_.thermal_temp_label, "Thermal: 50.2°C");
+    lv_obj_set_style_text_color(control_widgets_.thermal_temp_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.thermal_temp_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.thermal_temp_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.thermal_temp_label, LV_OBJ_FLAG_HIDDEN);
+    y_pos += 25;
     
-    control_widgets_.power_in_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.power_in_label, LV_OBJ_FLAG_HIDDEN);
+    // === 电源信息区域 - 表格式布局 ===
+    // VDD_IN电源行
+    lv_obj_t* power_in_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(power_in_row, lv_pct(100), 18);
+    lv_obj_set_pos(power_in_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(power_in_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(power_in_row, 0, 0);
+    lv_obj_set_style_pad_all(power_in_row, 0, 0);
+    lv_obj_clear_flag(power_in_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(power_in_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(power_in_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    control_widgets_.power_cpu_gpu_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.power_cpu_gpu_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t* power_in_label_name = lv_label_create(power_in_row);
+    lv_label_set_text(power_in_label_name, "VDD_IN:");
+    lv_obj_set_style_text_color(power_in_label_name, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(power_in_label_name, &lv_font_montserrat_12, 0);
     
-    control_widgets_.power_soc_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.power_soc_label, LV_OBJ_FLAG_HIDDEN);
+    control_widgets_.power_in_label = lv_label_create(power_in_row);
+    lv_label_set_text(control_widgets_.power_in_label, "5336mA/4970mW");
+    lv_obj_set_style_text_color(control_widgets_.power_in_label, color_success_, 0);
+    lv_obj_set_style_text_font(control_widgets_.power_in_label, &lv_font_montserrat_12, 0);
     
-    control_widgets_.emc_freq_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.emc_freq_label, LV_OBJ_FLAG_HIDDEN);
+    y_pos += 20;
     
-    control_widgets_.vic_usage_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.vic_usage_label, LV_OBJ_FLAG_HIDDEN);
+    // CPU_GPU电源行
+    lv_obj_t* power_cpu_gpu_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(power_cpu_gpu_row, lv_pct(100), 18);
+    lv_obj_set_pos(power_cpu_gpu_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(power_cpu_gpu_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(power_cpu_gpu_row, 0, 0);
+    lv_obj_set_style_pad_all(power_cpu_gpu_row, 0, 0);
+    lv_obj_clear_flag(power_cpu_gpu_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(power_cpu_gpu_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(power_cpu_gpu_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
-    control_widgets_.fan_speed_label = lv_label_create(jetson_section);
-    lv_obj_add_flag(control_widgets_.fan_speed_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t* power_cpu_gpu_label_name = lv_label_create(power_cpu_gpu_row);
+    lv_label_set_text(power_cpu_gpu_label_name, "CPU_GPU:");
+    lv_obj_set_style_text_color(power_cpu_gpu_label_name, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(power_cpu_gpu_label_name, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.power_cpu_gpu_label = lv_label_create(power_cpu_gpu_row);
+    lv_label_set_text(control_widgets_.power_cpu_gpu_label, "2617mA/2336mW");
+    lv_obj_set_style_text_color(control_widgets_.power_cpu_gpu_label, color_warning_, 0);
+    lv_obj_set_style_text_font(control_widgets_.power_cpu_gpu_label, &lv_font_montserrat_12, 0);
+    
+    y_pos += 20;
+    
+    // SOC电源行
+    lv_obj_t* power_soc_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(power_soc_row, lv_pct(100), 18);
+    lv_obj_set_pos(power_soc_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(power_soc_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(power_soc_row, 0, 0);
+    lv_obj_set_style_pad_all(power_soc_row, 0, 0);
+    lv_obj_clear_flag(power_soc_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(power_soc_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(power_soc_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    lv_obj_t* power_soc_label_name = lv_label_create(power_soc_row);
+    lv_label_set_text(power_soc_label_name, "SOC:");
+    lv_obj_set_style_text_color(power_soc_label_name, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(power_soc_label_name, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.power_soc_label = lv_label_create(power_soc_row);
+    lv_label_set_text(control_widgets_.power_soc_label, "1478mA/1318mW");
+    lv_obj_set_style_text_color(control_widgets_.power_soc_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.power_soc_label, &lv_font_montserrat_12, 0);
+    
+    y_pos += 25;
+    
+    // === 其他系统信息 - 表格式布局 ===
+    // EMC和VIC频率行
+    lv_obj_t* freq_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(freq_row, lv_pct(100), 18);
+    lv_obj_set_pos(freq_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(freq_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(freq_row, 0, 0);
+    lv_obj_set_style_pad_all(freq_row, 0, 0);
+    lv_obj_clear_flag(freq_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(freq_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(freq_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    // EMC频率 (左侧)
+    control_widgets_.emc_freq_label = lv_label_create(freq_row);
+    lv_label_set_text(control_widgets_.emc_freq_label, "EMC: 13%@2133MHz");
+    lv_obj_set_style_text_color(control_widgets_.emc_freq_label, color_primary_, 0);
+    lv_obj_set_style_text_font(control_widgets_.emc_freq_label, &lv_font_montserrat_12, 0);
+    
+    // VIC使用率 (右侧)
+    control_widgets_.vic_usage_label = lv_label_create(freq_row);
+    lv_label_set_text(control_widgets_.vic_usage_label, "VIC: 0%@115MHz");
+    lv_obj_set_style_text_color(control_widgets_.vic_usage_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.vic_usage_label, &lv_font_montserrat_12, 0);
+    
+    y_pos += 20;
+    
+    // 风扇转速行
+    lv_obj_t* fan_row = lv_obj_create(jetson_section);
+    lv_obj_set_size(fan_row, lv_pct(100), 18);
+    lv_obj_set_pos(fan_row, 0, y_pos);
+    lv_obj_set_style_bg_opa(fan_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(fan_row, 0, 0);
+    lv_obj_set_style_pad_all(fan_row, 0, 0);
+    lv_obj_clear_flag(fan_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(fan_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(fan_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    
+    lv_obj_t* fan_label_name = lv_label_create(fan_row);
+    lv_label_set_text(fan_label_name, "FAN:");
+    lv_obj_set_style_text_color(fan_label_name, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(fan_label_name, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.fan_speed_label = lv_label_create(fan_row);
+    lv_label_set_text(control_widgets_.fan_speed_label, "N/A");
+    lv_obj_set_style_text_color(control_widgets_.fan_speed_label, lv_color_hex(0x8A92A1), 0);
+    lv_obj_set_style_text_font(control_widgets_.fan_speed_label, &lv_font_montserrat_12, 0);
     
     // === AI Model Monitoring Area ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
@@ -1499,7 +1643,7 @@ void LVGLInterface::updateSystemStats() {
     if (jetson_monitor_ && jetson_monitor_->isRunning()) {
         utils::SystemStats stats = jetson_monitor_->getLatestStats();
         
-        // 更新CPU信息和表格
+        // 更新CPU信息
         if (control_widgets_.cpu_bar && !stats.cpu_cores.empty()) {
             // 计算平均CPU使用率
             int total_usage = 0;
@@ -1511,16 +1655,8 @@ void LVGLInterface::updateSystemStats() {
             int avg_usage = total_usage / stats.cpu_cores.size();
             int avg_freq = total_freq / stats.cpu_cores.size();
             
-            // 更新进度条
             lv_bar_set_value(control_widgets_.cpu_bar, avg_usage, LV_ANIM_ON);
-            
-            // 更新表格CPU行（第0行）
-            if (control_widgets_.system_table) {
-                char cpu_info[64];
-                snprintf(cpu_info, sizeof(cpu_info), "%d%%@%dMHz  %.1f°C",
-                        avg_usage, avg_freq, stats.temperature.cpu_temp);
-                lv_table_set_cell_value(control_widgets_.system_table, 0, 1, cpu_info);
-            }
+            lv_label_set_text_fmt(control_widgets_.cpu_label, "CPU: %d%% @%dMHz", avg_usage, avg_freq);
             
             // 设置进度条主体背景（未使用部分）
             lv_obj_set_style_bg_color(control_widgets_.cpu_bar, lv_color_hex(0x2A3441), LV_PART_MAIN);
@@ -1530,18 +1666,12 @@ void LVGLInterface::updateSystemStats() {
             lv_obj_set_style_bg_opa(control_widgets_.cpu_bar, LV_OPA_COVER, LV_PART_INDICATOR);
         }
         
-        // 更新GPU信息和表格
+        // 更新GPU信息
         if (control_widgets_.gpu_bar) {
             int gpu_usage = stats.gpu.usage_percent;
             lv_bar_set_value(control_widgets_.gpu_bar, gpu_usage, LV_ANIM_ON);
-            
-            // 更新表格GPU行（第1行）
-            if (control_widgets_.system_table) {
-                char gpu_info[64];
-                snprintf(gpu_info, sizeof(gpu_info), "%d%%@%dMHz  %.1f°C",
-                        gpu_usage, stats.gpu.frequency_mhz, stats.temperature.gpu_temp);
-                lv_table_set_cell_value(control_widgets_.system_table, 1, 1, gpu_info);
-            }
+            lv_label_set_text_fmt(control_widgets_.gpu_label, "GPU: %d%% @%dMHz",
+                                 gpu_usage, stats.gpu.frequency_mhz);
             
             // 设置进度条主体背景（未使用部分）
             lv_obj_set_style_bg_color(control_widgets_.gpu_bar, lv_color_hex(0x2A3441), LV_PART_MAIN);
@@ -1551,81 +1681,16 @@ void LVGLInterface::updateSystemStats() {
             lv_obj_set_style_bg_opa(control_widgets_.gpu_bar, LV_OPA_COVER, LV_PART_INDICATOR);
         }
         
-        // 更新内存信息和表格
+        // 更新内存信息
         if (control_widgets_.mem_bar && stats.memory.ram_total_mb > 0) {
             int mem_percentage = (stats.memory.ram_used_mb * 100) / stats.memory.ram_total_mb;
             lv_bar_set_value(control_widgets_.mem_bar, mem_percentage, LV_ANIM_ON);
-            
-            // 更新表格RAM行（第2行）
-            if (control_widgets_.system_table) {
-                char ram_info[64];
-                snprintf(ram_info, sizeof(ram_info), "%d/%dMB  %d%%",
-                        stats.memory.ram_used_mb, stats.memory.ram_total_mb, mem_percentage);
-                lv_table_set_cell_value(control_widgets_.system_table, 2, 1, ram_info);
-            }
+            lv_label_set_text_fmt(control_widgets_.mem_label, "RAM: %d%% %d/%dMB (LFB:%dx%dMB)",
+                                 mem_percentage, stats.memory.ram_used_mb, stats.memory.ram_total_mb,
+                                 stats.memory.lfb_blocks, stats.memory.lfb_size_mb);
             
             // 使用黄色条块代表已使用的量
             lv_obj_set_style_bg_color(control_widgets_.mem_bar, color_warning_, LV_PART_INDICATOR);
-        }
-        
-        // 更新表格的其他系统信息行
-        if (control_widgets_.system_table) {
-            // SWAP信息（第3行）
-            if (stats.memory.swap_total_mb > 0) {
-                char swap_info[64];
-                snprintf(swap_info, sizeof(swap_info), "%d/%dMB",
-                        stats.memory.swap_used_mb, stats.memory.swap_total_mb);
-                lv_table_set_cell_value(control_widgets_.system_table, 3, 1, swap_info);
-            } else {
-                lv_table_set_cell_value(control_widgets_.system_table, 3, 1, "0/0MB");
-            }
-            
-            // SOC温度（第4行）
-            char soc_info[32];
-            snprintf(soc_info, sizeof(soc_info), "%.1f°C", stats.temperature.soc_temp);
-            lv_table_set_cell_value(control_widgets_.system_table, 4, 1, soc_info);
-            
-            // Thermal温度（第5行）
-            char thermal_info[32];
-            snprintf(thermal_info, sizeof(thermal_info), "%.1f°C", stats.temperature.thermal_temp);
-            lv_table_set_cell_value(control_widgets_.system_table, 5, 1, thermal_info);
-            
-            // 电源信息（第6-8行）
-            char vdd_in_info[64];
-            snprintf(vdd_in_info, sizeof(vdd_in_info), "%dmA/%dmW",
-                    stats.power.vdd_in_current_ma, stats.power.vdd_in_power_mw);
-            lv_table_set_cell_value(control_widgets_.system_table, 6, 1, vdd_in_info);
-            
-            char cpu_gpu_power_info[64];
-            snprintf(cpu_gpu_power_info, sizeof(cpu_gpu_power_info), "%dmA/%dmW",
-                    stats.power.vdd_cpu_gpu_cv_current_ma, stats.power.vdd_cpu_gpu_cv_power_mw);
-            lv_table_set_cell_value(control_widgets_.system_table, 7, 1, cpu_gpu_power_info);
-            
-            char soc_power_info[64];
-            snprintf(soc_power_info, sizeof(soc_power_info), "%dmA/%dmW",
-                    stats.power.vdd_soc_current_ma, stats.power.vdd_soc_power_mw);
-            lv_table_set_cell_value(control_widgets_.system_table, 8, 1, soc_power_info);
-            
-            // EMC频率（第9行）
-            char emc_info[64];
-            snprintf(emc_info, sizeof(emc_info), "%d%%@%dMHz",
-                    stats.other.emc_freq_percent, stats.other.emc_freq_mhz);
-            lv_table_set_cell_value(control_widgets_.system_table, 9, 1, emc_info);
-            
-            // VIC使用率（第10行）
-            char vic_info[64];
-            snprintf(vic_info, sizeof(vic_info), "%d%%@%dMHz",
-                    stats.other.vic_usage_percent, stats.other.vic_freq_mhz);
-            lv_table_set_cell_value(control_widgets_.system_table, 10, 1, vic_info);
-            
-            // 风扇转速（第11行）
-            if (stats.other.fan_rpm > 0) {
-                char fan_info[32];
-                snprintf(fan_info, sizeof(fan_info), "%dRPM", stats.other.fan_rpm);
-                lv_table_set_cell_value(control_widgets_.system_table, 11, 1, fan_info);
-            } else {
-                lv_table_set_cell_value(control_widgets_.system_table, 11, 1, "N/A");
-            }
         }
         
         // 从DataBridge获取真实的AI模型统计数据

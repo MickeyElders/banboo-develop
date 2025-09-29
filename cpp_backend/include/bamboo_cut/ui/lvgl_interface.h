@@ -300,7 +300,6 @@ private:
         
         // 原有组件
         lv_obj_t* modbus_table;
-        lv_obj_t* system_table;  // Jetson系统信息表格
         std::vector<lv_obj_t*> blade_buttons;
     } control_widgets_;
     
