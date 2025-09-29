@@ -82,7 +82,7 @@ camera:
   # GStreamer管道配置
   gstreamer:
     enabled: true
-    pipeline: "nvarguscamerasrc sensor-id=0 ! video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+    pipeline: "nvarguscamerasrc sensor-id=0 ! video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! tee name=t ! queue ! nvdrmvideosink conn-id=0 plane-id=0 set-mode=0 t. ! queue ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
 
 # 系统运行参数
 system_params:

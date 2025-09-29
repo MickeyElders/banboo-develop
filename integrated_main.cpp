@@ -877,22 +877,24 @@ private:
         stereo_config.frame_size = cv::Size(1920, 1080);
         stereo_config.fps = 30;
         
-        // Jetson CSI摄像头配置 - 1920x1080@30fps 推荐配置
+        // Jetson CSI摄像头配置 - 使用 nvdrmvideosink 硬件加速显示
         stereo_config.left_camera_pipeline =
             "nvarguscamerasrc sensor-id=0 silent=true ! "
             "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! "
             "nvvidconv flip-method=0 silent=true ! "
-            "video/x-raw, width=(int)1920, height=(int)1080, format=(string)BGRx ! "
-            "videoconvert silent=true ! "
-            "video/x-raw, format=(string)BGR ! appsink sync=false";
+            "video/x-raw(memory:NVMM), format=(string)NV12 ! "
+            "tee name=t ! queue ! nvdrmvideosink conn-id=0 plane-id=0 set-mode=0 "
+            "t. ! queue ! nvvidconv ! video/x-raw, format=(string)BGRx ! "
+            "videoconvert ! video/x-raw, format=(string)BGR ! appsink sync=false";
             
         stereo_config.right_camera_pipeline =
             "nvarguscamerasrc sensor-id=1 silent=true ! "
             "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! "
             "nvvidconv flip-method=0 silent=true ! "
-            "video/x-raw, width=(int)1920, height=(int)1080, format=(string)BGRx ! "
-            "videoconvert silent=true ! "
-            "video/x-raw, format=(string)BGR ! appsink sync=false";
+            "video/x-raw(memory:NVMM), format=(string)NV12 ! "
+            "tee name=t ! queue ! nvdrmvideosink conn-id=0 plane-id=1 set-mode=0 "
+            "t. ! queue ! nvvidconv ! video/x-raw, format=(string)BGRx ! "
+            "videoconvert ! video/x-raw, format=(string)BGR ! appsink sync=false";
         
         // 回退选项：USB摄像头ID
         stereo_config.left_camera_id = 0;   // /dev/video0
