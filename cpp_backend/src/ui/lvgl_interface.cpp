@@ -909,19 +909,24 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === AI Model Monitoring Area ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(ai_section, lv_pct(100), 340);  // 增加高度以容纳摄像头状态信息
+    lv_obj_set_width(ai_section, lv_pct(100));  // 只设置宽度，高度自适应
     lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(ai_section, 12, 0);
     lv_obj_set_style_border_width(ai_section, 1, 0);
     lv_obj_set_style_border_color(ai_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(ai_section, 12, 0);
     lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_grow(ai_section, 2);  // 在 flex 中占据更多空间
+    
+    // 设置 AI 区域为垂直 Flex 布局
+    lv_obj_set_flex_flow(ai_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(ai_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(ai_section, 8, 0);
     
     lv_obj_t* ai_title = lv_label_create(ai_section);
     lv_label_set_text(ai_title, LV_SYMBOL_EYE_OPEN " AI Model Monitor");
     lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
     lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
-    lv_obj_align(ai_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
     // === 基本AI模型信息 (上半部分) ===
     // 模型版本
@@ -1122,13 +1127,19 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === Modbus Communication Statistics Area ===
     lv_obj_t* modbus_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(modbus_section, lv_pct(100), 200);  // 增加高度以容纳寄存器信息
+    lv_obj_set_width(modbus_section, lv_pct(100));  // 只设置宽度，高度自适应
     lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(modbus_section, 12, 0);
     lv_obj_set_style_border_width(modbus_section, 1, 0);
     lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(modbus_section, 10, 0);
     lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_grow(modbus_section, 1);  // 在 flex 中自动扩展
+    
+    // 设置 Modbus 区域为垂直 Flex 布局
+    lv_obj_set_flex_flow(modbus_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(modbus_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(modbus_section, 8, 0);
     
     lv_obj_t* modbus_title = lv_label_create(modbus_section);
     lv_label_set_text(modbus_title, LV_SYMBOL_WIFI " Modbus通信状态");
@@ -1238,35 +1249,26 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     // === 系统版本信息区域 - 使用Flex垂直布局实现1列5行统一间距 ===
     lv_obj_t* version_section = lv_obj_create(control_panel_);
-    lv_obj_set_size(version_section, lv_pct(100), 120);
+    lv_obj_set_width(version_section, lv_pct(100));  // 只设置宽度，高度自适应
     lv_obj_set_style_bg_color(version_section, lv_color_hex(0x0F1419), 0);
     lv_obj_set_style_radius(version_section, 12, 0);
     lv_obj_set_style_border_width(version_section, 1, 0);
     lv_obj_set_style_border_color(version_section, lv_color_hex(0x2A3441), 0);
     lv_obj_set_style_pad_all(version_section, 10, 0);
     lv_obj_clear_flag(version_section, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_grow(version_section, 1);  // 在 flex 中自动扩展
+    
+    // 设置版本区域为垂直 Flex 布局
+    lv_obj_set_flex_flow(version_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(version_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(version_section, 8, 0);
     
     lv_obj_t* version_title = lv_label_create(version_section);
     lv_label_set_text(version_title, LV_SYMBOL_LIST " System Version");
     lv_obj_set_style_text_color(version_title, lv_color_hex(0xE6A055), 0);
     lv_obj_set_style_text_font(version_title, &lv_font_montserrat_12, 0);
-    lv_obj_align(version_title, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    // 版本信息容器 - 使用Flex垂直布局统一间距
-    lv_obj_t* version_container = lv_obj_create(version_section);
-    lv_obj_set_size(version_container, lv_pct(100), 85);
-    lv_obj_set_pos(version_container, 0, 18);
-    lv_obj_set_style_bg_opa(version_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(version_container, 0, 0);
-    lv_obj_set_style_pad_all(version_container, 0, 0);
-    lv_obj_clear_flag(version_container, LV_OBJ_FLAG_SCROLLABLE);
-    
-    // 设置为Flex垂直布局，统一间距对齐
-    lv_obj_set_flex_flow(version_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(version_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_gap(version_container, 3, 0);  // 统一间距3px
-    
-    // 创建5个版本信息项
+    // 创建5个版本信息项 - 直接在 version_section 中使用 Flex 布局
     const char* version_texts[] = {
         "JetPack: 5.1.2",
         "CUDA: 11.4.315",
@@ -1281,18 +1283,11 @@ lv_obj_t* LVGLInterface::createControlPanel(lv_obj_t* parent) {
     
     lv_obj_t* version_labels[5];
     for (int i = 0; i < 5; i++) {
-        lv_obj_t* version_item = lv_obj_create(version_container);
-        lv_obj_set_size(version_item, lv_pct(100), 16);
-        lv_obj_set_style_bg_opa(version_item, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(version_item, 0, 0);
-        lv_obj_set_style_pad_all(version_item, 0, 0);
-        lv_obj_clear_flag(version_item, LV_OBJ_FLAG_SCROLLABLE);
-        
-        version_labels[i] = lv_label_create(version_item);
+        version_labels[i] = lv_label_create(version_section);
         lv_label_set_text(version_labels[i], version_texts[i]);
         lv_obj_set_style_text_color(version_labels[i], version_colors[i], 0);
         lv_obj_set_style_text_font(version_labels[i], &lv_font_montserrat_12, 0);
-        lv_obj_align(version_labels[i], LV_ALIGN_LEFT_MID, 0, 0);
+        // 移除 lv_obj_align 调用，让 Flex 布局自动处理位置
     }
     
     // 分配版本标签指针
