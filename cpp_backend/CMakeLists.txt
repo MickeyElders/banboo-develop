@@ -66,7 +66,7 @@ pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
 pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
 message(STATUS "Found GStreamer: ${GSTREAMER_VERSION}")
 
-# LVGL
+# LVGL和DRM
 if(ENABLE_LVGL)
     find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
         PATHS
@@ -82,6 +82,15 @@ if(ENABLE_LVGL)
             /usr/local/lib/aarch64-linux-gnu
             /usr/lib64
             /usr/local/lib64)
+    
+    # 查找DRM库（用于显示器分辨率自动检测）
+    pkg_check_modules(DRM REQUIRED libdrm)
+    if(DRM_FOUND)
+        message(STATUS "Found libdrm: ${DRM_VERSION}")
+        include_directories(${DRM_INCLUDE_DIRS})
+    else()
+        message(WARNING "libdrm not found - 无法自动检测显示器分辨率")
+    endif()
     
     # 尝试查找pkg-config的LVGL
     pkg_check_modules(LVGL_PKG QUIET lvgl)
@@ -311,6 +320,12 @@ if(ENABLE_LVGL)
         message(STATUS "链接LVGL库: ${LVGL_LIBRARY}")
     else()
         message(STATUS "LVGL库未找到，使用占位符实现（无需额外链接）")
+    endif()
+    
+    # 链接DRM库用于显示器分辨率检测
+    if(DRM_FOUND)
+        target_link_libraries(bamboo_system ${DRM_LIBRARIES})
+        message(STATUS "链接DRM库: ${DRM_LIBRARIES}")
     endif()
 endif()
 

@@ -191,6 +191,11 @@ private:
      */
     bool initializeInput();
 
+    /**
+     * @brief 自动检测DRM显示器分辨率
+     */
+    bool detectDisplayResolution(int& width, int& height);
+
 private:
     std::shared_ptr<core::DataBridge> data_bridge_;
     LVGLConfig config_;

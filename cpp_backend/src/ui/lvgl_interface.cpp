@@ -5,16 +5,21 @@
  * 适配DRM渲染后端
  */
 
-#include "lvgl_interface.h"
+#include "bamboo_cut/ui/lvgl_interface.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
 
 #ifdef ENABLE_LVGL
 #include <lvgl/lvgl.h>
 #include <lvgl/lv_drivers/display/drm.h>
 #include <lvgl/lv_drivers/indev/evdev.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 #endif
 
 namespace bamboo_cut {
@@ -84,6 +89,18 @@ LVGLInterface::~LVGLInterface() {
 bool LVGLInterface::initialize(const LVGLConfig& config) {
     std::cout << "[LVGLInterface] 初始化界面系统..." << std::endl;
     config_ = config;
+    
+    // 自动检测显示器分辨率
+    int detected_width, detected_height;
+    if (detectDisplayResolution(detected_width, detected_height)) {
+        std::cout << "[LVGLInterface] 检测到显示器分辨率: "
+                  << detected_width << "x" << detected_height << std::endl;
+        config_.screen_width = detected_width;
+        config_.screen_height = detected_height;
+    } else {
+        std::cout << "[LVGLInterface] 无法检测显示器分辨率，使用默认值: "
+                  << config_.screen_width << "x" << config_.screen_height << std::endl;
+    }
     
 #ifdef ENABLE_LVGL
     // 初始化LVGL
@@ -1012,6 +1029,71 @@ void LVGLInterface::showMessageDialog(const std::string& title, const std::strin
 void LVGLInterface::setFullscreen(bool fullscreen) {
     // DRM模式默认就是全屏
     std::cout << "[LVGLInterface] 全屏模式: " << (fullscreen ? "启用" : "禁用") << std::endl;
+}
+
+bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
+#ifdef ENABLE_LVGL
+    std::cout << "[LVGLInterface] 正在检测DRM显示器分辨率..." << std::endl;
+    
+    // 尝试多个DRM设备路径
+    const char* drm_devices[] = {
+        "/dev/dri/card1",
+        "/dev/dri/card0",
+        "/dev/dri/card2"
+    };
+    
+    for (const char* device_path : drm_devices) {
+        int fd = open(device_path, O_RDWR);
+        if (fd < 0) {
+            std::cout << "[LVGLInterface] 无法打开DRM设备: " << device_path << std::endl;
+            continue;
+        }
+        
+        std::cout << "[LVGLInterface] 成功打开DRM设备: " << device_path << std::endl;
+        
+        // 获取DRM资源
+        drmModeRes* resources = drmModeGetResources(fd);
+        if (!resources) {
+            std::cerr << "[LVGLInterface] 无法获取DRM资源" << std::endl;
+            close(fd);
+            continue;
+        }
+        
+        // 查找连接的显示器
+        for (int i = 0; i < resources->count_connectors; i++) {
+            drmModeConnector* connector = drmModeGetConnector(fd, resources->connectors[i]);
+            if (!connector) continue;
+            
+            // 检查连接器是否连接了显示器
+            if (connector->connection == DRM_MODE_CONNECTED && connector->count_modes > 0) {
+                // 获取首选模式（通常是第一个模式）
+                drmModeModeInfo* mode = &connector->modes[0];
+                width = mode->hdisplay;
+                height = mode->vdisplay;
+                
+                std::cout << "[LVGLInterface] 检测到显示器分辨率: "
+                          << width << "x" << height << " @" << mode->vrefresh << "Hz" << std::endl;
+                std::cout << "[LVGLInterface] 显示器模式名称: " << mode->name << std::endl;
+                
+                drmModeFreeConnector(connector);
+                drmModeFreeResources(resources);
+                close(fd);
+                return true;
+            }
+            
+            drmModeFreeConnector(connector);
+        }
+        
+        drmModeFreeResources(resources);
+        close(fd);
+    }
+    
+    std::cerr << "[LVGLInterface] 无法检测到连接的显示器" << std::endl;
+    return false;
+#else
+    std::cerr << "[LVGLInterface] LVGL未启用，无法检测显示器分辨率" << std::endl;
+    return false;
+#endif
 }
 
 } // namespace ui
