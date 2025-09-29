@@ -71,8 +71,8 @@ modbus:
 # 摄像头配置
 camera:
   device_index: 0
-  width: 1280
-  height: 720
+  width: 1920
+  height: 1080
   fps: 30
   format: "MJPG"
   auto_exposure: false
@@ -82,7 +82,7 @@ camera:
   # GStreamer管道配置
   gstreamer:
     enabled: true
-    pipeline: "v4l2src device=/dev/video0 ! videoconvert ! appsink"
+    pipeline: "nvarguscamerasrc sensor-id=0 ! video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
 
 # 系统运行参数
 system_params:

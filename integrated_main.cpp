@@ -874,23 +874,23 @@ private:
         
         vision::StereoConfig stereo_config;
         stereo_config.calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
-        stereo_config.frame_size = cv::Size(640, 480);
+        stereo_config.frame_size = cv::Size(1920, 1080);
         stereo_config.fps = 30;
         
-        // Jetson CSI摄像头配置 - 完全静默模式
+        // Jetson CSI摄像头配置 - 1920x1080@30fps 推荐配置
         stereo_config.left_camera_pipeline =
             "nvarguscamerasrc sensor-id=0 silent=true ! "
-            "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
+            "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! "
             "nvvidconv flip-method=0 silent=true ! "
-            "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
+            "video/x-raw, width=(int)1920, height=(int)1080, format=(string)BGRx ! "
             "videoconvert silent=true ! "
             "video/x-raw, format=(string)BGR ! appsink sync=false";
             
         stereo_config.right_camera_pipeline =
             "nvarguscamerasrc sensor-id=1 silent=true ! "
-            "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
+            "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! "
             "nvvidconv flip-method=0 silent=true ! "
-            "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
+            "video/x-raw, width=(int)1920, height=(int)1080, format=(string)BGRx ! "
             "videoconvert silent=true ! "
             "video/x-raw, format=(string)BGR ! appsink sync=false";
         
