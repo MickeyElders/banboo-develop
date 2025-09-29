@@ -411,10 +411,10 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
 #endif
 }
 
-bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc, 
-                        drmModeConnector*& connector, uint32_t*& framebuffer, 
+bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
+                        drmModeConnector*& connector, uint32_t*& framebuffer,
                         uint32_t& fb_handle, int& init_attempt_count,
-                        uint32_t& drm_width, uint32_t& drm_height, 
+                        uint32_t& drm_width, uint32_t& drm_height,
                         uint32_t& stride, uint32_t& buffer_size) {
 #ifdef ENABLE_LVGL
     init_attempt_count++;
@@ -431,25 +431,50 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
     bool device_opened = false;
     
     for (const char* device_path : drm_devices) {
+        // 先关闭之前可能打开的文件描述符
+        if (drm_fd >= 0) {
+            std::cout << "[DRM] 关闭之前的DRM文件描述符: " << drm_fd << std::endl;
+            close(drm_fd);
+            drm_fd = -1;
+        }
+        
         drm_fd = open(device_path, O_RDWR);
         if (drm_fd >= 0) {
-            std::cout << "[DRM] 成功打开设备: " << device_path << std::endl;
+            std::cout << "[DRM] 成功打开设备: " << device_path << " fd=" << drm_fd << std::endl;
             device_opened = true;
             
             if (setupDRMDisplay(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
                                drm_width, drm_height, stride, buffer_size)) {
+                std::cout << "[DRM] 设备 " << device_path << " 初始化成功" << std::endl;
                 return true;
             } else {
-                // 清理失败的初始化
-                cleanupDRMResources(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle, buffer_size);
+                std::cout << "[DRM] 设备 " << device_path << " 初始化失败，尝试下一个设备" << std::endl;
+                // 当前设备初始化失败，仅清理当前设备相关资源
+                // 不调用完整的cleanupDRMResources，避免清理未初始化的资源
+                if (drm_fd >= 0) {
+                    close(drm_fd);
+                    drm_fd = -1;
+                }
+                // 重置为初始状态，准备尝试下一个设备
+                fb_id = 0;
+                crtc = nullptr;
+                connector = nullptr;
+                framebuffer = nullptr;
+                fb_handle = 0;
+                drm_width = 0;
+                drm_height = 0;
+                stride = 0;
+                buffer_size = 0;
             }
+        } else {
+            std::cout << "[DRM] 无法打开设备: " << device_path << " (权限被拒绝或设备不存在)" << std::endl;
         }
     }
     
     if (!device_opened) {
         std::cerr << "[DRM] 无法打开任何DRM设备" << std::endl;
     } else {
-        std::cerr << "[DRM] DRM设备打开成功但初始化失败" << std::endl;
+        std::cerr << "[DRM] DRM设备打开成功但所有设备初始化失败" << std::endl;
     }
     
     return false;
