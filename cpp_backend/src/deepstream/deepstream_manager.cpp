@@ -266,56 +266,15 @@ std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, con
     }
 }
 
-std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
-    std::ostringstream pipeline;
-    
-    // 构建单摄像头管道 - 保持 NVMM 格式直接连接到 nvstreammux
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width
-             << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvstreammux name=m batch-size=1 width=" << config.camera_width
-             << " height=" << config.camera_height << " ! ";
-    
-    // 跳过 AI 推理（配置文件暂时不可用）
-    // TODO: 添加正确的 nvinfer 配置文件路径
-    // if (!config.nvinfer_config.empty()) {
-    //     pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
-    // }
-    
-    // 视频转换和显示
-    pipeline << "nvvideoconvert ! "
-             << "nvdrmvideosink "
-             << "conn-id=0 "
-             << "plane-id=0 "
-             << "offset-x=" << layout.offset_x << " "
-             << "offset-y=" << layout.offset_y;
-    
-    return pipeline.str();
-}
-
 std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 计算左半边尺寸
-    int half_width = layout.width / 2 - 5;  // 减去间隔
-    
-    // 构建摄像头管道（用于并排显示的单个摄像头）- 保持 NVMM 格式
+    // 并排显示 - 简化版(单个摄像头)
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvstreammux name=m batch-size=1 width=" << config.camera_width
-             << " height=" << config.camera_height << " ! ";
-    
-    // 跳过 AI 推理（配置文件暂时不可用）
-    // TODO: 添加正确的 nvinfer 配置文件路径
-    // if (!config.nvinfer_config.empty()) {
-    //     pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
-    // }
-    
-    // 视频转换和显示（左侧）
-    pipeline << "nvvideoconvert ! "
+             << ",framerate=30/1,format=NV12 ! "
+             << "nvvideoconvert ! "
              << "nvdrmvideosink "
              << "conn-id=0 "
              << "plane-id=0 "
@@ -328,34 +287,27 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 立体视觉管道：主摄像头显示，副摄像头用于深度计算 - 保持 NVMM 格式
+    // 双摄立体视觉 - 使用 nvstreammux 合并两路流
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1 ! "
-             << "tee name=t "
+             << ",framerate=30/1,format=NV12 ! "
+             << "m.sink_0 "  // 连接到 mux 的第一个输入
              
-             // 分支1：显示 - 直接连接到 nvstreammux
-             << "t. ! queue ! nvstreammux name=m batch-size=1 width=" << config.camera_width
-             << " height=" << config.camera_height << " ! ";
-    
-    // 跳过 AI 推理（配置文件暂时不可用）
-    // TODO: 添加正确的 nvinfer 配置文件路径
-    // if (!config.nvinfer_config.empty()) {
-    //     pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
-    // }
-    
-    pipeline << "nvvideoconvert ! "
-             << "nvdrmvideosink conn-id=0 plane-id=0 "
-             << "offset-x=" << layout.offset_x << " "
-             << "offset-y=" << layout.offset_y << " "
-             
-             // 分支2：立体计算（使用摄像头2）
              << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
-             << ",height=" << config.camera_height 
-             << ",framerate=" << config.camera_fps << "/1 ! "
-             << "appsink name=stereo_sink";  // 送到立体视觉处理模块
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
+             << ",framerate=30/1,format=NV12 ! "
+             << "m.sink_1 "  // 连接到 mux 的第二个输入
+             
+             << "nvstreammux name=m batch-size=1 width=" << config.camera_width
+             << " height=" << config.camera_height << " ! "
+             << "nvvideoconvert ! "
+             << "nvdrmvideosink "
+             << "conn-id=0 "
+             << "plane-id=0 "
+             << "offset-x=" << layout.offset_x << " "
+             << "offset-y=" << layout.offset_y;
     
     return pipeline.str();
 }
