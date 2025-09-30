@@ -271,10 +271,12 @@ std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig&
     
     // 构建单摄像头管道
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
-             << ",height=" << config.camera_height 
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvstreammux batch-size=1 width=" << config.camera_width 
+             << "nvvideoconvert ! "
+             << "video/x-raw,format=NV12 ! "
+             << "nvstreammux batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! ";
     
     // 跳过 AI 推理（配置文件暂时不可用）
@@ -302,10 +304,12 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
     
     // 构建摄像头管道（用于并排显示的单个摄像头）
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
-             << ",height=" << config.camera_height 
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvstreammux batch-size=1 width=" << config.camera_width 
+             << "nvvideoconvert ! "
+             << "video/x-raw,format=NV12 ! "
+             << "nvstreammux batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! ";
     
     // 跳过 AI 推理（配置文件暂时不可用）
@@ -330,13 +334,15 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
     
     // 立体视觉管道：主摄像头显示，副摄像头用于深度计算
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
-             << ",height=" << config.camera_height 
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ! "
+             << "nvvideoconvert ! "
+             << "video/x-raw,format=NV12 ! "
              << "tee name=t "
              
              // 分支1：显示
-             << "t. ! queue ! nvstreammux batch-size=1 width=" << config.camera_width 
+             << "t. ! queue ! nvstreammux batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! ";
     
     // 跳过 AI 推理（配置文件暂时不可用）
