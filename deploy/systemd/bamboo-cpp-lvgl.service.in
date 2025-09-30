@@ -33,11 +33,21 @@ LimitNPROC=4096
 OOMScoreAdjust=-100
 
 # 启动前检查和清理
-ExecStartPre=-/bin/sh -c 'pkill -f bamboo_cu || true'
-ExecStartPre=-/bin/sh -c 'pkill -f bamboo_integrated || true'
-ExecStartPre=-/bin/sh -c 'fuser -k /dev/video0 2>/dev/null || true'
-ExecStartPre=/bin/sleep 2
+ExecStartPre=/bin/bash -c 'systemctl is-active --quiet bamboo-cpp-lvgl.service && systemctl stop bamboo-cpp-lvgl.service || true'
+ExecStartPre=/bin/bash -c 'pkill -9 bamboo_integrated || true'
+ExecStartPre=/bin/bash -c 'pkill -9 bamboo_cu || true'
+ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video0 2>/dev/null); do kill -9 $p; done || true'
+ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video1 2>/dev/null); do kill -9 $p; done || true'
+ExecStartPre=/bin/bash -c 'systemctl restart nvargus-daemon'
+ExecStartPre=/bin/sleep 3
 
+# 改进停止命令
+ExecStop=/bin/bash -c 'kill -TERM $MAINPID; sleep 2; pkill -9 -g $MAINPID bamboo_integrated || true'
+
+# 更激进的清理
+TimeoutStopSec=10
+KillMode=control-group
+SendSIGKILL=yes
 # 重启策略
 Restart=always
 RestartSec=15
