@@ -289,8 +289,7 @@ std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig&
              << "conn-id=0 "
              << "plane-id=0 "
              << "offset-x=" << layout.offset_x << " "
-             << "offset-y=" << layout.offset_y << " "
-             << "set-mode=" << layout.width << "x" << layout.height;
+             << "offset-y=" << layout.offset_y;
     
     return pipeline.str();
 }
@@ -321,8 +320,7 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
              << "conn-id=0 "
              << "plane-id=0 "
              << "offset-x=" << layout.offset_x << " "
-             << "offset-y=" << layout.offset_y << " "
-             << "set-mode=" << half_width << "x" << layout.height;
+             << "offset-y=" << layout.offset_y;
     
     return pipeline.str();
 }
@@ -351,7 +349,6 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              << "nvdrmvideosink conn-id=0 plane-id=0 "
              << "offset-x=" << layout.offset_x << " "
              << "offset-y=" << layout.offset_y << " "
-             << "set-mode=" << layout.width << "x" << layout.height << " "
              
              // 分支2：立体计算（使用摄像头2）
              << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
