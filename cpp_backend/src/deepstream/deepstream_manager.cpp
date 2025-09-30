@@ -1,6 +1,6 @@
 /**
  * @file deepstream_manager.cpp
- * @brief DeepStream AI推理和视频显示管理器实现
+ * @brief DeepStream AI推理和视频显示管理器实现 - 使用nv3dsink窗口模式
  */
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
@@ -36,6 +36,22 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     if (!gst_is_initialized()) {
         gst_init(nullptr, nullptr);
         std::cout << "GStreamer 初始化完成" << std::endl;
+    }
+    
+    // 检查 nv3dsink 是否可用
+    GstElementFactory *factory = gst_element_factory_find("nv3dsink");
+    if (factory) {
+        std::cout << "✓ 使用 nv3dsink (窗口模式，与LVGL兼容)" << std::endl;
+        gst_object_unref(factory);
+    } else {
+        // 尝试 nveglglessink
+        factory = gst_element_factory_find("nveglglessink");
+        if (factory) {
+            std::cout << "✓ 使用 nveglglessink (窗口模式)" << std::endl;
+            gst_object_unref(factory);
+        } else {
+            std::cerr << "警告: 未找到合适的视频sink" << std::endl;
+        }
     }
     
     // 计算视频布局
@@ -101,34 +117,36 @@ bool DeepStreamManager::startSinglePipelineMode() {
     }
     
     running_ = true;
-    std::cout << "DeepStream 管道启动成功" << std::endl;
+    std::cout << "DeepStream 管道启动成功 (窗口模式，与LVGL共存)" << std::endl;
     return true;
 }
 
 bool DeepStreamManager::startSplitScreenMode() {
+    // 计算左右视频区域尺寸
+    int half_width = video_layout_.width / 2 - 5;  // 减去间隙
+    
     // 构建左侧摄像头管道
-    std::string pipeline1_str = buildSplitScreenPipeline(config_, video_layout_);
+    std::string pipeline1_str = buildSplitScreenPipeline(
+        config_, 
+        video_layout_.offset_x,
+        video_layout_.offset_y,
+        half_width,
+        video_layout_.height
+    );
     std::cout << "左侧管道: " << pipeline1_str << std::endl;
     
     // 构建右侧摄像头管道
     DeepStreamConfig config2 = config_;
     config2.camera_id = config_.camera_id_2;  // 使用副摄像头
-    std::string pipeline2_str = buildSplitScreenPipeline(config2, video_layout_);
     
-    // 修改右侧管道的偏移
-    size_t offset_pos = pipeline2_str.find("offset-x=");
-    if (offset_pos != std::string::npos) {
-        size_t end_pos = pipeline2_str.find(" ", offset_pos);
-        int right_offset = video_layout_.width / 2 + 10;  // 右半边偏移
-        pipeline2_str.replace(offset_pos, end_pos - offset_pos, 
-                             "offset-x=" + std::to_string(right_offset));
-    }
-    // 修改plane-id
-    size_t plane_pos = pipeline2_str.find("plane-id=0");
-    if (plane_pos != std::string::npos) {
-        pipeline2_str.replace(plane_pos, 10, "plane-id=1");
-    }
-    
+    int right_offset_x = video_layout_.offset_x + half_width + 10;  // 右半边偏移
+    std::string pipeline2_str = buildSplitScreenPipeline(
+        config2,
+        right_offset_x,
+        video_layout_.offset_y,
+        half_width,
+        video_layout_.height
+    );
     std::cout << "右侧管道: " << pipeline2_str << std::endl;
     
     // 创建两个管道
@@ -165,7 +183,7 @@ bool DeepStreamManager::startSplitScreenMode() {
     }
     
     running_ = true;
-    std::cout << "双摄像头并排显示管道启动成功" << std::endl;
+    std::cout << "双摄像头并排显示管道启动成功 (窗口模式)" << std::endl;
     return true;
 }
 
@@ -256,31 +274,56 @@ VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& conf
 std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     switch (config.dual_mode) {
         case DualCameraMode::SINGLE_CAMERA:
-            // 单摄像头使用简化的并排显示管道
-            return buildSplitScreenPipeline(config, layout);
+            return buildSplitScreenPipeline(
+                config, 
+                layout.offset_x, 
+                layout.offset_y,
+                layout.width,
+                layout.height
+            );
         case DualCameraMode::SPLIT_SCREEN:
-            return buildSplitScreenPipeline(config, layout);
+            return buildSplitScreenPipeline(
+                config, 
+                layout.offset_x, 
+                layout.offset_y,
+                layout.width,
+                layout.height
+            );
         case DualCameraMode::STEREO_VISION:
             return buildStereoVisionPipeline(config, layout);
         default:
-            return buildSplitScreenPipeline(config, layout);
+            return buildSplitScreenPipeline(
+                config, 
+                layout.offset_x, 
+                layout.offset_y,
+                layout.width,
+                layout.height
+            );
     }
 }
 
-std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
+std::string DeepStreamManager::buildSplitScreenPipeline(
+    const DeepStreamConfig& config, 
+    int offset_x, 
+    int offset_y,
+    int width,
+    int height) {
+    
     std::ostringstream pipeline;
     
-    // 并排显示 - 使用nvoverlaysink避免DRM冲突
+    // 使用 nv3dsink 窗口模式（不占用主DRM，与LVGL共存）
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=30/1,format=NV12 ! "
              << "nvvideoconvert ! "
-             << "nvoverlaysink "
-             << "overlay-x=" << layout.offset_x << " "
-             << "overlay-y=" << layout.offset_y << " "
-             << "overlay-w=" << layout.width << " "
-             << "overlay-h=" << layout.height;
+             << "video/x-raw(memory:NVMM),format=RGBA ! "
+             << "nv3dsink "
+             << "window-x=" << offset_x << " "
+             << "window-y=" << offset_y << " "
+             << "window-width=" << width << " "
+             << "window-height=" << height << " "
+             << "sync=false";  // 降低延迟
     
     return pipeline.str();
 }
@@ -288,7 +331,7 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 双摄立体视觉 - 使用 nvstreammux 合并两路流，nvoverlaysink避免DRM冲突
+    // 双摄立体视觉 - 使用 nvstreammux 合并两路流
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
@@ -304,11 +347,13 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! "
              << "nvvideoconvert ! "
-             << "nvoverlaysink "
-             << "overlay-x=" << layout.offset_x << " "
-             << "overlay-y=" << layout.offset_y << " "
-             << "overlay-w=" << layout.width << " "
-             << "overlay-h=" << layout.height;
+             << "video/x-raw(memory:NVMM),format=RGBA ! "
+             << "nv3dsink "
+             << "window-x=" << layout.offset_x << " "
+             << "window-y=" << layout.offset_y << " "
+             << "window-width=" << layout.width << " "
+             << "window-height=" << layout.height << " "
+             << "sync=false";
     
     return pipeline.str();
 }
