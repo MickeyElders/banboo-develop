@@ -229,7 +229,7 @@ public:
 #include "bamboo_cut/utils/logger.h"
 #include "bamboo_cut/inference/bamboo_detector.h"
 #include "bamboo_cut/core/data_bridge.h"
-#include "bamboo_cut/vision/stereo_vision.h"
+#include "bamboo_cut/deepstream/deepstream_manager.h"
 #include "bamboo_cut/ui/lvgl_interface.h"
 
 // 使用真实的命名空间
@@ -570,10 +570,8 @@ private:
     
     // 使用真实的后端组件
     std::unique_ptr<inference::BambooDetector> detector_;
-    std::unique_ptr<vision::StereoVision> stereo_vision_;
-    cv::VideoCapture camera_;
-    bool use_mock_camera_ = false;
-    bool use_stereo_vision_ = true;  // 启用立体视觉模式
+    std::unique_ptr<deepstream::DeepStreamManager> deepstream_manager_;
+    bool use_mock_data_ = false;
     
     // 性能统计
     int processed_frames_ = 0;
@@ -775,52 +773,14 @@ private:
     
     bool initializeJetsonCSICamera() {
         try {
-            std::cout << "Initializing Jetson CSI cameras with debug suppression..." << std::endl;
+            std::cout << "Note: CSI camera initialization delegated to DeepStream manager" << std::endl;
+            std::cout << "integrated_main will use simulation mode, actual cameras handled by DeepStream" << std::endl;
             
-            // 温和的调试信息抑制，只针对相机模块
-            selective_debug_suppress();
+            // integrated_main 不再直接初始化摄像头，而是使用模拟模式
+            // 实际的摄像头管理由 DeepStream 管理器负责
+            use_mock_camera_ = true;
             
-            // Jetson CSI摄像头 GStreamer pipeline - 完全静默模式
-            std::vector<std::string> csi_pipelines = {
-                "nvarguscamerasrc sensor-id=0 silent=true ! "
-                "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
-                "nvvidconv flip-method=0 silent=true ! "
-                "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
-                "videoconvert silent=true ! "
-                "video/x-raw, format=(string)BGR ! appsink sync=false",
-                
-                "nvarguscamerasrc sensor-id=1 silent=true ! "
-                "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, framerate=(fraction)30/1, format=(string)NV12 ! "
-                "nvvidconv flip-method=0 silent=true ! "
-                "video/x-raw, width=(int)640, height=(int)480, format=(string)BGRx ! "
-                "videoconvert silent=true ! "
-                "video/x-raw, format=(string)BGR ! appsink sync=false"
-            };
-            
-            bool camera_initialized = false;
-            
-            for (size_t i = 0; i < csi_pipelines.size(); i++) {
-                camera_.open(csi_pipelines[i], cv::CAP_GSTREAMER);
-                
-                if (camera_.isOpened()) {
-                    // 测试是否真的能读取帧
-                    cv::Mat test_frame;
-                    if (camera_.read(test_frame) && !test_frame.empty()) {
-                        camera_initialized = true;
-                        std::cout << "CSI camera sensor-id=" << i << " initialization successful, resolution: "
-                                  << test_frame.cols << "x" << test_frame.rows << std::endl;
-                        return true;
-                    } else {
-                        camera_.release();
-                    }
-                }
-            }
-            
-            if (!camera_initialized) {
-                std::cout << "All CSI camera initialization attempts failed" << std::endl;
-            }
-            
-            return false;
+            return true; // 总是返回成功，让 DeepStream 管理器处理实际摄像头
         } catch (const cv::Exception& e) {
             std::cout << "CSI摄像头初始化异常: " << e.what() << std::endl;
             return false;
@@ -877,24 +837,10 @@ private:
         stereo_config.frame_size = cv::Size(1920, 1080);
         stereo_config.fps = 30;
         
-        // Jetson CSI摄像头配置 - 使用 nvdrmvideosink 硬件加速显示
-        stereo_config.left_camera_pipeline =
-            "nvarguscamerasrc sensor-id=0 silent=true ! "
-            "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! "
-            "nvvidconv flip-method=0 silent=true ! "
-            "video/x-raw(memory:NVMM), format=(string)NV12 ! "
-            "tee name=t ! queue ! nvdrmvideosink conn-id=0 plane-id=0 set-mode=0 "
-            "t. ! queue ! nvvidconv ! video/x-raw, format=(string)BGRx ! "
-            "videoconvert ! video/x-raw, format=(string)BGR ! appsink sync=false";
-            
-        stereo_config.right_camera_pipeline =
-            "nvarguscamerasrc sensor-id=1 silent=true ! "
-            "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, framerate=(fraction)30/1, format=(string)NV12 ! "
-            "nvvidconv flip-method=0 silent=true ! "
-            "video/x-raw(memory:NVMM), format=(string)NV12 ! "
-            "tee name=t ! queue ! nvdrmvideosink conn-id=0 plane-id=1 set-mode=0 "
-            "t. ! queue ! nvvidconv ! video/x-raw, format=(string)BGRx ! "
-            "videoconvert ! video/x-raw, format=(string)BGR ! appsink sync=false";
+        // 摄像头管道配置由 DeepStream 管理器统一处理
+        // 这里不再直接设置管道字符串，避免配置冲突
+        stereo_config.left_camera_pipeline = "";  // 空字符串，由 DeepStream 管理
+        stereo_config.right_camera_pipeline = ""; // 空字符串，由 DeepStream 管理
         
         // 回退选项：USB摄像头ID
         stereo_config.left_camera_id = 0;   // /dev/video0

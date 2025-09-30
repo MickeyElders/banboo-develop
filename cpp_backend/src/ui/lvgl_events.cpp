@@ -145,10 +145,7 @@ void LVGLInterface::onStereoVisionButtonClicked(lv_event_t* e) {
         //     self->deepstream_manager_->switchDualMode(DualCameraMode::STEREO_VISION);
         // }
         
-        // 更新按钮状态
-        if (self->camera_widgets_.single_btn) {
-            lv_obj_set_style_bg_color(self->camera_widgets_.single_btn, self->color_primary_, 0);
-        }
+        // 更新按钮状态 - 移除单摄按钮引用
         if (self->camera_widgets_.split_btn) {
             lv_obj_set_style_bg_color(self->camera_widgets_.split_btn, self->color_primary_, 0);
         }
