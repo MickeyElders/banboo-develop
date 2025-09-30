@@ -130,11 +130,6 @@ private:
     VideoLayout calculateVideoLayout(const DeepStreamConfig& config);
 
     /**
-     * @brief 构建单摄像头管道
-     */
-    std::string buildSingleCameraPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
-
-    /**
      * @brief 构建并排显示管道
      */
     std::string buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout);

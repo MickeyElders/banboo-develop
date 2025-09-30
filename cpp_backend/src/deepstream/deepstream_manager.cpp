@@ -255,14 +255,11 @@ VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& conf
 
 std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     switch (config.dual_mode) {
-        case DualCameraMode::SINGLE_CAMERA:
-            return buildSingleCameraPipeline(config, layout);
         case DualCameraMode::SPLIT_SCREEN:
             return buildSplitScreenPipeline(config, layout);
         case DualCameraMode::STEREO_VISION:
             return buildStereoVisionPipeline(config, layout);
         default:
-            return buildSingleCameraPipeline(config, layout);
     }
 }
 
