@@ -242,6 +242,11 @@ private:
     static void onEmergencyButtonClicked(lv_event_t* e);
     static void onBladeSelectionChanged(lv_event_t* e);
     static void onSettingsButtonClicked(lv_event_t* e);
+    
+    // 双摄切换按钮事件处理器
+    static void onSingleCameraButtonClicked(lv_event_t* e);
+    static void onSplitScreenButtonClicked(lv_event_t* e);
+    static void onStereoVisionButtonClicked(lv_event_t* e);
 
     /**
      * @brief 显示消息对话框
