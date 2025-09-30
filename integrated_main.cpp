@@ -653,33 +653,15 @@ private:
     }
     
     void processFrame() {
-        // 从 DeepStream 管理器获取帧数据
-        if (deepstream_manager_ && !use_mock_data_) {
-            cv::Mat frame;
-            
-            // 尝试从 DeepStream 获取当前活跃模式的帧
-            if (deepstream_manager_->getCurrentFrame(frame) && !frame.empty()) {
-                // 更新视频到数据桥接
-                data_bridge_->updateVideo(frame);
-                
-                // AI检测
-                if (detector_) {
-                    core::DetectionResult result;
-                    if (detector_->detect(frame, result)) {
-                        data_bridge_->updateDetection(result);
-                    }
-                }
-                
-                processed_frames_++;
-                return;
-            }
-        }
-        
-        // 模拟模式（当DeepStream不可用时）
+        // DeepStream 管理器处理实际的视频显示和 AI 推理
+        // integrated_main 只处理模拟数据用于测试
         if (use_mock_data_) {
-            cv::Mat frame = cv::Mat::zeros(1080, 1920, CV_8UC3);
-            cv::putText(frame, "DEEPSTREAM SIMULATION - " + std::to_string(processed_frames_),
-                       cv::Point(100, 540), cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 255, 0), 3);
+            cv::Mat frame = cv::Mat::zeros(720, 1280, CV_8UC3);
+            cv::putText(frame, "DEEPSTREAM MODE - Frame " + std::to_string(processed_frames_),
+                       cv::Point(50, 360), cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 255, 0), 2);
+            cv::putText(frame, "Current Mode: " + std::to_string(static_cast<int>(deepstream_manager_ ?
+                       static_cast<int>(deepstream_manager_->getCurrentMode()) : 0)),
+                       cv::Point(50, 420), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 0), 2);
             
             // 更新模拟视频到数据桥接
             data_bridge_->updateVideo(frame);
@@ -730,22 +712,37 @@ private:
         std::cout << "初始化 DeepStream 管理器..." << std::endl;
         
         try {
+            // 创建 DeepStream 管理器实例
+            deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+            
+            // 配置 DeepStream 参数
             deepstream::DeepStreamConfig config;
-            config.width = 1920;
-            config.height = 1080;
-            config.fps = 30;
-            config.device_id = 0;
-            config.output_width = 1280;
-            config.output_height = 800;
+            config.screen_width = 1280;
+            config.screen_height = 800;
+            config.header_height = 80;
+            config.footer_height = 80;
+            config.video_width_ratio = 0.75f;
+            config.video_height_ratio = 1.0f;
+            config.camera_id = 0;
+            config.camera_id_2 = 1;
+            config.dual_mode = deepstream::DualCameraMode::SINGLE_CAMERA;
+            config.camera_width = 1280;
+            config.camera_height = 720;
+            config.camera_fps = 30;  // 确保30fps提高稳定性
             
-            deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>(config);
-            
-            if (!deepstream_manager_->initialize()) {
+            // 初始化 DeepStream 管理器
+            if (!deepstream_manager_->initialize(config)) {
                 std::cout << "DeepStream 管理器初始化失败" << std::endl;
                 return false;
             }
             
-            std::cout << "DeepStream 管理器初始化成功" << std::endl;
+            // 启动 DeepStream 管理器
+            if (!deepstream_manager_->start()) {
+                std::cout << "DeepStream 管理器启动失败" << std::endl;
+                return false;
+            }
+            
+            std::cout << "DeepStream 管理器初始化并启动成功" << std::endl;
             return true;
             
         } catch (const std::exception& e) {
