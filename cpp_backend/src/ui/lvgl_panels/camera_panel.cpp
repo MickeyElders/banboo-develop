@@ -14,99 +14,91 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_t* container = parent ? parent : main_screen_;
     
     camera_panel_ = lv_obj_create(container);
-    // ✅ 移除固定宽度，只用 flex_grow 控制比例
-    lv_obj_set_width(camera_panel_, LV_SIZE_CONTENT);  // 或者直接不设置宽度
-    lv_obj_set_height(camera_panel_, lv_pct(100));  // 高度填满父容器
-    lv_obj_set_flex_grow(camera_panel_, 3);  // ✅ 现在会生效，占3/4空间
-    lv_obj_add_style(camera_panel_, &style_card, 0);
+    // 设置大小和布局
+    lv_obj_set_width(camera_panel_, LV_SIZE_CONTENT);
+    lv_obj_set_height(camera_panel_, lv_pct(100));
+    lv_obj_set_flex_grow(camera_panel_, 3);  // 占3/4空间
     
-    // 简洁优雅的边框
-    lv_obj_set_style_bg_color(camera_panel_, lv_color_hex(0x1E2329), 0);
-    lv_obj_set_style_border_width(camera_panel_, 1, 0);
-    lv_obj_set_style_border_color(camera_panel_, lv_color_hex(0x3A4048), 0);
-    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_60, 0);
-    lv_obj_set_style_shadow_width(camera_panel_, 12, 0);
-    lv_obj_set_style_shadow_color(camera_panel_, lv_color_black(), 0);
-    lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_10, 0);
-    lv_obj_set_style_radius(camera_panel_, 16, 0);
+    // 设置为完全透明 - 让 nvdrmvideosink 硬件层透过来
+    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_outline_opa(camera_panel_, LV_OPA_TRANSP, 0);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置摄像头面板为垂直Flex布局
     lv_obj_set_flex_flow(camera_panel_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(camera_panel_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(camera_panel_, 5, 0);
+    lv_obj_set_style_pad_all(camera_panel_, 0, 0);  // 移除所有内边距
+    lv_obj_set_style_pad_gap(camera_panel_, 0, 0);  // 移除间隔
     
-    // Canvas画布容器
-    lv_obj_t* canvas_container = lv_obj_create(camera_panel_);
-    lv_obj_set_width(canvas_container, lv_pct(100));
-    lv_obj_set_flex_grow(canvas_container, 1);  // 占据剩余空间
-    lv_obj_set_style_bg_opa(canvas_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(canvas_container, 0, 0);
-    lv_obj_set_style_pad_all(canvas_container, 5, 0);
-    lv_obj_clear_flag(canvas_container, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_flow(canvas_container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(canvas_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // 创建完全透明的视频显示区域占位符
+    camera_canvas_ = lv_obj_create(camera_panel_);
+    lv_obj_set_width(camera_canvas_, lv_pct(100));
+    lv_obj_set_flex_grow(camera_canvas_, 1);  // 占据大部分空间
     
-    // 创建透明视频显示区域 - 用于 nvdrmvideosink 硬件层显示
-    camera_canvas_ = lv_obj_create(canvas_container);
-    
-    // 设置视频显示区域大小（对应摄像头在屏幕上的显示位置）
-    const int video_width = 640;   // 视频显示宽度
-    const int video_height = 360;  // 视频显示高度
-    
-    // 设置对象大小
-    lv_obj_set_width(camera_canvas_, video_width);
-    lv_obj_set_height(camera_canvas_, video_height);
-    
-    // 设置为完全透明，让下层的 nvdrmvideosink 视频显示出来
+    // 设置为完全透明 - 这里只是占位，实际视频由 nvdrmvideosink 显示
     lv_obj_set_style_bg_opa(camera_canvas_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(camera_canvas_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_shadow_opa(camera_canvas_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_outline_opa(camera_canvas_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(camera_canvas_, 0, 0);
     lv_obj_clear_flag(camera_canvas_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 可选：添加微弱的边框以标示视频区域（调试用）
-    // lv_obj_set_style_border_width(camera_canvas_, 1, 0);
-    // lv_obj_set_style_border_color(camera_canvas_, lv_color_hex(0x00FF00), 0);
-    // lv_obj_set_style_border_opa(camera_canvas_, LV_OPA_30, 0);
+    std::cout << "Camera panel set to fully transparent for nvdrmvideosink hardware layer" << std::endl;
     
-    std::cout << "Camera panel configured for nvdrmvideosink transparent overlay" << std::endl;
+    // 双摄切换按钮容器 - 半透明覆盖层
+    lv_obj_t* control_overlay = lv_obj_create(camera_panel_);
+    lv_obj_set_width(control_overlay, lv_pct(100));
+    lv_obj_set_height(control_overlay, 50);
+    lv_obj_set_flex_grow(control_overlay, 0);  // 固定高度
+    lv_obj_set_style_bg_color(control_overlay, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(control_overlay, LV_OPA_50, 0);  // 半透明
+    lv_obj_set_style_border_width(control_overlay, 0, 0);
+    lv_obj_set_style_radius(control_overlay, 8, 0);
+    lv_obj_set_style_pad_all(control_overlay, 8, 0);
+    lv_obj_clear_flag(control_overlay, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 信息覆盖层
-    lv_obj_t* info_overlay = lv_obj_create(camera_panel_);
-    lv_obj_set_width(info_overlay, lv_pct(100));
-    lv_obj_set_height(info_overlay, 60);
-    lv_obj_set_flex_grow(info_overlay, 0);  // 不允许增长
-    lv_obj_set_style_bg_color(info_overlay, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(info_overlay, LV_OPA_70, 0);
-    lv_obj_set_style_border_width(info_overlay, 0, 0);
-    lv_obj_set_style_radius(info_overlay, 8, 0);
-    lv_obj_set_style_pad_all(info_overlay, 10, 0);
-    lv_obj_clear_flag(info_overlay, LV_OBJ_FLAG_SCROLLABLE);
+    // 设置控制覆盖层为水平Flex布局
+    lv_obj_set_flex_flow(control_overlay, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(control_overlay, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(control_overlay, 10, 0);
     
-    // 设置信息覆盖层为水平Flex布局
-    lv_obj_set_flex_flow(info_overlay, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(info_overlay, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(info_overlay, 10, 0);
+    // 双摄模式切换按钮组
+    camera_widgets_.mode_label = lv_label_create(control_overlay);
+    lv_label_set_text(camera_widgets_.mode_label, LV_SYMBOL_VIDEO " 模式:");
+    lv_obj_set_style_text_color(camera_widgets_.mode_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(camera_widgets_.mode_label, &lv_font_montserrat_14, 0);
     
-    // Coordinate Information
-    camera_widgets_.coord_value = lv_label_create(info_overlay);
-    lv_label_set_text(camera_widgets_.coord_value, LV_SYMBOL_GPS " X: 0.00 Y: 0.00 Z: 0.00");
-    lv_obj_set_style_text_color(camera_widgets_.coord_value, color_primary_, 0);
-    lv_obj_set_style_text_font(camera_widgets_.coord_value, &lv_font_montserrat_14, 0);
-    // 移除 lv_obj_align，使用Flex布局控制位置
+    // 单摄按钮
+    camera_widgets_.single_btn = lv_btn_create(control_overlay);
+    lv_obj_set_size(camera_widgets_.single_btn, 60, 30);
+    lv_obj_t* single_label = lv_label_create(camera_widgets_.single_btn);
+    lv_label_set_text(single_label, "单摄");
+    lv_obj_center(single_label);
+    lv_obj_set_style_text_font(single_label, &lv_font_montserrat_12, 0);
     
-    // Quality Score
-    camera_widgets_.quality_value = lv_label_create(info_overlay);
-    lv_label_set_text(camera_widgets_.quality_value, LV_SYMBOL_IMAGE " Quality: 95%");
-    lv_obj_set_style_text_color(camera_widgets_.quality_value, color_success_, 0);
-    lv_obj_set_style_text_font(camera_widgets_.quality_value, &lv_font_montserrat_14, 0);
-    // 移除 lv_obj_align，使用Flex布局控制位置
+    // 并排按钮
+    camera_widgets_.split_btn = lv_btn_create(control_overlay);
+    lv_obj_set_size(camera_widgets_.split_btn, 60, 30);
+    lv_obj_t* split_label = lv_label_create(camera_widgets_.split_btn);
+    lv_label_set_text(split_label, "并排");
+    lv_obj_center(split_label);
+    lv_obj_set_style_text_font(split_label, &lv_font_montserrat_12, 0);
     
-    // Blade Information
-    camera_widgets_.blade_value = lv_label_create(info_overlay);
-    lv_label_set_text(camera_widgets_.blade_value, LV_SYMBOL_SETTINGS " Blade: #3");
-    lv_obj_set_style_text_color(camera_widgets_.blade_value, color_warning_, 0);
-    lv_obj_set_style_text_font(camera_widgets_.blade_value, &lv_font_montserrat_14, 0);
-    // 移除 lv_obj_align，使用Flex布局控制位置
+    // 立体按钮
+    camera_widgets_.stereo_btn = lv_btn_create(control_overlay);
+    lv_obj_set_size(camera_widgets_.stereo_btn, 60, 30);
+    lv_obj_t* stereo_label = lv_label_create(camera_widgets_.stereo_btn);
+    lv_label_set_text(stereo_label, "立体");
+    lv_obj_center(stereo_label);
+    lv_obj_set_style_text_font(stereo_label, &lv_font_montserrat_12, 0);
+    
+    // 状态指示
+    camera_widgets_.status_value = lv_label_create(control_overlay);
+    lv_label_set_text(camera_widgets_.status_value, LV_SYMBOL_OK " 就绪");
+    lv_obj_set_style_text_color(camera_widgets_.status_value, lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_text_font(camera_widgets_.status_value, &lv_font_montserrat_12, 0);
     
     return camera_panel_;
 #else

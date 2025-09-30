@@ -386,6 +386,13 @@ private:
         lv_obj_t* quality_value;
         lv_obj_t* blade_value;
         
+        // 双摄切换控件
+        lv_obj_t* mode_label;       // 模式标签
+        lv_obj_t* single_btn;       // 单摄按钮
+        lv_obj_t* split_btn;        // 并排按钮
+        lv_obj_t* stereo_btn;       // 立体按钮
+        lv_obj_t* status_value;     // 状态显示
+        
         // Canvas缓冲区和大小
         static const int canvas_width = 640;
         static const int canvas_height = 360;
