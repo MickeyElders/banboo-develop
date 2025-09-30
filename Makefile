@@ -430,7 +430,7 @@ backup:
 	echo "$(GREEN)[SUCCESS]$(NC) 备份已创建: /opt/backup/$$BACKUP_NAME.tar.gz"
 
 # 快速重新部署（跳过依赖检查）
-redeploy: stop build-system install-system restart
+redeploy: stop clean build-system install-system restart
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统重新部署完成！"
 
 # 完整重新部署（包括依赖检查）
