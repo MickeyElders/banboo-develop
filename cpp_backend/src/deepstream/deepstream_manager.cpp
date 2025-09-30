@@ -277,10 +277,11 @@ std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig&
              << "nvstreammux batch-size=1 width=" << config.camera_width 
              << " height=" << config.camera_height << " ! ";
     
-    // 如果有 nvinfer 配置文件，添加 AI 推理
-    if (!config.nvinfer_config.empty()) {
-        pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
-    }
+    // 跳过 AI 推理（配置文件暂时不可用）
+    // TODO: 添加正确的 nvinfer 配置文件路径
+    // if (!config.nvinfer_config.empty()) {
+    //     pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
+    // }
     
     // 视频转换和显示
     pipeline << "nvvideoconvert ! "
@@ -289,8 +290,7 @@ std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig&
              << "plane-id=0 "
              << "offset-x=" << layout.offset_x << " "
              << "offset-y=" << layout.offset_y << " "
-             << "width=" << layout.width << " "
-             << "height=" << layout.height;
+             << "set-mode=" << layout.width << "x" << layout.height;
     
     return pipeline.str();
 }
@@ -309,10 +309,11 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
              << "nvstreammux batch-size=1 width=" << config.camera_width 
              << " height=" << config.camera_height << " ! ";
     
-    // 如果有 nvinfer 配置文件，添加 AI 推理
-    if (!config.nvinfer_config.empty()) {
-        pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
-    }
+    // 跳过 AI 推理（配置文件暂时不可用）
+    // TODO: 添加正确的 nvinfer 配置文件路径
+    // if (!config.nvinfer_config.empty()) {
+    //     pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
+    // }
     
     // 视频转换和显示（左侧）
     pipeline << "nvvideoconvert ! "
@@ -321,8 +322,7 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
              << "plane-id=0 "
              << "offset-x=" << layout.offset_x << " "
              << "offset-y=" << layout.offset_y << " "
-             << "width=" << half_width << " "
-             << "height=" << layout.height;
+             << "set-mode=" << half_width << "x" << layout.height;
     
     return pipeline.str();
 }
@@ -341,17 +341,17 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              << "t. ! queue ! nvstreammux batch-size=1 width=" << config.camera_width 
              << " height=" << config.camera_height << " ! ";
     
-    // 如果有 nvinfer 配置文件，添加 AI 推理
-    if (!config.nvinfer_config.empty()) {
-        pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
-    }
+    // 跳过 AI 推理（配置文件暂时不可用）
+    // TODO: 添加正确的 nvinfer 配置文件路径
+    // if (!config.nvinfer_config.empty()) {
+    //     pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
+    // }
     
     pipeline << "nvvideoconvert ! "
              << "nvdrmvideosink conn-id=0 plane-id=0 "
              << "offset-x=" << layout.offset_x << " "
              << "offset-y=" << layout.offset_y << " "
-             << "width=" << layout.width << " "
-             << "height=" << layout.height << " "
+             << "set-mode=" << layout.width << "x" << layout.height << " "
              
              // 分支2：立体计算（使用摄像头2）
              << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
