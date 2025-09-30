@@ -73,27 +73,33 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     
     // 双摄模式切换按钮组
     camera_widgets_.mode_label = lv_label_create(control_overlay);
-    lv_label_set_text(camera_widgets_.mode_label, LV_SYMBOL_VIDEO " 模式:");
+    lv_label_set_text(camera_widgets_.mode_label, LV_SYMBOL_VIDEO " 双摄模式:");
     lv_obj_set_style_text_color(camera_widgets_.mode_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(camera_widgets_.mode_label, &lv_font_montserrat_14, 0);
     
-    // 并排按钮
+    // 并排按钮 - 强化可见性
     camera_widgets_.split_btn = lv_btn_create(control_overlay);
-    lv_obj_set_size(camera_widgets_.split_btn, 60, 30);
+    lv_obj_set_size(camera_widgets_.split_btn, 100, 45);  // 增大尺寸给更多空间
+    lv_obj_set_style_bg_color(camera_widgets_.split_btn, lv_color_hex(0x00FFFF), 0);  // 青色背景
     lv_obj_t* split_label = lv_label_create(camera_widgets_.split_btn);
-    lv_label_set_text(split_label, "并排");
+    lv_label_set_text(split_label, "并排显示");
     lv_obj_center(split_label);
-    lv_obj_set_style_text_font(split_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(split_label, lv_color_black(), 0);
+    lv_obj_set_style_text_font(split_label, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(camera_widgets_.split_btn, onSplitScreenButtonClicked, LV_EVENT_CLICKED, this);
+    std::cout << "Split screen button created with cyan background" << std::endl;
     
-    // 立体按钮
+    // 立体按钮 - 强化可见性
     camera_widgets_.stereo_btn = lv_btn_create(control_overlay);
-    lv_obj_set_size(camera_widgets_.stereo_btn, 60, 30);
+    lv_obj_set_size(camera_widgets_.stereo_btn, 100, 45);  // 增大尺寸给更多空间
+    lv_obj_set_style_bg_color(camera_widgets_.stereo_btn, lv_color_hex(0xFFFF00), 0);  // 黄色背景
     lv_obj_t* stereo_label = lv_label_create(camera_widgets_.stereo_btn);
-    lv_label_set_text(stereo_label, "立体");
+    lv_label_set_text(stereo_label, "立体视觉");
     lv_obj_center(stereo_label);
-    lv_obj_set_style_text_font(stereo_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(stereo_label, lv_color_black(), 0);
+    lv_obj_set_style_text_font(stereo_label, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(camera_widgets_.stereo_btn, onStereoVisionButtonClicked, LV_EVENT_CLICKED, this);
+    std::cout << "Stereo vision button created with yellow background" << std::endl;
     
     // 状态指示
     camera_widgets_.status_value = lv_label_create(control_overlay);

@@ -244,7 +244,6 @@ private:
     static void onSettingsButtonClicked(lv_event_t* e);
     
     // 双摄切换按钮事件处理器
-    static void onSingleCameraButtonClicked(lv_event_t* e);
     static void onSplitScreenButtonClicked(lv_event_t* e);
     static void onStereoVisionButtonClicked(lv_event_t* e);
 
@@ -393,7 +392,6 @@ private:
         
         // 双摄切换控件
         lv_obj_t* mode_label;       // 模式标签
-        lv_obj_t* single_btn;       // 单摄按钮
         lv_obj_t* split_btn;        // 并排按钮
         lv_obj_t* stereo_btn;       // 立体按钮
         lv_obj_t* status_value;     // 状态显示
