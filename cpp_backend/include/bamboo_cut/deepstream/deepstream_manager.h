@@ -57,7 +57,7 @@ struct DeepStreamConfig {
         , dual_mode(DualCameraMode::SINGLE_CAMERA)
         , camera_width(1280)
         , camera_height(720)
-        , camera_fps(30) {}
+        , camera_fps(30) {}  // 确保30fps提高稳定性
 };
 
 /**
