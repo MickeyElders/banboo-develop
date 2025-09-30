@@ -307,10 +307,10 @@ void LVGLInterface::createMainInterface() {
     
     // 2. 添加可见性测试标签
     lv_obj_t* test_label = lv_label_create(main_screen_);
-    lv_label_set_text(test_label, "BAMBOO SYSTEM - Interface Test");
+    lv_label_set_text(test_label, "BAMBOO SYSTEM");
     lv_obj_set_style_text_color(test_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_font(test_label, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_bg_color(test_label, lv_color_hex(0xFF0000), 0);  // 红色背景便于识别
+    lv_obj_set_style_bg_color(test_label, lv_color_hex(0x0000CC), 0);  // 红色背景便于识别
     lv_obj_set_style_bg_opa(test_label, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(test_label, 10, 0);
     std::cout << "[LVGLInterface] 创建测试标签完成" << std::endl;
