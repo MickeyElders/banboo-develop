@@ -270,17 +270,17 @@ std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, con
 std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 并排显示 - 简化版(单个摄像头)
+    // 并排显示 - 使用nvoverlaysink避免DRM冲突
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=30/1,format=NV12 ! "
              << "nvvideoconvert ! "
-             << "nvdrmvideosink "
-             << "conn-id=0 "
-             << "plane-id=0 "
-             << "offset-x=" << layout.offset_x << " "
-             << "offset-y=" << layout.offset_y;
+             << "nvoverlaysink "
+             << "overlay-x=" << layout.offset_x << " "
+             << "overlay-y=" << layout.offset_y << " "
+             << "overlay-w=" << layout.width << " "
+             << "overlay-h=" << layout.height;
     
     return pipeline.str();
 }
@@ -288,7 +288,7 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 双摄立体视觉 - 使用 nvstreammux 合并两路流
+    // 双摄立体视觉 - 使用 nvstreammux 合并两路流，nvoverlaysink避免DRM冲突
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
@@ -304,11 +304,11 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! "
              << "nvvideoconvert ! "
-             << "nvdrmvideosink "
-             << "conn-id=0 "
-             << "plane-id=0 "
-             << "offset-x=" << layout.offset_x << " "
-             << "offset-y=" << layout.offset_y;
+             << "nvoverlaysink "
+             << "overlay-x=" << layout.offset_x << " "
+             << "overlay-y=" << layout.offset_y << " "
+             << "overlay-w=" << layout.width << " "
+             << "overlay-h=" << layout.height;
     
     return pipeline.str();
 }
