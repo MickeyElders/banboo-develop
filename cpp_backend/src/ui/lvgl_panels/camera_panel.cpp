@@ -19,15 +19,14 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_set_height(camera_panel_, lv_pct(100));
     lv_obj_set_flex_grow(camera_panel_, 3);  // 占3/4空间
     
-    // 强化可见背景调试布局 - 确保面板可见
-    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_80, 0);  // 提高到80%透明度
-    lv_obj_set_style_bg_color(camera_panel_, lv_color_hex(0xFF0000), 0);  // 改为红色背景更醒目
-    lv_obj_set_style_border_width(camera_panel_, 5, 0);  // 加粗边框
-    lv_obj_set_style_border_color(camera_panel_, lv_color_hex(0x00FF00), 0);  // 绿色边框
-    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_100, 0);  // 边框完全不透明
+    // 设置为完全透明 - 允许 DeepStream 视频透过显示
+    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 完全透明背景
+    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 透明边框
+    lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 透明阴影
+    lv_obj_set_style_outline_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 透明轮廓
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
-    std::cout << "Camera panel created with red background and green border for visibility test" << std::endl;
+    std::cout << "Camera panel created with transparent background for DeepStream video overlay" << std::endl;
     
     // 设置摄像头面板为垂直Flex布局
     lv_obj_set_flex_flow(camera_panel_, LV_FLEX_FLOW_COLUMN);
@@ -50,60 +49,60 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     
     std::cout << "Camera panel set to fully transparent for nvdrmvideosink hardware layer" << std::endl;
     
-    // 双摄切换按钮容器 - 强化可见性
+    // 半透明控制覆盖层 - 保持控件可见但不遮挡视频
     lv_obj_t* control_overlay = lv_obj_create(camera_panel_);
     lv_obj_set_width(control_overlay, lv_pct(100));
-    lv_obj_set_height(control_overlay, 80);  // 增加高度
+    lv_obj_set_height(control_overlay, 80);  // 固定高度
     lv_obj_set_flex_grow(control_overlay, 0);  // 固定高度
-    lv_obj_set_style_bg_color(control_overlay, lv_color_hex(0x0000FF), 0);  // 蓝色背景
-    lv_obj_set_style_bg_opa(control_overlay, LV_OPA_80, 0);  // 提高不透明度
-    lv_obj_set_style_border_width(control_overlay, 3, 0);  // 加粗边框
-    lv_obj_set_style_border_color(control_overlay, lv_color_hex(0xFFFF00), 0);  // 黄色边框
-    lv_obj_set_style_border_opa(control_overlay, LV_OPA_100, 0);
+    lv_obj_set_style_bg_color(control_overlay, lv_color_hex(0x000000), 0);  // 黑色背景
+    lv_obj_set_style_bg_opa(control_overlay, LV_OPA_40, 0);  // 40%透明度
+    lv_obj_set_style_border_opa(control_overlay, LV_OPA_TRANSP, 0);  // 透明边框
     lv_obj_set_style_radius(control_overlay, 8, 0);
     lv_obj_set_style_pad_all(control_overlay, 8, 0);
     lv_obj_clear_flag(control_overlay, LV_OBJ_FLAG_SCROLLABLE);
     
-    std::cout << "Control overlay created with blue background and yellow border" << std::endl;
+    std::cout << "Control overlay created with semi-transparent background" << std::endl;
     
     // 设置控制覆盖层为水平Flex布局
     lv_obj_set_flex_flow(control_overlay, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(control_overlay, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(control_overlay, 10, 0);
     
-    // 双摄模式切换按钮组
+    // Dual camera mode control buttons
     camera_widgets_.mode_label = lv_label_create(control_overlay);
-    lv_label_set_text(camera_widgets_.mode_label, LV_SYMBOL_VIDEO " 双摄模式:");
+    lv_label_set_text(camera_widgets_.mode_label, LV_SYMBOL_VIDEO " Dual Camera:");
     lv_obj_set_style_text_color(camera_widgets_.mode_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(camera_widgets_.mode_label, &lv_font_montserrat_14, 0);
     
-    // 并排按钮 - 强化可见性
+    // Split screen button - semi-transparent design
     camera_widgets_.split_btn = lv_btn_create(control_overlay);
-    lv_obj_set_size(camera_widgets_.split_btn, 100, 45);  // 增大尺寸给更多空间
-    lv_obj_set_style_bg_color(camera_widgets_.split_btn, lv_color_hex(0x00FFFF), 0);  // 青色背景
+    lv_obj_set_size(camera_widgets_.split_btn, 100, 45);
+    lv_obj_set_style_bg_color(camera_widgets_.split_btn, lv_color_hex(0x4CAF50), 0);  // Green background
+    lv_obj_set_style_bg_opa(camera_widgets_.split_btn, LV_OPA_80, 0);  // Semi-transparent
     lv_obj_t* split_label = lv_label_create(camera_widgets_.split_btn);
-    lv_label_set_text(split_label, "并排显示");
+    lv_label_set_text(split_label, "Split View");
     lv_obj_center(split_label);
-    lv_obj_set_style_text_color(split_label, lv_color_black(), 0);
+    lv_obj_set_style_text_color(split_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(split_label, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(camera_widgets_.split_btn, onSplitScreenButtonClicked, LV_EVENT_CLICKED, this);
-    std::cout << "Split screen button created with cyan background" << std::endl;
+    std::cout << "Split screen button created with semi-transparent green background" << std::endl;
     
-    // 立体按钮 - 强化可见性
+    // Stereo vision button - semi-transparent design
     camera_widgets_.stereo_btn = lv_btn_create(control_overlay);
-    lv_obj_set_size(camera_widgets_.stereo_btn, 100, 45);  // 增大尺寸给更多空间
-    lv_obj_set_style_bg_color(camera_widgets_.stereo_btn, lv_color_hex(0xFFFF00), 0);  // 黄色背景
+    lv_obj_set_size(camera_widgets_.stereo_btn, 100, 45);
+    lv_obj_set_style_bg_color(camera_widgets_.stereo_btn, lv_color_hex(0x2196F3), 0);  // Blue background
+    lv_obj_set_style_bg_opa(camera_widgets_.stereo_btn, LV_OPA_80, 0);  // Semi-transparent
     lv_obj_t* stereo_label = lv_label_create(camera_widgets_.stereo_btn);
-    lv_label_set_text(stereo_label, "立体视觉");
+    lv_label_set_text(stereo_label, "Stereo 3D");
     lv_obj_center(stereo_label);
-    lv_obj_set_style_text_color(stereo_label, lv_color_black(), 0);
+    lv_obj_set_style_text_color(stereo_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(stereo_label, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(camera_widgets_.stereo_btn, onStereoVisionButtonClicked, LV_EVENT_CLICKED, this);
-    std::cout << "Stereo vision button created with yellow background" << std::endl;
+    std::cout << "Stereo vision button created with semi-transparent blue background" << std::endl;
     
-    // 状态指示
+    // Status indicator
     camera_widgets_.status_value = lv_label_create(control_overlay);
-    lv_label_set_text(camera_widgets_.status_value, LV_SYMBOL_OK " 就绪");
+    lv_label_set_text(camera_widgets_.status_value, LV_SYMBOL_OK " Ready");
     lv_obj_set_style_text_color(camera_widgets_.status_value, lv_color_hex(0x00FF00), 0);
     lv_obj_set_style_text_font(camera_widgets_.status_value, &lv_font_montserrat_12, 0);
     
