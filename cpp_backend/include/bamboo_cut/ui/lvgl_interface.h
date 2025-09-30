@@ -398,15 +398,17 @@ private:
         lv_obj_t* stereo_btn;       // 立体按钮
         lv_obj_t* status_value;     // 状态显示
         
-        // Canvas缓冲区和大小
-        static const int canvas_width = 640;
-        static const int canvas_height = 360;
+        // Canvas缓冲区
 #ifdef ENABLE_LVGL
         lv_color_t* canvas_buffer;
 #else
         void* canvas_buffer;
 #endif
     } camera_widgets_;
+    
+    // Canvas常量定义
+    static const int CANVAS_WIDTH = 640;
+    static const int CANVAS_HEIGHT = 360;
     
     struct {
         // Jetson系统监控组件
