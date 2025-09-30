@@ -132,7 +132,7 @@ private:
     /**
      * @brief 构建并排显示管道
      */
-    std::string buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
+    std::string buildSplitScreenPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
 
     /**
      * @brief 构建立体视觉管道
