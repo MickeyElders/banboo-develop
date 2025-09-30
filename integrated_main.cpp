@@ -589,27 +589,19 @@ public:
     bool initialize() {
         std::cout << "Initializing inference system..." << std::endl;
         
-        // 初始化检测器 (使用真实的BambooDetector) - 非阻塞
+        // 初始化检测器 (使用真实的BambooDetector)
         if (!initializeDetector()) {
             std::cout << "Detector initialization failed, using simulation mode" << std::endl;
-            use_mock_camera_ = true; // 启用模拟模式
+            use_mock_data_ = true;
         }
         
-        // 优先初始化立体视觉系统 - 非阻塞
-        if (use_stereo_vision_ && initializeStereoVision()) {
-            std::cout << "Stereo vision system initialization successful" << std::endl;
-        } else {
-            std::cout << "Stereo vision initialization failed, falling back to single camera mode" << std::endl;
-            use_stereo_vision_ = false;
-            
-            // 初始化单摄像头 - 非阻塞，失败时使用模拟模式
-            if (!initializeCamera()) {
-                std::cout << "Camera system initialization failed, enabling simulation mode" << std::endl;
-                use_mock_camera_ = true;
-            }
+        // 初始化 DeepStream 管理器
+        if (!initializeDeepStreamManager()) {
+            std::cout << "DeepStream manager initialization failed, using simulation mode" << std::endl;
+            use_mock_data_ = true;
         }
         
-        std::cout << "Inference system initialization complete (simulation mode: " << (use_mock_camera_ ? "yes" : "no") << ")" << std::endl;
+        std::cout << "Inference system initialization complete (simulation mode: " << (use_mock_data_ ? "yes" : "no") << ")" << std::endl;
         return true; // 总是返回成功，确保UI能够启动
     }
     
@@ -661,20 +653,19 @@ private:
     }
     
     void processFrame() {
-        // 优先处理立体视觉
-        if (use_stereo_vision_ && stereo_vision_) {
-            vision::StereoFrame stereo_frame;
-            if (stereo_vision_->capture_stereo_frame(stereo_frame) && stereo_frame.valid) {
-                // 更新立体视频到数据桥接
-                data_bridge_->updateStereoVideo(stereo_frame.left_image, stereo_frame.right_image);
+        // 从 DeepStream 管理器获取帧数据
+        if (deepstream_manager_ && !use_mock_data_) {
+            cv::Mat frame;
+            
+            // 尝试从 DeepStream 获取当前活跃模式的帧
+            if (deepstream_manager_->getCurrentFrame(frame) && !frame.empty()) {
+                // 更新视频到数据桥接
+                data_bridge_->updateVideo(frame);
                 
-                // 计算深度信息
-                stereo_vision_->compute_depth(stereo_frame);
-                
-                // AI检测 (使用校正后的左图像)
-                if (detector_ && !stereo_frame.rectified_left.empty()) {
+                // AI检测
+                if (detector_) {
                     core::DetectionResult result;
-                    if (detector_->detect(stereo_frame.rectified_left, result)) {
+                    if (detector_->detect(frame, result)) {
                         data_bridge_->updateDetection(result);
                     }
                 }
@@ -684,31 +675,17 @@ private:
             }
         }
         
-        // 单摄像头处理（回退模式）
-        cv::Mat frame;
-        if (use_mock_camera_) {
-            // 生成模拟帧用于测试
-            frame = cv::Mat::zeros(480, 640, CV_8UC3);
-            cv::putText(frame, "MOCK CAMERA - " + std::to_string(processed_frames_),
-                       cv::Point(50, 240), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
-        } else {
-            if (!camera_.read(frame) || frame.empty()) {
-                return;
-            }
+        // 模拟模式（当DeepStream不可用时）
+        if (use_mock_data_) {
+            cv::Mat frame = cv::Mat::zeros(1080, 1920, CV_8UC3);
+            cv::putText(frame, "DEEPSTREAM SIMULATION - " + std::to_string(processed_frames_),
+                       cv::Point(100, 540), cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 255, 0), 3);
+            
+            // 更新模拟视频到数据桥接
+            data_bridge_->updateVideo(frame);
+            
+            processed_frames_++;
         }
-        
-        // 更新视频到数据桥接
-        data_bridge_->updateVideo(frame);
-        
-        // AI检测
-        if (detector_ && !use_mock_camera_) {
-            core::DetectionResult result;
-            if (detector_->detect(frame, result)) {
-                data_bridge_->updateDetection(result);
-            }
-        }
-        
-        processed_frames_++;
     }
     
     void updatePerformanceStats() {
@@ -748,121 +725,33 @@ private:
         return detector_->initialize();
     }
     
-    bool initializeCamera() {
-        std::cout << "Detecting Jetson CSI camera devices..." << std::endl;
+    // === DeepStream 管理器初始化方法 ===
+    bool initializeDeepStreamManager() {
+        std::cout << "初始化 DeepStream 管理器..." << std::endl;
         
-        // 优先尝试Jetson CSI摄像头 (使用nvarguscamerasrc)
-        if (initializeJetsonCSICamera()) {
-            std::cout << "Jetson CSI camera initialization successful" << std::endl;
-            return true;
-        }
-        
-        std::cout << "CSI camera initialization failed, trying USB camera..." << std::endl;
-        
-        // 回退到USB摄像头 (使用v4l2)
-        if (initializeUSBCamera()) {
-            std::cout << "USB camera initialization successful" << std::endl;
-            return true;
-        }
-        
-        // 如果没有真实摄像头，创建虚拟摄像头用于测试
-        std::cout << "No available camera found, enabling simulation mode" << std::endl;
-        use_mock_camera_ = true;
-        return true;
-    }
-    
-    bool initializeJetsonCSICamera() {
         try {
-            std::cout << "Note: CSI camera initialization delegated to DeepStream manager" << std::endl;
-            std::cout << "integrated_main will use simulation mode, actual cameras handled by DeepStream" << std::endl;
+            deepstream::DeepStreamConfig config;
+            config.width = 1920;
+            config.height = 1080;
+            config.fps = 30;
+            config.device_id = 0;
+            config.output_width = 1280;
+            config.output_height = 800;
             
-            // integrated_main 不再直接初始化摄像头，而是使用模拟模式
-            // 实际的摄像头管理由 DeepStream 管理器负责
-            use_mock_camera_ = true;
+            deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>(config);
             
-            return true; // 总是返回成功，让 DeepStream 管理器处理实际摄像头
-        } catch (const cv::Exception& e) {
-            std::cout << "CSI摄像头初始化异常: " << e.what() << std::endl;
-            return false;
-        }
-    }
-    
-    bool initializeUSBCamera() {
-        try {
-            // USB摄像头设备ID列表
-            std::vector<int> camera_ids = {0, 1, 2};
-            
-            for (int id : camera_ids) {
-                std::cout << "尝试打开USB摄像头 /dev/video" << id << std::endl;
-                
-                camera_.open(id, cv::CAP_V4L2);
-                
-                if (camera_.isOpened()) {
-                    // 设置摄像头参数
-                    camera_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-                    camera_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-                    camera_.set(cv::CAP_PROP_FPS, 30);
-                    
-                    // 测试是否真的能读取帧
-                    cv::Mat test_frame;
-                    if (camera_.read(test_frame) && !test_frame.empty()) {
-                        std::cout << "USB摄像头 " << id << " 初始化成功，分辨率: "
-                                  << test_frame.cols << "x" << test_frame.rows << std::endl;
-                        return true;
-                    } else {
-                        std::cout << "USB摄像头 " << id << " 无法读取帧" << std::endl;
-                        camera_.release();
-                    }
-                } else {
-                    std::cout << "无法打开USB摄像头 " << id << std::endl;
-                }
+            if (!deepstream_manager_->initialize()) {
+                std::cout << "DeepStream 管理器初始化失败" << std::endl;
+                return false;
             }
             
+            std::cout << "DeepStream 管理器初始化成功" << std::endl;
+            return true;
+            
+        } catch (const std::exception& e) {
+            std::cout << "DeepStream 管理器初始化异常: " << e.what() << std::endl;
             return false;
-        } catch (const cv::Exception& e) {
-            std::cout << "USB摄像头初始化异常: " << e.what() << std::endl;
-            return false;
         }
-    }
-    
-    // === 立体视觉初始化方法 ===
-    bool initializeStereoVision() {
-        std::cout << "初始化双摄立体视觉系统..." << std::endl;
-        
-        // 应用温和的调试抑制
-        selective_debug_suppress();
-        
-        vision::StereoConfig stereo_config;
-        stereo_config.calibration_file = "/opt/bamboo-cut/config/stereo_calibration.xml";
-        stereo_config.frame_size = cv::Size(1920, 1080);
-        stereo_config.fps = 30;
-        
-        // 摄像头管道配置由 DeepStream 管理器统一处理
-        // 这里不再直接设置管道字符串，避免配置冲突
-        stereo_config.left_camera_pipeline = "";  // 空字符串，由 DeepStream 管理
-        stereo_config.right_camera_pipeline = ""; // 空字符串，由 DeepStream 管理
-        
-        // 回退选项：USB摄像头ID
-        stereo_config.left_camera_id = 0;   // /dev/video0
-        stereo_config.right_camera_id = 1;  // /dev/video1
-        stereo_config.use_gstreamer = true; // 优先使用GStreamer管道
-        
-        stereo_vision_ = std::make_unique<vision::StereoVision>(stereo_config);
-        
-        bool initialized = false;
-        try {
-            initialized = stereo_vision_->initialize();
-        } catch (...) {
-            initialized = false;
-        }
-        
-        if (initialized) {
-            std::cout << "立体视觉系统初始化成功" << std::endl;
-        } else {
-            std::cout << "立体视觉系统初始化失败" << std::endl;
-        }
-        
-        return initialized;
     }
     
     float getCpuUsage() const { return 45.0f; } // 简化实现
