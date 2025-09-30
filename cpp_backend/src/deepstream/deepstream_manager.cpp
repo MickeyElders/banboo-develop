@@ -269,14 +269,12 @@ std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, con
 std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 构建单摄像头管道
+    // 构建单摄像头管道 - 保持 NVMM 格式直接连接到 nvstreammux
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw,format=NV12 ! "
-             << "nvstreammux batch-size=1 width=" << config.camera_width
+             << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! ";
     
     // 跳过 AI 推理（配置文件暂时不可用）
@@ -302,14 +300,12 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
     // 计算左半边尺寸
     int half_width = layout.width / 2 - 5;  // 减去间隔
     
-    // 构建摄像头管道（用于并排显示的单个摄像头）
+    // 构建摄像头管道（用于并排显示的单个摄像头）- 保持 NVMM 格式
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw,format=NV12 ! "
-             << "nvstreammux batch-size=1 width=" << config.camera_width
+             << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! ";
     
     // 跳过 AI 推理（配置文件暂时不可用）
@@ -332,17 +328,15 @@ std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& 
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 立体视觉管道：主摄像头显示，副摄像头用于深度计算
+    // 立体视觉管道：主摄像头显示，副摄像头用于深度计算 - 保持 NVMM 格式
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw,format=NV12 ! "
              << "tee name=t "
              
-             // 分支1：显示
-             << "t. ! queue ! nvstreammux batch-size=1 width=" << config.camera_width
+             // 分支1：显示 - 直接连接到 nvstreammux
+             << "t. ! queue ! nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! ";
     
     // 跳过 AI 推理（配置文件暂时不可用）
