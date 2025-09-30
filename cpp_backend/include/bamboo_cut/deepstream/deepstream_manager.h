@@ -1,7 +1,7 @@
 /**
  * @file deepstream_manager.h
  * @brief DeepStream AI推理和视频显示管理器
- * 实现动态布局计算、AI推理和硬件加速显示
+ * 实现动态布局计算、AI推理和硬件加速显示，支持双摄像头
  */
 
 #pragma once
@@ -15,17 +15,34 @@ namespace bamboo_cut {
 namespace deepstream {
 
 /**
+ * @brief 双摄显示模式
+ */
+enum class DualCameraMode {
+    SINGLE_CAMERA,      ///< 单摄像头
+    SPLIT_SCREEN,       ///< 并排显示
+    STEREO_VISION       ///< 立体视觉合成
+};
+
+/**
  * @brief DeepStream配置参数
  */
 struct DeepStreamConfig {
+    // 基础配置
     int screen_width;           // 屏幕宽度
     int screen_height;          // 屏幕高度
     int header_height;          // 顶部栏高度
     int footer_height;          // 底部栏高度
     float video_width_ratio;    // 视频区域宽度比例 (0.0-1.0)
     float video_height_ratio;   // 视频区域高度比例 (0.0-1.0)
-    int camera_id;              // 摄像头ID
+    int camera_id;              // 主摄像头ID
+    int camera_id_2;            // 副摄像头ID（双摄模式）
     std::string nvinfer_config; // nvinfer配置文件路径
+    
+    // 双摄配置
+    DualCameraMode dual_mode;   // 双摄模式
+    int camera_width;           // 摄像头分辨率宽度
+    int camera_height;          // 摄像头分辨率高度
+    int camera_fps;             // 摄像头帧率
     
     DeepStreamConfig()
         : screen_width(1280)
@@ -35,7 +52,12 @@ struct DeepStreamConfig {
         , video_width_ratio(0.75f)
         , video_height_ratio(1.0f)
         , camera_id(0)
-        , nvinfer_config("/opt/bamboo-cut/config/nvinfer_config.txt") {}
+        , camera_id_2(1)
+        , nvinfer_config("/opt/bamboo-cut/config/nvinfer_config.txt")
+        , dual_mode(DualCameraMode::SINGLE_CAMERA)
+        , camera_width(1280)
+        , camera_height(720)
+        , camera_fps(30) {}
 };
 
 /**
@@ -52,7 +74,7 @@ struct VideoLayout {
 
 /**
  * @brief DeepStream管理器类
- * 负责AI推理、视频显示和布局计算
+ * 负责AI推理、视频显示和布局计算，支持双摄像头
  */
 class DeepStreamManager {
 public:
@@ -75,6 +97,13 @@ public:
     void stop();
 
     /**
+     * @brief 切换双摄显示模式
+     * @param mode 新的显示模式
+     * @return 是否成功
+     */
+    bool switchDualMode(DualCameraMode mode);
+
+    /**
      * @brief 检查是否正在运行
      */
     bool isRunning() const { return running_; }
@@ -83,6 +112,11 @@ public:
      * @brief 获取视频布局信息
      */
     VideoLayout getVideoLayout() const { return video_layout_; }
+
+    /**
+     * @brief 获取当前双摄模式
+     */
+    DualCameraMode getCurrentMode() const { return config_.dual_mode; }
 
     /**
      * @brief 动态更新布局（屏幕尺寸变化时）
@@ -96,9 +130,34 @@ private:
     VideoLayout calculateVideoLayout(const DeepStreamConfig& config);
 
     /**
+     * @brief 构建单摄像头管道
+     */
+    std::string buildSingleCameraPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
+
+    /**
+     * @brief 构建并排显示管道
+     */
+    std::string buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
+
+    /**
+     * @brief 构建立体视觉管道
+     */
+    std::string buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
+
+    /**
      * @brief 构建GStreamer管道
      */
     std::string buildPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
+
+    /**
+     * @brief 启动单管道模式
+     */
+    bool startSinglePipelineMode();
+
+    /**
+     * @brief 启动并排显示模式
+     */
+    bool startSplitScreenMode();
 
     /**
      * @brief 初始化DeepStream
@@ -119,9 +178,12 @@ private:
     DeepStreamConfig config_;
     VideoLayout video_layout_;
     
-    GstElement* pipeline_;
-    GstBus* bus_;
-    guint bus_watch_id_;
+    GstElement* pipeline_;      // 主管道
+    GstElement* pipeline2_;     // 副管道（双摄模式）
+    GstBus* bus_;              // 主消息总线
+    GstBus* bus2_;             // 副消息总线
+    guint bus_watch_id_;       // 主总线监听ID
+    guint bus_watch_id2_;      // 副总线监听ID
     
     bool running_;
     bool initialized_;

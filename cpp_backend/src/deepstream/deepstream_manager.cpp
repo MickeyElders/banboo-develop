@@ -13,8 +13,11 @@ namespace deepstream {
 
 DeepStreamManager::DeepStreamManager()
     : pipeline_(nullptr)
+    , pipeline2_(nullptr)
     , bus_(nullptr)
+    , bus2_(nullptr)
     , bus_watch_id_(0)
+    , bus_watch_id2_(0)
     , running_(false)
     , initialized_(false) {
 }
@@ -59,7 +62,18 @@ bool DeepStreamManager::start() {
     }
     
     std::cout << "启动 DeepStream 管道..." << std::endl;
+    std::cout << "双摄模式: " << static_cast<int>(config_.dual_mode) << std::endl;
     
+    if (config_.dual_mode == DualCameraMode::SPLIT_SCREEN) {
+        // 并排显示模式：创建两个独立管道
+        return startSplitScreenMode();
+    } else {
+        // 单摄像头或立体视觉模式：单管道
+        return startSinglePipelineMode();
+    }
+}
+
+bool DeepStreamManager::startSinglePipelineMode() {
     // 构建管道
     std::string pipeline_str = buildPipeline(config_, video_layout_);
     std::cout << "管道字符串: " << pipeline_str << std::endl;
@@ -91,6 +105,70 @@ bool DeepStreamManager::start() {
     return true;
 }
 
+bool DeepStreamManager::startSplitScreenMode() {
+    // 构建左侧摄像头管道
+    std::string pipeline1_str = buildSplitScreenPipeline(config_, video_layout_);
+    std::cout << "左侧管道: " << pipeline1_str << std::endl;
+    
+    // 构建右侧摄像头管道
+    DeepStreamConfig config2 = config_;
+    config2.camera_id = config_.camera_id_2;  // 使用副摄像头
+    std::string pipeline2_str = buildSplitScreenPipeline(config2, video_layout_);
+    
+    // 修改右侧管道的偏移
+    size_t offset_pos = pipeline2_str.find("offset-x=");
+    if (offset_pos != std::string::npos) {
+        size_t end_pos = pipeline2_str.find(" ", offset_pos);
+        int right_offset = video_layout_.width / 2 + 10;  // 右半边偏移
+        pipeline2_str.replace(offset_pos, end_pos - offset_pos, 
+                             "offset-x=" + std::to_string(right_offset));
+    }
+    // 修改plane-id
+    size_t plane_pos = pipeline2_str.find("plane-id=0");
+    if (plane_pos != std::string::npos) {
+        pipeline2_str.replace(plane_pos, 10, "plane-id=1");
+    }
+    
+    std::cout << "右侧管道: " << pipeline2_str << std::endl;
+    
+    // 创建两个管道
+    GError *error1 = nullptr, *error2 = nullptr;
+    pipeline_ = gst_parse_launch(pipeline1_str.c_str(), &error1);
+    pipeline2_ = gst_parse_launch(pipeline2_str.c_str(), &error2);
+    
+    if (!pipeline_ || error1) {
+        std::cerr << "创建左侧管道失败: " << (error1 ? error1->message : "未知错误") << std::endl;
+        if (error1) g_error_free(error1);
+        return false;
+    }
+    
+    if (!pipeline2_ || error2) {
+        std::cerr << "创建右侧管道失败: " << (error2 ? error2->message : "未知错误") << std::endl;
+        if (error2) g_error_free(error2);
+        return false;
+    }
+    
+    // 设置消息总线
+    bus_ = gst_element_get_bus(pipeline_);
+    bus2_ = gst_element_get_bus(pipeline2_);
+    bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
+    bus_watch_id2_ = gst_bus_add_watch(bus2_, busCallback, this);
+    
+    // 启动两个管道
+    GstStateChangeReturn ret1 = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
+    GstStateChangeReturn ret2 = gst_element_set_state(pipeline2_, GST_STATE_PLAYING);
+    
+    if (ret1 == GST_STATE_CHANGE_FAILURE || ret2 == GST_STATE_CHANGE_FAILURE) {
+        std::cerr << "启动管道失败" << std::endl;
+        cleanup();
+        return false;
+    }
+    
+    running_ = true;
+    std::cout << "双摄像头并排显示管道启动成功" << std::endl;
+    return true;
+}
+
 void DeepStreamManager::stop() {
     if (!running_) return;
     
@@ -100,8 +178,42 @@ void DeepStreamManager::stop() {
         gst_element_set_state(pipeline_, GST_STATE_NULL);
     }
     
+    if (pipeline2_) {
+        gst_element_set_state(pipeline2_, GST_STATE_NULL);
+    }
+    
     running_ = false;
     std::cout << "DeepStream 管道已停止" << std::endl;
+}
+
+bool DeepStreamManager::switchDualMode(DualCameraMode mode) {
+    if (config_.dual_mode == mode) {
+        std::cout << "已是当前模式，无需切换" << std::endl;
+        return true;
+    }
+    
+    std::cout << "切换双摄模式: " << static_cast<int>(config_.dual_mode) 
+              << " -> " << static_cast<int>(mode) << std::endl;
+    
+    // 停止当前管道
+    bool was_running = running_;
+    if (running_) {
+        stop();
+        cleanup();
+    }
+    
+    // 更新配置
+    config_.dual_mode = mode;
+    
+    // 重新计算布局
+    video_layout_ = calculateVideoLayout(config_);
+    
+    // 如果之前在运行，重新启动
+    if (was_running) {
+        return start();
+    }
+    
+    return true;
 }
 
 bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
@@ -138,20 +250,32 @@ VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& conf
     layout.offset_x = 0;  // 左对齐
     layout.offset_y = config.header_height;  // 顶部栏下方
     
-    // 可选：居中对齐
-    // layout.offset_x = (layout.available_width - layout.width) / 2;
-    // layout.offset_y = config.header_height + (layout.available_height - layout.height) / 2;
-    
     return layout;
 }
 
 std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
+    switch (config.dual_mode) {
+        case DualCameraMode::SINGLE_CAMERA:
+            return buildSingleCameraPipeline(config, layout);
+        case DualCameraMode::SPLIT_SCREEN:
+            return buildSplitScreenPipeline(config, layout);
+        case DualCameraMode::STEREO_VISION:
+            return buildStereoVisionPipeline(config, layout);
+        default:
+            return buildSingleCameraPipeline(config, layout);
+    }
+}
+
+std::string DeepStreamManager::buildSingleCameraPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // 构建完整的 DeepStream 管道
+    // 构建单摄像头管道
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=1920,height=1080,framerate=30/1 ! "
-             << "nvstreammux batch-size=1 width=1920 height=1080 ! ";
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
+             << ",height=" << config.camera_height 
+             << ",framerate=" << config.camera_fps << "/1 ! "
+             << "nvstreammux batch-size=1 width=" << config.camera_width 
+             << " height=" << config.camera_height << " ! ";
     
     // 如果有 nvinfer 配置文件，添加 AI 推理
     if (!config.nvinfer_config.empty()) {
@@ -167,6 +291,74 @@ std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, con
              << "offset-y=" << layout.offset_y << " "
              << "width=" << layout.width << " "
              << "height=" << layout.height;
+    
+    return pipeline.str();
+}
+
+std::string DeepStreamManager::buildSplitScreenPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
+    std::ostringstream pipeline;
+    
+    // 计算左半边尺寸
+    int half_width = layout.width / 2 - 5;  // 减去间隔
+    
+    // 构建摄像头管道（用于并排显示的单个摄像头）
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
+             << ",height=" << config.camera_height 
+             << ",framerate=" << config.camera_fps << "/1 ! "
+             << "nvstreammux batch-size=1 width=" << config.camera_width 
+             << " height=" << config.camera_height << " ! ";
+    
+    // 如果有 nvinfer 配置文件，添加 AI 推理
+    if (!config.nvinfer_config.empty()) {
+        pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
+    }
+    
+    // 视频转换和显示（左侧）
+    pipeline << "nvvideoconvert ! "
+             << "nvdrmvideosink "
+             << "conn-id=0 "
+             << "plane-id=0 "
+             << "offset-x=" << layout.offset_x << " "
+             << "offset-y=" << layout.offset_y << " "
+             << "width=" << half_width << " "
+             << "height=" << layout.height;
+    
+    return pipeline.str();
+}
+
+std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
+    std::ostringstream pipeline;
+    
+    // 立体视觉管道：主摄像头显示，副摄像头用于深度计算
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
+             << ",height=" << config.camera_height 
+             << ",framerate=" << config.camera_fps << "/1 ! "
+             << "tee name=t "
+             
+             // 分支1：显示
+             << "t. ! queue ! nvstreammux batch-size=1 width=" << config.camera_width 
+             << " height=" << config.camera_height << " ! ";
+    
+    // 如果有 nvinfer 配置文件，添加 AI 推理
+    if (!config.nvinfer_config.empty()) {
+        pipeline << "nvinfer config-file-path=" << config.nvinfer_config << " ! ";
+    }
+    
+    pipeline << "nvvideoconvert ! "
+             << "nvdrmvideosink conn-id=0 plane-id=0 "
+             << "offset-x=" << layout.offset_x << " "
+             << "offset-y=" << layout.offset_y << " "
+             << "width=" << layout.width << " "
+             << "height=" << layout.height << " "
+             
+             // 分支2：立体计算（使用摄像头2）
+             << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width 
+             << ",height=" << config.camera_height 
+             << ",framerate=" << config.camera_fps << "/1 ! "
+             << "appsink name=stereo_sink";  // 送到立体视觉处理模块
     
     return pipeline.str();
 }
@@ -225,14 +417,29 @@ void DeepStreamManager::cleanup() {
         bus_watch_id_ = 0;
     }
     
+    if (bus_watch_id2_ > 0) {
+        g_source_remove(bus_watch_id2_);
+        bus_watch_id2_ = 0;
+    }
+    
     if (bus_) {
         gst_object_unref(bus_);
         bus_ = nullptr;
     }
     
+    if (bus2_) {
+        gst_object_unref(bus2_);
+        bus2_ = nullptr;
+    }
+    
     if (pipeline_) {
         gst_object_unref(pipeline_);
         pipeline_ = nullptr;
+    }
+    
+    if (pipeline2_) {
+        gst_object_unref(pipeline2_);
+        pipeline2_ = nullptr;
     }
 }
 
