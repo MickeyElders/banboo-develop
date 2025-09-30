@@ -19,11 +19,14 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_set_height(camera_panel_, lv_pct(100));
     lv_obj_set_flex_grow(camera_panel_, 3);  // 占3/4空间
     
-    // 设置为完全透明 - 让 nvdrmvideosink 硬件层透过来
-    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_outline_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    // 临时添加可见背景调试布局 - 生产环境需要设置为透明
+    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_30, 0);  // 30%透明度便于调试
+    lv_obj_set_style_bg_color(camera_panel_, lv_color_hex(0x1E2329), 0);  // 深色背景
+    lv_obj_set_style_border_width(camera_panel_, 2, 0);
+    lv_obj_set_style_border_color(camera_panel_, lv_color_hex(0x00FF00), 0);  // 绿色边框便于识别
+    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_60, 0);
+    // lv_obj_set_style_shadow_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    // lv_obj_set_style_outline_opa(camera_panel_, LV_OPA_TRANSP, 0);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
     // 设置摄像头面板为垂直Flex布局
