@@ -77,6 +77,7 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_label_set_text(single_label, "单摄");
     lv_obj_center(single_label);
     lv_obj_set_style_text_font(single_label, &lv_font_montserrat_12, 0);
+    lv_obj_add_event_cb(camera_widgets_.single_btn, onSingleCameraButtonClicked, LV_EVENT_CLICKED, this);
     
     // 并排按钮
     camera_widgets_.split_btn = lv_btn_create(control_overlay);
@@ -85,6 +86,7 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_label_set_text(split_label, "并排");
     lv_obj_center(split_label);
     lv_obj_set_style_text_font(split_label, &lv_font_montserrat_12, 0);
+    lv_obj_add_event_cb(camera_widgets_.split_btn, onSplitScreenButtonClicked, LV_EVENT_CLICKED, this);
     
     // 立体按钮
     camera_widgets_.stereo_btn = lv_btn_create(control_overlay);
@@ -93,6 +95,7 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_label_set_text(stereo_label, "立体");
     lv_obj_center(stereo_label);
     lv_obj_set_style_text_font(stereo_label, &lv_font_montserrat_12, 0);
+    lv_obj_add_event_cb(camera_widgets_.stereo_btn, onStereoVisionButtonClicked, LV_EVENT_CLICKED, this);
     
     // 状态指示
     camera_widgets_.status_value = lv_label_create(control_overlay);

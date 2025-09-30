@@ -102,6 +102,107 @@ void LVGLInterface::onSettingsButtonClicked(lv_event_t* e) {
 #endif
 }
 
+// ==================== 双摄切换事件处理器 ====================
+
+void LVGLInterface::onSingleCameraButtonClicked(lv_event_t* e) {
+#ifdef ENABLE_LVGL
+    LVGLInterface* self = static_cast<LVGLInterface*>(lv_event_get_user_data(e));
+    if (self) {
+        std::cout << "[LVGLInterface] 单摄按钮被点击" << std::endl;
+        
+        // TODO: 集成 DeepStreamManager，切换到单摄模式
+        // if (self->deepstream_manager_) {
+        //     self->deepstream_manager_->switchDualMode(DualCameraMode::SINGLE_CAMERA);
+        // }
+        
+        // 更新按钮状态
+        if (self->camera_widgets_.single_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.single_btn, self->color_success_, 0);
+        }
+        if (self->camera_widgets_.split_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.split_btn, self->color_primary_, 0);
+        }
+        if (self->camera_widgets_.stereo_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.stereo_btn, self->color_primary_, 0);
+        }
+        
+        // 更新状态显示
+        if (self->camera_widgets_.status_value) {
+            lv_label_set_text(self->camera_widgets_.status_value, LV_SYMBOL_OK " 单摄模式");
+            lv_obj_set_style_text_color(self->camera_widgets_.status_value, self->color_success_, 0);
+        }
+        
+        self->showMessageDialog("摄像头模式", "已切换到单摄像头模式");
+    }
+#endif
+}
+
+void LVGLInterface::onSplitScreenButtonClicked(lv_event_t* e) {
+#ifdef ENABLE_LVGL
+    LVGLInterface* self = static_cast<LVGLInterface*>(lv_event_get_user_data(e));
+    if (self) {
+        std::cout << "[LVGLInterface] 并排显示按钮被点击" << std::endl;
+        
+        // TODO: 集成 DeepStreamManager，切换到并排显示模式
+        // if (self->deepstream_manager_) {
+        //     self->deepstream_manager_->switchDualMode(DualCameraMode::SPLIT_SCREEN);
+        // }
+        
+        // 更新按钮状态
+        if (self->camera_widgets_.single_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.single_btn, self->color_primary_, 0);
+        }
+        if (self->camera_widgets_.split_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.split_btn, self->color_success_, 0);
+        }
+        if (self->camera_widgets_.stereo_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.stereo_btn, self->color_primary_, 0);
+        }
+        
+        // 更新状态显示
+        if (self->camera_widgets_.status_value) {
+            lv_label_set_text(self->camera_widgets_.status_value, LV_SYMBOL_OK " 并排模式");
+            lv_obj_set_style_text_color(self->camera_widgets_.status_value, self->color_warning_, 0);
+        }
+        
+        self->showMessageDialog("摄像头模式", "已切换到双摄并排显示模式");
+    }
+#endif
+}
+
+void LVGLInterface::onStereoVisionButtonClicked(lv_event_t* e) {
+#ifdef ENABLE_LVGL
+    LVGLInterface* self = static_cast<LVGLInterface*>(lv_event_get_user_data(e));
+    if (self) {
+        std::cout << "[LVGLInterface] 立体视觉按钮被点击" << std::endl;
+        
+        // TODO: 集成 DeepStreamManager，切换到立体视觉模式
+        // if (self->deepstream_manager_) {
+        //     self->deepstream_manager_->switchDualMode(DualCameraMode::STEREO_VISION);
+        // }
+        
+        // 更新按钮状态
+        if (self->camera_widgets_.single_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.single_btn, self->color_primary_, 0);
+        }
+        if (self->camera_widgets_.split_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.split_btn, self->color_primary_, 0);
+        }
+        if (self->camera_widgets_.stereo_btn) {
+            lv_obj_set_style_bg_color(self->camera_widgets_.stereo_btn, self->color_success_, 0);
+        }
+        
+        // 更新状态显示
+        if (self->camera_widgets_.status_value) {
+            lv_label_set_text(self->camera_widgets_.status_value, LV_SYMBOL_OK " 立体模式");
+            lv_obj_set_style_text_color(self->camera_widgets_.status_value, self->color_primary_, 0);
+        }
+        
+        self->showMessageDialog("摄像头模式", "已切换到立体视觉模式");
+    }
+#endif
+}
+
 void LVGLInterface::showMessageDialog(const std::string& title, const std::string& message) {
 #ifdef ENABLE_LVGL
     lv_obj_t* mbox = lv_msgbox_create(NULL);
