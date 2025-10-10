@@ -594,16 +594,28 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     std::ostringstream pipeline;
     
     // 使用 nvdrmvideosink（DRM叠加平面模式，独立于LVGL显示层）
-    // 保持NV12格式以确保与DRM叠加平面的兼容性
+    // 添加必要的格式转换以确保兼容性
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
+             << "nvvideoconvert ! "  // 添加格式转换器
+             << "video/x-raw(memory:NVMM),format=NV12 ! "  // 确保NV12格式
              << "nvdrmvideosink ";
              
     // 如果检测到有效的平面ID，添加平面参数
     if (config.overlay.plane_id != -1) {
-        pipeline << "plane-id=" << config.overlay.plane_id << " ";
+        pipeline << "plane=" << config.overlay.plane_id << " ";  // 使用plane而非plane-id
+    }
+    
+    // 如果检测到有效的CRTC ID，添加CRTC参数
+    if (config.overlay.crtc_id != -1) {
+        pipeline << "crtc=" << config.overlay.crtc_id << " ";
+    }
+    
+    // 如果检测到有效的连接器ID，添加连接器参数
+    if (config.overlay.connector_id != -1) {
+        pipeline << "connector=" << config.overlay.connector_id << " ";
     }
     
     pipeline << "set-mode=false "  // 不设置显示模式，使用现有模式
@@ -692,7 +704,15 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
                      << "nvdrmvideosink ";
             // 如果检测到有效的平面ID，添加平面参数
             if (config.overlay.plane_id != -1) {
-                pipeline << "plane-id=" << config.overlay.plane_id << " ";
+                pipeline << "plane=" << config.overlay.plane_id << " ";  // 使用plane而非plane-id
+            }
+            // 如果检测到有效的CRTC ID，添加CRTC参数
+            if (config.overlay.crtc_id != -1) {
+                pipeline << "crtc=" << config.overlay.crtc_id << " ";
+            }
+            // 如果检测到有效的连接器ID，添加连接器参数
+            if (config.overlay.connector_id != -1) {
+                pipeline << "connector=" << config.overlay.connector_id << " ";
             }
             pipeline << "set-mode=false "
                      << "sync=false";
