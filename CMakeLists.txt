@@ -344,13 +344,26 @@ else()
     set(ENABLE_JSON OFF)
 endif()
 
-# libdrm - DRM/KMS硬件加速显示支持
+# libdrm - DRM/KMS硬件加速显示支持 (nvidia-drm + tegra-drm)
 pkg_check_modules(DRM QUIET libdrm)
 if(DRM_FOUND)
     message(STATUS "Found libdrm: ${DRM_VERSION}")
     set(ENABLE_DRM ON)
     include_directories(${DRM_INCLUDE_DIRS})
     link_directories(${DRM_LIBRARY_DIRS})
+    
+    # 检查是否支持NVIDIA DRM
+    if(TARGET_ARCH STREQUAL "aarch64")
+        # Jetson平台可能同时支持nvidia-drm和tegra-drm
+        message(STATUS "Jetson平台: 支持nvidia-drm和tegra-drm双驱动")
+        set(ENABLE_NVIDIA_DRM ON)
+        set(ENABLE_TEGRA_DRM ON)
+    else()
+        # x86_64平台主要支持nvidia-drm
+        message(STATUS "x86_64平台: 主要支持nvidia-drm")
+        set(ENABLE_NVIDIA_DRM ON)
+        set(ENABLE_TEGRA_DRM OFF)
+    endif()
 else()
     # 手动查找libdrm
     find_library(DRM_LIBRARY drm
@@ -363,9 +376,19 @@ else()
         set(ENABLE_DRM ON)
         set(DRM_LIBRARIES ${DRM_LIBRARY})
         include_directories(${DRM_INCLUDE_DIR})
+        
+        # 设置驱动支持标志
+        set(ENABLE_NVIDIA_DRM ON)
+        if(TARGET_ARCH STREQUAL "aarch64")
+            set(ENABLE_TEGRA_DRM ON)
+        else()
+            set(ENABLE_TEGRA_DRM OFF)
+        endif()
     else()
         message(WARNING "libdrm not found - DRM/KMS硬件加速将被禁用，使用优化framebuffer")
         set(ENABLE_DRM OFF)
+        set(ENABLE_NVIDIA_DRM OFF)
+        set(ENABLE_TEGRA_DRM OFF)
     endif()
 endif()
 
@@ -626,6 +649,8 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
     $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
     $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
+    $<$<BOOL:${ENABLE_NVIDIA_DRM}>:ENABLE_NVIDIA_DRM>
+    $<$<BOOL:${ENABLE_TEGRA_DRM}>:ENABLE_TEGRA_DRM>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
@@ -762,6 +787,8 @@ message(STATUS "  TensorRT: ${ENABLE_TENSORRT}")
 message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
 message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
 message(STATUS "  libdrm: ${ENABLE_DRM}")
+message(STATUS "    - NVIDIA DRM: ${ENABLE_NVIDIA_DRM}")
+message(STATUS "    - Tegra DRM: ${ENABLE_TEGRA_DRM}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
 message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
 message(STATUS "")
