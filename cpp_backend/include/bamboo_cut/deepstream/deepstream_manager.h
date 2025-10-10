@@ -183,6 +183,26 @@ public:
 
 private:
     /**
+     * @brief 设置DRM叠加平面
+     * @return 是否成功
+     */
+    bool setupDRMOverlayPlane();
+
+    /**
+     * @brief 构建nvdrmvideosink管道
+     */
+    std::string buildNVDRMVideoSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+
+    /**
+     * @brief 构建nv3dsink管道
+     */
+    std::string buildNV3DSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+
+    /**
+     * @brief 构建waylandsink管道
+     */
+    std::string buildWaylandSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+    /**
      * @brief 计算视频显示区域布局
      */
     VideoLayout calculateVideoLayout(const DeepStreamConfig& config);
@@ -240,7 +260,6 @@ private:
     
     bool running_;
     bool initialized_;
-    bool use_wayland_sink_;    // 是否使用Wayland sink
 };
 
 } // namespace deepstream
