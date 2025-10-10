@@ -268,7 +268,12 @@ private:
     void initializeTheme();
 
     /**
-     * @brief 初始化显示驱动
+     * @brief 智能显示驱动初始化 - 优先Wayland，回退DRM
+     */
+    bool initializeWaylandOrDRMDisplay();
+
+    /**
+     * @brief 初始化显示驱动 (DRM后端)
      */
     bool initializeDisplay();
 

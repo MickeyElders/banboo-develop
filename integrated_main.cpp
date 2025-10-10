@@ -736,6 +736,15 @@ private:
                 return false;
             }
             
+            // 初始化完成后，强制切换到Wayland sink模式
+            std::cout << "切换DeepStream到Wayland sink模式..." << std::endl;
+            if (!deepstream_manager_->switchSinkMode(true)) {
+                std::cout << "警告：切换到Wayland sink失败，尝试nv3dsink模式" << std::endl;
+                deepstream_manager_->switchSinkMode(false);
+            } else {
+                std::cout << "✓ 成功切换到Wayland sink模式" << std::endl;
+            }
+            
             // 启动 DeepStream 管理器
             if (!deepstream_manager_->start()) {
                 std::cout << "DeepStream 管理器启动失败" << std::endl;
@@ -743,6 +752,7 @@ private:
             }
             
             std::cout << "DeepStream 管理器初始化并启动成功" << std::endl;
+            std::cout << "当前sink模式: " << (deepstream_manager_->isUsingWaylandSink() ? "waylandsink" : "nv3dsink") << std::endl;
             return true;
             
         } catch (const std::exception& e) {
