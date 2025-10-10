@@ -9,6 +9,10 @@
 #include <gst/gst.h>
 #include <fstream>
 #include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 namespace bamboo_cut {
 namespace deepstream {
@@ -22,7 +26,7 @@ DeepStreamManager::DeepStreamManager()
     , bus_watch_id2_(0)
     , running_(false)
     , initialized_(false)
-    , use_wayland_sink_(false) {
+    {
 }
 
 DeepStreamManager::~DeepStreamManager() {
@@ -41,19 +45,33 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
         std::cout << "GStreamer 初始化完成" << std::endl;
     }
     
-    // 检查 nv3dsink 是否可用
-    GstElementFactory *factory = gst_element_factory_find("nv3dsink");
-    if (factory) {
-        std::cout << "✓ 使用 nv3dsink (窗口模式，与LVGL兼容)" << std::endl;
-        gst_object_unref(factory);
-    } else {
-        // 尝试 nveglglessink
-        factory = gst_element_factory_find("nveglglessink");
+    // 检查视频输出sink可用性
+    const char* sink_names[] = {"nvdrmvideosink", "nv3dsink", "nveglglessink"};
+    const char* sink_descriptions[] = {
+        "nvdrmvideosink (DRM叠加平面模式，独立显示层)",
+        "nv3dsink (窗口模式，与LVGL兼容)",
+        "nveglglessink (EGL窗口模式)"
+    };
+    
+    bool found_sink = false;
+    for (int i = 0; i < 3; i++) {
+        GstElementFactory *factory = gst_element_factory_find(sink_names[i]);
         if (factory) {
-            std::cout << "✓ 使用 nveglglessink (窗口模式)" << std::endl;
+            std::cout << "✓ 可用: " << sink_descriptions[i] << std::endl;
             gst_object_unref(factory);
-        } else {
-            std::cerr << "警告: 未找到合适的视频sink" << std::endl;
+            found_sink = true;
+        }
+    }
+    
+    if (!found_sink) {
+        std::cerr << "警告: 未找到合适的视频sink" << std::endl;
+    }
+    
+    // 设置DRM叠加平面
+    if (config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
+        if (!setupDRMOverlayPlane()) {
+            std::cout << "DRM叠加平面设置失败，将回退到nv3dsink模式" << std::endl;
+            config_.sink_mode = VideoSinkMode::NV3DSINK;
         }
     }
     
@@ -152,7 +170,9 @@ bool DeepStreamManager::startSinglePipelineMode() {
     }
     
     running_ = true;
-    std::cout << "DeepStream 管道启动成功 (窗口模式，与LVGL共存)" << std::endl;
+    const char* mode_name = config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK ?
+        "DRM叠加平面模式" : "窗口模式";
+    std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL分离显示)" << std::endl;
     return true;
 }
 
@@ -218,7 +238,9 @@ bool DeepStreamManager::startSplitScreenMode() {
     }
     
     running_ = true;
-    std::cout << "双摄像头并排显示管道启动成功 (窗口模式)" << std::endl;
+    const char* mode_name = config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK ?
+        "DRM叠加平面模式" : "窗口模式";
+    std::cout << "双摄像头并排显示管道启动成功 (" << mode_name << ")" << std::endl;
     return true;
 }
 
@@ -345,34 +367,91 @@ std::string DeepStreamManager::buildSplitScreenPipeline(
     int width,
     int height) {
     
+    switch (config.sink_mode) {
+        case VideoSinkMode::NVDRMVIDEOSINK:
+            return buildNVDRMVideoSinkPipeline(config, offset_x, offset_y, width, height);
+        case VideoSinkMode::WAYLANDSINK:
+            return buildWaylandSinkPipeline(config, offset_x, offset_y, width, height);
+        case VideoSinkMode::NV3DSINK:
+        default:
+            return buildNV3DSinkPipeline(config, offset_x, offset_y, width, height);
+    }
+}
+
+std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
     std::ostringstream pipeline;
     
-    // 根据use_wayland_sink_选择合适的sink
-    if (use_wayland_sink_) {
-        // 使用 waylandsink（Wayland合成器模式）
-        pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-                 << "video/x-raw(memory:NVMM),width=" << config.camera_width
-                 << ",height=" << config.camera_height
-                 << ",framerate=30/1,format=NV12 ! "
-                 << "nvvideoconvert ! "
-                 << "video/x-raw,format=RGBA ! "
-                 << "waylandsink "
-                 << "sync=false";  // 降低延迟
-    } else {
-        // 使用 nv3dsink 窗口模式（不占用主DRM，与LVGL共存）
-        pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-                 << "video/x-raw(memory:NVMM),width=" << config.camera_width
-                 << ",height=" << config.camera_height
-                 << ",framerate=30/1,format=NV12 ! "
-                 << "nvvideoconvert ! "
-                 << "video/x-raw(memory:NVMM),format=RGBA ! "
-                 << "nv3dsink "
-                 << "window-x=" << offset_x << " "
-                 << "window-y=" << offset_y << " "
-                 << "window-width=" << width << " "
-                 << "window-height=" << height << " "
-                 << "sync=false";  // 降低延迟
+    // 使用 nvdrmvideosink（DRM叠加平面模式，独立于LVGL显示层）
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
+             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
+             << "nvvideoconvert ! "
+             << "video/x-raw(memory:NVMM),format=RGBA ! "
+             << "nvdrmvideosink "
+             << "plane-id=" << config.overlay.plane_id << " "
+             << "set-mode=false "  // 不设置显示模式，使用现有模式
+             << "show-preroll-frame=false "  // 不显示预览帧
+             << "sync=false";  // 降低延迟
+             
+    // 如果启用硬件缩放，添加缩放参数
+    if (config.overlay.enable_scaling) {
+        pipeline << " enable-last-sample=false";
     }
+    
+    return pipeline.str();
+}
+
+std::string DeepStreamManager::buildNV3DSinkPipeline(
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
+    std::ostringstream pipeline;
+    
+    // 使用 nv3dsink 窗口模式（与LVGL共存）
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
+             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
+             << "nvvideoconvert ! "
+             << "video/x-raw(memory:NVMM),format=RGBA ! "
+             << "nv3dsink "
+             << "window-x=" << offset_x << " "
+             << "window-y=" << offset_y << " "
+             << "window-width=" << width << " "
+             << "window-height=" << height << " "
+             << "sync=false";  // 降低延迟
+    
+    return pipeline.str();
+}
+
+std::string DeepStreamManager::buildWaylandSinkPipeline(
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
+    std::ostringstream pipeline;
+    
+    // 使用 waylandsink（Wayland合成器模式）
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+             << ",height=" << config.camera_height
+             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
+             << "nvvideoconvert ! "
+             << "video/x-raw,format=RGBA ! "
+             << "waylandsink "
+             << "sync=false";  // 降低延迟
     
     return pipeline.str();
 }
