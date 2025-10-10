@@ -7,6 +7,8 @@
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
+#include <fstream>
+#include <cstdlib>
 
 namespace bamboo_cut {
 namespace deepstream {

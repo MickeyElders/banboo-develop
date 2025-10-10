@@ -1,0 +1,127 @@
+# Wayland合成器性能优化配置
+# 针对Jetson Orin NX的优化参数
+
+wayland:
+  # 合成器配置
+  compositor:
+    name: "custom"
+    backend: "drm"
+    renderer: "gl"
+    vsync: true
+    triple_buffering: true
+    
+  # 显示优化
+  display:
+    refresh_rate: 60
+    color_depth: 32
+    enable_hardware_cursor: true
+    enable_plane_composition: true
+    
+  # 内存优化
+  memory:
+    buffer_pool_size: 4
+    zero_copy_enabled: true
+    shared_memory_optimized: true
+    texture_cache_size: 64  # MB
+    
+  # GPU优化
+  gpu:
+    enable_gpu_acceleration: true
+    egl_config:
+      double_buffer: true
+      depth_size: 0
+      stencil_size: 0
+      msaa_samples: 0
+    
+  # 延迟优化
+  latency:
+    enable_immediate_flip: true
+    reduce_input_lag: true
+    frame_pacing: true
+    target_frame_time: 16.67  # 60 FPS in ms
+
+# DeepStream Wayland优化
+deepstream:
+  wayland_sink:
+    sync: false
+    async: true
+    enable_last_sample: false
+    qos: true
+    max_lateness: 20000000  # 20ms in nanoseconds
+    
+  buffer_management:
+    pool_size: 8
+    min_threshold: 2
+    max_threshold: 6
+    alignment: 32
+    
+  performance:
+    enable_nvidia_optimizations: true
+    use_cuda_unified_memory: true
+    enable_zero_copy: true
+
+# LVGL性能优化
+lvgl:
+  rendering:
+    partial_refresh: true
+    flush_period: 5  # ms
+    task_handler_period: 5  # ms
+    
+  memory:
+    buffer_mode: "double"
+    color_format: "XRGB8888"
+    dma_heap_optimization: true
+    
+  wayland_client:
+    surface_scale: 1
+    enable_damage_tracking: true
+    frame_callback_optimization: true
+
+# 系统级优化
+system:
+  # CPU调度优化
+  cpu:
+    governor: "performance"
+    scheduler: "deadline"
+    realtime_priority: 50
+    cpu_affinity:
+      compositor: [4, 5]  # 使用专用CPU核心
+      deepstream: [2, 3]
+      lvgl: [0, 1]
+      
+  # GPU调度优化  
+  gpu:
+    frequency_scaling: "performance"
+    power_management: "max_performance"
+    emc_frequency: "max"
+    
+  # 内存优化
+  memory:
+    transparent_hugepages: "always"
+    swappiness: 1
+    cache_pressure: 50
+    
+  # I/O优化
+  io:
+    scheduler: "deadline"
+    read_ahead: 256
+    queue_depth: 32
+
+# 监控和调试
+monitoring:
+  enable_performance_stats: true
+  frame_time_logging: false
+  memory_usage_tracking: true
+  gpu_utilization_monitoring: true
+  
+  alerts:
+    max_frame_time: 20.0  # ms
+    max_memory_usage: 80  # percent
+    max_gpu_usage: 95     # percent
+
+# 故障回退机制
+fallback:
+  drm_fallback_enabled: true
+  software_rendering_fallback: true
+  reduced_quality_mode: true
+  emergency_low_latency_mode: true

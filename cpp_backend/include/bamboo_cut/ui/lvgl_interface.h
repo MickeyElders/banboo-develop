@@ -29,6 +29,7 @@ typedef void* lv_indev_data_t;
 #include <chrono>
 #include "bamboo_cut/core/data_bridge.h"
 #include "bamboo_cut/utils/jetson_monitor.h"
+#include "bamboo_cut/ui/display_backend.h"
 
 // DRM头文件包含
 #ifdef ENABLE_DRM
@@ -36,6 +37,13 @@ typedef void* lv_indev_data_t;
 #include <xf86drmMode.h>
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
+#endif
+
+// Wayland头文件包含
+#ifdef ENABLE_WAYLAND
+#include <wayland-client.h>
+#include <wayland-egl.h>
+#include <EGL/egl.h>
 #endif
 
 namespace bamboo_cut {
@@ -70,14 +78,16 @@ struct LVGLConfig {
     std::string touch_device;   // 触摸设备路径
     std::string display_device; // 显示设备路径
     bool enable_touch;          // 启用触摸
+    DisplayBackendType backend_type;  // 显示后端类型
     
     LVGLConfig()
         : screen_width(1280)
-        , screen_height(800) 
+        , screen_height(800)
         , refresh_rate(60)
         , touch_device("/dev/input/event0")
         , display_device("/dev/fb0")
-        , enable_touch(true) {}
+        , enable_touch(true)
+        , backend_type(DisplayBackendType::AUTO_DETECT) {}
 };
 
 /**
@@ -271,6 +281,26 @@ private:
      * @brief 自动检测DRM显示器分辨率
      */
     bool detectDisplayResolution(int& width, int& height);
+
+    /**
+     * @brief 初始化Wayland显示后端
+     */
+    bool initializeWaylandDisplay();
+
+    /**
+     * @brief 检测并选择最佳显示后端
+     */
+    DisplayBackendType detectBestBackend();
+
+    /**
+     * @brief 切换显示后端
+     */
+    bool switchDisplayBackend(DisplayBackendType type);
+
+    /**
+     * @brief 检查Wayland支持
+     */
+    bool isWaylandSupported() const;
 
     // === DRM显示驱动相关函数 ===
 
@@ -590,6 +620,11 @@ void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map
  * @brief LVGL输入设备读取回调 (v9 API)
  */
 void input_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
+
+/**
+ * @brief LVGL Wayland刷新回调函数
+ */
+void wayland_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 
 // === DRM辅助函数声明 ===
 

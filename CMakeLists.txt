@@ -369,6 +369,37 @@ else()
     endif()
 endif()
 
+# Wayland - 画面合成支持，解决DRM资源争抢
+pkg_check_modules(WAYLAND_SERVER QUIET wayland-server)
+pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
+if(WAYLAND_SERVER_FOUND AND WAYLAND_CLIENT_FOUND)
+    message(STATUS "Found Wayland server: ${WAYLAND_SERVER_VERSION}")
+    message(STATUS "Found Wayland client: ${WAYLAND_CLIENT_VERSION}")
+    set(ENABLE_WAYLAND ON)
+    include_directories(${WAYLAND_SERVER_INCLUDE_DIRS} ${WAYLAND_CLIENT_INCLUDE_DIRS})
+    link_directories(${WAYLAND_SERVER_LIBRARY_DIRS} ${WAYLAND_CLIENT_LIBRARY_DIRS})
+else()
+    # 手动查找Wayland
+    find_library(WAYLAND_SERVER_LIBRARY wayland-server
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+    find_library(WAYLAND_CLIENT_LIBRARY wayland-client
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+    find_path(WAYLAND_INCLUDE_DIR wayland-server.h
+        PATHS /usr/include /usr/local/include)
+    
+    if(WAYLAND_SERVER_LIBRARY AND WAYLAND_CLIENT_LIBRARY AND WAYLAND_INCLUDE_DIR)
+        message(STATUS "Found Wayland manually:")
+        message(STATUS "  Server: ${WAYLAND_SERVER_LIBRARY}")
+        message(STATUS "  Client: ${WAYLAND_CLIENT_LIBRARY}")
+        set(ENABLE_WAYLAND ON)
+        set(WAYLAND_LIBRARIES ${WAYLAND_SERVER_LIBRARY} ${WAYLAND_CLIENT_LIBRARY})
+        include_directories(${WAYLAND_INCLUDE_DIR})
+    else()
+        message(WARNING "Wayland not found - 将仅使用DRM模式")
+        set(ENABLE_WAYLAND OFF)
+    endif()
+endif()
+
 # 移除Python绑定相关配置 - 项目现在是纯C++架构
 set(ENABLE_PYBIND11 OFF)
 set(ENABLE_PYTHON OFF)
@@ -513,6 +544,139 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/utils/system_monitor.cpp
     cpp_backend/src/utils/jetson_monitor.cpp
 )
+
+# Wayland显示后端源文件 - 渐进式迁移支持
+set(WAYLAND_BACKEND_SOURCES)
+if(ENABLE_WAYLAND)
+    list(APPEND WAYLAND_BACKEND_SOURCES
+        cpp_backend/src/ui/wayland_compositor.cpp
+        cpp_backend/src/ui/display_backend.cpp
+        cpp_backend/src/ui/lvgl_wayland_backend.cpp
+    )
+endif()
+
+# 过滤不存在的源文件
+set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${WAYLAND_BACKEND_SOURCES} ${LVGL_FRONTEND_SOURCES} ${CPP_INFERENCE_SOURCES})
+set(VALID_SOURCES)
+foreach(src ${ALL_SOURCES})
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
+        list(APPEND VALID_SOURCES ${src})
+    else()
+        message(WARNING "Source file not found: ${src}")
+    endif()
+endforeach()
+
+# 编译定义
+target_compile_definitions(bamboo_integrated PRIVATE
+    INTEGRATED_BUILD=1
+    LV_CONF_INCLUDE_SIMPLE=1
+    USE_FRAMEBUFFER
+    $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
+    $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
+    $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
+    $<$<BOOL:${ENABLE_JSON}>:ENABLE_JSON>
+    $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
+    $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
+    $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
+    $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
+    $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
+    $<$<BOOL:${ENABLE_WAYLAND}>:ENABLE_WAYLAND>
+    $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
+)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(bamboo_integrated PRIVATE DEBUG=1)
+endif()
+
+# 链接库
+target_link_libraries(bamboo_integrated
+    ${OpenCV_LIBS}
+    ${GSTREAMER_LIBRARIES}
+    ${GSTREAMER_APP_LIBRARIES}
+    ${GSTREAMER_VIDEO_LIBRARIES}
+    Threads::Threads
+    pthread
+    dl
+    m
+)
+
+# 条件链接库
+if(ENABLE_CUDA)
+    target_link_libraries(bamboo_integrated ${CUDA_LIBRARIES})
+endif()
+
+if(ENABLE_TENSORRT)
+    target_link_libraries(bamboo_integrated ${TENSORRT_LIBRARIES})
+endif()
+
+if(ENABLE_MODBUS)
+    target_link_libraries(bamboo_integrated ${MODBUS_LIBRARY})
+endif()
+
+if(ENABLE_JSON)
+    target_link_libraries(bamboo_integrated nlohmann_json::nlohmann_json)
+endif()
+
+if(ENABLE_DRM)
+    target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
+endif()
+
+if(ENABLE_WAYLAND)
+    # 添加Wayland编译定义
+    target_compile_definitions(bamboo_integrated PRIVATE ENABLE_WAYLAND)
+    
+    if(WAYLAND_SERVER_FOUND AND WAYLAND_CLIENT_FOUND)
+        target_link_libraries(bamboo_integrated ${WAYLAND_SERVER_LIBRARIES} ${WAYLAND_CLIENT_LIBRARIES})
+        # 添加EGL和OpenGL ES支持
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(EGL REQUIRED egl)
+        pkg_check_modules(GLES2 REQUIRED glesv2)
+        target_link_libraries(bamboo_integrated ${EGL_LIBRARIES} ${GLES2_LIBRARIES})
+        target_include_directories(bamboo_integrated PRIVATE ${EGL_INCLUDE_DIRS} ${GLES2_INCLUDE_DIRS})
+    else()
+        target_link_libraries(bamboo_integrated ${WAYLAND_LIBRARIES})
+    endif()
+endif()
+
+# LVGL库 - 确保正确链接
+if(ENABLE_LVGL)
+    if(TARGET lvgl)
+        target_link_libraries(bamboo_integrated lvgl)
+        message(STATUS "Linking LVGL library to bamboo_integrated")
+    elseif(TARGET lvgl::lvgl)
+        target_link_libraries(bamboo_integrated lvgl::lvgl)
+        message(STATUS "Linking LVGL namespace library to bamboo_integrated")
+    elseif(LVGL_FOUND AND LVGL_LIBRARIES)
+        # 使用pkg-config找到的LVGL库
+        target_link_libraries(bamboo_integrated ${LVGL_LIBRARIES})
+        message(STATUS "Linking pkg-config LVGL libraries: ${LVGL_LIBRARIES}")
+    else()
+        # 查找已安装的LVGL
+        find_package(lvgl QUIET)
+        if(lvgl_FOUND)
+            target_link_libraries(bamboo_integrated lvgl::lvgl)
+            message(STATUS "Linking system LVGL library to bamboo_integrated")
+        else()
+            message(WARNING "LVGL library not found for linking")
+            set(ENABLE_LVGL OFF)
+        endif()
+    endif()
+else()
+    message(WARNING "LVGL not available for linking")
+endif()
+
+# 依赖库状态
+message(STATUS "依赖库状态:")
+message(STATUS "  OpenCV: ${ENABLE_OPENCV} (${OpenCV_VERSION})")
+message(STATUS "  GStreamer: ${ENABLE_GSTREAMER} (${GSTREAMER_VERSION})")
+message(STATUS "  CUDA: ${ENABLE_CUDA}")
+message(STATUS "  TensorRT: ${ENABLE_TENSORRT}")
+message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
+message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
+message(STATUS "  libdrm: ${ENABLE_DRM}")
+message(STATUS "  Wayland: ${ENABLE_WAYLAND}")
+message(STATUS "  LVGL: ${ENABLE_LVGL}")
+message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
 
 # 条件包含CUDA相关文件
 if(ENABLE_CUDA)

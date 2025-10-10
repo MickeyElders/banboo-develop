@@ -1,0 +1,93 @@
+# 显示系统配置文件
+# 支持DRM和Wayland双模式渐进式迁移
+
+display:
+  # 显示后端选择
+  # - auto: 自动检测（优先Wayland，回退到DRM）
+  # - drm: 直接DRM模式（原有模式）
+  # - wayland: Wayland客户端模式（新模式）
+  backend: auto
+  
+  # 屏幕分辨率
+  resolution:
+    width: 1280
+    height: 800
+    
+  # 刷新率
+  refresh_rate: 60
+  
+  # DRM特定配置
+  drm:
+    device_path: "/dev/dri/card1"
+    fallback_devices:
+      - "/dev/dri/card0" 
+      - "/dev/dri/card2"
+    color_depth: 32
+    
+  # Wayland特定配置
+  wayland:
+    socket_name: "wayland-bamboo"
+    compositor_cmd: "weston --backend=drm-backend.so --tty=7"
+    enable_gpu_acceleration: true
+    client_timeout: 5000  # ms
+    
+    # 窗口布局配置
+    layout:
+      lvgl_window:
+        x: 0
+        y: 0
+        width: 1280
+        height: 800
+        z_order: 1
+        
+      video_window:
+        x: 0
+        y: 80        # header下方
+        width: 960   # 75%宽度
+        height: 640  # 主要区域
+        z_order: 2
+
+# DeepStream视频流配置
+deepstream:
+  # 视频输出模式
+  # - nv3dsink: 原有窗口模式
+  # - waylandsink: Wayland客户端模式
+  output_mode: auto  # 根据display.backend自动选择
+  
+  # nv3dsink配置（DRM模式）
+  nv3dsink:
+    sync: false
+    window_x: 0
+    window_y: 80
+    window_width: 960
+    window_height: 640
+    
+  # waylandsink配置（Wayland模式）
+  waylandsink:
+    display: "wayland-bamboo"
+    x: 0
+    y: 80
+    width: 960
+    height: 640
+
+# 迁移策略配置
+migration:
+  # 启用渐进式迁移
+  enable_progressive: true
+  
+  # 迁移阶段
+  # - phase1: 仅DRM（当前状态）
+  # - phase2: DeepStream -> Wayland
+  # - phase3: LVGL -> Wayland
+  # - phase4: 完全Wayland
+  current_phase: phase1
+  
+  # 错误处理
+  fallback_on_error: true
+  max_retry_attempts: 3
+  
+  # 性能监控
+  performance_monitor:
+    enable: true
+    fps_threshold: 25  # 最低FPS要求
+    latency_threshold: 50  # ms

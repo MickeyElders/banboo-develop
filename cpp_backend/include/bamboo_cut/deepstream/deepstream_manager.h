@@ -123,6 +123,18 @@ public:
      */
     bool updateLayout(int screen_width, int screen_height);
 
+    /**
+     * @brief 切换视频sink模式
+     * @param use_wayland 是否使用waylandsink
+     * @return 是否成功
+     */
+    bool switchSinkMode(bool use_wayland);
+
+    /**
+     * @brief 检查当前是否使用Wayland sink
+     */
+    bool isUsingWaylandSink() const { return use_wayland_sink_; }
+
 private:
     /**
      * @brief 计算视频显示区域布局
