@@ -361,6 +361,8 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
         }
     }
     
+    std::cout << "开始检测DRM叠加平面..." << std::endl;
+    
     // 获取DRM资源
     drmModeRes* resources = drmModeGetResources(drm_fd);
     if (!resources) {
@@ -369,29 +371,112 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
         return config;
     }
     
+    std::cout << "找到 " << resources->count_crtcs << " 个CRTC, "
+              << resources->count_connectors << " 个连接器" << std::endl;
+    
+    // 查找活跃的CRTC
+    uint32_t active_crtc_id = 0;
+    int active_crtc_index = -1;
+    
+    for (int i = 0; i < resources->count_crtcs; i++) {
+        drmModeCrtc* crtc = drmModeGetCrtc(drm_fd, resources->crtcs[i]);
+        if (crtc && crtc->mode_valid) {
+            active_crtc_id = resources->crtcs[i];
+            active_crtc_index = i;
+            std::cout << "找到活跃CRTC: " << active_crtc_id << " (索引: " << i << ")" << std::endl;
+            drmModeFreeCrtc(crtc);
+            break;
+        }
+        if (crtc) drmModeFreeCrtc(crtc);
+    }
+    
+    // 如果没有找到活跃CRTC，使用第一个CRTC
+    if (active_crtc_id == 0 && resources->count_crtcs > 0) {
+        active_crtc_id = resources->crtcs[0];
+        active_crtc_index = 0;
+        std::cout << "使用第一个CRTC: " << active_crtc_id << " (索引: " << active_crtc_index << ")" << std::endl;
+    }
+    
     // 查找可用的叠加平面
     drmModePlaneRes* plane_resources = drmModeGetPlaneResources(drm_fd);
     if (plane_resources) {
+        std::cout << "找到 " << plane_resources->count_planes << " 个平面，开始检查..." << std::endl;
+        
         for (uint32_t i = 0; i < plane_resources->count_planes; i++) {
-            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_resources->planes[i]);
-            if (plane && plane->possible_crtcs > 0) {
-                // 找到可用的叠加平面
-                config.plane_id = plane_resources->planes[i];
-                config.crtc_id = resources->crtcs[0];  // 使用第一个CRTC
-                config.connector_id = resources->connectors[0];  // 使用第一个连接器
+            uint32_t plane_id = plane_resources->planes[i];
+            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_id);
+            
+            if (plane) {
+                std::cout << "检查平面 " << plane_id << ": possible_crtcs=0x"
+                          << std::hex << plane->possible_crtcs << std::dec;
                 
-                std::cout << "检测到可用DRM叠加平面: plane_id=" << config.plane_id << std::endl;
+                // 检查possible_crtcs位掩码是否与活跃CRTC匹配
+                // possible_crtcs是位掩码，每一位对应一个CRTC索引
+                if (active_crtc_index >= 0 && (plane->possible_crtcs & (1 << active_crtc_index))) {
+                    
+                    // 检查平面类型，确保是叠加平面而不是主平面
+                    drmModeObjectProperties* props = drmModeObjectGetProperties(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE);
+                    bool is_overlay = false;
+                    
+                    if (props) {
+                        for (uint32_t j = 0; j < props->count_props; j++) {
+                            drmModePropertyRes* prop = drmModeGetProperty(drm_fd, props->props[j]);
+                            if (prop && strcmp(prop->name, "type") == 0) {
+                                // type属性: 1=Overlay, 2=Primary, 3=Cursor
+                                if (props->prop_values[j] == 1) {  // DRM_PLANE_TYPE_OVERLAY
+                                    is_overlay = true;
+                                    std::cout << " [OVERLAY]";
+                                }
+                                drmModeFreeProperty(prop);
+                                break;
+                            }
+                            if (prop) drmModeFreeProperty(prop);
+                        }
+                        drmModeFreeObjectProperties(props);
+                    }
+                    
+                    if (is_overlay) {
+                        // 找到可用的叠加平面
+                        config.plane_id = plane_id;
+                        config.crtc_id = active_crtc_id;
+                        
+                        // 查找连接到此CRTC的连接器
+                        for (int j = 0; j < resources->count_connectors; j++) {
+                            drmModeConnector* connector = drmModeGetConnector(drm_fd, resources->connectors[j]);
+                            if (connector && connector->connection == DRM_MODE_CONNECTED) {
+                                config.connector_id = resources->connectors[j];
+                                drmModeFreeConnector(connector);
+                                break;
+                            }
+                            if (connector) drmModeFreeConnector(connector);
+                        }
+                        
+                        std::cout << " -> 选中!" << std::endl;
+                        std::cout << "检测到可用DRM叠加平面: plane_id=" << config.plane_id
+                                  << ", crtc_id=" << config.crtc_id
+                                  << ", connector_id=" << config.connector_id << std::endl;
+                        
+                        drmModeFreePlane(plane);
+                        break;
+                    } else {
+                        std::cout << " [非叠加平面]" << std::endl;
+                    }
+                } else {
+                    std::cout << " [CRTC不匹配]" << std::endl;
+                }
                 
                 drmModeFreePlane(plane);
-                break;
             }
-            if (plane) drmModeFreePlane(plane);
         }
         drmModeFreePlaneResources(plane_resources);
     }
     
     drmModeFreeResources(resources);
     close(drm_fd);
+    
+    if (config.plane_id == -1) {
+        std::cerr << "未找到可用的DRM叠加平面" << std::endl;
+    }
     
     return config;
 }
