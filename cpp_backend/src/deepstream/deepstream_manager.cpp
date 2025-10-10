@@ -404,33 +404,42 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
-             << ",framerate=30/1,format=NV12 ! "
+             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
              << "m.sink_0 "  // 连接到 mux 的第一个输入
              
              << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
-             << ",framerate=30/1,format=NV12 ! "
+             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
              << "m.sink_1 "  // 连接到 mux 的第二个输入
              
              << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! "
              << "nvvideoconvert ! ";
              
-    if (use_wayland_sink_) {
-        // 使用 waylandsink（Wayland合成器模式）
-        pipeline << "video/x-raw,format=RGBA ! "
-                 << "waylandsink "
-                 << "sync=false";
-    } else {
-        // 使用 nv3dsink 窗口模式
-        pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
-                 << "nv3dsink "
-                 << "window-x=" << layout.offset_x << " "
-                 << "window-y=" << layout.offset_y << " "
-                 << "window-width=" << layout.width << " "
-                 << "window-height=" << layout.height << " "
-                 << "sync=false";
+    switch (config.sink_mode) {
+        case VideoSinkMode::NVDRMVIDEOSINK:
+            pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
+                     << "nvdrmvideosink "
+                     << "plane-id=" << config.overlay.plane_id << " "
+                     << "set-mode=false "
+                     << "sync=false";
+            break;
+        case VideoSinkMode::WAYLANDSINK:
+            pipeline << "video/x-raw,format=RGBA ! "
+                     << "waylandsink "
+                     << "sync=false";
+            break;
+        case VideoSinkMode::NV3DSINK:
+        default:
+            pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
+                     << "nv3dsink "
+                     << "window-x=" << layout.offset_x << " "
+                     << "window-y=" << layout.offset_y << " "
+                     << "window-width=" << layout.width << " "
+                     << "window-height=" << layout.height << " "
+                     << "sync=false";
+            break;
     }
     
     return pipeline.str();

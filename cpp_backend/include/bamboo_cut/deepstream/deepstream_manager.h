@@ -24,6 +24,33 @@ enum class DualCameraMode {
 };
 
 /**
+ * @brief 视频输出模式
+ */
+enum class VideoSinkMode {
+    NV3DSINK,           ///< nv3dsink窗口模式
+    NVDRMVIDEOSINK,     ///< nvdrmvideosink DRM叠加平面模式
+    WAYLANDSINK         ///< waylandsink模式
+};
+
+/**
+ * @brief DRM叠加平面配置
+ */
+struct DRMOverlayConfig {
+    int plane_id;           // DRM叠加平面ID
+    int connector_id;       // 连接器ID
+    int crtc_id;           // CRTC ID
+    int z_order;           // Z轴排序 (数值越大越靠前)
+    bool enable_scaling;   // 是否启用硬件缩放
+    
+    DRMOverlayConfig()
+        : plane_id(-1)      // -1表示自动检测
+        , connector_id(-1)  // -1表示自动检测
+        , crtc_id(-1)       // -1表示自动检测
+        , z_order(1)        // 默认在LVGL层之上
+        , enable_scaling(true) {}
+};
+
+/**
  * @brief DeepStream配置参数
  */
 struct DeepStreamConfig {
@@ -44,6 +71,10 @@ struct DeepStreamConfig {
     int camera_height;          // 摄像头分辨率高度
     int camera_fps;             // 摄像头帧率
     
+    // 视频输出配置
+    VideoSinkMode sink_mode;    // 视频输出模式
+    DRMOverlayConfig overlay;   // DRM叠加平面配置
+    
     DeepStreamConfig()
         : screen_width(1280)
         , screen_height(800)
@@ -57,7 +88,9 @@ struct DeepStreamConfig {
         , dual_mode(DualCameraMode::SINGLE_CAMERA)
         , camera_width(1280)
         , camera_height(720)
-        , camera_fps(30) {}  // 确保30fps提高稳定性
+        , camera_fps(30)
+        , sink_mode(VideoSinkMode::NVDRMVIDEOSINK)  // 默认使用nvdrmvideosink
+        , overlay() {}  // 使用默认叠加平面配置
 };
 
 /**
@@ -125,15 +158,28 @@ public:
 
     /**
      * @brief 切换视频sink模式
-     * @param use_wayland 是否使用waylandsink
+     * @param sink_mode 视频输出模式
      * @return 是否成功
      */
-    bool switchSinkMode(bool use_wayland);
+    bool switchSinkMode(VideoSinkMode sink_mode);
 
     /**
-     * @brief 检查当前是否使用Wayland sink
+     * @brief 获取当前视频sink模式
      */
-    bool isUsingWaylandSink() const { return use_wayland_sink_; }
+    VideoSinkMode getCurrentSinkMode() const { return config_.sink_mode; }
+
+    /**
+     * @brief 配置DRM叠加平面
+     * @param overlay_config 叠加平面配置
+     * @return 是否成功
+     */
+    bool configureDRMOverlay(const DRMOverlayConfig& overlay_config);
+
+    /**
+     * @brief 自动检测可用的DRM叠加平面
+     * @return 检测到的叠加平面配置，失败时返回空配置
+     */
+    DRMOverlayConfig detectAvailableOverlayPlane();
 
 private:
     /**
