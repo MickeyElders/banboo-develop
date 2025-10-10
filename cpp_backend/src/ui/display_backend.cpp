@@ -9,6 +9,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cstdlib>
+#include <cstring>
 
 #ifdef ENABLE_WAYLAND
 #include <wayland-client.h>
@@ -247,6 +249,67 @@ DisplayBackendType DisplayBackendFactory::getRecommendedType() {
     }
     
     return DisplayBackendType::FALLBACK;
+}
+
+// WaylandDetector 实现
+bool WaylandDetector::detectWaylandSupport() {
+    std::cout << "[WaylandDetector] 检测Wayland支持..." << std::endl;
+    
+    // 检查环境变量
+    if (!isWaylandSession()) {
+        std::cout << "[WaylandDetector] 未检测到Wayland会话" << std::endl;
+        return false;
+    }
+    
+    // 测试连接
+#ifdef ENABLE_WAYLAND
+    struct wl_display* display = wl_display_connect(nullptr);
+    if (display) {
+        wl_display_disconnect(display);
+        std::cout << "[WaylandDetector] Wayland支持检测成功" << std::endl;
+        return true;
+    }
+#endif
+    
+    std::cout << "[WaylandDetector] 无法连接到Wayland服务器" << std::endl;
+    return false;
+}
+
+std::string WaylandDetector::detectCompositor() {
+    // 检查常见的合成器环境变量
+    const char* compositor_vars[] = {
+        "WAYLAND_COMPOSITOR",
+        "XDG_CURRENT_DESKTOP",
+        "DESKTOP_SESSION",
+        nullptr
+    };
+    
+    for (int i = 0; compositor_vars[i]; i++) {
+        const char* value = std::getenv(compositor_vars[i]);
+        if (value) {
+            std::string compositor(value);
+            std::cout << "[WaylandDetector] 检测到合成器: " << compositor << std::endl;
+            return compositor;
+        }
+    }
+    
+    return "unknown";
+}
+
+bool WaylandDetector::isWaylandSession() {
+    // 检查WAYLAND_DISPLAY环境变量
+    const char* wayland_display = std::getenv("WAYLAND_DISPLAY");
+    if (wayland_display && strlen(wayland_display) > 0) {
+        return true;
+    }
+    
+    // 检查XDG_SESSION_TYPE
+    const char* session_type = std::getenv("XDG_SESSION_TYPE");
+    if (session_type && strcmp(session_type, "wayland") == 0) {
+        return true;
+    }
+    
+    return false;
 }
 
 } // namespace ui
