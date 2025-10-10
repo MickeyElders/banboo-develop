@@ -288,26 +288,6 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
     return true;
 }
 
-bool DeepStreamManager::switchSinkMode(bool use_wayland) {
-    std::cout << "切换sink模式: " << (use_wayland ? "waylandsink" : "nv3dsink") << std::endl;
-    
-    // 停止当前管道
-    bool was_running = running_;
-    if (running_) {
-        stop();
-        cleanup();
-    }
-    
-    // 更新sink模式
-    use_wayland_sink_ = use_wayland;
-    
-    // 如果之前在运行，重新启动
-    if (was_running) {
-        return start();
-    }
-    
-    return true;
-}
 
 VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& config) {
     VideoLayout layout;

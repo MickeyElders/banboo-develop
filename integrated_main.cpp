@@ -736,22 +736,16 @@ private:
                 return false;
             }
             
-            // 检查Wayland环境并决定sink模式
-            bool use_wayland = false;
-            const char* wayland_display = getenv("WAYLAND_DISPLAY");
-            const char* xdg_session_type = getenv("XDG_SESSION_TYPE");
+            // 设置视频输出模式为nvdrmvideosink (叠加平面模式)
+            std::cout << "配置nvdrmvideosink叠加平面模式..." << std::endl;
             
-            if (wayland_display != nullptr || (xdg_session_type && std::string(xdg_session_type) == "wayland")) {
-                std::cout << "检测到Wayland环境，切换到waylandsink模式..." << std::endl;
-                use_wayland = true;
-            } else {
-                std::cout << "未检测到Wayland环境，使用nv3dsink模式..." << std::endl;
-                use_wayland = false;
-            }
-            
-            // 在初始化之前设置sink模式
-            if (!deepstream_manager_->switchSinkMode(use_wayland)) {
-                std::cout << "警告：切换sink模式失败，使用默认模式" << std::endl;
+            // 设置为nvdrmvideosink模式
+            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::NVDRMVIDEOSINK)) {
+                std::cout << "警告：nvdrmvideosink模式设置失败，尝试回退到nv3dsink模式" << std::endl;
+                if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::NV3DSINK)) {
+                    std::cout << "错误：所有视频输出模式设置都失败" << std::endl;
+                    return false;
+                }
             }
             
             // 启动 DeepStream 管理器
@@ -761,7 +755,11 @@ private:
             }
             
             std::cout << "DeepStream 管理器初始化并启动成功" << std::endl;
-            std::cout << "当前sink模式: " << (deepstream_manager_->isUsingWaylandSink() ? "waylandsink" : "nv3dsink") << std::endl;
+            
+            // 显示当前sink模式
+            auto current_mode = deepstream_manager_->getCurrentSinkMode();
+            const char* mode_names[] = {"nv3dsink", "nvdrmvideosink", "waylandsink"};
+            std::cout << "当前sink模式: " << mode_names[static_cast<int>(current_mode)] << std::endl;
             return true;
             
         } catch (const std::exception& e) {
