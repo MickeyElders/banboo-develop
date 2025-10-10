@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 
 #ifdef ENABLE_WAYLAND
 #include <wayland-client.h>
@@ -18,46 +19,7 @@
 namespace bamboo_cut {
 namespace ui {
 
-/**
- * @brief Wayland检测器
- * 提供Wayland环境和合成器检测功能
- */
-class WaylandDetector {
-public:
-    /**
-     * @brief 检测Wayland支持
-     * @return true如果Wayland可用
-     */
-    static bool detectWaylandSupport();
-    
-    /**
-     * @brief 检测Wayland合成器
-     * @return 合成器名称，如果未检测到则为空
-     */
-    static std::string detectCompositor();
-    
-    /**
-     * @brief 检查环境变量
-     * @return Wayland display名称
-     */
-    static std::string getWaylandDisplay();
-    
-    /**
-     * @brief 列出可用的Wayland扩展
-     * @return 扩展名称列表
-     */
-    static std::vector<std::string> listWaylandExtensions();
-    
-    /**
-     * @brief 检查是否在Wayland会话中运行
-     * @return true如果在Wayland会话中
-     */
-    static bool isWaylandSession();
-
-private:
-    static bool checkWaylandSocket();
-    static bool testWaylandConnection();
-};
+// WaylandDetector已在display_backend.h中定义，避免重复定义
 
 /**
  * @brief Wayland合成器配置

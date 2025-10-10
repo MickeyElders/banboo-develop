@@ -135,7 +135,7 @@ bool WaylandDisplayBackend::connectToWaylandServer() {
 #ifdef ENABLE_WAYLAND
     std::cout << "[WaylandDisplayBackend] 连接到Wayland服务器..." << std::endl;
     
-    wl_display_ = wl_display_connect(nullptr);
+    wl_display_ = static_cast<void*>(wl_display_connect(nullptr));
     if (!wl_display_) {
         std::cerr << "[WaylandDisplayBackend] 无法连接到Wayland display" << std::endl;
         return false;
@@ -166,8 +166,8 @@ bool WaylandDisplayBackend::createWaylandSurface() {
 void WaylandDisplayBackend::handleWaylandEvents() {
 #ifdef ENABLE_WAYLAND
     if (wl_display_) {
-        wl_display_dispatch_pending(wl_display_);
-        wl_display_flush(wl_display_);
+        wl_display_dispatch_pending(static_cast<struct wl_display*>(wl_display_));
+        wl_display_flush(static_cast<struct wl_display*>(wl_display_));
     }
 #endif
 }

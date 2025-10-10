@@ -144,9 +144,9 @@ private:
     void handleWaylandEvents();
     
 #ifdef ENABLE_WAYLAND
-    struct wl_display* wl_display_ = nullptr;
-    struct wl_surface* wl_surface_ = nullptr;
-    struct wl_compositor* wl_compositor_ = nullptr;
+    void* wl_display_ = nullptr;      // 使用void*避免类型冲突
+    void* wl_surface_ = nullptr;
+    void* wl_compositor_ = nullptr;
 #else
     void* wl_display_ = nullptr;
     void* wl_surface_ = nullptr;
