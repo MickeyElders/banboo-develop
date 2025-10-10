@@ -408,24 +408,42 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
             
             if (plane) {
                 std::cout << "检查平面 " << plane_id << ": possible_crtcs=0x"
-                          << std::hex << plane->possible_crtcs << std::dec;
+                          << std::hex << plane->possible_crtcs << std::dec
+                          << ", crtc_id=" << plane->crtc_id
+                          << ", fb_id=" << plane->fb_id;
+                
+                // 首先检查平面是否未被占用
+                bool is_free = (plane->crtc_id == 0 && plane->fb_id == 0);
+                if (!is_free) {
+                    std::cout << " [已占用]" << std::endl;
+                    drmModeFreePlane(plane);
+                    continue;
+                }
                 
                 // 检查possible_crtcs位掩码是否与活跃CRTC匹配
                 // possible_crtcs是位掩码，每一位对应一个CRTC索引
                 if (active_crtc_index >= 0 && (plane->possible_crtcs & (1 << active_crtc_index))) {
                     
-                    // 检查平面类型，确保是叠加平面而不是主平面
+                    // 检查平面类型，NVIDIA DRM中Overlay类型值可能为0
                     drmModeObjectProperties* props = drmModeObjectGetProperties(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE);
                     bool is_overlay = false;
+                    uint64_t plane_type = 0;
                     
                     if (props) {
                         for (uint32_t j = 0; j < props->count_props; j++) {
                             drmModePropertyRes* prop = drmModeGetProperty(drm_fd, props->props[j]);
                             if (prop && strcmp(prop->name, "type") == 0) {
-                                // type属性: 1=Overlay, 2=Primary, 3=Cursor
-                                if (props->prop_values[j] == 1) {  // DRM_PLANE_TYPE_OVERLAY
+                                plane_type = props->prop_values[j];
+                                // NVIDIA DRM中: 0=Overlay, 1=Primary, 2=Cursor (与标准不同)
+                                if (plane_type == 0) {  // NVIDIA的Overlay类型值
                                     is_overlay = true;
-                                    std::cout << " [OVERLAY]";
+                                    std::cout << " [OVERLAY(NVIDIA)]";
+                                } else if (plane_type == 1) {
+                                    std::cout << " [PRIMARY]";
+                                } else if (plane_type == 2) {
+                                    std::cout << " [CURSOR]";
+                                } else {
+                                    std::cout << " [TYPE=" << plane_type << "]";
                                 }
                                 drmModeFreeProperty(prop);
                                 break;
@@ -435,7 +453,8 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
                         drmModeFreeObjectProperties(props);
                     }
                     
-                    if (is_overlay) {
+                    // 如果找不到type属性或检测为Overlay类型，则尝试使用该平面
+                    if (is_overlay || (props == nullptr)) {
                         // 找到可用的叠加平面
                         config.plane_id = plane_id;
                         config.crtc_id = active_crtc_id;
