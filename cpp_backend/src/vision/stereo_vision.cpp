@@ -188,7 +188,8 @@ bool StereoVision::initialize_cameras() {
         // 只释放 video0 设备（video1 被 nvargus-daemon 正常占用）
         if (config_.left_camera_id == 0) {
             std::string cmd = "fuser -k /dev/video0 2>/dev/null || true";
-            system(cmd.c_str());
+            int result = system(cmd.c_str());
+            (void)result; // 忽略返回值警告
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         

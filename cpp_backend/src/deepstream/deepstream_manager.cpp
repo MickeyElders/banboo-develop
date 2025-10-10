@@ -21,7 +21,8 @@ DeepStreamManager::DeepStreamManager()
     , bus_watch_id_(0)
     , bus_watch_id2_(0)
     , running_(false)
-    , initialized_(false) {
+    , initialized_(false)
+    , use_wayland_sink_(false) {
 }
 
 DeepStreamManager::~DeepStreamManager() {
@@ -255,6 +256,27 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
     return true;
 }
 
+bool DeepStreamManager::switchSinkMode(bool use_wayland) {
+    std::cout << "切换sink模式: " << (use_wayland ? "waylandsink" : "nv3dsink") << std::endl;
+    
+    // 停止当前管道
+    bool was_running = running_;
+    if (running_) {
+        stop();
+        cleanup();
+    }
+    
+    // 更新sink模式
+    use_wayland_sink_ = use_wayland;
+    
+    // 如果之前在运行，重新启动
+    if (was_running) {
+        return start();
+    }
+    
+    return true;
+}
+
 VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& config) {
     VideoLayout layout;
     
@@ -305,27 +327,40 @@ std::string DeepStreamManager::buildPipeline(const DeepStreamConfig& config, con
 }
 
 std::string DeepStreamManager::buildSplitScreenPipeline(
-    const DeepStreamConfig& config, 
-    int offset_x, 
+    const DeepStreamConfig& config,
+    int offset_x,
     int offset_y,
     int width,
     int height) {
     
     std::ostringstream pipeline;
     
-    // 使用 nv3dsink 窗口模式（不占用主DRM，与LVGL共存）
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width
-             << ",height=" << config.camera_height
-             << ",framerate=30/1,format=NV12 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw(memory:NVMM),format=RGBA ! "
-             << "nv3dsink "
-             << "window-x=" << offset_x << " "
-             << "window-y=" << offset_y << " "
-             << "window-width=" << width << " "
-             << "window-height=" << height << " "
-             << "sync=false";  // 降低延迟
+    // 根据use_wayland_sink_选择合适的sink
+    if (use_wayland_sink_) {
+        // 使用 waylandsink（Wayland合成器模式）
+        pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+                 << "video/x-raw(memory:NVMM),width=" << config.camera_width
+                 << ",height=" << config.camera_height
+                 << ",framerate=30/1,format=NV12 ! "
+                 << "nvvideoconvert ! "
+                 << "video/x-raw,format=RGBA ! "
+                 << "waylandsink "
+                 << "sync=false";  // 降低延迟
+    } else {
+        // 使用 nv3dsink 窗口模式（不占用主DRM，与LVGL共存）
+        pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+                 << "video/x-raw(memory:NVMM),width=" << config.camera_width
+                 << ",height=" << config.camera_height
+                 << ",framerate=30/1,format=NV12 ! "
+                 << "nvvideoconvert ! "
+                 << "video/x-raw(memory:NVMM),format=RGBA ! "
+                 << "nv3dsink "
+                 << "window-x=" << offset_x << " "
+                 << "window-y=" << offset_y << " "
+                 << "window-width=" << width << " "
+                 << "window-height=" << height << " "
+                 << "sync=false";  // 降低延迟
+    }
     
     return pipeline.str();
 }
@@ -348,14 +383,23 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              
              << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw(memory:NVMM),format=RGBA ! "
-             << "nv3dsink "
-             << "window-x=" << layout.offset_x << " "
-             << "window-y=" << layout.offset_y << " "
-             << "window-width=" << layout.width << " "
-             << "window-height=" << layout.height << " "
-             << "sync=false";
+             << "nvvideoconvert ! ";
+             
+    if (use_wayland_sink_) {
+        // 使用 waylandsink（Wayland合成器模式）
+        pipeline << "video/x-raw,format=RGBA ! "
+                 << "waylandsink "
+                 << "sync=false";
+    } else {
+        // 使用 nv3dsink 窗口模式
+        pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
+                 << "nv3dsink "
+                 << "window-x=" << layout.offset_x << " "
+                 << "window-y=" << layout.offset_y << " "
+                 << "window-width=" << layout.width << " "
+                 << "window-height=" << layout.height << " "
+                 << "sync=false";
+    }
     
     return pipeline.str();
 }

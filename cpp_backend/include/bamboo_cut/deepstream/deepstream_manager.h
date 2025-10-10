@@ -194,6 +194,7 @@ private:
     
     bool running_;
     bool initialized_;
+    bool use_wayland_sink_;    // 是否使用Wayland sink
 };
 
 } // namespace deepstream
