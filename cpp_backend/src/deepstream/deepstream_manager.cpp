@@ -582,6 +582,108 @@ void DeepStreamManager::cleanup() {
         gst_object_unref(pipeline2_);
         pipeline2_ = nullptr;
     }
+bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
+    const char* mode_names[] = {"nv3dsink", "nvdrmvideosink", "waylandsink"};
+    std::cout << "切换sink模式: " << mode_names[static_cast<int>(config_.sink_mode)]
+              << " -> " << mode_names[static_cast<int>(sink_mode)] << std::endl;
+    
+    // 停止当前管道
+    bool was_running = running_;
+    if (running_) {
+        stop();
+        cleanup();
+    }
+    
+    // 更新sink模式
+    config_.sink_mode = sink_mode;
+    
+    // 如果切换到nvdrmvideosink，设置叠加平面
+    if (sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
+        if (!setupDRMOverlayPlane()) {
+            std::cerr << "DRM叠加平面设置失败，无法切换到nvdrmvideosink模式" << std::endl;
+            config_.sink_mode = VideoSinkMode::NV3DSINK;  // 回退
+            return false;
+        }
+    }
+    
+    // 如果之前在运行，重新启动
+    if (was_running) {
+        return start();
+    }
+    
+    return true;
+}
+
+bool DeepStreamManager::configureDRMOverlay(const DRMOverlayConfig& overlay_config) {
+    config_.overlay = overlay_config;
+    std::cout << "配置DRM叠加平面: plane_id=" << overlay_config.plane_id
+              << ", z_order=" << overlay_config.z_order << std::endl;
+    return true;
+}
+
+DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
+    DRMOverlayConfig config;
+    
+    // 尝试打开DRM设备
+    int drm_fd = open("/dev/dri/card0", O_RDWR);
+    if (drm_fd < 0) {
+        drm_fd = open("/dev/dri/card1", O_RDWR);
+        if (drm_fd < 0) {
+            std::cerr << "无法打开DRM设备" << std::endl;
+            return config;
+        }
+    }
+    
+    // 获取DRM资源
+    drmModeRes* resources = drmModeGetResources(drm_fd);
+    if (!resources) {
+        std::cerr << "无法获取DRM资源" << std::endl;
+        close(drm_fd);
+        return config;
+    }
+    
+    // 查找可用的叠加平面
+    drmModePlaneRes* plane_resources = drmModeGetPlaneResources(drm_fd);
+    if (plane_resources) {
+        for (uint32_t i = 0; i < plane_resources->count_planes; i++) {
+            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_resources->planes[i]);
+            if (plane && plane->possible_crtcs > 0) {
+                // 找到可用的叠加平面
+                config.plane_id = plane_resources->planes[i];
+                config.crtc_id = resources->crtcs[0];  // 使用第一个CRTC
+                config.connector_id = resources->connectors[0];  // 使用第一个连接器
+                
+                std::cout << "检测到可用DRM叠加平面: plane_id=" << config.plane_id << std::endl;
+                
+                drmModeFreePlane(plane);
+                break;
+            }
+            if (plane) drmModeFreePlane(plane);
+        }
+        drmModeFreePlaneResources(plane_resources);
+    }
+    
+    drmModeFreeResources(resources);
+    close(drm_fd);
+    
+    return config;
+}
+
+bool DeepStreamManager::setupDRMOverlayPlane() {
+    std::cout << "设置DRM叠加平面..." << std::endl;
+    
+    // 如果未配置叠加平面，自动检测
+    if (config_.overlay.plane_id == -1) {
+        config_.overlay = detectAvailableOverlayPlane();
+        if (config_.overlay.plane_id == -1) {
+            std::cerr << "未找到可用的DRM叠加平面" << std::endl;
+            return false;
+        }
+    }
+    
+    std::cout << "DRM叠加平面设置完成: plane_id=" << config_.overlay.plane_id
+              << ", z_order=" << config_.overlay.z_order << std::endl;
+    return true;
 }
 
 } // namespace deepstream
