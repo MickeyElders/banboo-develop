@@ -150,7 +150,8 @@ bool LVGLInterface::initialize(const LVGLConfig& config) {
     // 初始化LVGL
     lv_init();
     
-    // 优先尝试使用Wayland显示驱动，回退到DRM
+    // 智能显示驱动初始化 - 优先Wayland，回退DRM
+    std::cout << "[LVGLInterface] 开始智能显示驱动初始化..." << std::endl;
     if (!initializeWaylandOrDRMDisplay()) {
         std::cerr << "[LVGLInterface] 显示驱动初始化失败" << std::endl;
         return false;

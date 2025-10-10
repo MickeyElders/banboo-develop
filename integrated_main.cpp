@@ -736,13 +736,22 @@ private:
                 return false;
             }
             
-            // 初始化完成后，强制切换到Wayland sink模式
-            std::cout << "切换DeepStream到Wayland sink模式..." << std::endl;
-            if (!deepstream_manager_->switchSinkMode(true)) {
-                std::cout << "警告：切换到Wayland sink失败，尝试nv3dsink模式" << std::endl;
-                deepstream_manager_->switchSinkMode(false);
+            // 检查Wayland环境并决定sink模式
+            bool use_wayland = false;
+            const char* wayland_display = getenv("WAYLAND_DISPLAY");
+            const char* xdg_session_type = getenv("XDG_SESSION_TYPE");
+            
+            if (wayland_display != nullptr || (xdg_session_type && std::string(xdg_session_type) == "wayland")) {
+                std::cout << "检测到Wayland环境，切换到waylandsink模式..." << std::endl;
+                use_wayland = true;
             } else {
-                std::cout << "✓ 成功切换到Wayland sink模式" << std::endl;
+                std::cout << "未检测到Wayland环境，使用nv3dsink模式..." << std::endl;
+                use_wayland = false;
+            }
+            
+            // 在初始化之前设置sink模式
+            if (!deepstream_manager_->switchSinkMode(use_wayland)) {
+                std::cout << "警告：切换sink模式失败，使用默认模式" << std::endl;
             }
             
             // 启动 DeepStream 管理器

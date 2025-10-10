@@ -111,12 +111,44 @@ bool DeepStreamManager::startSinglePipelineMode() {
     bus_ = gst_element_get_bus(pipeline_);
     bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
     
-    // 启动管道
+    // 启动管道 - 添加详细错误诊断
+    std::cout << "正在设置管道状态为PLAYING..." << std::endl;
     GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
+    
     if (ret == GST_STATE_CHANGE_FAILURE) {
-        std::cerr << "启动管道失败" << std::endl;
+        std::cerr << "启动管道失败，进行错误诊断..." << std::endl;
+        
+        // 获取详细错误信息
+        GstBus* bus = gst_element_get_bus(pipeline_);
+        GstMessage* msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
+            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
+            
+        if (msg) {
+            GError* err;
+            gchar* debug_info;
+            gst_message_parse_error(msg, &err, &debug_info);
+            std::cerr << "GStreamer错误: " << err->message << std::endl;
+            if (debug_info) {
+                std::cerr << "调试信息: " << debug_info << std::endl;
+                g_free(debug_info);
+            }
+            g_error_free(err);
+            gst_message_unref(msg);
+        }
+        gst_object_unref(bus);
+        
         cleanup();
         return false;
+    } else if (ret == GST_STATE_CHANGE_ASYNC) {
+        std::cout << "管道异步启动中，等待状态变化..." << std::endl;
+        // 等待异步状态变化完成
+        GstState state;
+        ret = gst_element_get_state(pipeline_, &state, NULL, GST_CLOCK_TIME_NONE);
+        if (ret == GST_STATE_CHANGE_FAILURE) {
+            std::cerr << "管道异步启动失败" << std::endl;
+            cleanup();
+            return false;
+        }
     }
     
     running_ = true;
