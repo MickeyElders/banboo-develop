@@ -399,16 +399,13 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
 bool DeepStreamManager::setupDRMOverlayPlane() {
     std::cout << "设置DRM叠加平面..." << std::endl;
     
-    // 如果未配置叠加平面，自动检测
-    if (config_.overlay.plane_id == -1) {
-        config_.overlay = detectAvailableOverlayPlane();
-        if (config_.overlay.plane_id == -1) {
-            std::cerr << "未找到可用的DRM叠加平面" << std::endl;
-            return false;
-        }
+    // 确保使用叠加平面44
+    if (config_.overlay.plane_id != 44) {
+        config_.overlay.plane_id = 44;
+        std::cout << "设置为叠加平面44" << std::endl;
     }
     
-    std::cout << "DRM叠加平面设置完成: plane_id=" << config_.overlay.plane_id 
+    std::cout << "DRM叠加平面设置完成: plane_id=" << config_.overlay.plane_id
               << ", z_order=" << config_.overlay.z_order << std::endl;
     return true;
 }
@@ -490,14 +487,13 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     std::ostringstream pipeline;
     
     // 使用 nvdrmvideosink（DRM叠加平面模式，独立于LVGL显示层）
+    // 保持NV12格式以确保与DRM叠加平面的兼容性
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw(memory:NVMM),format=RGBA ! "
              << "nvdrmvideosink "
-             << "plane-id=" << config.overlay.plane_id << " "
+             << "plane-id=44 "  // 指定叠加平面44
              << "set-mode=false "  // 不设置显示模式，使用现有模式
              << "show-preroll-frame=false "  // 不显示预览帧
              << "sync=false";  // 降低延迟
@@ -580,9 +576,9 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              
     switch (config.sink_mode) {
         case VideoSinkMode::NVDRMVIDEOSINK:
-            pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
+            pipeline << "video/x-raw(memory:NVMM),format=NV12 ! "
                      << "nvdrmvideosink "
-                     << "plane-id=" << config.overlay.plane_id << " "
+                     << "plane-id=44 "  // 指定叠加平面44
                      << "set-mode=false "
                      << "sync=false";
             break;

@@ -43,7 +43,7 @@ struct DRMOverlayConfig {
     bool enable_scaling;   // 是否启用硬件缩放
     
     DRMOverlayConfig()
-        : plane_id(-1)      // -1表示自动检测
+        : plane_id(44)      // 默认使用叠加平面44
         , connector_id(-1)  // -1表示自动检测
         , crtc_id(-1)       // -1表示自动检测
         , z_order(1)        // 默认在LVGL层之上
