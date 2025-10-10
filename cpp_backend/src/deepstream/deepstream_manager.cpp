@@ -351,14 +351,38 @@ bool DeepStreamManager::configureDRMOverlay(const DRMOverlayConfig& overlay_conf
 DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
     DRMOverlayConfig config;
     
-    // 尝试打开DRM设备
-    int drm_fd = open("/dev/dri/card0", O_RDWR);
-    if (drm_fd < 0) {
-        drm_fd = open("/dev/dri/card1", O_RDWR);
-        if (drm_fd < 0) {
-            std::cerr << "无法打开DRM设备" << std::endl;
-            return config;
+    // 尝试打开nvidia-drm设备，按优先级顺序
+    int drm_fd = -1;
+    const char* drm_devices[] = {
+        "/dev/dri/card0",
+        "/dev/dri/card1",
+        "/dev/dri/card2",
+        "/dev/dri/renderD128",
+        "/dev/dri/renderD129"
+    };
+    
+    for (int i = 0; i < 5; i++) {
+        drm_fd = open(drm_devices[i], O_RDWR);
+        if (drm_fd >= 0) {
+            // 检查是否是nvidia-drm设备
+            drmVersionPtr version = drmGetVersion(drm_fd);
+            if (version) {
+                std::cout << "检查DRM设备 " << drm_devices[i] << ": 驱动=" << version->name << std::endl;
+                if (strcmp(version->name, "nvidia-drm") == 0) {
+                    std::cout << "找到nvidia-drm设备: " << drm_devices[i] << std::endl;
+                    drmFreeVersion(version);
+                    break;
+                }
+                drmFreeVersion(version);
+            }
+            close(drm_fd);
+            drm_fd = -1;
         }
+    }
+    
+    if (drm_fd < 0) {
+        std::cerr << "无法找到可用的nvidia-drm设备" << std::endl;
+        return config;
     }
     
     std::cout << "开始检测DRM叠加平面..." << std::endl;
