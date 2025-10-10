@@ -747,8 +747,8 @@ else()
     set(ENABLE_CPP_INFERENCE OFF)
 endif()
 
-# 过滤不存在的源文件
-set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${LVGL_FRONTEND_SOURCES} ${CPP_INFERENCE_SOURCES})
+# 过滤不存在的源文件 - 只使用cpp_backend源文件
+set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${WAYLAND_BACKEND_SOURCES})
 set(VALID_SOURCES)
 foreach(src ${ALL_SOURCES})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
@@ -757,6 +757,9 @@ foreach(src ${ALL_SOURCES})
         message(WARNING "Source file not found: ${src}")
     endif()
 endforeach()
+
+# 禁用不存在的组件
+set(ENABLE_CPP_INFERENCE OFF)
 
 # 这个目标定义已在上面合并，删除重复定义
 
@@ -780,7 +783,7 @@ endif()
 # ================================
 # 安装配置
 # ================================
-install(TARGETS bamboo_integrated
+install(TARGETS bamboo_system
     RUNTIME DESTINATION bin
     COMPONENT Runtime
 )
