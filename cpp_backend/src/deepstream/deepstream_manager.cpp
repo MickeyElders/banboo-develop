@@ -618,29 +618,27 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     std::ostringstream pipeline;
     
     // 使用 nvdrmvideosink（DRM叠加平面模式，独立于LVGL显示层）
-    // 添加必要的格式转换以确保兼容性
+    // 使用RGBA格式以确保与nvdrmvideosink的最佳兼容性
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert ! "  // 添加格式转换器
-             << "video/x-raw(memory:NVMM),format=NV12 ! "  // 确保NV12格式
+             << "nvvideoconvert ! "  // 格式转换器
+             << "video/x-raw(memory:NVMM),format=RGBA ! "  // 转换为RGBA格式
              << "nvdrmvideosink ";
              
-    // 如果检测到有效的平面ID，添加平面参数
+    // 使用正确的nvdrmvideosink属性
     if (config.overlay.plane_id != -1) {
-        pipeline << "plane=" << config.overlay.plane_id << " ";  // 使用plane而非plane-id
+        pipeline << "plane-id=" << config.overlay.plane_id << " ";
     }
     
-    // 如果检测到有效的CRTC ID，添加CRTC参数
-    if (config.overlay.crtc_id != -1) {
-        pipeline << "crtc=" << config.overlay.crtc_id << " ";
-    }
-    
-    // 如果检测到有效的连接器ID，添加连接器参数
     if (config.overlay.connector_id != -1) {
-        pipeline << "connector=" << config.overlay.connector_id << " ";
+        pipeline << "conn-id=" << config.overlay.connector_id << " ";
     }
+    
+    // 添加位置参数
+    pipeline << "offset-x=" << offset_x << " "
+             << "offset-y=" << offset_y << " ";
     
     pipeline << "set-mode=false "  // 不设置显示模式，使用现有模式
              << "show-preroll-frame=false "  // 不显示预览帧
@@ -724,20 +722,18 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              
     switch (config.sink_mode) {
         case VideoSinkMode::NVDRMVIDEOSINK:
-            pipeline << "video/x-raw(memory:NVMM),format=NV12 ! "
+            pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
                      << "nvdrmvideosink ";
-            // 如果检测到有效的平面ID，添加平面参数
+            // 使用正确的nvdrmvideosink属性
             if (config.overlay.plane_id != -1) {
-                pipeline << "plane=" << config.overlay.plane_id << " ";  // 使用plane而非plane-id
+                pipeline << "plane-id=" << config.overlay.plane_id << " ";
             }
-            // 如果检测到有效的CRTC ID，添加CRTC参数
-            if (config.overlay.crtc_id != -1) {
-                pipeline << "crtc=" << config.overlay.crtc_id << " ";
-            }
-            // 如果检测到有效的连接器ID，添加连接器参数
             if (config.overlay.connector_id != -1) {
-                pipeline << "connector=" << config.overlay.connector_id << " ";
+                pipeline << "conn-id=" << config.overlay.connector_id << " ";
             }
+            // 添加位置参数
+            pipeline << "offset-x=" << layout.offset_x << " "
+                     << "offset-y=" << layout.offset_y << " ";
             pipeline << "set-mode=false "
                      << "sync=false";
             break;
