@@ -622,12 +622,38 @@ if(ENABLE_WAYLAND)
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(EGL QUIET egl)
         pkg_check_modules(GLES2 QUIET glesv2)
+        pkg_check_modules(WAYLAND_EGL QUIET wayland-egl)
+        
         if(EGL_FOUND AND GLES2_FOUND)
             target_link_libraries(bamboo_system ${EGL_LIBRARIES} ${GLES2_LIBRARIES})
             target_include_directories(bamboo_system PRIVATE ${EGL_INCLUDE_DIRS} ${GLES2_INCLUDE_DIRS})
         endif()
+        
+        # 添加Wayland EGL库支持
+        if(WAYLAND_EGL_FOUND)
+            target_link_libraries(bamboo_system ${WAYLAND_EGL_LIBRARIES})
+            target_include_directories(bamboo_system PRIVATE ${WAYLAND_EGL_INCLUDE_DIRS})
+            message(STATUS "Found Wayland EGL: ${WAYLAND_EGL_VERSION}")
+        else()
+            # 手动查找wayland-egl库
+            find_library(WAYLAND_EGL_LIBRARY wayland-egl
+                PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+            if(WAYLAND_EGL_LIBRARY)
+                target_link_libraries(bamboo_system ${WAYLAND_EGL_LIBRARY})
+                message(STATUS "Found Wayland EGL manually: ${WAYLAND_EGL_LIBRARY}")
+            else()
+                message(WARNING "Wayland EGL library not found - EGL窗口功能将受限")
+            endif()
+        endif()
     else()
         target_link_libraries(bamboo_system ${WAYLAND_LIBRARIES})
+        # 手动查找wayland-egl库
+        find_library(WAYLAND_EGL_LIBRARY wayland-egl
+            PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+        if(WAYLAND_EGL_LIBRARY)
+            target_link_libraries(bamboo_system ${WAYLAND_EGL_LIBRARY})
+            message(STATUS "Found Wayland EGL manually: ${WAYLAND_EGL_LIBRARY}")
+        endif()
     endif()
 endif()
 
