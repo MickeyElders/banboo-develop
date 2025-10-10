@@ -58,7 +58,7 @@ deepstream:
   # nvdrmvideosink配置（DRM叠加平面模式）
   nvdrmvideosink:
     # DRM叠加平面设置
-    plane_id: 44         # 指定叠加平面44
+    plane_id: -1         # -1表示自动检测可用平面
     connector_id: -1      # -1表示自动检测连接器
     crtc_id: -1          # -1表示自动检测CRTC
     z_order: 1           # Z轴层级（1=在LVGL之上，0=在LVGL之下）
