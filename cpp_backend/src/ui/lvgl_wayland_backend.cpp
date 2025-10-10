@@ -302,7 +302,7 @@ bool LVGLWaylandBackend::initializeWaylandConnection() {
 #ifdef ENABLE_WAYLAND
     std::cout << "[LVGLWaylandBackend] 连接Wayland服务器..." << std::endl;
     
-    wl_display_ = static_cast<void*>(wl_display_connect(nullptr));
+    wl_display_ = wl_display_connect(nullptr);
     if (!wl_display_) {
         std::cerr << "[LVGLWaylandBackend] 无法连接到Wayland display" << std::endl;
         return false;
@@ -315,8 +315,8 @@ bool LVGLWaylandBackend::initializeWaylandConnection() {
     }
     
     wl_registry_add_listener(wl_registry_, &registry_listener_, this);
-    wl_display_dispatch(static_cast<struct wl_display*>(wl_display_));
-    wl_display_roundtrip(static_cast<struct wl_display*>(wl_display_));
+    wl_display_dispatch(wl_display_);
+    wl_display_roundtrip(wl_display_);
     
     if (!wl_compositor_ || !wl_shell_) {
         std::cerr << "[LVGLWaylandBackend] 缺少必要的Wayland协议支持" << std::endl;
@@ -335,13 +335,13 @@ bool LVGLWaylandBackend::createWaylandSurface() {
 #ifdef ENABLE_WAYLAND
     std::cout << "[LVGLWaylandBackend] 创建Wayland surface..." << std::endl;
     
-    wl_surface_ = static_cast<void*>(wl_compositor_create_surface(static_cast<struct wl_compositor*>(wl_compositor_)));
+    wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
         std::cerr << "[LVGLWaylandBackend] 无法创建Wayland surface" << std::endl;
         return false;
     }
     
-    wl_shell_surface_ = wl_shell_get_shell_surface(wl_shell_, static_cast<struct wl_surface*>(wl_surface_));
+    wl_shell_surface_ = wl_shell_get_shell_surface(wl_shell_, wl_surface_);
     if (!wl_shell_surface_) {
         std::cerr << "[LVGLWaylandBackend] 无法创建shell surface" << std::endl;
         return false;
@@ -486,15 +486,15 @@ void LVGLWaylandBackend::flushDisplay(const void* area, const uint8_t* color_map
     eglSwapBuffers(egl_display_, egl_surface_);
     
     // 提交Wayland surface
-    wl_surface_commit(static_cast<struct wl_surface*>(wl_surface_));
+    wl_surface_commit(wl_surface_);
 #endif
 }
 
 void LVGLWaylandBackend::handleWaylandEvents() {
 #ifdef ENABLE_WAYLAND
     if (wl_display_) {
-        wl_display_dispatch_pending(static_cast<struct wl_display*>(wl_display_));
-        wl_display_flush(static_cast<struct wl_display*>(wl_display_));
+        wl_display_dispatch_pending(wl_display_);
+        wl_display_flush(wl_display_);
     }
 #endif
 }
@@ -536,19 +536,19 @@ void LVGLWaylandBackend::cleanup() {
         wl_shell_surface_destroy(wl_shell_surface_);
     }
     if (wl_surface_) {
-        wl_surface_destroy(static_cast<struct wl_surface*>(wl_surface_));
+        wl_surface_destroy(wl_surface_);
     }
     if (wl_shell_) {
         wl_shell_destroy(wl_shell_);
     }
     if (wl_compositor_) {
-        wl_compositor_destroy(static_cast<struct wl_compositor*>(wl_compositor_));
+        wl_compositor_destroy(wl_compositor_);
     }
     if (wl_registry_) {
         wl_registry_destroy(wl_registry_);
     }
     if (wl_display_) {
-        wl_display_disconnect(static_cast<struct wl_display*>(wl_display_));
+        wl_display_disconnect(wl_display_);
     }
 #endif
 
