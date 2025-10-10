@@ -19,16 +19,6 @@
 #include <lvgl/lvgl.h>
 #endif
 
-// 添加Wayland后端支持
-namespace bamboo_cut {
-namespace ui {
-namespace lvgl_wayland_extension {
-    bool initializeWaylandBackend(LVGLInterface* interface, const LVGLConfig& config);
-    void cleanupWaylandBackend();
-    bool isWaylandBackendAvailable();
-}
-}
-}
 
 namespace bamboo_cut {
 namespace ui {
@@ -503,26 +493,9 @@ void LVGLInterface::uiLoop() {
 }
 
 
-// 新的智能显示初始化方法 - 优先Wayland，回退DRM
+// DRM显示初始化方法
 bool LVGLInterface::initializeWaylandOrDRMDisplay() {
 #ifdef ENABLE_LVGL
-    std::cout << "[LVGLInterface] 智能显示驱动初始化 - 优先Wayland，回退DRM..." << std::endl;
-    
-    // 首先尝试Wayland后端
-    if (lvgl_wayland_extension::isWaylandBackendAvailable()) {
-        std::cout << "[LVGLInterface] 检测到Wayland环境，尝试使用Wayland后端..." << std::endl;
-        
-        if (lvgl_wayland_extension::initializeWaylandBackend(this, config_)) {
-            std::cout << "[LVGLInterface] ✓ Wayland显示驱动初始化成功" << std::endl;
-            return true;
-        } else {
-            std::cout << "[LVGLInterface] ✗ Wayland显示驱动初始化失败，回退到DRM" << std::endl;
-        }
-    } else {
-        std::cout << "[LVGLInterface] Wayland环境不可用，直接使用DRM后端" << std::endl;
-    }
-    
-    // 回退到DRM显示驱动
     std::cout << "[LVGLInterface] 使用DRM显示驱动..." << std::endl;
     return initializeDisplay();
 #else
