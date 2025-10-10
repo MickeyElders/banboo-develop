@@ -677,10 +677,65 @@ bool createFramebuffer(int drm_fd, uint32_t drm_width, uint32_t drm_height,
                       uint32_t& stride, uint32_t& buffer_size);
 
 /**
+ * @brief 检测DRM驱动类型
+ */
+bool detectDRMDriverType(int drm_fd, std::string& driver_name);
+
+/**
  * @brief 设置CRTC模式
  */
 bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
                 drmModeConnector* connector, drmModeModeInfo* mode);
+
+// === NVIDIA-DRM迁移相关函数 ===
+
+/**
+ * @brief 检测DRM驱动类型(无参数版本)
+ * @return 驱动名称字符串 ("nvidia-drm", "tegra-drm", 或 "unknown")
+ */
+std::string detectDRMDriverType();
+
+/**
+ * @brief 运行DRM渲染功能验证测试
+ * @return true 测试通过，false 测试失败
+ *
+ * 该函数执行完整的DRM渲染功能验证，包括：
+ * - 帧缓冲区初始化测试
+ * - 显示输出配置验证
+ * - GPU加速支持检测
+ * - 图形性能基准测试
+ * - 界面元素渲染验证
+ * - 内存优化效果测试
+ */
+bool runDRMRenderTest();
+
+/**
+ * @brief 运行触摸交互功能验证测试
+ * @return true 测试通过，false 测试失败
+ *
+ * 该函数执行完整的触摸交互功能验证，包括：
+ * - 触摸设备检测和识别
+ * - 基础触摸事件响应测试
+ * - 触摸坐标映射验证
+ * - 触摸响应延迟测试
+ * - 多点触控支持检测
+ * - LVGL界面交互验证
+ */
+bool runTouchInteractionTest();
+
+/**
+ * @brief 运行界面元素显示效果验证测试
+ * @return true 测试通过，false 测试失败
+ *
+ * 该函数执行完整的界面显示效果验证，包括：
+ * - 色彩准确性和色域测试
+ * - 字体渲染清晰度测试
+ * - 控件布局对齐验证
+ * - 动画效果流畅性测试
+ * - 整体视觉质量评估
+ * - NVIDIA-DRM特定优化验证
+ */
+bool runInterfaceDisplayTest();
 
 } // namespace ui
 } // namespace bamboo_cut
