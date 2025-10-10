@@ -506,30 +506,14 @@ endif()
 # 源文件收集
 # ================================
 
-# C++后端源文件 - 基于原有CMakeLists.txt的精确配置
-# 确保Logger实现文件被正确包含
+# C++后端源文件 - 仅包含实际存在的文件
 set(CPP_BACKEND_SOURCES
     cpp_backend/src/utils/logger.cpp
-    cpp_backend/src/core/system_utils.cpp
     cpp_backend/src/core/bamboo_system.cpp
     cpp_backend/src/core/data_bridge.cpp
     cpp_backend/src/vision/stereo_vision.cpp
-    cpp_backend/src/vision/detector.cpp
-    cpp_backend/src/vision/camera_manager.cpp
-    cpp_backend/src/vision/shared_memory_manager.cpp
-    cpp_backend/src/vision/optimized_detector.cpp
-    cpp_backend/src/vision/nam_attention.cpp
-    cpp_backend/src/vision/ghost_conv.cpp
-    cpp_backend/src/vision/vov_gscsp.cpp
-    cpp_backend/src/vision/sahi_slicing.cpp
-    cpp_backend/src/vision/wise_iou.cpp
-    cpp_backend/src/vision/tensorrt_engine.cpp
-    cpp_backend/src/vision/deepstream_pipeline.cpp
-    cpp_backend/src/communication/modbus_server.cpp
-    cpp_backend/src/communication/tcp_socket_server.cpp
     cpp_backend/src/communication/modbus_interface.cpp
     cpp_backend/src/inference/bamboo_detector.cpp
-    cpp_backend/src/inference/ghost_conv.cpp
     cpp_backend/src/deepstream/deepstream_manager.cpp
     cpp_backend/src/ui/lvgl_interface.cpp
     cpp_backend/src/ui/lvgl_updates.cpp
@@ -556,7 +540,7 @@ if(ENABLE_WAYLAND)
 endif()
 
 # 过滤不存在的源文件
-set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${WAYLAND_BACKEND_SOURCES} ${LVGL_FRONTEND_SOURCES} ${CPP_INFERENCE_SOURCES})
+set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${WAYLAND_BACKEND_SOURCES})
 set(VALID_SOURCES)
 foreach(src ${ALL_SOURCES})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
@@ -566,8 +550,16 @@ foreach(src ${ALL_SOURCES})
     endif()
 endforeach()
 
+# ================================
+# 主程序 - 一体化可执行文件
+# ================================
+add_executable(bamboo_system
+    integrated_main.cpp
+    ${VALID_SOURCES}
+)
+
 # 编译定义
-target_compile_definitions(bamboo_integrated PRIVATE
+target_compile_definitions(bamboo_system PRIVATE
     INTEGRATED_BUILD=1
     LV_CONF_INCLUDE_SIMPLE=1
     USE_FRAMEBUFFER
@@ -578,18 +570,17 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
     $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
     $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
-    $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
     $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
     $<$<BOOL:${ENABLE_WAYLAND}>:ENABLE_WAYLAND>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(bamboo_integrated PRIVATE DEBUG=1)
+    target_compile_definitions(bamboo_system PRIVATE DEBUG=1)
 endif()
 
 # 链接库
-target_link_libraries(bamboo_integrated
+target_link_libraries(bamboo_system
     ${OpenCV_LIBS}
     ${GSTREAMER_LIBRARIES}
     ${GSTREAMER_APP_LIBRARIES}
@@ -602,60 +593,62 @@ target_link_libraries(bamboo_integrated
 
 # 条件链接库
 if(ENABLE_CUDA)
-    target_link_libraries(bamboo_integrated ${CUDA_LIBRARIES})
+    target_link_libraries(bamboo_system ${CUDA_LIBRARIES})
 endif()
 
 if(ENABLE_TENSORRT)
-    target_link_libraries(bamboo_integrated ${TENSORRT_LIBRARIES})
+    target_link_libraries(bamboo_system ${TENSORRT_LIBRARIES})
 endif()
 
 if(ENABLE_MODBUS)
-    target_link_libraries(bamboo_integrated ${MODBUS_LIBRARY})
+    target_link_libraries(bamboo_system ${MODBUS_LIBRARY})
 endif()
 
 if(ENABLE_JSON)
-    target_link_libraries(bamboo_integrated nlohmann_json::nlohmann_json)
+    target_link_libraries(bamboo_system nlohmann_json::nlohmann_json)
 endif()
 
 if(ENABLE_DRM)
-    target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
+    target_link_libraries(bamboo_system ${DRM_LIBRARIES})
 endif()
 
 if(ENABLE_WAYLAND)
     # 添加Wayland编译定义
-    target_compile_definitions(bamboo_integrated PRIVATE ENABLE_WAYLAND)
+    target_compile_definitions(bamboo_system PRIVATE ENABLE_WAYLAND)
     
     if(WAYLAND_SERVER_FOUND AND WAYLAND_CLIENT_FOUND)
-        target_link_libraries(bamboo_integrated ${WAYLAND_SERVER_LIBRARIES} ${WAYLAND_CLIENT_LIBRARIES})
+        target_link_libraries(bamboo_system ${WAYLAND_SERVER_LIBRARIES} ${WAYLAND_CLIENT_LIBRARIES})
         # 添加EGL和OpenGL ES支持
         find_package(PkgConfig REQUIRED)
-        pkg_check_modules(EGL REQUIRED egl)
-        pkg_check_modules(GLES2 REQUIRED glesv2)
-        target_link_libraries(bamboo_integrated ${EGL_LIBRARIES} ${GLES2_LIBRARIES})
-        target_include_directories(bamboo_integrated PRIVATE ${EGL_INCLUDE_DIRS} ${GLES2_INCLUDE_DIRS})
+        pkg_check_modules(EGL QUIET egl)
+        pkg_check_modules(GLES2 QUIET glesv2)
+        if(EGL_FOUND AND GLES2_FOUND)
+            target_link_libraries(bamboo_system ${EGL_LIBRARIES} ${GLES2_LIBRARIES})
+            target_include_directories(bamboo_system PRIVATE ${EGL_INCLUDE_DIRS} ${GLES2_INCLUDE_DIRS})
+        endif()
     else()
-        target_link_libraries(bamboo_integrated ${WAYLAND_LIBRARIES})
+        target_link_libraries(bamboo_system ${WAYLAND_LIBRARIES})
     endif()
 endif()
 
 # LVGL库 - 确保正确链接
 if(ENABLE_LVGL)
     if(TARGET lvgl)
-        target_link_libraries(bamboo_integrated lvgl)
-        message(STATUS "Linking LVGL library to bamboo_integrated")
+        target_link_libraries(bamboo_system lvgl)
+        message(STATUS "Linking LVGL library to bamboo_system")
     elseif(TARGET lvgl::lvgl)
-        target_link_libraries(bamboo_integrated lvgl::lvgl)
-        message(STATUS "Linking LVGL namespace library to bamboo_integrated")
+        target_link_libraries(bamboo_system lvgl::lvgl)
+        message(STATUS "Linking LVGL namespace library to bamboo_system")
     elseif(LVGL_FOUND AND LVGL_LIBRARIES)
         # 使用pkg-config找到的LVGL库
-        target_link_libraries(bamboo_integrated ${LVGL_LIBRARIES})
+        target_link_libraries(bamboo_system ${LVGL_LIBRARIES})
         message(STATUS "Linking pkg-config LVGL libraries: ${LVGL_LIBRARIES}")
     else()
         # 查找已安装的LVGL
         find_package(lvgl QUIET)
         if(lvgl_FOUND)
-            target_link_libraries(bamboo_integrated lvgl::lvgl)
-            message(STATUS "Linking system LVGL library to bamboo_integrated")
+            target_link_libraries(bamboo_system lvgl::lvgl)
+            message(STATUS "Linking system LVGL library to bamboo_system")
         else()
             message(WARNING "LVGL library not found for linking")
             set(ENABLE_LVGL OFF)
@@ -765,97 +758,7 @@ foreach(src ${ALL_SOURCES})
     endif()
 endforeach()
 
-# ================================
-# 主程序 - 一体化可执行文件
-# ================================
-add_executable(bamboo_integrated
-    integrated_main.cpp
-    ${VALID_SOURCES}
-)
-
-# 确保只有我们的主程序是默认构建目标
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bamboo_integrated)
-
-# 编译定义
-target_compile_definitions(bamboo_integrated PRIVATE
-    INTEGRATED_BUILD=1
-    LV_CONF_INCLUDE_SIMPLE=1
-    USE_FRAMEBUFFER
-    $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
-    $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
-    $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
-    $<$<BOOL:${ENABLE_JSON}>:ENABLE_JSON>
-    $<$<BOOL:${ENABLE_OPENCV}>:ENABLE_OPENCV>
-    $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
-    $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
-    $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
-    $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
-    $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
-)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(bamboo_integrated PRIVATE DEBUG=1)
-endif()
-
-# 链接库
-target_link_libraries(bamboo_integrated 
-    ${OpenCV_LIBS}
-    ${GSTREAMER_LIBRARIES}
-    ${GSTREAMER_APP_LIBRARIES}
-    ${GSTREAMER_VIDEO_LIBRARIES}
-    Threads::Threads
-    pthread
-    dl
-    m
-)
-
-# 条件链接库
-if(ENABLE_CUDA)
-    target_link_libraries(bamboo_integrated ${CUDA_LIBRARIES})
-endif()
-
-if(ENABLE_TENSORRT)
-    target_link_libraries(bamboo_integrated ${TENSORRT_LIBRARIES})
-endif()
-
-if(ENABLE_MODBUS)
-    target_link_libraries(bamboo_integrated ${MODBUS_LIBRARY})
-endif()
-
-if(ENABLE_JSON)
-    target_link_libraries(bamboo_integrated nlohmann_json::nlohmann_json)
-endif()
-
-if(ENABLE_DRM)
-    target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
-endif()
-
-# LVGL库 - 确保正确链接
-if(ENABLE_LVGL)
-    if(TARGET lvgl)
-        target_link_libraries(bamboo_integrated lvgl)
-        message(STATUS "Linking LVGL library to bamboo_integrated")
-    elseif(TARGET lvgl::lvgl)
-        target_link_libraries(bamboo_integrated lvgl::lvgl)
-        message(STATUS "Linking LVGL namespace library to bamboo_integrated")
-    elseif(LVGL_FOUND AND LVGL_LIBRARIES)
-        # 使用pkg-config找到的LVGL库
-        target_link_libraries(bamboo_integrated ${LVGL_LIBRARIES})
-        message(STATUS "Linking pkg-config LVGL libraries: ${LVGL_LIBRARIES}")
-    else()
-        # 查找已安装的LVGL
-        find_package(lvgl QUIET)
-        if(lvgl_FOUND)
-            target_link_libraries(bamboo_integrated lvgl::lvgl)
-            message(STATUS "Linking system LVGL library to bamboo_integrated")
-        else()
-            message(WARNING "LVGL library not found for linking")
-            set(ENABLE_LVGL OFF)
-        endif()
-    endif()
-else()
-    message(WARNING "LVGL not available for linking")
-endif()
+# 这个目标定义已在上面合并，删除重复定义
 
 
 # ================================
