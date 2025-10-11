@@ -1224,7 +1224,7 @@ void DeepStreamManager::canvasUpdateLoop() {
                     }
                     
                     // 获取canvas缓冲区并更新
-                    lv_img_dsc_t* canvas_dsc = lv_canvas_get_img(canvas);
+                    lv_img_dsc_t* canvas_dsc = lv_canvas_get_image(canvas);
                     if (canvas_dsc && canvas_dsc->data) {
                         // 复制像素数据到canvas缓冲区
                         const size_t pixel_count = 960 * 640;
