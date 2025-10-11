@@ -1003,9 +1003,12 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 添加颜色空间转换和缩放，确保与LVGL像素格式对齐
+    // 添加颜色空间转换和缩放，使用更兼容的格式流程
     pipeline << "videoconvert ! "
+             << "video/x-raw,format=BGRx ! "    // 先转换为BGRx格式
              << "videoscale ! "
+             << "video/x-raw,format=BGRx,width=" << width << ",height=" << height << " ! "
+             << "videoconvert ! "               // 再转换为目标格式
              << "video/x-raw,format=" << config.target_pixel_format
              << ",width=" << width << ",height=" << height << " ! "
              << "queue "
