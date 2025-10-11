@@ -1130,42 +1130,32 @@ void DeepStreamManager::cleanup() {
 }
 
 // 新增：构建摄像头源字符串
-// 🔧 修复：使用摄像头原生分辨率然后缩放
+// 🔧 修复：回到使用nvarguscamerasrc，因为GBM共享DRM资源后不再有冲突
 std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config) {
     std::ostringstream source;
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
+            // 🔧 关键修复：回到使用nvarguscamerasrc Argus驱动
+            std::cout << "🔧 配置nvarguscamerasrc Argus驱动摄像头..." << std::endl;
+            
+            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "! video/x-raw(memory:NVMM)"
+                   << ",width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",format=NV12";
+            break;
+            
         case CameraSourceMode::V4L2SRC:
-            // 🔧 关键修复：使用摄像头原生分辨率，避免不支持的分辨率
-            std::cout << "🔧 配置摄像头原生分辨率处理管道..." << std::endl;
-            
-            // 尝试常见的摄像头原生分辨率，让v4l2src自动协商
+            // 保留v4l2src作为备用方案
+            std::cout << "🔧 配置v4l2src备用方案..." << std::endl;
             source << "v4l2src device=/dev/video" << config.camera_id << " "
-                   << "io-mode=2 ";  // MMAP 模式
-            
-            // 检查摄像头是否支持Bayer格式
-            std::cout << "🔍 尝试检测摄像头支持的格式..." << std::endl;
-            
-            // 首先尝试RGB原生格式（大多数USB摄像头）
-            source << "! video/x-raw ";
-            
-            // 如果摄像头支持常见分辨率，让GStreamer自动协商
-            // 不强制指定分辨率，让摄像头使用原生分辨率
-            if (config.camera_width == 1280 && config.camera_height == 720) {
-                // 如果配置是720p，尝试原生1920x1080然后缩放
-                std::cout << "📹 尝试使用1080p原生分辨率..." << std::endl;
-                source << ",width=1920,height=1080";
-            } else if (config.camera_width == 960 && config.camera_height == 640) {
-                // 如果配置是自定义分辨率，使用最接近的标准分辨率
-                std::cout << "📹 使用720p原生分辨率并缩放到960x640..." << std::endl;
-                source << ",width=1280,height=720";
-            } else {
-                // 其他情况，让摄像头自动选择
-                std::cout << "📹 让摄像头自动选择最佳分辨率..." << std::endl;
-            }
-            
-            source << ",framerate=" << config.camera_fps << "/1";
+                   << "io-mode=2 "
+                   << "! video/x-raw"
+                   << ",width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1";
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
@@ -1174,33 +1164,36 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
                    << ",framerate=" << config.camera_fps << "/1"
-                   << ",format=RGB";
+                   << ",format=NV12";
             break;
             
         case CameraSourceMode::FILESRC:
             source << "filesrc location=" << config.video_file_path << " "
                    << "! decodebin "
-                   << "! videoconvert "
-                   << "! video/x-raw"
+                   << "! nvvideoconvert "
+                   << "! video/x-raw(memory:NVMM)"
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
                    << ",framerate=" << config.camera_fps << "/1"
-                   << ",format=RGB";
+                   << ",format=NV12";
             break;
             
         default:
-            // 备用方案：使用v4l2src自动协商
-            std::cout << "⚠️ 使用v4l2src自动协商方案..." << std::endl;
-            source << "v4l2src device=/dev/video" << config.camera_id << " "
-                   << "io-mode=2 "
-                   << "! video/x-raw";
+            // 默认使用nvarguscamerasrc
+            std::cout << "⚠️ 使用默认nvarguscamerasrc方案..." << std::endl;
+            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "! video/x-raw(memory:NVMM)"
+                   << ",width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",format=NV12";
             break;
     }
     
     return source.str();
 }
 
-// 新增：构建KMSSink管道 - 解决多层显示冲突
+// 新增：构建KMSSink管道 - 使用GBM共享DRM资源的分层显示
 std::string DeepStreamManager::buildKMSSinkPipeline(
     const DeepStreamConfig& config,
     int offset_x,
@@ -1210,15 +1203,15 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 🔧 修复：使用摄像头原生分辨率然后缩放到目标尺寸
-    std::cout << "🔧 构建原生分辨率KMSSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
+    // 🔧 关键修复：使用nvarguscamerasrc + GBM共享DRM资源
+    std::cout << "🔧 构建GBM共享DRM的KMSSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
     
-    // 构建摄像头源（使用原生分辨率）
+    // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 格式转换和缩放
-    pipeline << "videoconvert ! "  // 统一转换为标准格式
-             << "videoscale ! "    // 缩放到目标尺寸
+    // NVMM格式转换和缩放
+    pipeline << "nvvideoconvert ! "  // NVMM -> 标准格式转换
+             << "videoscale ! "      // 缩放到目标尺寸
              << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
@@ -1227,28 +1220,28 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
              << "leaky=downstream "
              << "! ";
     
-    // 🔧 关键修复：使用检测到的特定overlay plane，避免与LVGL的primary plane冲突
+    // 🔧 关键修复：使用GBM后端提供的overlay plane，实现真正的分层显示
     if (config_.overlay.plane_id > 0) {
-        std::cout << "🎯 使用检测到的overlay plane: " << config_.overlay.plane_id << std::endl;
+        std::cout << "🎯 使用GBM共享的overlay plane: " << config_.overlay.plane_id << std::endl;
         pipeline << "kmssink "
-                 << "plane-id=" << config_.overlay.plane_id << " "     // 使用特定overlay plane
-                 << "connector-id=" << config_.overlay.connector_id << " " // 使用检测到的connector
-                 << "force-modesetting=false " // 不强制设置模式，避免干扰LVGL
+                 << "plane-id=" << config_.overlay.plane_id << " "     // 使用GBM分配的overlay plane
+                 << "connector-id=" << config_.overlay.connector_id << " " // 使用GBM共享的connector
+                 << "force-modesetting=false " // 不改变显示模式，LVGL已通过GBM设置
                  << "can-scale=true "          // 启用硬件缩放
                  << "sync=false "              // 低延迟模式
-                 << "restore-crtc=false";      // 不恢复CRTC，保持LVGL控制
+                 << "restore-crtc=false";      // 不恢复CRTC，保持GBM管理
     } else {
-        std::cout << "⚠️  未检测到overlay plane，使用自动检测模式（可能冲突）" << std::endl;
+        std::cout << "⚠️  GBM后端未提供overlay plane，使用默认配置" << std::endl;
         pipeline << "kmssink "
                  << "connector-id=-1 "         // 自动检测连接器
-                 << "plane-id=-1 "             // 自动检测平面（高风险）
+                 << "plane-id=-1 "             // 自动检测平面
                  << "force-modesetting=false " // 不强制设置模式
                  << "can-scale=true "          // 启用硬件缩放
                  << "sync=false "              // 低延迟模式
-                 << "restore-crtc=true";       // 退出时恢复CRTC状态
+                 << "restore-crtc=false";      // 不恢复CRTC，保持GBM管理
     }
     
-    std::cout << "🔧 构建原生分辨率KMSSink管道 (智能overlay plane选择): " << pipeline.str() << std::endl;
+    std::cout << "🔧 构建GBM共享DRM的KMSSink管道: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
