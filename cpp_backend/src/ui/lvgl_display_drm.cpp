@@ -671,19 +671,29 @@ bool createFramebuffer(int drm_fd, uint32_t width, uint32_t height,
 bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
                 drmModeConnector* connector, drmModeModeInfo* mode) {
 #ifdef ENABLE_LVGL
-    // 🔧 修复DRM独占问题：不设置CRTC模式，只创建framebuffer
-    // 让系统保持现有的CRTC配置，避免与GStreamer冲突
-    std::cout << "[DRM] 跳过CRTC模式设置，避免与GStreamer冲突" << std::endl;
+    // 🔧 恢复LVGL独占DRM模式 - 用户反馈需要完整的DRM控制才能渲染
+    std::cout << "[DRM] 设置CRTC模式以启用LVGL渲染" << std::endl;
     std::cout << "[DRM] CRTC ID: " << crtc->crtc_id << ", FB ID: " << fb_id << std::endl;
     
-    // 不调用 drmModeSetCrtc，避免独占CRTC
-    // int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0,
-    //                         &connector->connector_id, 1, mode);
+    // 恢复完整的CRTC模式设置，让LVGL独占显示控制
+    int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0,
+                            &connector->connector_id, 1, mode);
     
-    std::cout << "[DRM] DRM framebuffer创建成功（共享模式）" << std::endl;
+    if (ret != 0) {
+        std::cerr << "[DRM] 设置CRTC模式失败: " << strerror(errno) << std::endl;
+        return false;
+    }
     
-    // 不强制刷新显示，避免干扰现有显示状态
-    // drmModePageFlip(drm_fd, crtc->crtc_id, fb_id, 0, nullptr);
+    std::cout << "[DRM] CRTC模式设置成功，LVGL获得显示控制权" << std::endl;
+    
+    // 执行初始页面翻转以激活显示
+    ret = drmModePageFlip(drm_fd, crtc->crtc_id, fb_id, 0, nullptr);
+    if (ret != 0) {
+        std::cout << "[DRM] 初始页面翻转失败（非致命）: " << strerror(errno) << std::endl;
+        // 页面翻转失败不影响基本功能
+    } else {
+        std::cout << "[DRM] 初始页面翻转成功" << std::endl;
+    }
     
     return true;
 #else
