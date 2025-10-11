@@ -370,6 +370,10 @@ private:
     std::thread canvas_update_thread_;          // Canvas更新线程
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
     
+    // 🔧 线程安全保护
+    mutable std::mutex drm_mutex_;      // DRM资源访问互斥锁
+    mutable std::mutex pipeline_mutex_; // GStreamer管道操作互斥锁
+    
     bool running_;
     bool initialized_;
 };

@@ -141,132 +141,222 @@ bool DeepStreamManager::start() {
 }
 
 bool DeepStreamManager::startSinglePipelineMode() {
+    std::lock_guard<std::mutex> lock(pipeline_mutex_);  // 🔧 线程安全保护
+    
     const int MAX_RETRIES = 3;
-    const int RETRY_DELAY_MS = 3000;  // 增加重试延迟到2秒
+    const int RETRY_DELAY_MS = 3000;
     
     // 等待LVGL完全初始化后再启动DeepStream
     std::cout << "等待LVGL完全初始化..." << std::endl;
     
-    if (lvgl_interface_) {
-        auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
-        int wait_count = 0;
-        const int MAX_WAIT_SECONDS = 10;
-        
-        while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            wait_count++;
-            std::cout << "等待LVGL初始化完成... (" << (wait_count * 0.5) << "秒)" << std::endl;
-        }
-        
-        if (lvgl_if->isFullyInitialized()) {
-            std::cout << "✅ LVGL已完全初始化，继续启动DeepStream管道" << std::endl;
+    try {
+        if (lvgl_interface_) {
+            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
+            int wait_count = 0;
+            const int MAX_WAIT_SECONDS = 10;
+            
+            while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                wait_count++;
+                std::cout << "等待LVGL初始化完成... (" << (wait_count * 0.5) << "秒)" << std::endl;
+            }
+            
+            if (lvgl_if->isFullyInitialized()) {
+                std::cout << "✅ LVGL已完全初始化，继续启动DeepStream管道" << std::endl;
+            } else {
+                std::cout << "⚠️ 警告：LVGL初始化超时，继续启动DeepStream管道" << std::endl;
+            }
         } else {
-            std::cout << "⚠️ 警告：LVGL初始化超时，继续启动DeepStream管道" << std::endl;
-        }
-    } else {
-        std::cout << "警告：LVGL接口不可用，使用固定延迟" << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-    }
-    
-    for (int retry = 0; retry < MAX_RETRIES; retry++) {
-        if (retry > 0) {
-            std::cout << "重试启动管道 (第" << retry + 1 << "次尝试)..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+            std::cout << "警告：LVGL接口不可用，使用固定延迟" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(3000));
         }
         
-        // 构建管道
-        std::string pipeline_str = buildPipeline(config_, video_layout_);
-        std::cout << "管道字符串: " << pipeline_str << std::endl;
-        
-        // 创建管道
-        GError *error = nullptr;
-        pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
-        
-        if (!pipeline_ || error) {
-            std::cerr << "创建管道失败: " << (error ? error->message : "未知错误") << std::endl;
-            if (error) g_error_free(error);
-            if (retry < MAX_RETRIES - 1) continue;
-            return false;
-        }
-        
-        // 检查NVMM缓冲区可用性
-        if (!checkNVMMBufferAvailability()) {
-            std::cout << "NVMM缓冲区检查失败，等待释放..." << std::endl;
+        for (int retry = 0; retry < MAX_RETRIES; retry++) {
+            if (retry > 0) {
+                std::cout << "重试启动管道 (第" << retry + 1 << "次尝试)..." << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+            }
+            
+            // 🔧 新增：清理之前的管道状态
             if (pipeline_) {
+                gst_element_set_state(pipeline_, GST_STATE_NULL);
                 gst_object_unref(pipeline_);
                 pipeline_ = nullptr;
             }
-            if (retry < MAX_RETRIES - 1) continue;
-        }
-        
-        // 设置消息总线
-        bus_ = gst_element_get_bus(pipeline_);
-        bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
-        
-        // 启动管道 - 添加详细错误诊断和重试机制，增加Argus超时处理
-        std::cout << "正在设置管道状态为PLAYING..." << std::endl;
-        GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
-        
-        if (ret == GST_STATE_CHANGE_FAILURE) {
-            std::cerr << "启动管道失败，进行错误诊断..." << std::endl;
             
-            // 获取详细错误信息
-            GstBus* bus = gst_element_get_bus(pipeline_);
-            GstMessage* msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
-                static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
-                
-            if (msg) {
-                GError* err;
-                gchar* debug_info;
-                gst_message_parse_error(msg, &err, &debug_info);
-                std::cerr << "GStreamer错误: " << err->message << std::endl;
-                if (debug_info) {
-                    std::cerr << "调试信息: " << debug_info << std::endl;
-                    
-                    // 检查是否为NVMM相关错误或Argus超时
-                    if (strstr(debug_info, "NvBuffer") || strstr(debug_info, "NVMM") ||
-                        strstr(debug_info, "Argus") || strstr(debug_info, "Timeout")) {
-                        std::cout << "检测到NVMM/Argus缓冲区错误，等待更长时间后重试..." << std::endl;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(5000));  // 额外等待5秒
-                    }
-                    g_free(debug_info);
-                }
-                g_error_free(err);
-                gst_message_unref(msg);
+            // 构建管道
+            std::string pipeline_str = buildPipeline(config_, video_layout_);
+            std::cout << "管道字符串: " << pipeline_str << std::endl;
+            
+            // 🔧 新增：验证管道字符串有效性
+            if (pipeline_str.empty()) {
+                std::cerr << "❌ 管道字符串为空，配置错误" << std::endl;
+                return false;
             }
-            gst_object_unref(bus);
             
-            cleanup();
-            if (retry < MAX_RETRIES - 1) continue;
-            return false;
-        } else if (ret == GST_STATE_CHANGE_ASYNC) {
-            std::cout << "管道异步启动中，等待状态变化..." << std::endl;
-            // 大幅增加超时时间，给NVMM/Argus缓冲区分配更多时间
-            GstState state;
-            ret = gst_element_get_state(pipeline_, &state, NULL, 30 * GST_SECOND);  // 增加到30秒
+            // 创建管道
+            GError *error = nullptr;
+            pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
+            
+            if (!pipeline_ || error) {
+                std::cerr << "创建管道失败: " << (error ? error->message : "未知错误") << std::endl;
+                if (error) {
+                    g_error_free(error);
+                    error = nullptr;
+                }
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            }
+            
+            // 检查NVMM缓冲区可用性
+            if (!checkNVMMBufferAvailability()) {
+                std::cout << "NVMM缓冲区检查失败，等待释放..." << std::endl;
+                if (pipeline_) {
+                    gst_element_set_state(pipeline_, GST_STATE_NULL);
+                    gst_object_unref(pipeline_);
+                    pipeline_ = nullptr;
+                }
+                if (retry < MAX_RETRIES - 1) continue;
+            }
+            
+            // 🔧 新增：验证关键元素存在
+            if (config_.sink_mode == VideoSinkMode::KMSSINK) {
+                GstElement* kmssink = gst_bin_get_by_name(GST_BIN(pipeline_), "kmssink0");
+                if (!kmssink) {
+                    std::cerr << "❌ 无法找到kmssink元素" << std::endl;
+                    if (retry < MAX_RETRIES - 1) continue;
+                    return false;
+                } else {
+                    gst_object_unref(kmssink);
+                }
+            }
+            
+            // 设置消息总线
+            bus_ = gst_element_get_bus(pipeline_);
+            if (!bus_) {
+                std::cerr << "❌ 无法获取消息总线" << std::endl;
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            }
+            bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
+            
+            // 🔧 改进：分阶段启动管道，降低段错误风险
+            std::cout << "正在分阶段启动管道..." << std::endl;
+            
+            // 第一阶段：设置为READY状态
+            std::cout << "第一阶段：设置管道为READY状态..." << std::endl;
+            GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_READY);
             if (ret == GST_STATE_CHANGE_FAILURE) {
-                std::cerr << "管道异步启动失败" << std::endl;
+                std::cerr << "❌ READY状态设置失败" << std::endl;
                 cleanup();
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
+            
+            // 等待READY状态稳定
+            GstState state;
+            ret = gst_element_get_state(pipeline_, &state, NULL, 5 * GST_SECOND);
+            if (ret == GST_STATE_CHANGE_FAILURE || state != GST_STATE_READY) {
+                std::cerr << "❌ READY状态等待失败" << std::endl;
+                cleanup();
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            }
+            std::cout << "✅ READY状态设置成功" << std::endl;
+            
+            // 第二阶段：设置为PAUSED状态
+            std::cout << "第二阶段：设置管道为PAUSED状态..." << std::endl;
+            ret = gst_element_set_state(pipeline_, GST_STATE_PAUSED);
+            if (ret == GST_STATE_CHANGE_FAILURE) {
+                std::cerr << "❌ PAUSED状态设置失败" << std::endl;
+                cleanup();
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            }
+            
+            // 等待PAUSED状态稳定
+            ret = gst_element_get_state(pipeline_, &state, NULL, 10 * GST_SECOND);
+            if (ret == GST_STATE_CHANGE_FAILURE) {
+                std::cerr << "❌ PAUSED状态等待失败" << std::endl;
+                cleanup();
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            }
+            std::cout << "✅ PAUSED状态设置成功" << std::endl;
+            
+            // 第三阶段：设置为PLAYING状态
+            std::cout << "第三阶段：设置管道为PLAYING状态..." << std::endl;
+            ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
+            
+            if (ret == GST_STATE_CHANGE_FAILURE) {
+                std::cerr << "启动管道失败，进行错误诊断..." << std::endl;
+                
+                // 获取详细错误信息
+                GstBus* bus = gst_element_get_bus(pipeline_);
+                GstMessage* msg = gst_bus_timed_pop_filtered(bus, 2 * GST_SECOND,
+                    static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
+                    
+                if (msg) {
+                    GError* err;
+                    gchar* debug_info;
+                    gst_message_parse_error(msg, &err, &debug_info);
+                    std::cerr << "GStreamer错误: " << err->message << std::endl;
+                    if (debug_info) {
+                        std::cerr << "调试信息: " << debug_info << std::endl;
+                        
+                        // 检查是否为DRM相关错误
+                        if (strstr(debug_info, "DRM") || strstr(debug_info, "plane") ||
+                            strstr(debug_info, "kmssink") || strstr(debug_info, "CRTC")) {
+                            std::cout << "检测到DRM资源错误，可能是plane冲突..." << std::endl;
+                        }
+                        g_free(debug_info);
+                    }
+                    g_error_free(err);
+                    gst_message_unref(msg);
+                }
+                if (bus) gst_object_unref(bus);
+                
+                cleanup();
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            } else if (ret == GST_STATE_CHANGE_ASYNC) {
+                std::cout << "管道异步启动中，等待状态变化..." << std::endl;
+                ret = gst_element_get_state(pipeline_, &state, NULL, 15 * GST_SECOND);
+                if (ret == GST_STATE_CHANGE_FAILURE) {
+                    std::cerr << "管道异步启动失败" << std::endl;
+                    cleanup();
+                    if (retry < MAX_RETRIES - 1) continue;
+                    return false;
+                }
+            }
+            
+            std::cout << "✅ PLAYING状态设置成功" << std::endl;
+            
+            // 成功启动，跳出重试循环
+            break;
         }
         
-        // 成功启动，跳出重试循环
-        break;
+        running_ = true;
+        const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
+        const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
+        std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL协同工作)" << std::endl;
+        
+        // 如果使用appsink模式，设置回调函数
+        if (config_.sink_mode == VideoSinkMode::APPSINK) {
+            setupAppSinkCallbacks();
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "❌ 管道启动异常: " << e.what() << std::endl;
+        cleanup();
+        return false;
+    } catch (...) {
+        std::cerr << "❌ 管道启动未知异常" << std::endl;
+        cleanup();
+        return false;
     }
-    
-    running_ = true;
-    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
-    const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
-    std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL协同工作)" << std::endl;
-    
-    // 如果使用appsink模式，设置回调函数
-    if (config_.sink_mode == VideoSinkMode::APPSINK) {
-        setupAppSinkCallbacks();
-    }
-    
-    return true;
 }
 
 // 新增：检查NVMM缓冲区可用性
@@ -741,29 +831,42 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
 }
 
 bool DeepStreamManager::setupDRMOverlayPlane() {
+    std::lock_guard<std::mutex> lock(drm_mutex_);  // 🔧 线程安全保护
+    
     std::cout << "🔧 设置DRM叠加平面..." << std::endl;
     
-    // 如果未配置叠加平面，自动检测
-    if (config_.overlay.plane_id == -1) {
-        std::cout << "🔍 执行智能overlay plane检测..." << std::endl;
-        config_.overlay = detectAvailableOverlayPlane();
+    try {
+        // 如果未配置叠加平面，自动检测
         if (config_.overlay.plane_id == -1) {
-            std::cerr << "❌ 未找到可用的DRM叠加平面" << std::endl;
+            std::cout << "🔍 执行智能overlay plane检测..." << std::endl;
+            config_.overlay = detectAvailableOverlayPlane();
+            if (config_.overlay.plane_id == -1) {
+                std::cerr << "❌ 未找到可用的DRM叠加平面" << std::endl;
+                return false;
+            }
+        }
+        
+        // 🔧 新增：验证plane-id有效性
+        if (config_.overlay.plane_id <= 0) {
+            std::cerr << "❌ 无效的plane_id: " << config_.overlay.plane_id << std::endl;
             return false;
         }
+        
+        std::cout << "✅ DRM叠加平面设置完成: plane_id=" << config_.overlay.plane_id
+                  << ", crtc_id=" << config_.overlay.crtc_id
+                  << ", connector_id=" << config_.overlay.connector_id
+                  << ", z_order=" << config_.overlay.z_order << std::endl;
+        
+        // 🔧 新增：验证多层显示配置
+        if (!verifyMultiLayerDisplaySetup()) {
+            std::cout << "⚠️  多层显示验证失败，但继续尝试..." << std::endl;
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "❌ DRM叠加平面设置异常: " << e.what() << std::endl;
+        return false;
     }
-    
-    std::cout << "✅ DRM叠加平面设置完成: plane_id=" << config_.overlay.plane_id
-              << ", crtc_id=" << config_.overlay.crtc_id
-              << ", connector_id=" << config_.overlay.connector_id
-              << ", z_order=" << config_.overlay.z_order << std::endl;
-    
-    // 🔧 新增：验证多层显示配置
-    if (!verifyMultiLayerDisplaySetup()) {
-        std::cout << "⚠️  多层显示验证失败，但继续尝试..." << std::endl;
-    }
-    
-    return true;
 }
 
 // 🔧 新增：验证多层显示设置的函数
