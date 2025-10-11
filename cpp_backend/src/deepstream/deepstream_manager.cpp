@@ -999,20 +999,19 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 使用JetPack 6的硬件加速转换器（正确的分步骤转换）
+    // 🔧 修复：nvvidconv无法输出BGRA格式到系统内存，使用videoconvert
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 对于真实摄像头（NVMM格式），分两步转换：
-        // 第一步：NV12 → RGBA（保持在NVMM硬件加速内存中）
+        // 对于真实摄像头（NVMM格式），使用nvvidconv转换到系统内存，再用videoconvert转换格式
+        // 第一步：nvvidconv转换到系统内存（但保持原格式）
         pipeline << "nvvidconv ! "
-                 << "video/x-raw(memory:NVMM),format=RGBA ! ";
+                 << "video/x-raw ! ";
         
-        // 第二步：RGBA(NVMM) → BGRA（转到系统内存）+ 尺寸调整
-        pipeline << "nvvidconv ! "
-                 << "video/x-raw,format=BGRA ! "
+        // 第二步：使用videoconvert转换到BGRA格式 + 尺寸调整
+        pipeline << "videoconvert ! "
                  << "videoscale ! "
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     } else {
-        // 对于测试源（普通内存），使用软件转换
+        // 对于测试源（普通内存），直接使用软件转换
         pipeline << "videoconvert ! "
                  << "videoscale ! "
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
