@@ -12,6 +12,8 @@
 #include <sys/mman.h>
 #include <cstring>
 #include <cerrno>
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
 
 #ifdef ENABLE_LVGL
 #include <xf86drm.h>
