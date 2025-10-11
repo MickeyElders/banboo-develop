@@ -1004,19 +1004,20 @@ public:
     void run() {
         std::cout << "Starting integrated system..." << std::endl;
         
-        // 🔧 修改启动顺序：先启动推理线程（让GStreamer先占用DRM），再让LVGL启动
-        std::cout << "🔧 采用新的启动顺序：推理线程优先启动..." << std::endl;
+        // 🔧 恢复启动顺序：LVGL优先获得DRM独占控制权
+        std::cout << "🔧 LVGL优先启动，获得DRM独占控制权..." << std::endl;
         
-        // 先启动推理工作线程，让GStreamer优先占用DRM资源
+        std::cout << "等待LVGL完全初始化并获得DRM控制..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(2)); // 给LVGL充足时间获得DRM控制
+        
+        // 然后启动推理工作线程，GStreamer将在appsink模式下工作
+        std::cout << "现在启动推理线程（appsink模式）..." << std::endl;
         if (!inference_worker_->start()) {
             std::cout << "Inference thread startup failed" << std::endl;
             return;
         }
         
-        std::cout << "推理线程已启动，等待GStreamer完全初始化..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(3)); // 给GStreamer充足时间初始化
-        
-        std::cout << "现在启动LVGL主循环..." << std::endl;
+        std::cout << "推理线程已启动，系统完全就绪" << std::endl;
         std::cout << "Press Ctrl+C to exit system" << std::endl;
         
         // 主线程运行UI (阻塞) - LVGL现在是次要的
