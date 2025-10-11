@@ -1377,9 +1377,11 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
         
-        // 🔧 修复：简化nvarguscamerasrc管道，让GStreamer自动协商格式
+        // 🔧 修复：使用两步转换，先nvvidconv转到标准内存，再videoconvert转BGRA
         pipeline << buildCameraSource(config) << " ! "
-                 << "nvvidconv ! "  // NVMM -> 标准内存转换
+                 << "nvvidconv ! "    // NVMM -> 标准内存，保持NV12格式
+                 << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
+                 << "videoconvert ! "  // NV12 -> BGRA格式转换（软件）
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
