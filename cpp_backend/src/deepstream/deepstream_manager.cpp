@@ -951,14 +951,14 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
     bamboo_cut::ui::XvfbManager::setupEnvironment();
     
-    // 🔧 关键修复：nvvidconv输出RGBA，然后通过videoconvert转换为ABGR
+    // 🔧 关键修复：使用BGRA格式，这是AR24在DRM中的实际对应格式
     pipeline << buildCameraSource(config) << " ! "
              << "nvvidconv ! "  // NVMM -> RGBA格式转换和缩放（硬件加速）
              << "video/x-raw(memory:NVMM),format=RGBA,width=" << width << ",height=" << height << " ! "
              << "nvvidconv ! "     // NVMM -> 标准内存转换
              << "video/x-raw,format=RGBA,width=" << width << ",height=" << height << " ! "
-             << "videoconvert ! "  // RGBA -> ABGR格式转换（支持plane-id=44）
-             << "video/x-raw,format=ABGR,width=" << width << ",height=" << height << " ! "  // 使用AR24/ABGR格式
+             << "videoconvert ! "  // RGBA -> BGRA格式转换（AR24对应BGRA）
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "  // 使用AR24/BGRA格式
              << "kmssink "
              << "driver-name=nvidia-drm "     // 使用 nvidia-drm 驱动
              << "plane-id=44 "                // 用户指定的overlay plane，支持AR24
@@ -1220,19 +1220,20 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 关键修复：nvvidconv输出RGBA，然后通过videoconvert转换为ABGR
+    // 🔧 关键修复：使用BGRA格式，这是AR24在DRM中的实际对应格式
     pipeline << "nvvidconv ! "  // NVMM -> RGBA格式转换和缩放（硬件加速）
              << "video/x-raw(memory:NVMM),format=RGBA,width=" << width << ",height=" << height << " ! "
              << "nvvidconv ! "     // NVMM -> 标准内存转换
              << "video/x-raw,format=RGBA,width=" << width << ",height=" << height << " ! "
-             << "videoconvert ! "  // RGBA -> ABGR格式转换（支持plane-id=44）
-             << "video/x-raw,format=ABGR,width=" << width << ",height=" << height << " ! ";
+             << "videoconvert ! "  // RGBA -> BGRA格式转换（AR24对应BGRA）
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度
              << "max-size-time=0 "
              << "leaky=downstream "
-             << "! ";
+             << "! "
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
     // 🔧 关键修复：使用GBM后端提供的overlay plane，实现真正的分层显示
     if (config_.overlay.plane_id > 0) {
