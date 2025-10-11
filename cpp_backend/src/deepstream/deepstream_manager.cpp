@@ -5,6 +5,7 @@
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
 #include "bamboo_cut/ui/lvgl_interface.h"
+#include "bamboo_cut/ui/xvfb_manager.h"
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
@@ -946,20 +947,24 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 先用测试源验证 kmssink
-    pipeline << "videotestsrc pattern=smpte ! "
-             << "video/x-raw,width=" << width
-             << ",height=" << height
-             << ",framerate=" << config.camera_fps << "/1 ! "
-             << "videoconvert ! "
-             << "video/x-raw,format=BGRx ! "  // kmssink 支持的格式
+    // 🔧 修复：配置Xvfb环境以解决nvarguscamerasrc EGL初始化问题
+    std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
+    if (!bamboo_cut::ui::XvfbManager::setupEnvironment()) {
+        std::cout << "⚠️ Xvfb环境设置失败，可能影响nvarguscamerasrc启动" << std::endl;
+    }
+    
+    // 🔧 关键修复：使用真实摄像头源 + AR24格式输出到overlay plane-id=44
+    pipeline << buildCameraSource(config) << " ! "
+             << "nvvidconv ! "  // NVMM -> 标准格式转换（硬件加速）
+             << "video/x-raw,format=ABGR,width=" << width << ",height=" << height << " ! "  // 使用AR24/ABGR格式
              << "kmssink "
              << "driver-name=nvidia-drm "     // 使用 nvidia-drm 驱动
-             << "plane-id=44 "                // overlay plane
-             << "connector-id=63 "            // 从检测中获取的 connector
+             << "plane-id=44 "                // 用户指定的overlay plane，支持AR24
+             << "connector-id=-1 "            // 自动检测连接器
              << "can-scale=true "             // 启用缩放支持
              << "force-modesetting=false "    // 不改变显示模式
-             << "sync=false";                 // 降低延迟
+             << "sync=false "                 // 降低延迟
+             << "restore-crtc=false";         // 不恢复CRTC
     
     return pipeline.str();
 }
@@ -1203,15 +1208,21 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::ostringstream pipeline;
     
+    // 🔧 修复：配置Xvfb环境以解决nvarguscamerasrc EGL初始化问题
+    std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
+    if (!bamboo_cut::ui::XvfbManager::setupEnvironment()) {
+        std::cout << "⚠️ Xvfb环境设置失败，可能影响nvarguscamerasrc启动" << std::endl;
+    }
+    
     // 🔧 关键修复：使用nvarguscamerasrc + GBM共享DRM资源
     std::cout << "🔧 构建GBM共享DRM的KMSSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
     
     // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // NVMM格式转换和缩放 - 使用nvvidconv统一处理
+    // 🔧 关键修复：使用AR24/ABGR格式，与plane-id=44兼容
     pipeline << "nvvidconv ! "  // NVMM -> 标准格式转换和缩放（硬件加速）
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+             << "video/x-raw,format=ABGR,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度
@@ -1231,9 +1242,9 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
                  << "restore-crtc=false";      // 不恢复CRTC，保持GBM管理
     } else {
         std::cout << "⚠️  GBM后端未提供overlay plane，使用用户指定的plane-id=44" << std::endl;
-        // 🔧 修复：直接使用用户指定的overlay plane-id=44，支持NV12格式
+        // 🔧 修复：直接使用用户指定的overlay plane-id=44，支持AR24/ABGR格式
         pipeline << "kmssink "
-                 << "plane-id=44 "             // 用户指定的overlay plane，支持NV12
+                 << "plane-id=44 "             // 用户指定的overlay plane，支持AR24/ABGR
                  << "connector-id=-1 "         // 自动检测连接器
                  << "force-modesetting=false " // 不强制设置模式
                  << "can-scale=true "          // 启用硬件缩放
