@@ -67,16 +67,6 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
         }
     }
     
-    bool found_sink = false;
-    for (int i = 0; i < 3; i++) {
-        GstElementFactory *factory = gst_element_factory_find(sink_names[i]);
-        if (factory) {
-            std::cout << "✓ 可用: " << sink_descriptions[i] << std::endl;
-            gst_object_unref(factory);
-            found_sink = true;
-        }
-    }
-    
     if (!found_sink) {
         std::cerr << "警告: 未找到合适的视频sink" << std::endl;
     }

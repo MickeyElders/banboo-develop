@@ -7,8 +7,11 @@
 #pragma once
 
 #include <gst/gst.h>
+#include <gst/app/gstappsink.h>
 #include <string>
 #include <memory>
+#include <atomic>
+#include <mutex>
 #include <opencv2/opencv.hpp>
 
 namespace bamboo_cut {

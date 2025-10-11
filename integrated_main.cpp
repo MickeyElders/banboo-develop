@@ -748,10 +748,10 @@ private:
             // 设置视频输出模式为nvdrmvideosink (叠加平面模式)
             std::cout << "配置nvdrmvideosink叠加平面模式..." << std::endl;
             
-            // 设置为nvdrmvideosink模式
-            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::NVDRMVIDEOSINK)) {
-                std::cout << "警告：nvdrmvideosink模式设置失败，尝试回退到kmssink模式" << std::endl;
-                if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::KMSSINK)) {
+            // 设置为appsink软件合成模式（解决CRTC冲突）
+            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::APPSINK)) {
+                std::cout << "警告：appsink模式设置失败，尝试回退到nvdrmvideosink模式" << std::endl;
+                if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::NVDRMVIDEOSINK)) {
                     std::cout << "错误：所有视频输出模式设置都失败" << std::endl;
                     return false;
                 }
@@ -761,7 +761,7 @@ private:
             
             // 显示当前sink模式
             auto current_mode = deepstream_manager_->getCurrentSinkMode();
-            const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+            const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
             std::cout << "当前sink模式: " << mode_names[static_cast<int>(current_mode)] << std::endl;
             return true;
             
