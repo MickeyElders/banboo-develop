@@ -1047,44 +1047,39 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 构建摄像头源
-    pipeline << buildCameraSource(config) << " ! ";
-    
-    // ✅ 修复：nvvidconv只输出RGBA，用videoconvert转BGRA
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 真实摄像头：使用硬件加速转换
-        pipeline << "nvvidconv ! "                               // NVMM NV12 → RGBA
-                 << "video/x-raw,format=RGBA ! "                 // 转到系统内存RGBA
-                 << "videoconvert ! "                            // RGBA → BGRA（软件转换）
-                 << "video/x-raw,format=BGRA ! "
-                 << "videoscale ! "                              // 调整尺寸
-                 << "video/x-raw,format=BGRA,width=" << width 
-                 << ",height=" << height << " ! ";
+        // ✅ 使用相机原生分辨率，避免NVMM缓冲区问题
+        pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                 << "sensor-mode=2 "  // 1920x1080@30fps
+                 << "! video/x-raw(memory:NVMM)"
+                 << ",width=1920,height=1080"
+                 << ",framerate=30/1,format=NV12 "
+                 << "! nvvidconv "  // 硬件缩放 + 格式转换
+                 << "! video/x-raw"
+                 << ",width=" << width << ",height=" << height
+                 << ",format=RGBA "
+                 << "! videoconvert "  // RGBA → BGRA
+                 << "! video/x-raw,format=BGRA ";
     } else {
-        // 测试源：直接使用软件转换
-        pipeline << "videoconvert ! "
+        pipeline << buildCameraSource(config) << " ! "
+                 << "videoconvert ! "
                  << "video/x-raw,format=BGRA ! "
                  << "videoscale ! "
-                 << "video/x-raw,format=BGRA,width=" << width 
-                 << ",height=" << height << " ! ";
+                 << "video/x-raw,format=BGRA"
+                 << ",width=" << width << ",height=" << height << " ";
     }
     
-    pipeline << "queue "
+    pipeline << "! queue "
              << "max-size-buffers=2 "
              << "max-size-time=0 "
              << "leaky=downstream "
-             << "! ";
-    
-    // appsink配置
-    pipeline << "appsink name=video_appsink "
+             << "! appsink name=video_appsink "
              << "emit-signals=true "
              << "sync=false "
              << "max-buffers=2 "
-             << "drop=true "
-             << "caps=video/x-raw,format=BGRA"
-             << ",width=" << width << ",height=" << height;
+             << "drop=true";
     
-    std::cout << "构建AppSink软件合成管道 (LVGL兼容): " << pipeline.str() << std::endl;
+    std::cout << "构建AppSink软件合成管道: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
