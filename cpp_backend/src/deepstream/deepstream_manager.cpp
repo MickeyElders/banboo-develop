@@ -951,9 +951,11 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
     bamboo_cut::ui::XvfbManager::setupEnvironment();
     
-    // 🔧 关键修复：使用真实摄像头源 + AR24格式输出到overlay plane-id=44
+    // 🔧 关键修复：nvvidconv不支持ABGR输出，使用BGRA然后通过videoconvert转换为ABGR
     pipeline << buildCameraSource(config) << " ! "
-             << "nvvidconv ! "  // NVMM -> 标准格式转换（硬件加速）
+             << "nvvidconv ! "  // NVMM -> BGRA格式转换（硬件加速）
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+             << "videoconvert ! "  // BGRA -> ABGR格式转换（支持plane-id=44）
              << "video/x-raw,format=ABGR,width=" << width << ",height=" << height << " ! "  // 使用AR24/ABGR格式
              << "kmssink "
              << "driver-name=nvidia-drm "     // 使用 nvidia-drm 驱动
@@ -1216,8 +1218,10 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 关键修复：使用AR24/ABGR格式，与plane-id=44兼容
-    pipeline << "nvvidconv ! "  // NVMM -> 标准格式转换和缩放（硬件加速）
+    // 🔧 关键修复：nvvidconv不支持ABGR输出，使用BGRA然后通过videoconvert转换为ABGR
+    pipeline << "nvvidconv ! "  // NVMM -> BGRA格式转换和缩放（硬件加速）
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+             << "videoconvert ! "  // BGRA -> ABGR格式转换（支持plane-id=44）
              << "video/x-raw,format=ABGR,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
