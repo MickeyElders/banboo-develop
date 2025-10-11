@@ -1243,12 +1243,16 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
-        // 🔧 使用 v4l2src 绕过 Argus 超时问题，使用自动协商格式
+        // 🔧 关键修复：正确处理Bayer格式（RG10）摄像头
+        std::cout << "🔧 构建Bayer格式AppSink管道..." << std::endl;
         pipeline << "v4l2src device=/dev/video" << config.camera_id << " "
                  << "io-mode=2 "  // MMAP 模式
-                 << "! video/x-raw "  // 移除固定格式，让v4l2src自动协商
-                 // 软件转换：自动格式 -> BGRA
-                 << "! videoconvert "
+                 << "! video/x-bayer,format=rggb10,width=" << config.camera_width
+                 << ",height=" << config.camera_height
+                 << ",framerate=" << config.camera_fps << "/1 "
+                 << "! bayer2rgb "  // Bayer转RGB插件
+                 << "! video/x-raw,format=RGB "
+                 << "! videoconvert "  // RGB -> BGRA转换
                  << "! videoscale "
                  << "! video/x-raw,format=BGRA,width=" << width << ",height=" << height << " "
                  << "! queue max-size-buffers=2 leaky=downstream "
@@ -1264,10 +1268,9 @@ std::string DeepStreamManager::buildAppSinkPipeline(
                  << "! appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=1 drop=false";
     } else {
-        // 其他源
+        // 其他源（使用通用Bayer处理）
         pipeline << buildCameraSource(config) << " ! "
-                 << "videoconvert ! "
-                 << "video/x-raw,format=BGRA ! "
+                 << "videoconvert ! "  // RGB -> BGRA转换
                  << "videoscale ! "
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " "
                  << "! queue max-size-buffers=2 leaky=downstream "
@@ -1275,7 +1278,7 @@ std::string DeepStreamManager::buildAppSinkPipeline(
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
     }
     
-    std::cout << "构建AppSink管道: " << pipeline.str() << std::endl;
+    std::cout << "🔧 构建Bayer处理AppSink管道: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
