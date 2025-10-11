@@ -934,10 +934,8 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 真实摄像头源 - 使用基础兼容属性
+            // 真实摄像头源 - JetPack 6兼容配置
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "bufapi-version=1 "           // 使用版本1 API
-                   << "maxperf=true "                // 启用最大性能模式
                    << "wbmode=0 "                    // 自动白平衡
                    << "aelock=false "                // 自动曝光不锁定
                    << "awblock=false "               // 自动白平衡不锁定
@@ -964,8 +962,7 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             // 文件源
             source << "filesrc location=" << config.video_file_path << " "
                    << "! decodebin "
-                   << "! videoscale "
-                   << "! videoconvert "
+                   << "! nvvidconv "                 // 使用硬件加速转换器
                    << "! video/x-raw"
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
@@ -977,7 +974,7 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             // 默认使用真实摄像头，如果失败回退到测试源
             std::cout << "默认尝试使用真实摄像头源..." << std::endl;
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "bufapi-version=1 maxperf=true wbmode=0 "
+                   << "wbmode=0 "
                    << "! video/x-raw(memory:NVMM)"
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
@@ -1002,11 +999,19 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 添加颜色空间转换和缩放
-    pipeline << "videoconvert ! "
-             << "videoscale ! "
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
-             << "queue "
+    // 使用JetPack 6的硬件加速转换器
+    if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
+        // 对于真实摄像头（NVMM格式），使用nvvidconv硬件加速
+        pipeline << "nvvidconv ! "
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+    } else {
+        // 对于测试源（普通内存），使用软件转换
+        pipeline << "videoconvert ! "
+                 << "videoscale ! "
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+    }
+    
+    pipeline << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度
              << "max-size-time=0 "
              << "leaky=downstream "
@@ -1038,12 +1043,20 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 使用更兼容的格式流程，避免ARGB32兼容性问题
-    pipeline << "videoconvert ! "
-             << "video/x-raw,format=BGRA ! "    // 使用BGRA替代ARGB32
-             << "videoscale ! "
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
-             << "queue "
+    // 使用JetPack 6的硬件加速转换器（NVMM零拷贝）
+    if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
+        // 对于真实摄像头（NVMM格式），使用nvvidconv硬件加速
+        pipeline << "nvvidconv ! "
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+    } else {
+        // 对于测试源（普通内存），使用软件转换
+        pipeline << "videoconvert ! "
+                 << "video/x-raw,format=BGRA ! "
+                 << "videoscale ! "
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+    }
+    
+    pipeline << "queue "
              << "max-size-buffers=2 "      // 减少缓冲区降低延迟
              << "max-size-time=0 "
              << "leaky=downstream "        // 丢弃旧帧防止堆积
