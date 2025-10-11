@@ -741,7 +741,7 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
             if (config.overlay.crtc_id != -1) {
                 pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
             }
-            pipeline << "set-mode=false "
+            pipeline << "set-mode=false "；
             break;
         case VideoSinkMode::WAYLANDSINK:
             pipeline << "video/x-raw,format=RGBA ! "
