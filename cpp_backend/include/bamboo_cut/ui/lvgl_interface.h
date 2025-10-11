@@ -692,6 +692,20 @@ bool detectDRMDriverType(int drm_fd, std::string& driver_name);
 bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
                 drmModeConnector* connector, drmModeModeInfo* mode);
 
+/**
+ * @brief 共享模式DRM设置（不独占CRTC）
+ */
+bool setupDRMDisplayShared(int drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
+                          drmModeConnector*& connector, uint32_t*& framebuffer,
+                          uint32_t& fb_handle, uint32_t& drm_width, uint32_t& drm_height,
+                          uint32_t& stride, uint32_t& buffer_size);
+
+/**
+ * @brief 创建系统内存framebuffer（避免DRM冲突）
+ */
+bool createSystemFramebuffer(uint32_t width, uint32_t height, uint32_t*& framebuffer,
+                           uint32_t& stride, uint32_t& buffer_size);
+
 // === NVIDIA-DRM迁移相关函数 ===
 
 /**

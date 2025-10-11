@@ -440,11 +440,11 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
         return false;
     }
     
-    std::cout << "[DRM] 开始DRM初始化尝试 #" << init_attempt_count << std::endl;
+    std::cout << "[DRM] 开始非独占DRM初始化尝试 #" << init_attempt_count << std::endl;
     
-    // 智能检测nvidia-drm设备，优先使用nvidia-drm
+    // 🔧 修复：使用只读模式打开DRM设备，避免独占
     const char* drm_devices[] = {
-        "/dev/dri/card1",  // 备用nvidia-drm或tegra_drm
+        "/dev/dri/card1",  // nvidia-drm或tegra_drm
     };
     bool device_opened = false;
     
@@ -456,9 +456,10 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
             drm_fd = -1;
         }
         
-        drm_fd = open(device_path, O_RDWR);
+        // 🔧 关键修改：使用只读模式 O_RDONLY 而非 O_RDWR，避免独占资源
+        drm_fd = open(device_path, O_RDONLY);
         if (drm_fd >= 0) {
-            std::cout << "[DRM] 成功打开设备: " << device_path << " fd=" << drm_fd << std::endl;
+            std::cout << "[DRM] 以只读模式打开设备: " << device_path << " fd=" << drm_fd << std::endl;
             device_opened = true;
             
             // 检测驱动类型
@@ -469,26 +470,21 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
                 
                 std::cout << "[DRM] 驱动类型: " << driver_name
                           << (is_nvidia ? " (NVIDIA GPU)" : is_tegra ? " (Tegra)" : " (其他)") << std::endl;
-                
-                // 优先使用nvidia-drm，如果可用的话
-                if (is_nvidia) {
-                    std::cout << "[DRM] 使用优化的NVIDIA-DRM配置" << std::endl;
-                }
+                std::cout << "[DRM] 🔧 使用非独占共享模式，与GStreamer兼容" << std::endl;
             }
             
-            if (setupDRMDisplay(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
-                               drm_width, drm_height, stride, buffer_size)) {
-                std::cout << "[DRM] 设备 " << device_path << " 初始化成功" << std::endl;
+            // 🔧 使用简化的设置流程，避免独占CRTC
+            if (setupDRMDisplayShared(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
+                                    drm_width, drm_height, stride, buffer_size)) {
+                std::cout << "[DRM] 设备 " << device_path << " 共享模式初始化成功" << std::endl;
                 return true;
             } else {
-                std::cout << "[DRM] 设备 " << device_path << " 初始化失败，尝试下一个设备" << std::endl;
-                // 当前设备初始化失败，仅清理当前设备相关资源
-                // 不调用完整的cleanupDRMResources，避免清理未初始化的资源
+                std::cout << "[DRM] 设备 " << device_path << " 共享模式初始化失败" << std::endl;
                 if (drm_fd >= 0) {
                     close(drm_fd);
                     drm_fd = -1;
                 }
-                // 重置为初始状态，准备尝试下一个设备
+                // 重置状态
                 fb_id = 0;
                 crtc = nullptr;
                 connector = nullptr;
@@ -500,14 +496,12 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
                 buffer_size = 0;
             }
         } else {
-            std::cout << "[DRM] 无法打开设备: " << device_path << " (权限被拒绝或设备不存在)" << std::endl;
+            std::cout << "[DRM] 无法打开设备: " << device_path << " error: " << strerror(errno) << std::endl;
         }
     }
     
     if (!device_opened) {
         std::cerr << "[DRM] 无法打开任何DRM设备" << std::endl;
-    } else {
-        std::cerr << "[DRM] DRM设备打开成功但所有设备初始化失败" << std::endl;
     }
     
     return false;
