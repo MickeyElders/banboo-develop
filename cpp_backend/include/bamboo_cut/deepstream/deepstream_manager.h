@@ -12,6 +12,7 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
+#include <thread>
 #include <opencv2/opencv.hpp>
 
 namespace bamboo_cut {

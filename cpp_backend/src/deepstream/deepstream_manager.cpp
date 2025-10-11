@@ -4,6 +4,7 @@
  */
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
+#include "bamboo_cut/ui/lvgl_interface.h"
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
@@ -16,6 +17,10 @@
 #include <thread>
 #include <chrono>
 #include <gst/app/gstappsink.h>
+
+#ifdef ENABLE_LVGL
+#include <lvgl/lvgl.h>
+#endif
 
 namespace bamboo_cut {
 namespace deepstream {
@@ -1193,8 +1198,8 @@ void DeepStreamManager::canvasUpdateLoop() {
             std::lock_guard<std::mutex> lock(frame_mutex_);
             
             if (!latest_frame_.empty()) {
-                // 获取LVGL界面的camera canvas
                 #ifdef ENABLE_LVGL
+                // 获取LVGL界面的camera canvas
                 auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
                 
@@ -1243,6 +1248,8 @@ void DeepStreamManager::canvasUpdateLoop() {
                         std::cout << "Canvas已更新新帧" << std::endl;
                     }
                 }
+                #else
+                std::cout << "LVGL未启用，跳过canvas更新" << std::endl;
                 #endif
                 
                 new_frame_available_ = false;
