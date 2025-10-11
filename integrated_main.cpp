@@ -799,6 +799,12 @@ private:
             return false;
         }
         
+        // 启动canvas更新线程 (如果支持LVGL界面集成)
+        if (deepstream_manager_) {
+            std::cout << "启动Canvas更新线程...（从integrated_main）" << std::endl;
+            deepstream_manager_->startCanvasUpdateThread();
+        }
+        
         std::cout << "DeepStream 管理器延迟启动成功" << std::endl;
         return true;
     }

@@ -1055,38 +1055,65 @@ std::string DeepStreamManager::buildAppSinkPipeline(
 GstFlowReturn DeepStreamManager::newSampleCallback(GstAppSink* appsink, gpointer user_data) {
     DeepStreamManager* manager = static_cast<DeepStreamManager*>(user_data);
     
+    std::cout << "newSampleCallback被调用" << std::endl;
+    
     // 获取新样本
     GstSample* sample = gst_app_sink_pull_sample(appsink);
     if (!sample) {
+        std::cout << "错误：无法获取sample" << std::endl;
         return GST_FLOW_OK;
     }
+    
+    std::cout << "成功获取sample" << std::endl;
     
     // 获取缓冲区
     GstBuffer* buffer = gst_sample_get_buffer(sample);
     if (!buffer) {
+        std::cout << "错误：无法获取buffer" << std::endl;
         gst_sample_unref(sample);
         return GST_FLOW_OK;
     }
+    
+    std::cout << "成功获取buffer" << std::endl;
     
     // 映射缓冲区数据
     GstMapInfo map_info;
     if (!gst_buffer_map(buffer, &map_info, GST_MAP_READ)) {
+        std::cout << "错误：无法映射buffer数据" << std::endl;
         gst_sample_unref(sample);
         return GST_FLOW_OK;
     }
     
+    std::cout << "成功映射buffer，数据大小: " << map_info.size << " 字节" << std::endl;
+    
     // 获取视频信息
     GstCaps* caps = gst_sample_get_caps(sample);
     if (caps) {
+        gchar* caps_str = gst_caps_to_string(caps);
+        std::cout << "Caps信息: " << caps_str << std::endl;
+        g_free(caps_str);
+        
         GstStructure* structure = gst_caps_get_structure(caps, 0);
         gint width, height;
+        const gchar* format;
+        
+        format = gst_structure_get_string(structure, "format");
+        if (format) {
+            std::cout << "视频格式: " << format << std::endl;
+        }
         
         if (gst_structure_get_int(structure, "width", &width) &&
             gst_structure_get_int(structure, "height", &height)) {
             
+            std::cout << "视频尺寸: " << width << "x" << height << std::endl;
+            
             // 线程安全地合成帧到LVGL画布
             manager->compositeFrameToLVGL(&map_info, width, height);
+        } else {
+            std::cout << "错误：无法获取视频尺寸信息" << std::endl;
         }
+    } else {
+        std::cout << "错误：无法获取caps信息" << std::endl;
     }
     
     // 清理资源
@@ -1100,21 +1127,50 @@ GstFlowReturn DeepStreamManager::newSampleCallback(GstAppSink* appsink, gpointer
 void DeepStreamManager::compositeFrameToLVGL(GstMapInfo* map_info, int width, int height) {
     std::lock_guard<std::mutex> lock(frame_mutex_);
     
+    std::cout << "compositeFrameToLVGL被调用，尺寸: " << width << "x" << height
+              << "，数据大小: " << map_info->size << " 字节" << std::endl;
+    
     try {
+        // 检查数据大小是否合理 (BGRA格式应该是 width * height * 4)
+        size_t expected_size = width * height * 4;
+        if (map_info->size < expected_size) {
+            std::cout << "警告：数据大小不匹配，期望: " << expected_size
+                     << "，实际: " << map_info->size << std::endl;
+        }
+        
         // 创建OpenCV Mat包装GStreamer数据，避免内存拷贝
         cv::Mat frame;
         
         // 统一使用BGRA格式，确保兼容性
         frame = cv::Mat(height, width, CV_8UC4, map_info->data);
         
+        std::cout << "创建OpenCV Mat: " << frame.cols << "x" << frame.rows
+                 << "，通道数: " << frame.channels()
+                 << "，数据指针: " << (void*)frame.data << std::endl;
+        
         // 检查帧数据有效性
         if (!frame.empty() && frame.data) {
+            // 检查第一个像素的值，确保数据不是全黑
+            if (frame.channels() == 4) {
+                cv::Vec4b first_pixel = frame.at<cv::Vec4b>(0, 0);
+                cv::Vec4b center_pixel = frame.at<cv::Vec4b>(height/2, width/2);
+                
+                std::cout << "第一个像素BGRA值: ["
+                         << (int)first_pixel[0] << ", " << (int)first_pixel[1]
+                         << ", " << (int)first_pixel[2] << ", " << (int)first_pixel[3] << "]" << std::endl;
+                         
+                std::cout << "中心像素BGRA值: ["
+                         << (int)center_pixel[0] << ", " << (int)center_pixel[1]
+                         << ", " << (int)center_pixel[2] << ", " << (int)center_pixel[3] << "]" << std::endl;
+            }
+            
             // 克隆帧数据用于后续处理
             latest_frame_ = frame.clone();
             new_frame_available_ = true;
             
-            // TODO: 这里将来可以直接写入到LVGL画布
-            // 目前先存储到latest_frame_供其他组件使用
+            std::cout << "帧数据已更新，设置new_frame_available标志" << std::endl;
+        } else {
+            std::cout << "错误：帧数据为空或无效" << std::endl;
         }
         
     } catch (const std::exception& e) {
@@ -1199,39 +1255,51 @@ void DeepStreamManager::canvasUpdateLoop() {
             
             if (!latest_frame_.empty()) {
                 #ifdef ENABLE_LVGL
+                std::cout << "处理新帧: " << latest_frame_.cols << "x" << latest_frame_.rows
+                         << " 通道数:" << latest_frame_.channels() << std::endl;
+                         
                 // 获取LVGL界面的camera canvas
                 auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
                 
                 if (canvas) {
+                    std::cout << "Canvas对象获取成功" << std::endl;
+                    
                     // 转换OpenCV Mat到LVGL格式
                     cv::Mat display_frame;
                     if (latest_frame_.channels() == 4) {
                         // BGRA格式，直接使用
                         display_frame = latest_frame_;
+                        std::cout << "使用BGRA格式帧" << std::endl;
                     } else if (latest_frame_.channels() == 3) {
                         // BGR格式，转换为BGRA
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_BGR2BGRA);
+                        std::cout << "BGR转换为BGRA格式" << std::endl;
                     } else {
                         // 其他格式，先转换为BGR再转换为BGRA
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_GRAY2BGR);
                         cv::cvtColor(display_frame, display_frame, cv::COLOR_BGR2BGRA);
+                        std::cout << "灰度转换为BGRA格式" << std::endl;
                     }
                     
                     // 调整尺寸到canvas大小 (960x640)
                     if (display_frame.cols != 960 || display_frame.rows != 640) {
                         cv::resize(display_frame, display_frame, cv::Size(960, 640));
+                        std::cout << "帧大小调整为960x640" << std::endl;
                     }
                     
                     // 获取canvas缓冲区并更新
                     lv_img_dsc_t* canvas_dsc = lv_canvas_get_image(canvas);
                     if (canvas_dsc && canvas_dsc->data) {
+                        std::cout << "Canvas缓冲区获取成功，开始复制像素数据" << std::endl;
+                        
                         // 复制像素数据到canvas缓冲区
                         const size_t pixel_count = 960 * 640;
                         const size_t bytes_to_copy = pixel_count * 4; // BGRA, 4字节每像素
                         
                         if (display_frame.isContinuous()) {
                             std::memcpy((void*)canvas_dsc->data, display_frame.data, bytes_to_copy);
+                            std::cout << "连续内存复制完成: " << bytes_to_copy << " 字节" << std::endl;
                         } else {
                             // 逐行复制
                             for (int row = 0; row < display_frame.rows; ++row) {
@@ -1241,19 +1309,28 @@ void DeepStreamManager::canvasUpdateLoop() {
                                     960 * 4
                                 );
                             }
+                            std::cout << "逐行内存复制完成" << std::endl;
                         }
                         
                         // 通知LVGL刷新canvas
                         lv_obj_invalidate(canvas);
-                        std::cout << "Canvas已更新新帧" << std::endl;
+                        std::cout << "Canvas刷新通知已发送" << std::endl;
+                    } else {
+                        std::cout << "错误：Canvas缓冲区获取失败" << std::endl;
                     }
+                } else {
+                    std::cout << "错误：Canvas对象获取失败" << std::endl;
                 }
                 #else
                 std::cout << "LVGL未启用，跳过canvas更新" << std::endl;
                 #endif
                 
                 new_frame_available_ = false;
+            } else {
+                std::cout << "最新帧为空，跳过处理" << std::endl;
             }
+        } else if (!lvgl_interface_) {
+            std::cout << "LVGL界面指针为空" << std::endl;
         }
         
         // 帧率控制
