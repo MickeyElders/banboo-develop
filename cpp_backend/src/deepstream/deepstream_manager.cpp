@@ -940,16 +940,25 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // ✅ 只使用 JetPack 6 支持的属性
-            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "wbmode=0 "
-                   << "aelock=false "
-                   << "awblock=false "
-                   << "! video/x-raw(memory:NVMM)"
+            // 🔧 优先使用 v4l2src 绕过 Argus 驱动问题
+            source << "v4l2src device=/dev/video" << config.camera_id << " "
+                   << "io-mode=2 "  // MMAP 模式
+                   << "! video/x-raw"
                    << ",width=1920"
                    << ",height=1080"
                    << ",framerate=30/1"
-                   << ",format=NV12";
+                   << ",format=YUY2";
+            break;
+            
+        case CameraSourceMode::V4L2SRC:
+            // 显式使用 v4l2src
+            source << "v4l2src device=/dev/video" << config.camera_id << " "
+                   << "io-mode=2 "  // MMAP 模式
+                   << "! video/x-raw"
+                   << ",width=1920"
+                   << ",height=1080"
+                   << ",framerate=30/1"
+                   << ",format=YUY2";
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
@@ -1046,18 +1055,16 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     
     std::ostringstream pipeline;
     
-    if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // ✅ JetPack 6 干净的管道配置（移除所有不支持的属性）
-        pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                 << "sensor-mode=2 "
-                 // ✅ 只使用基本的 caps
-                 << "! video/x-raw(memory:NVMM),width=1920,height=1080,format=NV12 "
-                 // ✅ 第一次转换：缩放 + 格式转换（在 NVMM 中完成）
-                 << "! nvvidconv "
-                 << "! video/x-raw,width=" << width << ",height=" << height << ",format=RGBA "
-                 // ✅ 第二次转换：RGBA -> BGRA（转到系统内存）
+    if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
+        config.camera_source == CameraSourceMode::V4L2SRC) {
+        // 🔧 使用 v4l2src 绕过 Argus 超时问题
+        pipeline << "v4l2src device=/dev/video" << config.camera_id << " "
+                 << "io-mode=2 "  // MMAP 模式
+                 << "! video/x-raw,width=1920,height=1080,format=YUY2,framerate=30/1 "
+                 // 软件转换：YUY2 -> BGRA
                  << "! videoconvert "
-                 << "! video/x-raw,format=BGRA "
+                 << "! videoscale "
+                 << "! video/x-raw,format=BGRA,width=" << width << ",height=" << height << " "
                  << "! queue max-size-buffers=2 leaky=downstream "
                  << "! appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";

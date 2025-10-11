@@ -41,9 +41,10 @@ enum class VideoSinkMode {
  * @brief 摄像头源模式
  */
 enum class CameraSourceMode {
-    NVARGUSCAMERA,      ///< nvarguscamerasrc (真实摄像头)
+    NVARGUSCAMERA,      ///< v4l2src (V4L2摄像头，绕过Argus) 或 nvarguscamerasrc
     VIDEOTESTSRC,       ///< videotestsrc (虚拟测试源)
-    FILESRC             ///< filesrc (文件源)
+    FILESRC,            ///< filesrc (文件源)
+    V4L2SRC             ///< v4l2src (直接V4L2接口，避免Argus超时)
 };
 
 /**
