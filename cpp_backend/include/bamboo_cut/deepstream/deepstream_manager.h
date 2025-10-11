@@ -220,6 +220,12 @@ public:
     DRMOverlayConfig detectAvailableOverlayPlane();
     
     /**
+     * @brief 验证多层显示设置
+     * @return 是否验证通过
+     */
+    bool verifyMultiLayerDisplaySetup();
+    
+    /**
      * @brief 启动Canvas更新线程
      */
     void startCanvasUpdateThread();
