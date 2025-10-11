@@ -84,6 +84,11 @@ struct DeepStreamConfig {
     VideoSinkMode sink_mode;    // 视频输出模式
     DRMOverlayConfig overlay;   // DRM叠加平面配置
     
+    // 摄像头源配置
+    CameraSourceMode camera_source;  // 摄像头源模式
+    int test_pattern;                // 测试图案模式（videotestsrc使用）
+    std::string video_file_path;     // 视频文件路径（filesrc使用）
+    
     DeepStreamConfig()
         : screen_width(1280)
         , screen_height(800)
@@ -98,8 +103,11 @@ struct DeepStreamConfig {
         , camera_width(1280)
         , camera_height(720)
         , camera_fps(30)
-        , sink_mode(VideoSinkMode::NVDRMVIDEOSINK)  // 默认使用nvdrmvideosink
-        , overlay() {}  // 使用默认叠加平面配置
+        , sink_mode(VideoSinkMode::KMSSINK)  // 默认使用kmssink
+        , overlay()  // 使用默认叠加平面配置
+        , camera_source(CameraSourceMode::VIDEOTESTSRC)  // 默认使用测试源
+        , test_pattern(0)  // 默认测试图案
+        , video_file_path("/opt/bamboo-cut/test_video.mp4") {}  // 默认测试视频文件
 };
 
 /**
