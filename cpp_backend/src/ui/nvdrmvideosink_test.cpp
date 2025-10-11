@@ -180,7 +180,7 @@ private:
         std::cout << "检测DRM设备能力..." << std::endl;
         
         // 尝试打开DRM设备
-        const char* drm_devices[] = {"/dev/dri/card0", "/dev/dri/card1"};
+        const char* drm_devices[] = {"/dev/dri/card1"};
         int drm_fd = -1;
         
         for (const char* device : drm_devices) {

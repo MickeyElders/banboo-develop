@@ -354,11 +354,7 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
     // 尝试打开nvidia-drm设备，按优先级顺序
     int drm_fd = -1;
     const char* drm_devices[] = {
-        "/dev/dri/card0",
         "/dev/dri/card1",
-        "/dev/dri/card2",
-        "/dev/dri/renderD128",
-        "/dev/dri/renderD129"
     };
     
     for (int i = 0; i < 5; i++) {
@@ -630,10 +626,7 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     if (config.overlay.plane_id != -1) {
         pipeline << "plane-id=" << config.overlay.plane_id << " ";
     }
-    
-    if (config.overlay.connector_id != -1) {
-        pipeline << "conn-id=" << config.overlay.connector_id << " ";
-    }
+
     
     
     // 添加位置参数

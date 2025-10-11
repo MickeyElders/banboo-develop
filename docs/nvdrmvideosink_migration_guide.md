@@ -87,7 +87,7 @@ nvdrmvideosink plane-id=1 set-mode=false sync=false
 ```cpp
 DRMOverlayConfig detectAvailableOverlayPlane() {
     // 1. 打开DRM设备
-    int drm_fd = open("/dev/dri/card0", O_RDWR);
+    int drm_fd = open("/dev/dri/card1", O_RDWR);
     
     // 2. 获取叠加平面资源
     drmModePlaneRes* plane_resources = drmModeGetPlaneResources(drm_fd);

@@ -256,9 +256,7 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
     
     // 优先尝试nvidia-drm设备，然后回退到tegra_drm
     const char* drm_devices[] = {
-        "/dev/dri/card0",  // 通常nvidia-drm在card0
         "/dev/dri/card1",  // 备用nvidia-drm或tegra_drm
-        "/dev/dri/card2"   // 其他设备
     };
     
     for (const char* device_path : drm_devices) {
@@ -446,9 +444,7 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
     
     // 智能检测nvidia-drm设备，优先使用nvidia-drm
     const char* drm_devices[] = {
-        "/dev/dri/card0",  // 通常nvidia-drm在card0
         "/dev/dri/card1",  // 备用nvidia-drm或tegra_drm
-        "/dev/dri/card2"   // 其他设备
     };
     bool device_opened = false;
     

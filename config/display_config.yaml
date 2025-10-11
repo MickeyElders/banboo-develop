@@ -19,9 +19,6 @@ display:
   # DRM特定配置
   drm:
     device_path: "/dev/dri/card1"
-    fallback_devices:
-      - "/dev/dri/card0" 
-      - "/dev/dri/card2"
     color_depth: 32
     
   # Wayland特定配置

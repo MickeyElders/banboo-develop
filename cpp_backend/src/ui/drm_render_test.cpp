@@ -156,17 +156,10 @@ private:
      * @brief 打开DRM设备
      */
     bool openDRMDevice() {
-        // 优先尝试nvidia-drm设备 (/dev/dri/card0)
-        drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
-        if (drm_fd >= 0) {
-            Logger::info("成功打开nvidia-drm设备: /dev/dri/card0");
-            return true;
-        }
-        
-        // 回退到tegra-drm设备 (/dev/dri/card1)
+        // 优先尝试nvidia-drm设备 (/dev/dri/card1)
         drm_fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
         if (drm_fd >= 0) {
-            Logger::info("回退到tegra-drm设备: /dev/dri/card1");
+            Logger::info("成功打开nvidia-drm设备: /dev/dri/card1");
             return true;
         }
         

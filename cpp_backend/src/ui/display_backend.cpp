@@ -220,11 +220,6 @@ bool DisplayBackendFactory::isBackendAvailable(DisplayBackendType type) {
                 close(fd);
                 return true;
             }
-            fd = open("/dev/dri/card0", O_RDWR);
-            if (fd >= 0) {
-                close(fd);
-                return true;
-            }
             return false;
         }
         
