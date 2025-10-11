@@ -1323,16 +1323,17 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 关键修复：直接使用NV12格式，避免破坏NVIDIA_BLOCK_LINEAR_2D内存布局
-    std::cout << "🎯 直接使用NV12格式避免格式转换链破坏memory layout" << std::endl;
+    // 🔧 关键修复：直接使用NV12格式，让GStreamer自动协商内存类型
+    std::cout << "🎯 直接使用NV12格式，让GStreamer自动协商内存类型和缩放" << std::endl;
     
-    // 直接从nvarguscamerasrc的NV12输出到kmssink，保持NVMM内存布局完整性
-    pipeline << "queue "
+    // 让GStreamer自动协商从NVMM到标准内存的转换，保持NV12格式
+    pipeline << "nvvidconv ! "  // NVMM到标准内存转换，保持NV12格式
+             << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
+             << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度
              << "max-size-time=0 "
              << "leaky=downstream "
-             << "! "
-             << "video/x-raw(memory:NVMM),format=NV12,width=" << width << ",height=" << height << " ! ";
+             << "! ";
     
     // 🔧 关键修复：使用GBM后端提供的overlay plane，实现真正的分层显示
     if (config_.overlay.plane_id > 0) {
