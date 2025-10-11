@@ -1130,23 +1130,22 @@ void DeepStreamManager::cleanup() {
 }
 
 // 新增：构建摄像头源字符串
-// 修复：移除不支持的属性
+// 🔧 修复：正确处理Bayer格式（RG10）摄像头
 std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config) {
     std::ostringstream source;
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 🔧 优先使用 v4l2src 绕过 Argus 驱动问题，使用自动协商
-            source << "v4l2src device=/dev/video" << config.camera_id << " "
-                   << "io-mode=2 "  // MMAP 模式
-                   << "! video/x-raw";  // 移除固定格式，让摄像头自动协商
-            break;
-            
         case CameraSourceMode::V4L2SRC:
-            // 显式使用 v4l2src，自动协商格式
+            // 🔧 关键修复：处理Bayer格式摄像头（RG10）
+            std::cout << "🔧 配置Bayer格式摄像头处理管道..." << std::endl;
             source << "v4l2src device=/dev/video" << config.camera_id << " "
                    << "io-mode=2 "  // MMAP 模式
-                   << "! video/x-raw";  // 让摄像头自动协商最佳格式
+                   << "! video/x-bayer,format=rggb10,width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1 "
+                   << "! bayer2rgb "  // Bayer转RGB插件
+                   << "! video/x-raw,format=RGB ";
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
@@ -1155,27 +1154,27 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
                    << ",framerate=" << config.camera_fps << "/1"
-                   << ",format=I420";
+                   << ",format=RGB";
             break;
             
         case CameraSourceMode::FILESRC:
             source << "filesrc location=" << config.video_file_path << " "
                    << "! decodebin "
-                   << "! nvvidconv "
+                   << "! videoconvert "
                    << "! video/x-raw"
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
                    << ",framerate=" << config.camera_fps << "/1"
-                   << ",format=I420";
+                   << ",format=RGB";
             break;
             
         default:
-            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "wbmode=0 "
-                   << "! video/x-raw(memory:NVMM)"
-                   << ",width=1920,height=1080"
-                   << ",framerate=30/1"
-                   << ",format=NV12";
+            // 备用方案：尝试Bayer格式处理
+            std::cout << "⚠️ 使用备用Bayer处理方案..." << std::endl;
+            source << "v4l2src device=/dev/video" << config.camera_id << " "
+                   << "! video/x-bayer,format=rggb10 "
+                   << "! bayer2rgb "
+                   << "! video/x-raw,format=RGB";
             break;
     }
     
