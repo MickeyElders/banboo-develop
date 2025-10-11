@@ -41,7 +41,7 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     
     // 为canvas分配缓冲区 (960x640, BGRA格式, 32位/像素)
     static uint32_t canvas_buffer[960 * 640];  // 静态缓冲区避免栈溢出
-    lv_canvas_set_buffer(camera_canvas_, canvas_buffer, 960, 640, LV_IMG_CF_TRUE_COLOR_ALPHA);
+    lv_canvas_set_buffer(camera_canvas_, canvas_buffer, 960, 640, LV_COLOR_FORMAT_ARGB8888);
     
     // 设置canvas样式
     lv_obj_set_style_bg_opa(camera_canvas_, LV_OPA_COVER, 0);
