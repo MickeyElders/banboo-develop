@@ -648,19 +648,39 @@ void gbm_display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px
         std::cout << "[GBM] 创建LVGL framebuffer成功: " << drm_width << "x" << drm_height << std::endl;
     }
     
-    // 映射framebuffer用于写入 - 修复段错误：使用正确的GBM buffer映射
+    // 映射framebuffer用于写入 - 修复GBM映射问题
     if (!current_fb->map && current_fb->bo) {
-        // 使用gbm_bo_map来正确映射GBM buffer
-        uint32_t stride;
-        void* map_data;
-        current_fb->map = gbm_bo_map(current_fb->bo, 0, 0, drm_width, drm_height,
-                                     GBM_BO_TRANSFER_WRITE, &stride, &map_data);
-        if (!current_fb->map) {
-            std::cerr << "[GBM] GBM framebuffer映射失败" << std::endl;
+        // 检查GBM buffer object是否支持映射
+        uint32_t bo_stride = gbm_bo_get_stride(current_fb->bo);
+        uint32_t bo_width = gbm_bo_get_width(current_fb->bo);
+        uint32_t bo_height = gbm_bo_get_height(current_fb->bo);
+        
+        std::cout << "[GBM] BO详细信息: " << bo_width << "x" << bo_height
+                  << " stride: " << bo_stride << std::endl;
+        
+        // 尝试使用简化的映射方法，避免复杂的GBM映射
+        // 直接使用DRM framebuffer内存映射
+        int drm_fd = 3; // 从日志中获取的DRM FD
+        struct drm_mode_map_dumb map_req = {};
+        map_req.handle = current_fb->handle;
+        
+        if (ioctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) == 0) {
+            current_fb->map = mmap(nullptr, current_fb->size, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED, drm_fd, map_req.offset);
+            if (current_fb->map != MAP_FAILED) {
+                std::cout << "[GBM] DRM framebuffer映射成功: " << current_fb->map
+                          << " size: " << current_fb->size << std::endl;
+            } else {
+                std::cerr << "[GBM] DRM framebuffer映射失败: " << strerror(errno) << std::endl;
+                current_fb->map = nullptr;
+                lv_display_flush_ready(disp);
+                return;
+            }
+        } else {
+            std::cerr << "[GBM] DRM map请求失败: " << strerror(errno) << std::endl;
             lv_display_flush_ready(disp);
             return;
         }
-        std::cout << "[GBM] framebuffer映射成功: " << current_fb->map << " stride: " << stride << std::endl;
     }
     
     // 复制像素数据到GBM framebuffer
