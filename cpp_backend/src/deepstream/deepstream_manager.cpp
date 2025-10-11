@@ -1323,20 +1323,16 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 关键修复：使用BGRA格式，这是AR24在DRM中的实际对应格式
-    pipeline << "nvvidconv ! "  // NVMM -> RGBA格式转换和缩放（硬件加速）
-             << "video/x-raw(memory:NVMM),format=RGBA,width=" << width << ",height=" << height << " ! "
-             << "nvvidconv ! "     // NVMM -> 标准内存转换
-             << "video/x-raw,format=RGBA,width=" << width << ",height=" << height << " ! "
-             << "videoconvert ! "  // RGBA -> BGRA格式转换（AR24对应BGRA）
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+    // 🔧 关键修复：直接使用NV12格式，避免破坏NVIDIA_BLOCK_LINEAR_2D内存布局
+    std::cout << "🎯 直接使用NV12格式避免格式转换链破坏memory layout" << std::endl;
     
+    // 直接从nvarguscamerasrc的NV12输出到kmssink，保持NVMM内存布局完整性
     pipeline << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度
              << "max-size-time=0 "
              << "leaky=downstream "
              << "! "
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+             << "video/x-raw(memory:NVMM),format=NV12,width=" << width << ",height=" << height << " ! ";
     
     // 🔧 关键修复：使用GBM后端提供的overlay plane，实现真正的分层显示
     if (config_.overlay.plane_id > 0) {
