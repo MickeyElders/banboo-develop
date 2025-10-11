@@ -540,11 +540,14 @@ bool setupDRMDisplay(int drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
             std::cout << "[DRM] 显示器模式: " << drm_width << "x" << drm_height
                       << " @" << mode->vrefresh << "Hz" << std::endl;
             
-            // 查找合适的CRTC并创建framebuffer
+            // 查找合适的CRTC并创建framebuffer（共享模式）
             if (findSuitableCRTC(drm_fd, resources, connector, crtc) &&
-                createFramebuffer(drm_fd, drm_width, drm_height, fb_id, fb_handle, 
-                                 framebuffer, stride, buffer_size) &&
-                setCRTCMode(drm_fd, crtc, fb_id, connector, mode)) {
+                createFramebuffer(drm_fd, drm_width, drm_height, fb_id, fb_handle,
+                                 framebuffer, stride, buffer_size)) {
+                
+                // 🔧 修复：使用非独占模式，只创建framebuffer不设置CRTC
+                std::cout << "[DRM] 使用共享DRM模式，不独占CRTC" << std::endl;
+                setCRTCMode(drm_fd, crtc, fb_id, connector, mode);  // 这里现在只是记录，不实际设置
                 
                 drmModeFreeResources(resources);
                 return true;
@@ -669,21 +672,22 @@ bool createFramebuffer(int drm_fd, uint32_t width, uint32_t height,
 #endif
 }
 
-bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id, 
+bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
                 drmModeConnector* connector, drmModeModeInfo* mode) {
 #ifdef ENABLE_LVGL
-    // 设置CRTC使用我们的framebuffer
-    int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0,
-                            &connector->connector_id, 1, mode);
-    if (ret != 0) {
-        std::cerr << "[DRM] drmModeSetCrtc失败: " << ret << " (" << strerror(-ret) << ")" << std::endl;
-        return false;
-    }
+    // 🔧 修复DRM独占问题：不设置CRTC模式，只创建framebuffer
+    // 让系统保持现有的CRTC配置，避免与GStreamer冲突
+    std::cout << "[DRM] 跳过CRTC模式设置，避免与GStreamer冲突" << std::endl;
+    std::cout << "[DRM] CRTC ID: " << crtc->crtc_id << ", FB ID: " << fb_id << std::endl;
     
-    std::cout << "[DRM] DRM framebuffer初始化成功" << std::endl;
+    // 不调用 drmModeSetCrtc，避免独占CRTC
+    // int ret = drmModeSetCrtc(drm_fd, crtc->crtc_id, fb_id, 0, 0,
+    //                         &connector->connector_id, 1, mode);
     
-    // 强制刷新显示
-    drmModePageFlip(drm_fd, crtc->crtc_id, fb_id, 0, nullptr);
+    std::cout << "[DRM] DRM framebuffer创建成功（共享模式）" << std::endl;
+    
+    // 不强制刷新显示，避免干扰现有显示状态
+    // drmModePageFlip(drm_fd, crtc->crtc_id, fb_id, 0, nullptr);
     
     return true;
 #else
