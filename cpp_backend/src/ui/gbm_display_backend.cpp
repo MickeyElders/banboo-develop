@@ -424,12 +424,28 @@ GBMFramebuffer* GBMDisplayBackend::createLVGLFramebuffer(uint32_t width, uint32_
     
     std::cout << "🔧 为LVGL创建framebuffer: " << width << "x" << height << std::endl;
     
+    // 修复nvidia-drm兼容性：使用正确的格式和用法标志
+    uint32_t gbm_format = GBM_FORMAT_XRGB8888;  // nvidia-drm兼容格式
+    uint32_t gbm_flags = GBM_BO_USE_SCANOUT | GBM_BO_USE_LINEAR;  // 移除RENDERING，添加LINEAR
+    
+    std::cout << "🔧 创建NVIDIA兼容的GBM buffer object: " << width << "x" << height
+              << " 格式: XRGB8888, 标志: SCANOUT|LINEAR" << std::endl;
+    
     // 创建GBM buffer object
-    gbm_bo* bo = gbm_bo_create(gbm_device_, width, height, GBM_FORMAT_XRGB8888, 
-                               GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+    gbm_bo* bo = gbm_bo_create(gbm_device_, width, height, gbm_format, gbm_flags);
     if (!bo) {
-        std::cerr << "❌ 创建GBM buffer object失败" << std::endl;
-        return nullptr;
+        std::cerr << "❌ 创建GBM buffer object失败，尝试回退方案..." << std::endl;
+        
+        // 回退：尝试最基本的标志
+        gbm_flags = GBM_BO_USE_SCANOUT;
+        bo = gbm_bo_create(gbm_device_, width, height, gbm_format, gbm_flags);
+        if (!bo) {
+            std::cerr << "❌ GBM buffer object创建完全失败" << std::endl;
+            return nullptr;
+        }
+        std::cout << "✅ 使用基本标志创建GBM buffer object成功" << std::endl;
+    } else {
+        std::cout << "✅ GBM buffer object创建成功" << std::endl;
     }
     
     // 获取DRM framebuffer信息
@@ -437,11 +453,29 @@ GBMFramebuffer* GBMDisplayBackend::createLVGLFramebuffer(uint32_t width, uint32_
     uint32_t stride = gbm_bo_get_stride(bo);
     uint32_t size = height * stride;
     
-    // 创建DRM framebuffer
+    // NVIDIA兼容性修复：验证stride对齐
+    uint32_t nvidia_aligned_stride = ((stride + 255) & ~255);  // 256字节对齐
+    if (stride != nvidia_aligned_stride) {
+        std::cout << "🔧 NVIDIA对齐修复: stride从 " << stride
+                  << " 调整到 " << nvidia_aligned_stride << std::endl;
+        stride = nvidia_aligned_stride;
+        size = height * stride;
+    }
+    
+    std::cout << "🔧 Buffer详细信息: handle=" << handle
+              << " stride=" << stride << " size=" << size
+              << " 格式: XRGB8888" << std::endl;
+    
+    // 创建DRM framebuffer - 使用正确的参数避免-22错误
     uint32_t fb_id;
-    int ret = drmModeAddFB(drm_fd_, width, height, 24, 32, stride, handle, &fb_id);
+    uint32_t depth = 24;   // 颜色深度
+    uint32_t bpp = 32;     // 每像素位数
+    int ret = drmModeAddFB(drm_fd_, width, height, depth, bpp, stride, handle, &fb_id);
     if (ret) {
-        std::cerr << "❌ 创建DRM framebuffer失败: " << strerror(-ret) << std::endl;
+        std::cerr << "❌ 创建DRM framebuffer失败: " << strerror(-ret)
+                  << " (width=" << width << " height=" << height
+                  << " depth=" << depth << " bpp=" << bpp
+                  << " stride=" << stride << " handle=" << handle << ")" << std::endl;
         gbm_bo_destroy(bo);
         return nullptr;
     }
