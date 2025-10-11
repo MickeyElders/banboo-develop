@@ -632,22 +632,20 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
         pipeline << "plane-id=" << config.overlay.plane_id << " ";
     }
     
-    // 省略conn-id，让nvdrmvideosink自动选择连接器
-    // if (config.overlay.connector_id != -1) {
-    //     pipeline << "conn-id=" << config.overlay.connector_id << " ";
-    // }
     
     // 添加位置参数
     pipeline << "offset-x=" << offset_x << " "
-             << "offset-y=" << offset_y << " ";
-    
-    // 添加Z轴层级控制
-    pipeline << "zorder=" << config.overlay.z_order << " ";
-    
-    pipeline << "set-mode=false "  // 不设置显示模式，使用现有模式
-             << "show-preroll-frame=false "  // 不显示预览帧
-             << "sync=false";  // 降低延迟
-             
+            << "offset-y=" << offset_y << " ";
+
+    // 取消注释conn-id，并移除zorder（nvdrmvideosink不支持zorder属性）
+    if (config.overlay.connector_id != -1) {
+        pipeline << "conn-id=" << config.overlay.connector_id << " ";
+    }
+    if (config.overlay.crtc_id != -1) {
+        pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
+    }
+
+    pipeline << "set-mode=false "
     // 如果启用硬件缩放，添加缩放参数
     if (config.overlay.enable_scaling) {
         pipeline << " enable-last-sample=false";
@@ -738,11 +736,15 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
             // }
             // 添加位置参数
             pipeline << "offset-x=" << layout.offset_x << " "
-                     << "offset-y=" << layout.offset_y << " ";
-            // 添加Z轴层级控制
-            pipeline << "zorder=" << config.overlay.z_order << " ";
+                    << "offset-y=" << layout.offset_y << " ";
+            // nvdrmvideosink不支持zorder，使用conn-id和crtc-id代替
+            if (config.overlay.connector_id != -1) {
+                pipeline << "conn-id=" << config.overlay.connector_id << " ";
+            }
+            if (config.overlay.crtc_id != -1) {
+                pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
+            }
             pipeline << "set-mode=false "
-                     << "sync=false";
             break;
         case VideoSinkMode::WAYLANDSINK:
             pipeline << "video/x-raw,format=RGBA ! "
