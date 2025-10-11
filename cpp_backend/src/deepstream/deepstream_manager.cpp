@@ -940,27 +940,20 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 🔧 JetPack 6修复：添加nvbufferapi-version和NVMM内存池配置
+            // ✅ 只使用 JetPack 6 支持的属性
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "nvbufferapi-version=1 "       // ✅ JetPack 6 NVMM API版本
-                   << "bufapi-version=1 "            // ✅ 缓冲区API版本
-                   << "timeout=10 "                  // 增加超时到10秒
-                   << "retry=3 "                     // 重试3次
-                   << "wbmode=0 "                    // 自动白平衡
-                   << "aelock=false "                // 自动曝光不锁定
-                   << "awblock=false "               // 自动白平衡不锁定
+                   << "wbmode=0 "
+                   << "aelock=false "
+                   << "awblock=false "
                    << "! video/x-raw(memory:NVMM)"
-                   << ",width=" << config.camera_width
-                   << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",width=1920"
+                   << ",height=1080"
+                   << ",framerate=30/1"
                    << ",format=NV12";
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
-            // 虚拟测试源 - 使用稳定的彩色条纹图案
-            source << "videotestsrc pattern=0 "     // 使用彩色条纹图案而非smpte
-                   << "is-live=true "
-                   << "do-timestamp=true "
+            source << "videotestsrc pattern=18 is-live=true "
                    << "! video/x-raw"
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
@@ -969,10 +962,9 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         case CameraSourceMode::FILESRC:
-            // 文件源
             source << "filesrc location=" << config.video_file_path << " "
                    << "! decodebin "
-                   << "! nvvidconv "                 // 使用硬件加速转换器
+                   << "! nvvidconv "
                    << "! video/x-raw"
                    << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
@@ -981,17 +973,11 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         default:
-            // 默认使用真实摄像头，如果失败回退到测试源
-            std::cout << "默认尝试使用真实摄像头源..." << std::endl;
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "nvbufferapi-version=1 "       // ✅ JetPack 6兼容
-                   << "bufapi-version=1 "            // ✅ 缓冲区API版本
-                   << "timeout=10 retry=3 "          // 增加超时和重试设置
                    << "wbmode=0 "
                    << "! video/x-raw(memory:NVMM)"
-                   << ",width=" << config.camera_width
-                   << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",width=1920,height=1080"
+                   << ",framerate=30/1"
                    << ",format=NV12";
             break;
     }
@@ -1061,41 +1047,42 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     std::ostringstream pipeline;
     
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 🔧 JetPack 6修复：完整NVMM配置和内存池优化
+        // ✅ JetPack 6 干净的管道配置（移除所有不支持的属性）
         pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                 << "nvbufferapi-version=1 "       // ✅ NVMM API版本
-                 << "bufapi-version=1 "            // ✅ 缓冲区API版本
-                 << "sensor-mode=2 "               // 1920x1080@30fps
-                 << "! video/x-raw(memory:NVMM)"
-                 << ",width=1920,height=1080"
-                 << ",framerate=30/1,format=NV12 "
-                 << "! nvvidconv "                 // 硬件缩放 + 格式转换
-                 << "nvbuf-memory-type=0 "         // ✅ NVMM内存类型
-                 << "! video/x-raw(memory:NVMM)"   // 保持NVMM格式
+                 << "sensor-mode=2 "
+                 // ✅ 只使用基本的 caps
+                 << "! video/x-raw(memory:NVMM),width=1920,height=1080,format=NV12 "
+                 // ✅ 第一次转换：缩放 + 格式转换（在 NVMM 中完成）
+                 << "! nvvidconv "
+                 << "! video/x-raw,width=" << width << ",height=" << height << ",format=RGBA "
+                 // ✅ 第二次转换：RGBA -> BGRA（转到系统内存）
+                 << "! videoconvert "
+                 << "! video/x-raw,format=BGRA "
+                 << "! queue max-size-buffers=2 leaky=downstream "
+                 << "! appsink name=video_appsink "
+                 << "emit-signals=true sync=false max-buffers=2 drop=true";
+                 
+    } else if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
+        // ✅ 测试源
+        pipeline << "videotestsrc pattern=18 is-live=true "
+                 << "! video/x-raw,format=BGRA"
                  << ",width=" << width << ",height=" << height
-                 << ",format=RGBA "
-                 << "! nvvidconv "                 // 第二次转换：NVMM→系统内存
-                 << "! video/x-raw,format=BGRA ";  // 最终格式
+                 << ",framerate=30/1 "
+                 << "! appsink name=video_appsink "
+                 << "emit-signals=true sync=false max-buffers=1 drop=false";
     } else {
+        // 其他源
         pipeline << buildCameraSource(config) << " ! "
                  << "videoconvert ! "
                  << "video/x-raw,format=BGRA ! "
                  << "videoscale ! "
-                 << "video/x-raw,format=BGRA"
-                 << ",width=" << width << ",height=" << height << " ";
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " "
+                 << "! queue max-size-buffers=2 leaky=downstream "
+                 << "! appsink name=video_appsink "
+                 << "emit-signals=true sync=false max-buffers=2 drop=true";
     }
     
-    pipeline << "! queue "
-             << "max-size-buffers=2 "
-             << "max-size-time=0 "
-             << "leaky=downstream "
-             << "! appsink name=video_appsink "
-             << "emit-signals=true "
-             << "sync=false "
-             << "max-buffers=2 "
-             << "drop=true";
-    
-    std::cout << "构建AppSink软件合成管道: " << pipeline.str() << std::endl;
+    std::cout << "构建AppSink管道: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
