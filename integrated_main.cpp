@@ -747,9 +747,10 @@ private:
             config.camera_id = 0;
             config.camera_id_2 = 1;
             config.dual_mode = deepstream::DualCameraMode::SINGLE_CAMERA;
-            config.camera_width = 1280;
-            config.camera_height = 720;
-            config.camera_fps = 30;  // 确保30fps提高稳定性
+            config.camera_width = 960;   // 匹配Canvas尺寸
+            config.camera_height = 640;  // 匹配Canvas尺寸
+            config.camera_fps = 30;      // 确保30fps提高稳定性
+            config.test_pattern = 0;     // 使用smpte标准彩条图案
             
             // 初始化 DeepStream 管理器 (但暂不启动)
             if (!deepstream_manager_->initialize(config)) {

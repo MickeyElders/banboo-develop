@@ -945,8 +945,8 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
-            // 虚拟测试源 - 兼容多层显示系统
-            source << "videotestsrc pattern=" << config.test_pattern << " "
+            // 虚拟测试源 - 使用稳定的SMPTE彩条图案
+            source << "videotestsrc pattern=smpte "  // 使用标准SMPTE彩条图案
                    << "is-live=true "
                    << "do-timestamp=true "
                    << "! "
@@ -967,7 +967,7 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         default:
-            // 默认使用测试源
+            // 默认使用稳定的测试源
             source << "videotestsrc pattern=smpte is-live=true do-timestamp=true "
                    << "! video/x-raw,width=" << config.camera_width
                    << ",height=" << config.camera_height
