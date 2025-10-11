@@ -933,11 +933,16 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 真实摄像头
+            // 真实摄像头源 - 优先使用实际硬件
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
                    << "bufapi-version=1 "
                    << "maxperf=true "
                    << "wbmode=0 "
+                   << "saturation=1.2 "        // 增加饱和度
+                   << "exposuretimerange=\"34000 358733000\" "  // 自动曝光范围
+                   << "gainrange=\"1 16\" "     // 增益范围
+                   << "aelock=false "           // 自动曝光
+                   << "awblock=false "          // 自动白平衡
                    << "! "
                    << "video/x-raw(memory:NVMM),width=" << config.camera_width
                    << ",height=" << config.camera_height
@@ -945,8 +950,8 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
-            // 虚拟测试源 - 使用稳定的SMPTE彩条图案
-            source << "videotestsrc pattern=smpte "  // 使用标准SMPTE彩条图案
+            // 虚拟测试源 - 使用稳定的彩色条纹图案
+            source << "videotestsrc pattern=0 "     // 使用彩色条纹图案而非smpte
                    << "is-live=true "
                    << "do-timestamp=true "
                    << "! "
@@ -967,11 +972,13 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         default:
-            // 默认使用稳定的测试源
-            source << "videotestsrc pattern=smpte is-live=true do-timestamp=true "
-                   << "! video/x-raw,width=" << config.camera_width
+            // 默认使用真实摄像头，如果失败回退到测试源
+            std::cout << "默认尝试使用真实摄像头源..." << std::endl;
+            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "bufapi-version=1 maxperf=true wbmode=0 "
+                   << "! video/x-raw(memory:NVMM),width=" << config.camera_width
                    << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1,format=I420";
+                   << ",framerate=" << config.camera_fps << "/1,format=NV12";
             break;
     }
     
@@ -1249,7 +1256,6 @@ void DeepStreamManager::canvasUpdateLoop() {
     while (canvas_update_running_) {
         auto current_time = std::chrono::steady_clock::now();
         
-        // 检查是否有新帧可用
         if (new_frame_available_.load() && lvgl_interface_) {
             std::lock_guard<std::mutex> lock(frame_mutex_);
             
@@ -1258,87 +1264,112 @@ void DeepStreamManager::canvasUpdateLoop() {
                 std::cout << "处理新帧: " << latest_frame_.cols << "x" << latest_frame_.rows
                          << " 通道数:" << latest_frame_.channels() << std::endl;
                          
-                // 获取LVGL界面的camera canvas
                 auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
                 
                 if (canvas) {
                     std::cout << "Canvas对象获取成功" << std::endl;
                     
-                    // 转换OpenCV Mat到LVGL格式
+                    // 🔧 修复1: 确保帧格式统一为BGRA
                     cv::Mat display_frame;
                     if (latest_frame_.channels() == 4) {
-                        // BGRA格式，直接使用
-                        display_frame = latest_frame_;
-                        std::cout << "使用BGRA格式帧" << std::endl;
+                        display_frame = latest_frame_.clone();  // 克隆避免引用问题
                     } else if (latest_frame_.channels() == 3) {
-                        // BGR格式，转换为BGRA
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_BGR2BGRA);
-                        std::cout << "BGR转换为BGRA格式" << std::endl;
                     } else {
-                        // 其他格式，先转换为BGR再转换为BGRA
-                        cv::cvtColor(latest_frame_, display_frame, cv::COLOR_GRAY2BGR);
-                        cv::cvtColor(display_frame, display_frame, cv::COLOR_BGR2BGRA);
-                        std::cout << "灰度转换为BGRA格式" << std::endl;
+                        cv::cvtColor(latest_frame_, display_frame, cv::COLOR_GRAY2BGRA);
                     }
                     
-                    // 调整尺寸到canvas大小 (960x640)
+                    // 🔧 修复2: 调整尺寸并确保数据连续
                     if (display_frame.cols != 960 || display_frame.rows != 640) {
-                        cv::resize(display_frame, display_frame, cv::Size(960, 640));
-                        std::cout << "帧大小调整为960x640" << std::endl;
+                        cv::resize(display_frame, display_frame, cv::Size(960, 640), 
+                                   0, 0, cv::INTER_LINEAR);
                     }
                     
-                    // 获取canvas缓冲区并更新
+                    // 🔧 修复3: 确保数据连续性
+                    if (!display_frame.isContinuous()) {
+                        display_frame = display_frame.clone();
+                        std::cout << "帧数据不连续，已克隆" << std::endl;
+                    }
+                    
+                    // 验证数据
+                    if (display_frame.channels() != 4 || 
+                        display_frame.cols != 960 || 
+                        display_frame.rows != 640) {
+                        std::cout << "错误：帧格式不正确" << std::endl;
+                        continue;
+                    }
+                    
+                    // 调试：检查源数据
+                    cv::Vec4b src_first = display_frame.at<cv::Vec4b>(0, 0);
+                    cv::Vec4b src_center = display_frame.at<cv::Vec4b>(320, 480);
+                    std::cout << "源数据 - 第一个像素BGRA: [" 
+                             << (int)src_first[0] << "," << (int)src_first[1] 
+                             << "," << (int)src_first[2] << "," << (int)src_first[3] << "]" << std::endl;
+                    std::cout << "源数据 - 中心像素BGRA: [" 
+                             << (int)src_center[0] << "," << (int)src_center[1] 
+                             << "," << (int)src_center[2] << "," << (int)src_center[3] << "]" << std::endl;
+                    
+                    // 获取canvas缓冲区
                     lv_img_dsc_t* canvas_dsc = lv_canvas_get_image(canvas);
                     if (canvas_dsc && canvas_dsc->data) {
-                        std::cout << "Canvas缓冲区获取成功，开始复制像素数据" << std::endl;
+                        std::cout << "Canvas缓冲区获取成功" << std::endl;
                         
-                        // BGRA到ARGB格式转换和复制
-                        const size_t pixel_count = 960 * 640;
                         uint32_t* canvas_buffer = (uint32_t*)canvas_dsc->data;
-                        uint8_t* src_data = display_frame.data;
+                        const uint8_t* src_data = display_frame.data;
+                        const size_t pixel_count = 960 * 640;
+                        const int step = display_frame.step[0];  // 行步长
                         
-                        std::cout << "开始BGRA到ARGB格式转换，像素数: " << pixel_count << std::endl;
+                        std::cout << "OpenCV Mat step: " << step 
+                                 << ", expected: " << (960 * 4) << std::endl;
                         
-                        // 逐像素转换 BGRA -> ARGB
-                        for (size_t i = 0; i < pixel_count; i++) {
-                            uint8_t b = src_data[i * 4 + 0];  // Blue
-                            uint8_t g = src_data[i * 4 + 1];  // Green
-                            uint8_t r = src_data[i * 4 + 2];  // Red
-                            uint8_t a = src_data[i * 4 + 3];  // Alpha
+                        // 🔧 修复4: 正确处理步长的像素转换
+                        for (int y = 0; y < 640; y++) {
+                            const uint8_t* row_ptr = src_data + y * step;
+                            uint32_t* canvas_row = canvas_buffer + y * 960;
                             
-                            // LVGL ARGB8888格式: AARRGGBB
-                            canvas_buffer[i] = (a << 24) | (r << 16) | (g << 8) | b;
+                            for (int x = 0; x < 960; x++) {
+                                const uint8_t* pixel = row_ptr + x * 4;
+                                uint8_t b = pixel[0];
+                                uint8_t g = pixel[1];
+                                uint8_t r = pixel[2];
+                                uint8_t a = pixel[3];
+                                
+                                // LVGL ARGB8888: A在最高位
+                                canvas_row[x] = (a << 24) | (r << 16) | (g << 8) | b;
+                            }
                         }
                         
-                        std::cout << "BGRA到ARGB格式转换完成" << std::endl;
+                        std::cout << "像素转换完成" << std::endl;
                         
                         // 验证转换结果
-                        uint32_t first_pixel = canvas_buffer[0];
-                        uint32_t center_pixel = canvas_buffer[pixel_count / 2];
-                        std::cout << "转换后第一个像素ARGB: 0x" << std::hex << first_pixel << std::dec << std::endl;
-                        std::cout << "转换后中心像素ARGB: 0x" << std::hex << center_pixel << std::dec << std::endl;
+                        uint32_t dst_first = canvas_buffer[0];
+                        uint32_t dst_center = canvas_buffer[320 * 960 + 480];
                         
-                        // 强制刷新canvas和显示
+                        std::cout << "目标数据 - 第一个像素ARGB: 0x" << std::hex << dst_first << std::dec;
+                        std::cout << " [A=" << ((dst_first >> 24) & 0xFF)
+                                 << ",R=" << ((dst_first >> 16) & 0xFF)
+                                 << ",G=" << ((dst_first >> 8) & 0xFF)
+                                 << ",B=" << (dst_first & 0xFF) << "]" << std::endl;
+                                 
+                        std::cout << "目标数据 - 中心像素ARGB: 0x" << std::hex << dst_center << std::dec;
+                        std::cout << " [A=" << ((dst_center >> 24) & 0xFF)
+                                 << ",R=" << ((dst_center >> 16) & 0xFF)
+                                 << ",G=" << ((dst_center >> 8) & 0xFF)
+                                 << ",B=" << (dst_center & 0xFF) << "]" << std::endl;
+                        
+                        // 刷新显示
                         lv_obj_invalidate(canvas);
-                        lv_refr_now(NULL);  // 立即刷新显示
-                        std::cout << "Canvas刷新和立即更新完成" << std::endl;
-                    } else {
-                        std::cout << "错误：Canvas缓冲区获取失败" << std::endl;
+                        lv_refr_now(NULL);
+                        std::cout << "Canvas刷新完成" << std::endl;
                     }
                 } else {
                     std::cout << "错误：Canvas对象获取失败" << std::endl;
                 }
-                #else
-                std::cout << "LVGL未启用，跳过canvas更新" << std::endl;
                 #endif
                 
                 new_frame_available_ = false;
-            } else {
-                std::cout << "最新帧为空，跳过处理" << std::endl;
             }
-        } else if (!lvgl_interface_) {
-            std::cout << "LVGL界面指针为空" << std::endl;
         }
         
         // 帧率控制

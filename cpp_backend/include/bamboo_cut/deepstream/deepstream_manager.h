@@ -115,7 +115,7 @@ struct DeepStreamConfig {
         , camera_fps(30)
         , sink_mode(VideoSinkMode::APPSINK)  // 默认使用appsink软件合成
         , overlay()  // 使用默认叠加平面配置
-        , camera_source(CameraSourceMode::VIDEOTESTSRC)  // 默认使用测试源
+        , camera_source(CameraSourceMode::NVARGUSCAMERA)  // 默认使用真实摄像头
         , test_pattern(0)  // 默认测试图案
         , video_file_path("/opt/bamboo-cut/test_video.mp4")  // 默认测试视频文件
         , enable_software_composition(true)  // 启用软件合成
