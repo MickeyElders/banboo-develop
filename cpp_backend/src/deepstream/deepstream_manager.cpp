@@ -1377,9 +1377,12 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
         
-        // 使用nvarguscamerasrc + nvvidconv硬件加速处理
+        // 🔧 修复：简化nvarguscamerasrc管道，直接使用NV12格式
+        std::cout << "🔧 构建原生分辨率AppSink管道: " << buildCameraSource(config) << " ! video/x-raw(memory:NVMM),width=" << width << ",height=" << height << ",framerate=30/1,format=NV12 ! nvvidconv ! video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! queue max-size-buffers=2 leaky=downstream ! appsink name=video_appsink emit-signals=true sync=false max-buffers=2 drop=true" << std::endl;
+        
         pipeline << buildCameraSource(config) << " ! "
-                 << "nvvidconv ! "  // NVMM -> 标准格式转换和缩放（硬件加速）
+                 << "video/x-raw(memory:NVMM),width=" << width << ",height=" << height << ",framerate=30/1,format=NV12 ! "
+                 << "nvvidconv ! "  // NVMM -> 标准内存转换
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
