@@ -928,36 +928,54 @@ void DeepStreamManager::cleanup() {
 }
 
 // 新增：构建摄像头源字符串
+// 修复：移除不支持的属性
 std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config) {
     std::ostringstream source;
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 真实摄像头源 - 优先使用实际硬件
-            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "bufapi-version=1 "
-                   << "maxperf=true "
-                   << "wbmode=0 "
-                   << "saturation=1.2 "        // 增加饱和度
-                   << "exposuretimerange=\"34000 358733000\" "  // 自动曝光范围
-                   << "gainrange=\"1 16\" "     // 增益范围
-                   << "aelock=false "           // 自动曝光
-                   << "awblock=false "          // 自动白平衡
-                   << "! "
-                   << "video/x-raw(memory:NVMM),width=" << config.camera_width
+            // 🔧 修复：移除 bufapi-version，保留基础和兼容性最好的属性
+            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " ";
+            
+            // 可选：添加性能优化属性（如果需要且支持）
+            // source << "maxperf=true ";  // 可能不支持，先注释
+            
+            // 图像质量相关属性（通常都支持）
+            if (config.saturation != 1.0) {
+                source << "saturation=" << config.saturation << " ";
+            }
+            
+            // 曝光和增益范围（标准属性）
+            source << "exposuretimerange=\"" << config.min_exposure 
+                   << " " << config.max_exposure << "\" ";
+            source << "gainrange=\"" << config.min_gain 
+                   << " " << config.max_gain << "\" ";
+            
+            // 白平衡模式
+            source << "wbmode=" << config.wb_mode << " ";
+            
+            // 自动曝光/白平衡锁定
+            source << "aelock=" << (config.ae_lock ? "true" : "false") << " ";
+            source << "awblock=" << (config.awb_lock ? "true" : "false") << " ";
+            
+            // 视频格式
+            source << "! video/x-raw(memory:NVMM)"
+                   << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1,format=NV12";
+                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",format=NV12";
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
-            // 虚拟测试源 - 使用稳定的彩色条纹图案
-            source << "videotestsrc pattern=0 "     // 使用彩色条纹图案而非smpte
+            // 虚拟测试源 - 使用稳定的SMPTE彩条图案
+            source << "videotestsrc pattern=smpte "
                    << "is-live=true "
                    << "do-timestamp=true "
-                   << "! "
-                   << "video/x-raw,width=" << config.camera_width
+                   << "! video/x-raw"
+                   << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1,format=I420";
+                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",format=I420";
             break;
             
         case CameraSourceMode::FILESRC:
@@ -966,23 +984,76 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
                    << "! decodebin "
                    << "! videoscale "
                    << "! videoconvert "
-                   << "! video/x-raw,width=" << config.camera_width
+                   << "! video/x-raw"
+                   << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1,format=I420";
+                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",format=I420";
             break;
             
         default:
-            // 默认使用真实摄像头，如果失败回退到测试源
-            std::cout << "默认尝试使用真实摄像头源..." << std::endl;
-            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                   << "bufapi-version=1 maxperf=true wbmode=0 "
-                   << "! video/x-raw(memory:NVMM),width=" << config.camera_width
+            // 默认使用稳定的测试源
+            source << "videotestsrc pattern=smpte "
+                   << "is-live=true "
+                   << "do-timestamp=true "
+                   << "! video/x-raw"
+                   << ",width=" << config.camera_width
                    << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1,format=NV12";
+                   << ",framerate=" << config.camera_fps << "/1"
+                   << ",format=I420";
             break;
     }
     
     return source.str();
+}
+
+// 🆕 可选：添加属性检测函数
+bool DeepStreamManager::checkGStreamerProperty(const char* element_name, 
+                                                const char* property_name) {
+    GstElement* element = gst_element_factory_make(element_name, "test_element");
+    if (!element) {
+        std::cout << "无法创建元素: " << element_name << std::endl;
+        return false;
+    }
+    
+    // 检查属性是否存在
+    GParamSpec* spec = g_object_class_find_property(
+        G_OBJECT_GET_CLASS(element), property_name);
+    
+    bool has_property = (spec != nullptr);
+    
+    if (has_property) {
+        std::cout << "✓ " << element_name << " 支持属性: " 
+                  << property_name << std::endl;
+    } else {
+        std::cout << "✗ " << element_name << " 不支持属性: " 
+                  << property_name << std::endl;
+    }
+    
+    gst_object_unref(element);
+    return has_property;
+}
+
+// 🆕 在 initialize() 中添加属性检测（可选）
+void DeepStreamManager::detectCameraCapabilities() {
+    std::cout << "\n=== 检测摄像头元素支持的属性 ===" << std::endl;
+    
+    const char* properties[] = {
+        "bufapi-version",
+        "maxperf",
+        "saturation",
+        "exposuretimerange",
+        "gainrange",
+        "wbmode",
+        "aelock",
+        "awblock"
+    };
+    
+    for (const char* prop : properties) {
+        checkGStreamerProperty("nvarguscamerasrc", prop);
+    }
+    
+    std::cout << "===================================\n" << std::endl;
 }
 
 // 新增：构建KMSSink管道 - 解决多层显示冲突
