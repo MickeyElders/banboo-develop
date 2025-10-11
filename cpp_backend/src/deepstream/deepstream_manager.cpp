@@ -999,10 +999,17 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 使用JetPack 6的硬件加速转换器
+    // 使用JetPack 6的硬件加速转换器（正确的分步骤转换）
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 对于真实摄像头（NVMM格式），使用nvvidconv硬件加速
+        // 对于真实摄像头（NVMM格式），分两步转换：
+        // 第一步：NV12 → RGBA（保持在NVMM硬件加速内存中）
         pipeline << "nvvidconv ! "
+                 << "video/x-raw(memory:NVMM),format=RGBA ! ";
+        
+        // 第二步：RGBA(NVMM) → BGRA（转到系统内存）+ 尺寸调整
+        pipeline << "nvvidconv ! "
+                 << "video/x-raw,format=BGRA ! "
+                 << "videoscale ! "
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     } else {
         // 对于测试源（普通内存），使用软件转换
@@ -1043,10 +1050,17 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 使用JetPack 6的硬件加速转换器（NVMM零拷贝）
+    // 使用JetPack 6的硬件加速转换器（正确的分步骤转换）
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 对于真实摄像头（NVMM格式），使用nvvidconv硬件加速
+        // 对于真实摄像头（NVMM格式），分两步转换：
+        // 第一步：NV12 → RGBA（保持在NVMM硬件加速内存中）
         pipeline << "nvvidconv ! "
+                 << "video/x-raw(memory:NVMM),format=RGBA ! ";
+        
+        // 第二步：RGBA(NVMM) → BGRA（转到系统内存）+ 尺寸调整
+        pipeline << "nvvidconv ! "
+                 << "video/x-raw,format=BGRA ! "
+                 << "videoscale ! "
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     } else {
         // 对于测试源（普通内存），使用软件转换
