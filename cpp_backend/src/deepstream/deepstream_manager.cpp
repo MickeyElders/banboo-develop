@@ -949,9 +949,7 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     // 🔧 修复：配置Xvfb环境以解决nvarguscamerasrc EGL初始化问题
     std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
-    if (!bamboo_cut::ui::XvfbManager::setupEnvironment()) {
-        std::cout << "⚠️ Xvfb环境设置失败，可能影响nvarguscamerasrc启动" << std::endl;
-    }
+    bamboo_cut::ui::XvfbManager::setupEnvironment();
     
     // 🔧 关键修复：使用真实摄像头源 + AR24格式输出到overlay plane-id=44
     pipeline << buildCameraSource(config) << " ! "
@@ -1210,9 +1208,7 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     // 🔧 修复：配置Xvfb环境以解决nvarguscamerasrc EGL初始化问题
     std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
-    if (!bamboo_cut::ui::XvfbManager::setupEnvironment()) {
-        std::cout << "⚠️ Xvfb环境设置失败，可能影响nvarguscamerasrc启动" << std::endl;
-    }
+    bamboo_cut::ui::XvfbManager::setupEnvironment();
     
     // 🔧 关键修复：使用nvarguscamerasrc + GBM共享DRM资源
     std::cout << "🔧 构建GBM共享DRM的KMSSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
