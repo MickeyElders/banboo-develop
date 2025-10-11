@@ -1003,27 +1003,24 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 添加颜色空间转换和缩放，使用更兼容的格式流程
+    // 使用更兼容的格式流程，避免ARGB32兼容性问题
     pipeline << "videoconvert ! "
-             << "video/x-raw,format=BGRx ! "    // 先转换为BGRx格式
+             << "video/x-raw,format=BGRA ! "    // 使用BGRA替代ARGB32
              << "videoscale ! "
-             << "video/x-raw,format=BGRx,width=" << width << ",height=" << height << " ! "
-             << "videoconvert ! "               // 再转换为目标格式
-             << "video/x-raw,format=" << config.target_pixel_format
-             << ",width=" << width << ",height=" << height << " ! "
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
              << "queue "
              << "max-size-buffers=2 "      // 减少缓冲区降低延迟
              << "max-size-time=0 "
              << "leaky=downstream "        // 丢弃旧帧防止堆积
              << "! ";
     
-    // 使用appsink进行软件合成
+    // 使用appsink进行软件合成，使用BGRA格式
     pipeline << "appsink name=video_appsink "
              << "emit-signals=true "       // 启用新样本信号
              << "sync=false "              // 异步模式降低延迟
              << "max-buffers=2 "           // 最多缓冲2帧
              << "drop=true "               // 丢弃过多的帧
-             << "caps=video/x-raw,format=" << config.target_pixel_format
+             << "caps=video/x-raw,format=BGRA"
              << ",width=" << width << ",height=" << height;
     
     std::cout << "构建AppSink软件合成管道 (LVGL兼容): " << pipeline.str() << std::endl;
@@ -1083,17 +1080,8 @@ void DeepStreamManager::compositeFrameToLVGL(GstMapInfo* map_info, int width, in
         // 创建OpenCV Mat包装GStreamer数据，避免内存拷贝
         cv::Mat frame;
         
-        if (config_.target_pixel_format == "BGRA") {
-            // BGRA格式 - 直接包装数据
-            frame = cv::Mat(height, width, CV_8UC4, map_info->data);
-        } else if (config_.target_pixel_format == "BGR") {
-            // BGR格式
-            frame = cv::Mat(height, width, CV_8UC3, map_info->data);
-        } else {
-            // 其他格式暂时跳过
-            std::cout << "警告：不支持的像素格式 " << config_.target_pixel_format << std::endl;
-            return;
-        }
+        // 统一使用BGRA格式，确保兼容性
+        frame = cv::Mat(height, width, CV_8UC4, map_info->data);
         
         // 检查帧数据有效性
         if (!frame.empty() && frame.data) {

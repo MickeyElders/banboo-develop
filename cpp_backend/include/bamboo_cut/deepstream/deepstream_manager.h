@@ -119,7 +119,7 @@ struct DeepStreamConfig {
         , video_file_path("/opt/bamboo-cut/test_video.mp4")  // 默认测试视频文件
         , enable_software_composition(true)  // 启用软件合成
         , composition_fps(30)  // 30fps合成
-        , target_pixel_format("ARGB32") {}  // LVGL兼容的像素格式
+        , target_pixel_format("BGRA") {}  // 使用更兼容的BGRA格式
 };
 
 /**
