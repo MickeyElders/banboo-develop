@@ -72,6 +72,12 @@ help:
 	@echo "  build-debug      - 构建调试版本"
 	@echo "  clean            - 清理构建目录"
 	@echo ""
+	@echo "$(GREEN)单进程统一架构:$(NC)"
+	@echo "  unified          - 构建单进程LVGL+GStreamer统一架构"
+	@echo "  unified-run      - 运行统一架构"
+	@echo "  unified-test     - 测试统一架构和环境"
+	@echo "  unified-clean    - 清理统一架构构建文件"
+	@echo ""
 	@echo "$(GREEN)安装命令:$(NC)"
 	@echo "  install          - 完整安装系统"
 	@echo "  install-deps     - 安装所有依赖(系统+LVGL)"
@@ -474,6 +480,49 @@ uninstall:
 	@sudo systemctl daemon-reload
 	@sudo rm -rf $(INSTALL_DIR)
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统已卸载"
+
+# === 单进程统一架构 ===
+unified: unified-build
+	@echo "$(GREEN)[SUCCESS]$(NC) 单进程统一架构构建完成"
+
+unified-build:
+	@echo "$(CYAN)[UNIFIED]$(NC) 构建单进程LVGL+GStreamer统一架构..."
+	@PKG_CONFIG_PATH=/usr/local/lib/pkgconfig g++ -o simple_unified_main \
+		simple_unified_main.cpp \
+		$$(pkg-config --cflags --libs lvgl) \
+		$$(pkg-config --cflags --libs gstreamer-1.0) \
+		$$(pkg-config --cflags --libs gstreamer-app-1.0) \
+		-lEGL -lpthread \
+		-std=c++17 -O2 -DENABLE_LVGL=1
+	@echo "$(GREEN)[SUCCESS]$(NC) 统一架构编译完成: ./simple_unified_main"
+
+unified-run:
+	@echo "$(BLUE)[INFO]$(NC) 运行单进程统一架构..."
+	@if [ ! -f "./simple_unified_main" ]; then \
+		echo "$(RED)[ERROR]$(NC) 统一架构可执行文件不存在，请先运行 make unified"; \
+		exit 1; \
+	fi
+	@sudo ./simple_unified_main
+
+unified-test:
+	@echo "$(BLUE)[INFO]$(NC) 测试单进程统一架构..."
+	@echo "$(CYAN)检查EGL环境...$(NC)"
+	@if command -v eglinfo >/dev/null 2>&1; then \
+		eglinfo | head -10; \
+	else \
+		echo "$(YELLOW)[WARNING]$(NC) eglinfo未安装，跳过EGL检查"; \
+	fi
+	@echo "$(CYAN)检查DRM设备...$(NC)"
+	@ls -la /dev/dri/ || echo "$(YELLOW)[WARNING]$(NC) DRM设备不可用"
+	@echo "$(CYAN)检查摄像头设备...$(NC)"
+	@ls -la /dev/video* || echo "$(YELLOW)[WARNING]$(NC) 摄像头设备不可用"
+	@echo "$(GREEN)[SUCCESS]$(NC) 环境检查完成，运行统一架构..."
+	@$(MAKE) unified-run
+
+unified-clean:
+	@echo "$(BLUE)[INFO]$(NC) 清理统一架构构建文件..."
+	@rm -f simple_unified_main
+	@echo "$(GREEN)[SUCCESS]$(NC) 清理完成"
 
 # === 开发辅助 ===
 dev-run:

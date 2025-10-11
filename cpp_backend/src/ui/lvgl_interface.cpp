@@ -7,6 +7,7 @@
 
 #include "bamboo_cut/ui/lvgl_interface.h"
 #include "bamboo_cut/ui/gbm_display_backend.h"
+#include "bamboo_cut/ui/egl_context_manager.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
