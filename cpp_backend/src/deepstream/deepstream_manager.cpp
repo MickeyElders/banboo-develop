@@ -725,24 +725,22 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
              
     switch (config.sink_mode) {
         case VideoSinkMode::NVDRMVIDEOSINK:
-            pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
-                     << "nvdrmvideosink ";
-            // 使用正确的nvdrmvideosink属性
-            if (config.overlay.plane_id != -1) {
-                pipeline << "plane-id=" << config.overlay.plane_id << " ";
-            }
-            // 添加位置参数
-            pipeline << "offset-x=" << layout.offset_x << " "
-                    << "offset-y=" << layout.offset_y << " ";
-            // nvdrmvideosink不支持zorder，使用conn-id和crtc-id代替
-            if (config.overlay.connector_id != -1) {
-                pipeline << "conn-id=" << config.overlay.connector_id << " ";
-            }
-            if (config.overlay.crtc_id != -1) {
-                pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
-            }
-            pipeline << "set-mode=false "；
-            break;
+        pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
+                << "nvdrmvideosink ";
+        if (config.overlay.plane_id != -1) {
+            pipeline << "plane-id=" << config.overlay.plane_id << " ";
+        }
+        if (config.overlay.connector_id != -1) {
+            pipeline << "conn-id=" << config.overlay.connector_id << " ";
+        }
+        if (config.overlay.crtc_id != -1) {
+            pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
+        }
+        pipeline << "offset-x=" << layout.offset_x << " "
+                << "offset-y=" << layout.offset_y << " "
+                << "set-mode=false "
+                << "sync=false"; 
+        break;
         case VideoSinkMode::WAYLANDSINK:
             pipeline << "video/x-raw,format=RGBA ! "
                      << "waylandsink "
