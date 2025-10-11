@@ -761,10 +761,10 @@ private:
             // 设置视频输出模式为nvdrmvideosink (叠加平面模式)
             std::cout << "配置nvdrmvideosink叠加平面模式..." << std::endl;
             
-            // 设置为appsink软件合成模式（解决CRTC冲突）
-            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::APPSINK)) {
-                std::cout << "警告：appsink模式设置失败，尝试回退到nvdrmvideosink模式" << std::endl;
-                if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::NVDRMVIDEOSINK)) {
+            // 设置为kmssink KMS多层渲染模式（默认模式）
+            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::KMSSINK)) {
+                std::cout << "警告：kmssink模式设置失败，尝试回退到appsink模式" << std::endl;
+                if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::APPSINK)) {
                     std::cout << "错误：所有视频输出模式设置都失败" << std::endl;
                     return false;
                 }

@@ -114,7 +114,7 @@ struct DeepStreamConfig {
         , camera_width(1280)
         , camera_height(720)
         , camera_fps(30)
-        , sink_mode(VideoSinkMode::APPSINK)  // 默认使用appsink软件合成
+        , sink_mode(VideoSinkMode::KMSSINK)  // 默认使用kmssink KMS多层渲染
         , overlay()  // 使用默认叠加平面配置
         , camera_source(CameraSourceMode::NVARGUSCAMERA)  // 默认使用真实摄像头
         , test_pattern(0)  // 默认测试图案
