@@ -1210,13 +1210,15 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 构建Bayer格式摄像头源
+    // 🔧 修复：使用摄像头原生分辨率然后缩放到目标尺寸
+    std::cout << "🔧 构建原生分辨率KMSSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
+    
+    // 构建摄像头源（使用原生分辨率）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 修复：正确处理Bayer转换后的RGB格式
-    // buildCameraSource现在输出RGB格式，需要转换为BGRA
-    pipeline << "videoconvert ! "  // RGB -> BGRA转换
-             << "videoscale ! "
+    // 格式转换和缩放
+    pipeline << "videoconvert ! "  // 统一转换为标准格式
+             << "videoscale ! "    // 缩放到目标尺寸
              << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
@@ -1246,7 +1248,7 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
                  << "restore-crtc=true";       // 退出时恢复CRTC状态
     }
     
-    std::cout << "🔧 构建Bayer处理KMSSink管道 (智能overlay plane选择): " << pipeline.str() << std::endl;
+    std::cout << "🔧 构建原生分辨率KMSSink管道 (智能overlay plane选择): " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
