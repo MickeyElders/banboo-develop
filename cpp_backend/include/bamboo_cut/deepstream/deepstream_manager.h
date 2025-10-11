@@ -217,6 +217,16 @@ public:
      * @return 检测到的叠加平面配置，失败时返回空配置
      */
     DRMOverlayConfig detectAvailableOverlayPlane();
+    
+    /**
+     * @brief 启动Canvas更新线程
+     */
+    void startCanvasUpdateThread();
+    
+    /**
+     * @brief 停止Canvas更新线程
+     */
+    void stopCanvasUpdateThread();
 
 private:
     /**
@@ -277,16 +287,6 @@ private:
      * @return 是否有新帧可用
      */
     bool getLatestCompositeFrame(cv::Mat& frame);
-    
-    /**
-     * @brief 启动Canvas更新线程
-     */
-    void startCanvasUpdateThread();
-    
-    /**
-     * @brief 停止Canvas更新线程
-     */
-    void stopCanvasUpdateThread();
     
     /**
      * @brief Canvas更新线程主循环
