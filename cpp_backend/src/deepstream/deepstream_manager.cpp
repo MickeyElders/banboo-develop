@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <thread>
+#include <chrono>
 
 namespace bamboo_cut {
 namespace deepstream {
