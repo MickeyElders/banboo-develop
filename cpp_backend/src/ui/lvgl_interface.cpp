@@ -536,7 +536,7 @@ bool LVGLInterface::initializeDisplay() {
     DRMSharedConfig gbm_config;
     gbm_config.width = config_.screen_width;
     gbm_config.height = config_.screen_height;
-    gbm_config.connector_id = 0;  // 自动检测
+    gbm_config.connector_id = 63;  // 使用modetest检测到的正确Connector ID
     gbm_config.crtc_id = 0;      // 自动检测
     gbm_config.primary_plane_id = 0;   // 自动检测primary plane (LVGL)
     gbm_config.overlay_plane_id = 44;  // 用户指定的overlay plane (GStreamer)
