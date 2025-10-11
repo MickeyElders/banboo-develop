@@ -536,14 +536,14 @@ bool setupDRMDisplay(int drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
             std::cout << "[DRM] 显示器模式: " << drm_width << "x" << drm_height
                       << " @" << mode->vrefresh << "Hz" << std::endl;
             
-            // 查找合适的CRTC并创建framebuffer（共享模式）
+            // 查找合适的CRTC并创建framebuffer（独占模式）
             if (findSuitableCRTC(drm_fd, resources, connector, crtc) &&
                 createFramebuffer(drm_fd, drm_width, drm_height, fb_id, fb_handle,
                                  framebuffer, stride, buffer_size)) {
                 
-                // 🔧 修复：使用非独占模式，只创建framebuffer不设置CRTC
-                std::cout << "[DRM] 使用共享DRM模式，不独占CRTC" << std::endl;
-                setCRTCMode(drm_fd, crtc, fb_id, connector, mode);  // 这里现在只是记录，不实际设置
+                // 🔧 恢复：使用LVGL独占模式，完整设置CRTC
+                std::cout << "[DRM] 使用LVGL独占DRM模式，设置CRTC" << std::endl;
+                setCRTCMode(drm_fd, crtc, fb_id, connector, mode);  // 现在完整设置CRTC
                 
                 drmModeFreeResources(resources);
                 return true;
