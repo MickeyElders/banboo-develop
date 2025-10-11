@@ -110,68 +110,156 @@ bool DeepStreamManager::start() {
 }
 
 bool DeepStreamManager::startSinglePipelineMode() {
-    // 构建管道
-    std::string pipeline_str = buildPipeline(config_, video_layout_);
-    std::cout << "管道字符串: " << pipeline_str << std::endl;
+    const int MAX_RETRIES = 3;
+    const int RETRY_DELAY_MS = 1000;
     
-    // 创建管道
-    GError *error = nullptr;
-    pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
-    
-    if (!pipeline_ || error) {
-        std::cerr << "创建管道失败: " << (error ? error->message : "未知错误") << std::endl;
-        if (error) g_error_free(error);
-        return false;
-    }
-    
-    // 设置消息总线
-    bus_ = gst_element_get_bus(pipeline_);
-    bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
-    
-    // 启动管道 - 添加详细错误诊断
-    std::cout << "正在设置管道状态为PLAYING..." << std::endl;
-    GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
-    
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        std::cerr << "启动管道失败，进行错误诊断..." << std::endl;
-        
-        // 获取详细错误信息
-        GstBus* bus = gst_element_get_bus(pipeline_);
-        GstMessage* msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
-            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
-            
-        if (msg) {
-            GError* err;
-            gchar* debug_info;
-            gst_message_parse_error(msg, &err, &debug_info);
-            std::cerr << "GStreamer错误: " << err->message << std::endl;
-            if (debug_info) {
-                std::cerr << "调试信息: " << debug_info << std::endl;
-                g_free(debug_info);
-            }
-            g_error_free(err);
-            gst_message_unref(msg);
+    for (int retry = 0; retry < MAX_RETRIES; retry++) {
+        if (retry > 0) {
+            std::cout << "重试启动管道 (第" << retry + 1 << "次尝试)..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
         }
-        gst_object_unref(bus);
         
-        cleanup();
-        return false;
-    } else if (ret == GST_STATE_CHANGE_ASYNC) {
-        std::cout << "管道异步启动中，等待状态变化..." << std::endl;
-        // 等待异步状态变化完成
-        GstState state;
-        ret = gst_element_get_state(pipeline_, &state, NULL, GST_CLOCK_TIME_NONE);
-        if (ret == GST_STATE_CHANGE_FAILURE) {
-            std::cerr << "管道异步启动失败" << std::endl;
-            cleanup();
+        // 构建管道
+        std::string pipeline_str = buildPipeline(config_, video_layout_);
+        std::cout << "管道字符串: " << pipeline_str << std::endl;
+        
+        // 创建管道
+        GError *error = nullptr;
+        pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
+        
+        if (!pipeline_ || error) {
+            std::cerr << "创建管道失败: " << (error ? error->message : "未知错误") << std::endl;
+            if (error) g_error_free(error);
+            if (retry < MAX_RETRIES - 1) continue;
             return false;
         }
+        
+        // 检查NVMM缓冲区可用性
+        if (!checkNVMMBufferAvailability()) {
+            std::cout << "NVMM缓冲区检查失败，等待释放..." << std::endl;
+            if (pipeline_) {
+                gst_object_unref(pipeline_);
+                pipeline_ = nullptr;
+            }
+            if (retry < MAX_RETRIES - 1) continue;
+        }
+        
+        // 设置消息总线
+        bus_ = gst_element_get_bus(pipeline_);
+        bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
+        
+        // 启动管道 - 添加详细错误诊断和重试机制
+        std::cout << "正在设置管道状态为PLAYING..." << std::endl;
+        GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
+        
+        if (ret == GST_STATE_CHANGE_FAILURE) {
+            std::cerr << "启动管道失败，进行错误诊断..." << std::endl;
+            
+            // 获取详细错误信息
+            GstBus* bus = gst_element_get_bus(pipeline_);
+            GstMessage* msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
+                static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
+                
+            if (msg) {
+                GError* err;
+                gchar* debug_info;
+                gst_message_parse_error(msg, &err, &debug_info);
+                std::cerr << "GStreamer错误: " << err->message << std::endl;
+                if (debug_info) {
+                    std::cerr << "调试信息: " << debug_info << std::endl;
+                    
+                    // 检查是否为NVMM相关错误
+                    if (strstr(debug_info, "NvBuffer") || strstr(debug_info, "NVMM")) {
+                        std::cout << "检测到NVMM缓冲区错误，准备重试..." << std::endl;
+                    }
+                    g_free(debug_info);
+                }
+                g_error_free(err);
+                gst_message_unref(msg);
+            }
+            gst_object_unref(bus);
+            
+            cleanup();
+            if (retry < MAX_RETRIES - 1) continue;
+            return false;
+        } else if (ret == GST_STATE_CHANGE_ASYNC) {
+            std::cout << "管道异步启动中，等待状态变化..." << std::endl;
+            // 增加超时时间，给NVMM缓冲区分配更多时间
+            GstState state;
+            ret = gst_element_get_state(pipeline_, &state, NULL, 10 * GST_SECOND);
+            if (ret == GST_STATE_CHANGE_FAILURE) {
+                std::cerr << "管道异步启动失败" << std::endl;
+                cleanup();
+                if (retry < MAX_RETRIES - 1) continue;
+                return false;
+            }
+        }
+        
+        // 成功启动，跳出重试循环
+        break;
     }
     
     running_ = true;
-    const char* mode_name = config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK ? 
+    const char* mode_name = config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK ?
         "DRM叠加平面模式" : "窗口模式";
     std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL分离显示)" << std::endl;
+    return true;
+}
+
+// 新增：检查NVMM缓冲区可用性
+bool DeepStreamManager::checkNVMMBufferAvailability() {
+    std::cout << "检查NVMM缓冲区可用性..." << std::endl;
+    
+    // 检查系统内存使用情况
+    std::ifstream meminfo("/proc/meminfo");
+    if (meminfo.is_open()) {
+        std::string line;
+        long total_mem = 0, available_mem = 0;
+        
+        while (std::getline(meminfo, line)) {
+            if (line.find("MemTotal:") == 0) {
+                sscanf(line.c_str(), "MemTotal: %ld kB", &total_mem);
+            } else if (line.find("MemAvailable:") == 0) {
+                sscanf(line.c_str(), "MemAvailable: %ld kB", &available_mem);
+            }
+        }
+        meminfo.close();
+        
+        if (total_mem > 0 && available_mem > 0) {
+            double memory_usage = 1.0 - (double)available_mem / total_mem;
+            std::cout << "系统内存使用率: " << (memory_usage * 100) << "%" << std::endl;
+            
+            if (memory_usage > 0.9) { // 内存使用超过90%
+                std::cout << "系统内存使用率过高，可能影响NVMM缓冲区分配" << std::endl;
+                return false;
+            }
+        }
+    }
+    
+    // 检查NVIDIA GPU内存
+    std::string gpu_mem_cmd = "nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo '0,0'";
+    FILE* pipe = popen(gpu_mem_cmd.c_str(), "r");
+    if (pipe) {
+        char buffer[128];
+        if (fgets(buffer, sizeof(buffer), pipe)) {
+            int used_mem = 0, total_mem = 0;
+            sscanf(buffer, "%d, %d", &used_mem, &total_mem);
+            
+            if (total_mem > 0) {
+                double gpu_usage = (double)used_mem / total_mem;
+                std::cout << "GPU内存使用率: " << (gpu_usage * 100) << "%" << std::endl;
+                
+                if (gpu_usage > 0.9) { // GPU内存使用超过90%
+                    std::cout << "GPU内存使用率过高，可能影响NVMM缓冲区分配" << std::endl;
+                    pclose(pipe);
+                    return false;
+                }
+            }
+        }
+        pclose(pipe);
+    }
+    
+    std::cout << "NVMM缓冲区可用性检查通过" << std::endl;
     return true;
 }
 
@@ -646,12 +734,22 @@ std::string DeepStreamManager::buildNV3DSinkPipeline(
     std::ostringstream pipeline;
     
     // 使用 nv3dsink 窗口模式（与LVGL共存）
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+             << "bufapi-version=1 " // 使用新的缓冲区API
+             << "maxperf=true "      // 启用最大性能模式
+             << "! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert ! "
+             << "nvvideoconvert "
+             << "interpolation-method=5 "  // 高质量插值
+             << "! "
              << "video/x-raw(memory:NVMM),format=RGBA ! "
+             << "queue "
+             << "max-size-buffers=8 "      // 增加缓冲区队列深度
+             << "max-size-time=0 "         // 无时间限制
+             << "leaky=downstream "        // 当队列满时丢弃下游数据
+             << "! "
              << "nv3dsink "
              << "window-x=" << offset_x << " "
              << "window-y=" << offset_y << " "

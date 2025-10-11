@@ -626,7 +626,16 @@ public:
 
 private:
     void workerLoop() {
-        std::cout << "Inference worker thread started" << std::endl;
+        std::cout << "Inference worker thread started (延迟启动模式)" << std::endl;
+        
+        // 延迟启动DeepStream，确保LVGL完全初始化
+        if (!use_mock_data_ && deepstream_manager_) {
+            std::cout << "工作线程中延迟启动DeepStream..." << std::endl;
+            if (!startDeepStreamManagerDelayed()) {
+                std::cout << "DeepStream延迟启动失败，切换到模拟模式" << std::endl;
+                use_mock_data_ = true;
+            }
+        }
         
         auto last_frame_time = std::chrono::steady_clock::now();
         const auto target_interval = std::chrono::milliseconds(33); // 30fps
@@ -730,7 +739,7 @@ private:
             config.camera_height = 720;
             config.camera_fps = 30;  // 确保30fps提高稳定性
             
-            // 初始化 DeepStream 管理器
+            // 初始化 DeepStream 管理器 (但暂不启动)
             if (!deepstream_manager_->initialize(config)) {
                 std::cout << "DeepStream 管理器初始化失败" << std::endl;
                 return false;
@@ -748,13 +757,7 @@ private:
                 }
             }
             
-            // 启动 DeepStream 管理器
-            if (!deepstream_manager_->start()) {
-                std::cout << "DeepStream 管理器启动失败" << std::endl;
-                return false;
-            }
-            
-            std::cout << "DeepStream 管理器初始化并启动成功" << std::endl;
+            std::cout << "DeepStream 管理器初始化完成 (延迟启动模式)" << std::endl;
             
             // 显示当前sink模式
             auto current_mode = deepstream_manager_->getCurrentSinkMode();
@@ -766,6 +769,26 @@ private:
             std::cout << "DeepStream 管理器初始化异常: " << e.what() << std::endl;
             return false;
         }
+    }
+    
+    // === 延迟启动DeepStream管理器 ===
+    bool startDeepStreamManagerDelayed() {
+        if (!deepstream_manager_) {
+            std::cout << "错误：DeepStream管理器尚未初始化" << std::endl;
+            return false;
+        }
+        
+        std::cout << "等待LVGL完全初始化..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(2)); // 延迟2秒确保LVGL完全就绪
+        
+        std::cout << "启动DeepStream管理器..." << std::endl;
+        if (!deepstream_manager_->start()) {
+            std::cout << "DeepStream 管理器启动失败" << std::endl;
+            return false;
+        }
+        
+        std::cout << "DeepStream 管理器延迟启动成功" << std::endl;
+        return true;
     }
     
     float getCpuUsage() const { return 45.0f; } // 简化实现
@@ -944,13 +967,17 @@ public:
     void run() {
         std::cout << "Starting integrated system..." << std::endl;
         
+        // 延迟启动推理工作线程，确保UI先完全启动
+        std::cout << "等待UI完全初始化..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        
         // 启动推理工作线程
         if (!inference_worker_->start()) {
             std::cout << "Inference thread startup failed" << std::endl;
             return;
         }
         
-        std::cout << "Inference thread started" << std::endl;
+        std::cout << "Inference thread started with delayed startup" << std::endl;
         std::cout << "Press Ctrl+C to exit system" << std::endl;
         
         // 主线程运行UI (阻塞)

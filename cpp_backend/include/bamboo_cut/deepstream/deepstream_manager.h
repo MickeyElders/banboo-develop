@@ -187,6 +187,12 @@ private:
      * @return 是否成功
      */
     bool setupDRMOverlayPlane();
+    
+    /**
+     * @brief 检查NVMM缓冲区可用性
+     * @return 是否有足够的NVMM缓冲区可用
+     */
+    bool checkNVMMBufferAvailability();
 
     /**
      * @brief 构建nvdrmvideosink管道
