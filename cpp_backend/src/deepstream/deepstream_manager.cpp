@@ -1050,38 +1050,37 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 使用JetPack 6的硬件加速转换器（正确的分步骤转换）
+    // ✅ 修复：nvvidconv只输出RGBA，用videoconvert转BGRA
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 对于真实摄像头（NVMM格式），分两步转换：
-        // 第一步：NV12 → RGBA（保持在NVMM硬件加速内存中）
-        pipeline << "nvvidconv ! "
-                 << "video/x-raw(memory:NVMM),format=RGBA ! ";
-        
-        // 第二步：RGBA(NVMM) → BGRA（转到系统内存）+ 尺寸调整
-        pipeline << "nvvidconv ! "
+        // 真实摄像头：使用硬件加速转换
+        pipeline << "nvvidconv ! "                               // NVMM NV12 → RGBA
+                 << "video/x-raw,format=RGBA ! "                 // 转到系统内存RGBA
+                 << "videoconvert ! "                            // RGBA → BGRA（软件转换）
                  << "video/x-raw,format=BGRA ! "
-                 << "videoscale ! "
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+                 << "videoscale ! "                              // 调整尺寸
+                 << "video/x-raw,format=BGRA,width=" << width 
+                 << ",height=" << height << " ! ";
     } else {
-        // 对于测试源（普通内存），使用软件转换
+        // 测试源：直接使用软件转换
         pipeline << "videoconvert ! "
                  << "video/x-raw,format=BGRA ! "
                  << "videoscale ! "
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
+                 << "video/x-raw,format=BGRA,width=" << width 
+                 << ",height=" << height << " ! ";
     }
     
     pipeline << "queue "
-             << "max-size-buffers=2 "      // 减少缓冲区降低延迟
+             << "max-size-buffers=2 "
              << "max-size-time=0 "
-             << "leaky=downstream "        // 丢弃旧帧防止堆积
+             << "leaky=downstream "
              << "! ";
     
-    // 使用appsink进行软件合成，使用BGRA格式
+    // appsink配置
     pipeline << "appsink name=video_appsink "
-             << "emit-signals=true "       // 启用新样本信号
-             << "sync=false "              // 异步模式降低延迟
-             << "max-buffers=2 "           // 最多缓冲2帧
-             << "drop=true "               // 丢弃过多的帧
+             << "emit-signals=true "
+             << "sync=false "
+             << "max-buffers=2 "
+             << "drop=true "
              << "caps=video/x-raw,format=BGRA"
              << ",width=" << width << ",height=" << height;
     
