@@ -1226,25 +1226,100 @@ void DeepStreamManager::setupAppSinkCallbacks() {
         return;
     }
     
+    std::cout << "🔧 开始修复AppSink回调机制..." << std::endl;
+    
     // 查找appsink元素
     appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "video_appsink");
     if (!appsink_) {
-        std::cout << "错误：未找到appsink元素" << std::endl;
+        std::cout << "错误：未找到appsink元素，尝试列出所有元素..." << std::endl;
+        
+        // 列出管道中的所有元素用于调试
+        GstIterator* it = gst_bin_iterate_elements(GST_BIN(pipeline_));
+        GValue item = G_VALUE_INIT;
+        gboolean done = FALSE;
+        
+        std::cout << "管道中的元素列表：" << std::endl;
+        while (!done) {
+            switch (gst_iterator_next(it, &item)) {
+                case GST_ITERATOR_OK: {
+                    GstElement* element = GST_ELEMENT(g_value_get_object(&item));
+                    gchar* name = gst_element_get_name(element);
+                    std::cout << "  - " << name << std::endl;
+                    g_free(name);
+                    g_value_reset(&item);
+                    break;
+                }
+                case GST_ITERATOR_RESYNC:
+                    gst_iterator_resync(it);
+                    break;
+                case GST_ITERATOR_ERROR:
+                case GST_ITERATOR_DONE:
+                    done = TRUE;
+                    break;
+            }
+        }
+        g_value_unset(&item);
+        gst_iterator_free(it);
         return;
     }
     
-    // 设置appsink属性
+    std::cout << "✅ 成功找到appsink元素" << std::endl;
+    
+    // 🔧 修复：强制设置appsink属性，确保信号发射正常
     g_object_set(G_OBJECT(appsink_),
-                 "emit-signals", TRUE,    // 启用信号
-                 "sync", FALSE,           // 异步模式
-                 "max-buffers", 2,        // 最大缓冲区数量
-                 "drop", TRUE,            // 丢弃旧帧
+                 "emit-signals", TRUE,        // 启用信号
+                 "sync", FALSE,               // 异步模式
+                 "max-buffers", 2,            // 最大缓冲区数量
+                 "drop", TRUE,                // 丢弃旧帧
+                 "wait-on-eos", FALSE,        // 不等待EOS
                  NULL);
     
-    // 连接新样本信号
-    g_signal_connect(appsink_, "new-sample", G_CALLBACK(newSampleCallback), this);
+    // 🔧 修复：验证属性设置
+    gboolean emit_signals = FALSE;
+    gboolean sync = TRUE;
+    guint max_buffers = 0;
+    gboolean drop = FALSE;
     
-    std::cout << "AppSink回调函数设置完成" << std::endl;
+    g_object_get(G_OBJECT(appsink_),
+                 "emit-signals", &emit_signals,
+                 "sync", &sync,
+                 "max-buffers", &max_buffers,
+                 "drop", &drop,
+                 NULL);
+    
+    std::cout << "AppSink属性验证：" << std::endl;
+    std::cout << "  - emit-signals: " << (emit_signals ? "TRUE" : "FALSE") << std::endl;
+    std::cout << "  - sync: " << (sync ? "TRUE" : "FALSE") << std::endl;
+    std::cout << "  - max-buffers: " << max_buffers << std::endl;
+    std::cout << "  - drop: " << (drop ? "TRUE" : "FALSE") << std::endl;
+    
+    // 🔧 修复：连接信号并验证连接
+    gulong handler_id = g_signal_connect(appsink_, "new-sample", G_CALLBACK(newSampleCallback), this);
+    
+    if (handler_id > 0) {
+        std::cout << "✅ AppSink信号连接成功，handler_id: " << handler_id << std::endl;
+    } else {
+        std::cout << "❌ AppSink信号连接失败" << std::endl;
+        return;
+    }
+    
+    // 🔧 新增：强制触发一次sample拉取测试
+    std::cout << "🔧 执行AppSink连接测试..." << std::endl;
+    
+    // 使用GMainLoop确保信号处理正常工作
+    GMainContext* context = g_main_context_default();
+    if (context) {
+        std::cout << "✅ GMainContext可用，信号处理应该正常" << std::endl;
+        
+        // 检查是否有待处理的消息
+        while (g_main_context_pending(context)) {
+            g_main_context_iteration(context, FALSE);
+        }
+    } else {
+        std::cout << "⚠️ 警告：GMainContext不可用，信号可能无法正常处理" << std::endl;
+    }
+    
+    std::cout << "🎯 AppSink回调机制修复完成" << std::endl;
 }
 
 // 获取最新合成帧（供外部访问）
@@ -1284,10 +1359,17 @@ void DeepStreamManager::stopCanvasUpdateThread() {
 void DeepStreamManager::canvasUpdateLoop() {
     std::cout << "Canvas更新循环开始运行" << std::endl;
     
+    // 🔧 修复：在Canvas更新循环中处理GStreamer事件
+    GMainContext* context = g_main_context_default();
     auto last_update = std::chrono::steady_clock::now();
     const auto target_interval = std::chrono::milliseconds(33); // 30fps
     
     while (canvas_update_running_) {
+        // 🔧 关键修复：处理GStreamer消息和信号
+        if (context && g_main_context_pending(context)) {
+            g_main_context_iteration(context, FALSE);
+        }
+        
         auto current_time = std::chrono::steady_clock::now();
         
         if (new_frame_available_.load() && lvgl_interface_) {

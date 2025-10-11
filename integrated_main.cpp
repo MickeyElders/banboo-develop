@@ -1004,20 +1004,22 @@ public:
     void run() {
         std::cout << "Starting integrated system..." << std::endl;
         
-        // 延迟启动推理工作线程，确保UI先完全启动
-        std::cout << "等待UI完全初始化..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        // 🔧 修改启动顺序：先启动推理线程（让GStreamer先占用DRM），再让LVGL启动
+        std::cout << "🔧 采用新的启动顺序：推理线程优先启动..." << std::endl;
         
-        // 启动推理工作线程
+        // 先启动推理工作线程，让GStreamer优先占用DRM资源
         if (!inference_worker_->start()) {
             std::cout << "Inference thread startup failed" << std::endl;
             return;
         }
         
-        std::cout << "Inference thread started with delayed startup" << std::endl;
+        std::cout << "推理线程已启动，等待GStreamer完全初始化..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(3)); // 给GStreamer充足时间初始化
+        
+        std::cout << "现在启动LVGL主循环..." << std::endl;
         std::cout << "Press Ctrl+C to exit system" << std::endl;
         
-        // 主线程运行UI (阻塞)
+        // 主线程运行UI (阻塞) - LVGL现在是次要的
         ui_manager_->runMainLoop();
         
         std::cout << "Starting system shutdown..." << std::endl;

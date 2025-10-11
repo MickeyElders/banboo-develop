@@ -456,10 +456,9 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
             drm_fd = -1;
         }
         
-        // 🔧 关键修改：使用只读模式 O_RDONLY 而非 O_RDWR，避免独占资源
-        drm_fd = open(device_path, O_RDONLY);
+        drm_fd = open(device_path, O_RDWR);
         if (drm_fd >= 0) {
-            std::cout << "[DRM] 以只读模式打开设备: " << device_path << " fd=" << drm_fd << std::endl;
+            std::cout << "[DRM] 成功打开设备: " << device_path << " fd=" << drm_fd << std::endl;
             device_opened = true;
             
             // 检测驱动类型
@@ -470,16 +469,19 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
                 
                 std::cout << "[DRM] 驱动类型: " << driver_name
                           << (is_nvidia ? " (NVIDIA GPU)" : is_tegra ? " (Tegra)" : " (其他)") << std::endl;
-                std::cout << "[DRM] 🔧 使用非独占共享模式，与GStreamer兼容" << std::endl;
+                
+                // 优先使用nvidia-drm，如果可用的话
+                if (is_nvidia) {
+                    std::cout << "[DRM] 使用优化的NVIDIA-DRM配置" << std::endl;
+                }
             }
             
-            // 🔧 使用标准设置流程，但修改为只读模式避免独占
             if (setupDRMDisplay(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
                                drm_width, drm_height, stride, buffer_size)) {
-                std::cout << "[DRM] 设备 " << device_path << " 共享模式初始化成功" << std::endl;
+                std::cout << "[DRM] 设备 " << device_path << " 初始化成功" << std::endl;
                 return true;
             } else {
-                std::cout << "[DRM] 设备 " << device_path << " 共享模式初始化失败" << std::endl;
+                std::cout << "[DRM] 设备 " << device_path << " 初始化失败，尝试下一个设备" << std::endl;
                 if (drm_fd >= 0) {
                     close(drm_fd);
                     drm_fd = -1;
