@@ -635,9 +635,6 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
         pipeline << "conn-id=" << config.overlay.connector_id << " ";
     }
     
-    if (config.overlay.crtc_id != -1) {
-        pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
-    }
     
     // 添加位置参数
     pipeline << "offset-x=" << offset_x << " "
@@ -732,9 +729,6 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
         }
         if (config.overlay.connector_id != -1) {
             pipeline << "conn-id=" << config.overlay.connector_id << " ";
-        }
-        if (config.overlay.crtc_id != -1) {
-            pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
         }
         pipeline << "offset-x=" << layout.offset_x << " "
                 << "offset-y=" << layout.offset_y << " "
