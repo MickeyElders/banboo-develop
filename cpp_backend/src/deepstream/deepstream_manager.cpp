@@ -703,18 +703,20 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 临时使用测试源代替摄像头，验证 DRM 显示
-    pipeline << "videotestsrc pattern=smpte ! "  // SMPTE 彩条测试图案
-             << "video/x-raw,width=" << config.camera_width
-             << ",height=" << config.camera_height
+    // 先用测试源验证 kmssink
+    pipeline << "videotestsrc pattern=smpte ! "
+             << "video/x-raw,width=" << width
+             << ",height=" << height
              << ",framerate=" << config.camera_fps << "/1 ! "
-             << "videoconvert ! "  // 使用普通 videoconvert，不需要 NVMM
-             << "video/x-raw,format=BGRx ! "  // DRM 兼容格式
-             << "nvdrmvideosink "
-             << "offset-x=" << offset_x << " "
-             << "offset-y=" << offset_y << " "
-             << "set-mode=false "
-             << "sync=false";
+             << "videoconvert ! "
+             << "video/x-raw,format=BGRx ! "  // kmssink 支持的格式
+             << "kmssink "
+             << "driver-name=nvidia-drm "     // 使用 nvidia-drm 驱动
+             << "plane-id=44 "                // overlay plane
+             << "connector-id=63 "            // 从检测中获取的 connector
+             << "can-scale=true "             // 启用缩放支持
+             << "force-modesetting=false "    // 不改变显示模式
+             << "sync=false";                 // 降低延迟
     
     return pipeline.str();
 }
