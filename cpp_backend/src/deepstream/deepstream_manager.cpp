@@ -613,7 +613,6 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 使用 nvdrmvideosink（DRM叠加平面模式，独立于LVGL显示层）
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
@@ -621,20 +620,19 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
              << "nvvideoconvert ! "
              << "video/x-raw(memory:NVMM),format=RGBA ! "
              << "nvdrmvideosink ";
-             
-    // 使用正确的nvdrmvideosink属性
+    
+    // 关键：必须明确指定使用 card1 (nvidia-drm)
+    pipeline << "device=/dev/dri/card1 ";
+    
+    // 然后指定 plane-id
     if (config.overlay.plane_id != -1) {
         pipeline << "plane-id=" << config.overlay.plane_id << " ";
     }
-
     
-    
-    // 添加位置参数
+    // 位置参数
     pipeline << "offset-x=" << offset_x << " "
-             << "offset-y=" << offset_y << " ";
-    
-    // 其他设置（nvdrmvideosink不支持zorder属性，层级由DRM硬件平面类型决定）
-    pipeline << "set-mode=false "
+             << "offset-y=" << offset_y << " "
+             << "set-mode=false "
              << "show-preroll-frame=false "
              << "sync=false";
              
@@ -716,17 +714,15 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
     switch (config.sink_mode) {
         case VideoSinkMode::NVDRMVIDEOSINK:
         pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
-                << "nvdrmvideosink ";
+                << "nvdrmvideosink "
+                << "device=/dev/dri/card1 ";  // 关键！
         if (config.overlay.plane_id != -1) {
             pipeline << "plane-id=" << config.overlay.plane_id << " ";
-        }
-        if (config.overlay.connector_id != -1) {
-            pipeline << "conn-id=" << config.overlay.connector_id << " ";
         }
         pipeline << "offset-x=" << layout.offset_x << " "
                 << "offset-y=" << layout.offset_y << " "
                 << "set-mode=false "
-                << "sync=false"; 
+                << "sync=false";
         break;
         case VideoSinkMode::WAYLANDSINK:
             pipeline << "video/x-raw,format=RGBA ! "
