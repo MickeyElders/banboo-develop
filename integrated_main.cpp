@@ -761,13 +761,11 @@ private:
             // 设置视频输出模式为nvdrmvideosink (叠加平面模式)
             std::cout << "配置nvdrmvideosink叠加平面模式..." << std::endl;
             
-            // 设置为kmssink KMS多层渲染模式（默认模式）
-            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::KMSSINK)) {
-                std::cout << "警告：kmssink模式设置失败，尝试回退到appsink模式" << std::endl;
-                if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::APPSINK)) {
-                    std::cout << "错误：所有视频输出模式设置都失败" << std::endl;
-                    return false;
-                }
+            // 🔧 修复：强制使用appsink软件合成模式，避免DRM plane冲突
+            std::cout << "🔧 强制使用appsink模式，避免与LVGL的DRM plane冲突..." << std::endl;
+            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::APPSINK)) {
+                std::cout << "错误：appsink模式设置失败" << std::endl;
+                return false;
             }
             
             std::cout << "DeepStream 管理器初始化完成 (延迟启动模式)" << std::endl;
@@ -775,7 +773,7 @@ private:
             // 显示当前sink模式
             auto current_mode = deepstream_manager_->getCurrentSinkMode();
             const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
-            std::cout << "当前sink模式: " << mode_names[static_cast<int>(current_mode)] << std::endl;
+            std::cout << "✅ 当前sink模式: " << mode_names[static_cast<int>(current_mode)] << " (避免DRM冲突)" << std::endl;
             return true;
             
         } catch (const std::exception& e) {
