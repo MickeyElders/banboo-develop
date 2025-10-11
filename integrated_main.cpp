@@ -758,15 +758,8 @@ private:
                 return false;
             }
             
-            // 设置视频输出模式为nvdrmvideosink (叠加平面模式)
-            std::cout << "配置nvdrmvideosink叠加平面模式..." << std::endl;
-            
-            // 🔧 修复：强制使用appsink软件合成模式，避免DRM plane冲突
-            std::cout << "🔧 强制使用appsink模式，避免与LVGL的DRM plane冲突..." << std::endl;
-            if (!deepstream_manager_->switchSinkMode(deepstream::VideoSinkMode::APPSINK)) {
-                std::cout << "错误：appsink模式设置失败" << std::endl;
-                return false;
-            }
+            // 使用默认配置的sink模式（在头文件中已设置为APPSINK）
+            std::cout << "使用默认配置的sink模式..." << std::endl;
             
             std::cout << "DeepStream 管理器初始化完成 (延迟启动模式)" << std::endl;
             
