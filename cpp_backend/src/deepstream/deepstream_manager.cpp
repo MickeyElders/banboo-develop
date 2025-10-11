@@ -140,7 +140,11 @@ bool DeepStreamManager::start() {
 
 bool DeepStreamManager::startSinglePipelineMode() {
     const int MAX_RETRIES = 3;
-    const int RETRY_DELAY_MS = 1000;
+    const int RETRY_DELAY_MS = 3000;  // 增加重试延迟到2秒
+    
+    // 等待LVGL完全初始化后再启动DeepStream
+    std::cout << "等待LVGL完全初始化..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(3000));  // 等待3秒确保LVGL完全初始化
     
     for (int retry = 0; retry < MAX_RETRIES; retry++) {
         if (retry > 0) {
@@ -177,7 +181,7 @@ bool DeepStreamManager::startSinglePipelineMode() {
         bus_ = gst_element_get_bus(pipeline_);
         bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
         
-        // 启动管道 - 添加详细错误诊断和重试机制
+        // 启动管道 - 添加详细错误诊断和重试机制，增加Argus超时处理
         std::cout << "正在设置管道状态为PLAYING..." << std::endl;
         GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
         
@@ -197,9 +201,11 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 if (debug_info) {
                     std::cerr << "调试信息: " << debug_info << std::endl;
                     
-                    // 检查是否为NVMM相关错误
-                    if (strstr(debug_info, "NvBuffer") || strstr(debug_info, "NVMM")) {
-                        std::cout << "检测到NVMM缓冲区错误，准备重试..." << std::endl;
+                    // 检查是否为NVMM相关错误或Argus超时
+                    if (strstr(debug_info, "NvBuffer") || strstr(debug_info, "NVMM") ||
+                        strstr(debug_info, "Argus") || strstr(debug_info, "Timeout")) {
+                        std::cout << "检测到NVMM/Argus缓冲区错误，等待更长时间后重试..." << std::endl;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5000));  // 额外等待5秒
                     }
                     g_free(debug_info);
                 }
@@ -213,9 +219,9 @@ bool DeepStreamManager::startSinglePipelineMode() {
             return false;
         } else if (ret == GST_STATE_CHANGE_ASYNC) {
             std::cout << "管道异步启动中，等待状态变化..." << std::endl;
-            // 增加超时时间，给NVMM缓冲区分配更多时间
+            // 大幅增加超时时间，给NVMM/Argus缓冲区分配更多时间
             GstState state;
-            ret = gst_element_get_state(pipeline_, &state, NULL, 10 * GST_SECOND);
+            ret = gst_element_get_state(pipeline_, &state, NULL, 30 * GST_SECOND);  // 增加到30秒
             if (ret == GST_STATE_CHANGE_FAILURE) {
                 std::cerr << "管道异步启动失败" << std::endl;
                 cleanup();
@@ -934,8 +940,10 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 真实摄像头源 - JetPack 6兼容配置
+            // 真实摄像头源 - JetPack 6兼容配置，增加超时和重试设置
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "timeout=10 "                  // 增加超时到10秒
+                   << "retry=3 "                     // 重试3次
                    << "wbmode=0 "                    // 自动白平衡
                    << "aelock=false "                // 自动曝光不锁定
                    << "awblock=false "               // 自动白平衡不锁定
@@ -974,6 +982,7 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             // 默认使用真实摄像头，如果失败回退到测试源
             std::cout << "默认尝试使用真实摄像头源..." << std::endl;
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "timeout=10 retry=3 "          // 增加超时和重试设置
                    << "wbmode=0 "
                    << "! video/x-raw(memory:NVMM)"
                    << ",width=" << config.camera_width
