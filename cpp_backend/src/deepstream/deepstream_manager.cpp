@@ -1377,16 +1377,15 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
         
-        // 🔧 修复：简化nvarguscamerasrc管道，直接使用NV12格式
-        std::cout << "🔧 构建原生分辨率AppSink管道: " << buildCameraSource(config) << " ! video/x-raw(memory:NVMM),width=" << width << ",height=" << height << ",framerate=30/1,format=NV12 ! nvvidconv ! video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! queue max-size-buffers=2 leaky=downstream ! appsink name=video_appsink emit-signals=true sync=false max-buffers=2 drop=true" << std::endl;
-        
+        // 🔧 修复：简化nvarguscamerasrc管道，让GStreamer自动协商格式
         pipeline << buildCameraSource(config) << " ! "
-                 << "video/x-raw(memory:NVMM),width=" << width << ",height=" << height << ",framerate=30/1,format=NV12 ! "
                  << "nvvidconv ! "  // NVMM -> 标准内存转换
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
+        
+        std::cout << "🔧 构建原生分辨率AppSink管道: " << pipeline.str() << std::endl;
                  
     } else if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
         // ✅ 测试源直接使用目标分辨率
