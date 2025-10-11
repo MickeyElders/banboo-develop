@@ -47,11 +47,11 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     }
     
     // 检查视频输出sink可用性
-    const char* sink_names[] = {"nvdrmvideosink", "nv3dsink", "nveglglessink"};
+    const char* sink_names[] = {"kmssink", "nvdrmvideosink", "waylandsink"};
     const char* sink_descriptions[] = {
-        "nvdrmvideosink (DRM叠加平面模式，独立显示层)",
-        "nv3dsink (窗口模式，与LVGL兼容)",
-        "nveglglessink (EGL窗口模式)"
+        "kmssink (KMS多层渲染模式，推荐)",
+        "nvdrmvideosink (DRM叠加平面模式)",
+        "waylandsink (Wayland合成器模式)"
     };
     
     bool found_sink = false;
@@ -71,8 +71,8 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     // 设置DRM叠加平面
     if (config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
         if (!setupDRMOverlayPlane()) {
-            std::cout << "DRM叠加平面设置失败，将回退到nv3dsink模式" << std::endl;
-            config_.sink_mode = VideoSinkMode::NV3DSINK;
+            std::cout << "DRM叠加平面设置失败，将回退到kmssink模式" << std::endl;
+            config_.sink_mode = VideoSinkMode::KMSSINK;
         }
     }
     
@@ -202,8 +202,8 @@ bool DeepStreamManager::startSinglePipelineMode() {
     }
     
     running_ = true;
-    const char* mode_name = config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK ?
-        "DRM叠加平面模式" : "窗口模式";
+    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+    const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
     std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL分离显示)" << std::endl;
     return true;
 }
@@ -327,8 +327,8 @@ bool DeepStreamManager::startSplitScreenMode() {
     }
     
     running_ = true;
-    const char* mode_name = config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK ? 
-        "DRM叠加平面模式" : "窗口模式";
+    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+    const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
     std::cout << "双摄像头并排显示管道启动成功 (" << mode_name << ")" << std::endl;
     return true;
 }
@@ -400,8 +400,8 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
 }
 
 bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
-    const char* mode_names[] = {"nv3dsink", "nvdrmvideosink", "waylandsink"};
-    std::cout << "切换sink模式: " << mode_names[static_cast<int>(config_.sink_mode)] 
+    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+    std::cout << "切换sink模式: " << mode_names[static_cast<int>(config_.sink_mode)]
               << " -> " << mode_names[static_cast<int>(sink_mode)] << std::endl;
     
     // 停止当前管道
@@ -417,8 +417,8 @@ bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
     // 如果切换到nvdrmvideosink，设置叠加平面
     if (sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
         if (!setupDRMOverlayPlane()) {
-            std::cerr << "DRM叠加平面设置失败，无法切换到nvdrmvideosink模式" << std::endl;
-            config_.sink_mode = VideoSinkMode::NV3DSINK;  // 回退
+            std::cerr << "DRM叠加平面设置失败，无法切换到nvdrmvideosink模式，回退到kmssink" << std::endl;
+            config_.sink_mode = VideoSinkMode::KMSSINK;  // 回退到kmssink
             return false;
         }
     }
@@ -688,9 +688,9 @@ std::string DeepStreamManager::buildSplitScreenPipeline(
             return buildNVDRMVideoSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::WAYLANDSINK:
             return buildWaylandSinkPipeline(config, offset_x, offset_y, width, height);
-        case VideoSinkMode::NV3DSINK:
+        case VideoSinkMode::KMSSINK:
         default:
-            return buildNV3DSinkPipeline(config, offset_x, offset_y, width, height);
+            return buildKMSSinkPipeline(config, offset_x, offset_y, width, height);
     }
 }
 
@@ -721,41 +721,6 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     return pipeline.str();
 }
 
-std::string DeepStreamManager::buildNV3DSinkPipeline(
-    const DeepStreamConfig& config,
-    int offset_x,
-    int offset_y,
-    int width,
-    int height) {
-    
-    std::ostringstream pipeline;
-    
-    // 使用 nv3dsink 窗口模式（与LVGL共存）
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-             << "bufapi-version=1 " // 使用新的缓冲区API
-             << "maxperf=true "      // 启用最大性能模式
-             << "! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width
-             << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert "
-             << "interpolation-method=5 "  // 高质量插值
-             << "! "
-             << "video/x-raw(memory:NVMM),format=RGBA ! "
-             << "queue "
-             << "max-size-buffers=8 "      // 增加缓冲区队列深度
-             << "max-size-time=0 "         // 无时间限制
-             << "leaky=downstream "        // 当队列满时丢弃下游数据
-             << "! "
-             << "nv3dsink "
-             << "window-x=" << offset_x << " "
-             << "window-y=" << offset_y << " "
-             << "window-width=" << width << " "
-             << "window-height=" << height << " "
-             << "sync=false";  // 降低延迟
-    
-    return pipeline.str();
-}
 
 std::string DeepStreamManager::buildWaylandSinkPipeline(
     const DeepStreamConfig& config,
@@ -813,15 +778,17 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
                      << "waylandsink "
                      << "sync=false";
             break;
-        case VideoSinkMode::NV3DSINK:
+        case VideoSinkMode::KMSSINK:
         default:
-            pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
-                     << "nv3dsink "
-                     << "window-x=" << layout.offset_x << " "
-                     << "window-y=" << layout.offset_y << " "
-                     << "window-width=" << layout.width << " "
-                     << "window-height=" << layout.height << " "
-                     << "sync=false";
+            pipeline << "videoconvert ! "
+                     << "videoscale ! "
+                     << "video/x-raw,format=BGRA,width=" << layout.width
+                     << ",height=" << layout.height << " ! "
+                     << "queue max-size-buffers=4 max-size-time=0 leaky=downstream ! "
+                     << "kmssink "
+                     << "connector-id=-1 plane-id=-1 "
+                     << "force-modesetting=false can-scale=true "
+                     << "sync=false restore-crtc=true";
             break;
     }
     
@@ -906,6 +873,93 @@ void DeepStreamManager::cleanup() {
         gst_object_unref(pipeline2_);
         pipeline2_ = nullptr;
     }
+}
+
+// 新增：构建摄像头源字符串
+std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config) {
+    std::ostringstream source;
+    
+    switch (config.camera_source) {
+        case CameraSourceMode::NVARGUSCAMERA:
+            // 真实摄像头
+            source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "bufapi-version=1 "
+                   << "maxperf=true "
+                   << "wbmode=0 "
+                   << "! "
+                   << "video/x-raw(memory:NVMM),width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1,format=NV12";
+            break;
+            
+        case CameraSourceMode::VIDEOTESTSRC:
+            // 虚拟测试源 - 兼容多层显示系统
+            source << "videotestsrc pattern=" << config.test_pattern << " "
+                   << "is-live=true "
+                   << "do-timestamp=true "
+                   << "! "
+                   << "video/x-raw,width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1,format=I420";
+            break;
+            
+        case CameraSourceMode::FILESRC:
+            // 文件源
+            source << "filesrc location=" << config.video_file_path << " "
+                   << "! decodebin "
+                   << "! videoscale "
+                   << "! videoconvert "
+                   << "! video/x-raw,width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1,format=I420";
+            break;
+            
+        default:
+            // 默认使用测试源
+            source << "videotestsrc pattern=smpte is-live=true do-timestamp=true "
+                   << "! video/x-raw,width=" << config.camera_width
+                   << ",height=" << config.camera_height
+                   << ",framerate=" << config.camera_fps << "/1,format=I420";
+            break;
+    }
+    
+    return source.str();
+}
+
+// 新增：构建KMSSink管道 - 解决多层显示冲突
+std::string DeepStreamManager::buildKMSSinkPipeline(
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
+    std::ostringstream pipeline;
+    
+    // 构建摄像头源
+    pipeline << buildCameraSource(config) << " ! ";
+    
+    // 添加颜色空间转换和缩放
+    pipeline << "videoconvert ! "
+             << "videoscale ! "
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+             << "queue "
+             << "max-size-buffers=4 "      // 适中的缓冲区深度
+             << "max-size-time=0 "
+             << "leaky=downstream "
+             << "! ";
+    
+    // 使用kmssink - 更好的多层渲染兼容性
+    pipeline << "kmssink "
+             << "connector-id=-1 "         // 自动检测连接器
+             << "plane-id=-1 "             // 自动检测平面
+             << "force-modesetting=false " // 不强制设置模式
+             << "can-scale=true "          // 启用硬件缩放
+             << "sync=false "              // 低延迟模式
+             << "restore-crtc=true";       // 退出时恢复CRTC状态
+    
+    std::cout << "构建KMSSink管道 (多层渲染兼容): " << pipeline.str() << std::endl;
+    return pipeline.str();
 }
 
 } // namespace deepstream

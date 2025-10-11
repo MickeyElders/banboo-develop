@@ -27,9 +27,18 @@ enum class DualCameraMode {
  * @brief 视频输出模式
  */
 enum class VideoSinkMode {
-    NV3DSINK,           ///< nv3dsink窗口模式
     NVDRMVIDEOSINK,     ///< nvdrmvideosink DRM叠加平面模式
-    WAYLANDSINK         ///< waylandsink模式
+    WAYLANDSINK,        ///< waylandsink模式
+    KMSSINK             ///< kmssink KMS多层渲染模式 (推荐)
+};
+
+/**
+ * @brief 摄像头源模式
+ */
+enum class CameraSourceMode {
+    NVARGUSCAMERA,      ///< nvarguscamerasrc (真实摄像头)
+    VIDEOTESTSRC,       ///< videotestsrc (虚拟测试源)
+    FILESRC             ///< filesrc (文件源)
 };
 
 /**
@@ -200,14 +209,20 @@ private:
     std::string buildNVDRMVideoSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
 
     /**
-     * @brief 构建nv3dsink管道
-     */
-    std::string buildNV3DSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
-
-    /**
      * @brief 构建waylandsink管道
      */
     std::string buildWaylandSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+    
+    /**
+     * @brief 构建kmssink管道
+     */
+    std::string buildKMSSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+    
+    /**
+     * @brief 构建摄像头源字符串
+     */
+    std::string buildCameraSource(const DeepStreamConfig& config);
+    
     /**
      * @brief 计算视频显示区域布局
      */
