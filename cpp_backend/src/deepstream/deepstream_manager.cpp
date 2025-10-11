@@ -28,11 +28,30 @@ DeepStreamManager::DeepStreamManager()
     , bus_watch_id_(0)
     , bus_watch_id2_(0)
     , appsink_(nullptr)
+    , lvgl_interface_(nullptr)
+    , canvas_update_running_(false)
     , running_(false)
     , initialized_(false) {
 }
 
+DeepStreamManager::DeepStreamManager(void* lvgl_interface)
+    : pipeline_(nullptr)
+    , pipeline2_(nullptr)
+    , bus_(nullptr)
+    , bus2_(nullptr)
+    , bus_watch_id_(0)
+    , bus_watch_id2_(0)
+    , appsink_(nullptr)
+    , lvgl_interface_(lvgl_interface)
+    , canvas_update_running_(false)
+    , running_(false)
+    , initialized_(false) {
+    
+    std::cout << "DeepStreamManager 构造函数完成（支持LVGL界面集成）" << std::endl;
+}
+
 DeepStreamManager::~DeepStreamManager() {
+    stopCanvasUpdateThread();
     stop();
     cleanup();
 }
@@ -1136,6 +1155,110 @@ bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
         return true;
     }
     return false;
+}
+
+void DeepStreamManager::startCanvasUpdateThread() {
+    if (canvas_update_running_ || !lvgl_interface_) {
+        return;
+    }
+    
+    canvas_update_running_ = true;
+    canvas_update_thread_ = std::thread(&DeepStreamManager::canvasUpdateLoop, this);
+    std::cout << "Canvas更新线程已启动" << std::endl;
+}
+
+void DeepStreamManager::stopCanvasUpdateThread() {
+    if (!canvas_update_running_) {
+        return;
+    }
+    
+    canvas_update_running_ = false;
+    if (canvas_update_thread_.joinable()) {
+        canvas_update_thread_.join();
+    }
+    std::cout << "Canvas更新线程已停止" << std::endl;
+}
+
+void DeepStreamManager::canvasUpdateLoop() {
+    std::cout << "Canvas更新循环开始运行" << std::endl;
+    
+    auto last_update = std::chrono::steady_clock::now();
+    const auto target_interval = std::chrono::milliseconds(33); // 30fps
+    
+    while (canvas_update_running_) {
+        auto current_time = std::chrono::steady_clock::now();
+        
+        // 检查是否有新帧可用
+        if (new_frame_available_.load() && lvgl_interface_) {
+            std::lock_guard<std::mutex> lock(frame_mutex_);
+            
+            if (!latest_frame_.empty()) {
+                // 获取LVGL界面的camera canvas
+                #ifdef ENABLE_LVGL
+                auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
+                lv_obj_t* canvas = lvgl_if->getCameraCanvas();
+                
+                if (canvas) {
+                    // 转换OpenCV Mat到LVGL格式
+                    cv::Mat display_frame;
+                    if (latest_frame_.channels() == 4) {
+                        // BGRA格式，直接使用
+                        display_frame = latest_frame_;
+                    } else if (latest_frame_.channels() == 3) {
+                        // BGR格式，转换为BGRA
+                        cv::cvtColor(latest_frame_, display_frame, cv::COLOR_BGR2BGRA);
+                    } else {
+                        // 其他格式，先转换为BGR再转换为BGRA
+                        cv::cvtColor(latest_frame_, display_frame, cv::COLOR_GRAY2BGR);
+                        cv::cvtColor(display_frame, display_frame, cv::COLOR_BGR2BGRA);
+                    }
+                    
+                    // 调整尺寸到canvas大小 (960x640)
+                    if (display_frame.cols != 960 || display_frame.rows != 640) {
+                        cv::resize(display_frame, display_frame, cv::Size(960, 640));
+                    }
+                    
+                    // 获取canvas缓冲区并更新
+                    lv_img_dsc_t* canvas_dsc = lv_canvas_get_img(canvas);
+                    if (canvas_dsc && canvas_dsc->data) {
+                        // 复制像素数据到canvas缓冲区
+                        const size_t pixel_count = 960 * 640;
+                        const size_t bytes_to_copy = pixel_count * 4; // BGRA, 4字节每像素
+                        
+                        if (display_frame.isContinuous()) {
+                            std::memcpy((void*)canvas_dsc->data, display_frame.data, bytes_to_copy);
+                        } else {
+                            // 逐行复制
+                            for (int row = 0; row < display_frame.rows; ++row) {
+                                std::memcpy(
+                                    (uint8_t*)canvas_dsc->data + row * 960 * 4,
+                                    display_frame.ptr(row),
+                                    960 * 4
+                                );
+                            }
+                        }
+                        
+                        // 通知LVGL刷新canvas
+                        lv_obj_invalidate(canvas);
+                        std::cout << "Canvas已更新新帧" << std::endl;
+                    }
+                }
+                #endif
+                
+                new_frame_available_ = false;
+            }
+        }
+        
+        // 帧率控制
+        auto processing_time = std::chrono::steady_clock::now() - current_time;
+        auto sleep_time = target_interval - processing_time;
+        
+        if (sleep_time > std::chrono::milliseconds(0)) {
+            std::this_thread::sleep_for(sleep_time);
+        }
+    }
+    
+    std::cout << "Canvas更新循环已退出" << std::endl;
 }
 
 } // namespace deepstream

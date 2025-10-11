@@ -34,20 +34,27 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_set_style_pad_all(camera_panel_, 0, 0);  // 移除所有内边距
     lv_obj_set_style_pad_gap(camera_panel_, 0, 0);  // 移除间隔
     
-    // 创建完全透明的视频显示区域占位符
-    camera_canvas_ = lv_obj_create(camera_panel_);
+    // 创建真正的LVGL canvas用于appsink软件合成
+    camera_canvas_ = lv_canvas_create(camera_panel_);
     lv_obj_set_width(camera_canvas_, lv_pct(100));
     lv_obj_set_flex_grow(camera_canvas_, 1);  // 占据大部分空间
     
-    // 设置为完全透明 - 这里只是占位，实际视频由 nvdrmvideosink 显示
-    lv_obj_set_style_bg_opa(camera_canvas_, LV_OPA_TRANSP, 0);
+    // 为canvas分配缓冲区 (960x640, BGRA格式, 32位/像素)
+    static uint32_t canvas_buffer[960 * 640];  // 静态缓冲区避免栈溢出
+    lv_canvas_set_buffer(camera_canvas_, canvas_buffer, 960, 640, LV_IMG_CF_TRUE_COLOR_ALPHA);
+    
+    // 设置canvas样式
+    lv_obj_set_style_bg_opa(camera_canvas_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_opa(camera_canvas_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_shadow_opa(camera_canvas_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_outline_opa(camera_canvas_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_pad_all(camera_canvas_, 0, 0);
     lv_obj_clear_flag(camera_canvas_, LV_OBJ_FLAG_SCROLLABLE);
     
-    std::cout << "Camera panel set to fully transparent for nvdrmvideosink hardware layer" << std::endl;
+    // 初始化canvas为黑色背景
+    lv_canvas_fill_bg(camera_canvas_, lv_color_black(), LV_OPA_COVER);
+    
+    std::cout << "Camera canvas created for appsink software composition (960x640 BGRA)" << std::endl;
     
     // 半透明控制覆盖层 - 保持控件可见但不遮挡视频
     lv_obj_t* control_overlay = lv_obj_create(camera_panel_);

@@ -572,6 +572,7 @@ private:
     std::unique_ptr<inference::BambooDetector> detector_;
     std::unique_ptr<deepstream::DeepStreamManager> deepstream_manager_;
     bool use_mock_data_ = false;
+    void* lvgl_interface_ptr_ = nullptr;  // 用于存储LVGL界面指针
     
     // 性能统计
     int processed_frames_ = 0;
@@ -579,8 +580,13 @@ private:
     float current_fps_ = 0.0f;
 
 public:
-    InferenceWorkerThread(IntegratedDataBridge* bridge) 
+    InferenceWorkerThread(IntegratedDataBridge* bridge)
         : data_bridge_(bridge), last_stats_time_(std::chrono::steady_clock::now()) {}
+    
+    // 设置LVGL界面指针
+    void setLVGLInterface(void* lvgl_interface) {
+        lvgl_interface_ptr_ = lvgl_interface;
+    }
     
     ~InferenceWorkerThread() {
         stop();
@@ -721,8 +727,14 @@ private:
         std::cout << "初始化 DeepStream 管理器..." << std::endl;
         
         try {
-            // 创建 DeepStream 管理器实例
-            deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+            // 创建 DeepStream 管理器实例（如果有LVGL界面指针则传入）
+            if (lvgl_interface_ptr_) {
+                deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>(lvgl_interface_ptr_);
+                std::cout << "DeepStream管理器已连接LVGL界面" << std::endl;
+            } else {
+                deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+                std::cout << "DeepStream管理器创建（无LVGL界面连接）" << std::endl;
+            }
             
             // 配置 DeepStream 参数
             deepstream::DeepStreamConfig config;
@@ -837,6 +849,15 @@ public:
         std::cout << "FPS Updated: " << fps << std::endl;
     }
     
+    // 获取LVGL界面指针（用于传递给DeepStreamManager）
+    void* getLVGLInterface() {
+        #ifdef ENABLE_LVGL
+        return lvgl_interface_.get();
+        #else
+        return nullptr;
+        #endif
+    }
+    
     bool initialize() {
         std::cout << "Initializing LVGL UI system with optimized interface..." << std::endl;
         
@@ -946,17 +967,26 @@ public:
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // 初始化推理工作线程
-        inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
-        if (!inference_worker_->initialize()) {
-            std::cout << "Inference system initialization failed" << std::endl;
-            return false;
-        }
-        
         // 初始化UI管理器
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
             std::cout << "UI system initialization failed" << std::endl;
+            return false;
+        }
+        
+        // 初始化推理工作线程
+        inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
+        
+        // 传递LVGL界面指针给推理工作线程
+        #ifdef ENABLE_LVGL
+        if (ui_manager_ && ui_manager_->getLVGLInterface()) {
+            inference_worker_->setLVGLInterface(ui_manager_->getLVGLInterface());
+            std::cout << "LVGL界面指针已传递给推理工作线程" << std::endl;
+        }
+        #endif
+        
+        if (!inference_worker_->initialize()) {
+            std::cout << "Inference system initialization failed" << std::endl;
             return false;
         }
         

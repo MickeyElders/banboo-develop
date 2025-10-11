@@ -131,6 +131,11 @@ public:
     bool isRunning() const { return running_.load(); }
 
     /**
+     * @brief 获取摄像头画布对象（用于appsink软件合成）
+     */
+    lv_obj_t* getCameraCanvas() const { return camera_canvas_; }
+
+    /**
      * @brief 设置全屏模式
      */
     void setFullscreen(bool fullscreen);
