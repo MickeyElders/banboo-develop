@@ -940,8 +940,10 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // 真实摄像头源 - JetPack 6兼容配置，增加超时和重试设置
+            // 🔧 JetPack 6修复：添加nvbufferapi-version和NVMM内存池配置
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "nvbufferapi-version=1 "       // ✅ JetPack 6 NVMM API版本
+                   << "bufapi-version=1 "            // ✅ 缓冲区API版本
                    << "timeout=10 "                  // 增加超时到10秒
                    << "retry=3 "                     // 重试3次
                    << "wbmode=0 "                    // 自动白平衡
@@ -982,6 +984,8 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             // 默认使用真实摄像头，如果失败回退到测试源
             std::cout << "默认尝试使用真实摄像头源..." << std::endl;
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                   << "nvbufferapi-version=1 "       // ✅ JetPack 6兼容
+                   << "bufapi-version=1 "            // ✅ 缓冲区API版本
                    << "timeout=10 retry=3 "          // 增加超时和重试设置
                    << "wbmode=0 "
                    << "! video/x-raw(memory:NVMM)"
@@ -1057,18 +1061,21 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     std::ostringstream pipeline;
     
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // ✅ 使用相机原生分辨率，避免NVMM缓冲区问题
+        // 🔧 JetPack 6修复：完整NVMM配置和内存池优化
         pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                 << "sensor-mode=2 "  // 1920x1080@30fps
+                 << "nvbufferapi-version=1 "       // ✅ NVMM API版本
+                 << "bufapi-version=1 "            // ✅ 缓冲区API版本
+                 << "sensor-mode=2 "               // 1920x1080@30fps
                  << "! video/x-raw(memory:NVMM)"
                  << ",width=1920,height=1080"
                  << ",framerate=30/1,format=NV12 "
-                 << "! nvvidconv "  // 硬件缩放 + 格式转换
-                 << "! video/x-raw"
+                 << "! nvvidconv "                 // 硬件缩放 + 格式转换
+                 << "nvbuf-memory-type=0 "         // ✅ NVMM内存类型
+                 << "! video/x-raw(memory:NVMM)"   // 保持NVMM格式
                  << ",width=" << width << ",height=" << height
                  << ",format=RGBA "
-                 << "! videoconvert "  // RGBA → BGRA
-                 << "! video/x-raw,format=BGRA ";
+                 << "! nvvidconv "                 // 第二次转换：NVMM→系统内存
+                 << "! video/x-raw,format=BGRA ";  // 最终格式
     } else {
         pipeline << buildCameraSource(config) << " ! "
                  << "videoconvert ! "

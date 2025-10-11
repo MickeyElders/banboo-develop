@@ -338,6 +338,11 @@ private:
      */
     void cleanup();
 
+    /**
+     * @brief 配置JetPack 6的NVMM环境
+     */
+    void configureNVMMEnvironment();
+
 private:
     DeepStreamConfig config_;
     VideoLayout video_layout_;
