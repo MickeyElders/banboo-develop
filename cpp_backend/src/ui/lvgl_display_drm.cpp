@@ -473,9 +473,9 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
                 std::cout << "[DRM] 🔧 使用非独占共享模式，与GStreamer兼容" << std::endl;
             }
             
-            // 🔧 使用简化的设置流程，避免独占CRTC
-            if (setupDRMDisplayShared(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
-                                    drm_width, drm_height, stride, buffer_size)) {
+            // 🔧 使用标准设置流程，但修改为只读模式避免独占
+            if (setupDRMDisplay(drm_fd, fb_id, crtc, connector, framebuffer, fb_handle,
+                               drm_width, drm_height, stride, buffer_size)) {
                 std::cout << "[DRM] 设备 " << device_path << " 共享模式初始化成功" << std::endl;
                 return true;
             } else {
