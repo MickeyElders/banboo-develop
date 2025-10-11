@@ -1209,9 +1209,8 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建nvarguscamerasrc摄像头源（现在可以正常工作，因为GBM共享DRM资源）
     pipeline << buildCameraSource(config) << " ! ";
     
-    // NVMM格式转换和缩放
-    pipeline << "nvvideoconvert ! "  // NVMM -> 标准格式转换
-             << "videoscale ! "      // 缩放到目标尺寸
+    // NVMM格式转换和缩放 - 使用nvvidconv统一处理
+    pipeline << "nvvidconv ! "  // NVMM -> 标准格式转换和缩放（硬件加速）
              << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
@@ -1231,10 +1230,11 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
                  << "sync=false "              // 低延迟模式
                  << "restore-crtc=false";      // 不恢复CRTC，保持GBM管理
     } else {
-        std::cout << "⚠️  GBM后端未提供overlay plane，使用默认配置" << std::endl;
+        std::cout << "⚠️  GBM后端未提供overlay plane，使用用户指定的plane-id=44" << std::endl;
+        // 🔧 修复：直接使用用户指定的overlay plane-id=44，支持NV12格式
         pipeline << "kmssink "
+                 << "plane-id=44 "             // 用户指定的overlay plane，支持NV12
                  << "connector-id=-1 "         // 自动检测连接器
-                 << "plane-id=-1 "             // 自动检测平面
                  << "force-modesetting=false " // 不强制设置模式
                  << "can-scale=true "          // 启用硬件缩放
                  << "sync=false "              // 低延迟模式
@@ -1261,10 +1261,9 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
         
-        // 使用摄像头原生分辨率，然后缩放
+        // 使用nvarguscamerasrc + nvvidconv硬件加速处理
         pipeline << buildCameraSource(config) << " ! "
-                 << "videoconvert ! "  // 统一转换为标准RGB格式
-                 << "videoscale ! "    // 缩放到目标尺寸
+                 << "nvvidconv ! "  // NVMM -> 标准格式转换和缩放（硬件加速）
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "

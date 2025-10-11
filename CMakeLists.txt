@@ -527,6 +527,7 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/ui/lvgl_updates.cpp
     cpp_backend/src/ui/lvgl_events.cpp
     cpp_backend/src/ui/lvgl_display_drm.cpp
+    cpp_backend/src/ui/xvfb_manager.cpp
     cpp_backend/src/ui/lvgl_panels/header_panel.cpp
     cpp_backend/src/ui/lvgl_panels/camera_panel.cpp
     cpp_backend/src/ui/lvgl_panels/control_panel.cpp
