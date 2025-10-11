@@ -271,6 +271,11 @@ private:
     bool getLatestCompositeFrame(cv::Mat& frame);
     
     /**
+     * @brief 设置AppSink回调函数 (私有方法)
+     */
+    void setupAppSinkCallbacks();
+    
+    /**
      * @brief 计算视频显示区域布局
      */
     VideoLayout calculateVideoLayout(const DeepStreamConfig& config);
