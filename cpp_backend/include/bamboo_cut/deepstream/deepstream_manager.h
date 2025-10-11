@@ -29,7 +29,8 @@ enum class DualCameraMode {
 enum class VideoSinkMode {
     NVDRMVIDEOSINK,     ///< nvdrmvideosink DRM叠加平面模式
     WAYLANDSINK,        ///< waylandsink模式
-    KMSSINK             ///< kmssink KMS多层渲染模式 (推荐)
+    KMSSINK,            ///< kmssink KMS多层渲染模式
+    APPSINK             ///< appsink 软件合成到LVGL画布模式 (推荐)
 };
 
 /**
@@ -89,6 +90,11 @@ struct DeepStreamConfig {
     int test_pattern;                // 测试图案模式（videotestsrc使用）
     std::string video_file_path;     // 视频文件路径（filesrc使用）
     
+    // APPSINK软件合成配置
+    bool enable_software_composition;   // 启用软件合成到LVGL画布
+    int composition_fps;               // 合成帧率
+    std::string target_pixel_format;   // 目标像素格式 (ARGB32, RGB565等)
+    
     DeepStreamConfig()
         : screen_width(1280)
         , screen_height(800)
@@ -103,11 +109,14 @@ struct DeepStreamConfig {
         , camera_width(1280)
         , camera_height(720)
         , camera_fps(30)
-        , sink_mode(VideoSinkMode::KMSSINK)  // 默认使用kmssink
+        , sink_mode(VideoSinkMode::APPSINK)  // 默认使用appsink软件合成
         , overlay()  // 使用默认叠加平面配置
         , camera_source(CameraSourceMode::VIDEOTESTSRC)  // 默认使用测试源
         , test_pattern(0)  // 默认测试图案
-        , video_file_path("/opt/bamboo-cut/test_video.mp4") {}  // 默认测试视频文件
+        , video_file_path("/opt/bamboo-cut/test_video.mp4")  // 默认测试视频文件
+        , enable_software_composition(true)  // 启用软件合成
+        , composition_fps(30)  // 30fps合成
+        , target_pixel_format("ARGB32") {}  // LVGL兼容的像素格式
 };
 
 /**
@@ -232,6 +241,33 @@ private:
     std::string buildCameraSource(const DeepStreamConfig& config);
     
     /**
+     * @brief 构建appsink软件合成管道
+     */
+    std::string buildAppSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+    
+    /**
+     * @brief appsink新样本回调
+     */
+    static GstFlowReturn newSampleCallback(GstAppSink* appsink, gpointer user_data);
+    
+    /**
+     * @brief 软件合成帧到LVGL画布
+     */
+    void compositeFrameToLVGL(GstMapInfo* map_info, int width, int height);
+    
+    /**
+     * @brief 设置AppSink回调函数
+     */
+    void setupAppSinkCallbacks();
+    
+    /**
+     * @brief 获取最新合成帧
+     * @param frame 输出的帧数据
+     * @return 是否有新帧可用
+     */
+    bool getLatestCompositeFrame(cv::Mat& frame);
+    
+    /**
      * @brief 计算视频显示区域布局
      */
     VideoLayout calculateVideoLayout(const DeepStreamConfig& config);
@@ -286,6 +322,12 @@ private:
     GstBus* bus2_;             // 副消息总线
     guint bus_watch_id_;       // 主总线监听ID
     guint bus_watch_id2_;      // 副总线监听ID
+    
+    // APPSINK软件合成相关
+    GstElement* appsink_;       // appsink元素
+    std::mutex frame_mutex_;    // 帧数据同步互斥锁
+    cv::Mat latest_frame_;      // 最新帧数据
+    std::atomic<bool> new_frame_available_{false};  // 新帧可用标志
     
     bool running_;
     bool initialized_;

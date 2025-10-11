@@ -15,6 +15,7 @@
 #include <xf86drmMode.h>
 #include <thread>
 #include <chrono>
+#include <gst/app/gstappsink.h>
 
 namespace bamboo_cut {
 namespace deepstream {
@@ -26,6 +27,7 @@ DeepStreamManager::DeepStreamManager()
     , bus2_(nullptr)
     , bus_watch_id_(0)
     , bus_watch_id2_(0)
+    , appsink_(nullptr)
     , running_(false)
     , initialized_(false) {
 }
@@ -47,12 +49,23 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     }
     
     // 检查视频输出sink可用性
-    const char* sink_names[] = {"kmssink", "nvdrmvideosink", "waylandsink"};
+    const char* sink_names[] = {"appsink", "kmssink", "nvdrmvideosink", "waylandsink"};
     const char* sink_descriptions[] = {
-        "kmssink (KMS多层渲染模式，推荐)",
+        "appsink (软件合成到LVGL画布，推荐)",
+        "kmssink (KMS多层渲染模式)",
         "nvdrmvideosink (DRM叠加平面模式)",
         "waylandsink (Wayland合成器模式)"
     };
+    
+    bool found_sink = false;
+    for (int i = 0; i < 4; i++) {
+        GstElementFactory *factory = gst_element_factory_find(sink_names[i]);
+        if (factory) {
+            std::cout << "✓ 可用: " << sink_descriptions[i] << std::endl;
+            gst_object_unref(factory);
+            found_sink = true;
+        }
+    }
     
     bool found_sink = false;
     for (int i = 0; i < 3; i++) {
@@ -71,8 +84,8 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     // 设置DRM叠加平面
     if (config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
         if (!setupDRMOverlayPlane()) {
-            std::cout << "DRM叠加平面设置失败，将回退到kmssink模式" << std::endl;
-            config_.sink_mode = VideoSinkMode::KMSSINK;
+            std::cout << "DRM叠加平面设置失败，将回退到appsink软件合成模式" << std::endl;
+            config_.sink_mode = VideoSinkMode::APPSINK;
         }
     }
     
@@ -202,9 +215,15 @@ bool DeepStreamManager::startSinglePipelineMode() {
     }
     
     running_ = true;
-    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
     const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
-    std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL分离显示)" << std::endl;
+    std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL协同工作)" << std::endl;
+    
+    // 如果使用appsink模式，设置回调函数
+    if (config_.sink_mode == VideoSinkMode::APPSINK) {
+        setupAppSinkCallbacks();
+    }
+    
     return true;
 }
 
@@ -327,9 +346,15 @@ bool DeepStreamManager::startSplitScreenMode() {
     }
     
     running_ = true;
-    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
     const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
     std::cout << "双摄像头并排显示管道启动成功 (" << mode_name << ")" << std::endl;
+    
+    // 如果使用appsink模式，设置回调函数
+    if (config_.sink_mode == VideoSinkMode::APPSINK) {
+        setupAppSinkCallbacks();
+    }
+    
     return true;
 }
 
@@ -400,7 +425,7 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
 }
 
 bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
-    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink"};
+    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
     std::cout << "切换sink模式: " << mode_names[static_cast<int>(config_.sink_mode)]
               << " -> " << mode_names[static_cast<int>(sink_mode)] << std::endl;
     
@@ -417,8 +442,8 @@ bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
     // 如果切换到nvdrmvideosink，设置叠加平面
     if (sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
         if (!setupDRMOverlayPlane()) {
-            std::cerr << "DRM叠加平面设置失败，无法切换到nvdrmvideosink模式，回退到kmssink" << std::endl;
-            config_.sink_mode = VideoSinkMode::KMSSINK;  // 回退到kmssink
+            std::cerr << "DRM叠加平面设置失败，无法切换到nvdrmvideosink模式，回退到appsink" << std::endl;
+            config_.sink_mode = VideoSinkMode::APPSINK;  // 回退到appsink
             return false;
         }
     }
@@ -689,8 +714,10 @@ std::string DeepStreamManager::buildSplitScreenPipeline(
         case VideoSinkMode::WAYLANDSINK:
             return buildWaylandSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::KMSSINK:
-        default:
             return buildKMSSinkPipeline(config, offset_x, offset_y, width, height);
+        case VideoSinkMode::APPSINK:
+        default:
+            return buildAppSinkPipeline(config, offset_x, offset_y, width, height);
     }
 }
 
@@ -779,7 +806,6 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
                      << "sync=false";
             break;
         case VideoSinkMode::KMSSINK:
-        default:
             pipeline << "videoconvert ! "
                      << "videoscale ! "
                      << "video/x-raw,format=BGRA,width=" << layout.width
@@ -789,6 +815,18 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
                      << "connector-id=-1 plane-id=-1 "
                      << "force-modesetting=false can-scale=true "
                      << "sync=false restore-crtc=true";
+            break;
+        case VideoSinkMode::APPSINK:
+        default:
+            pipeline << "videoconvert ! "
+                     << "videoscale ! "
+                     << "video/x-raw,format=BGRA,width=" << layout.width
+                     << ",height=" << layout.height << " ! "
+                     << "queue max-size-buffers=2 max-size-time=0 leaky=downstream ! "
+                     << "appsink name=video_appsink "
+                     << "emit-signals=true sync=false "
+                     << "caps=video/x-raw,format=BGRA,width=" << layout.width
+                     << ",height=" << layout.height;
             break;
     }
     
@@ -960,6 +998,163 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::cout << "构建KMSSink管道 (多层渲染兼容): " << pipeline.str() << std::endl;
     return pipeline.str();
+}
+
+// 新增：构建AppSink软件合成管道 - 解决LVGL CRTC独占冲突
+std::string DeepStreamManager::buildAppSinkPipeline(
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
+    std::ostringstream pipeline;
+    
+    // 构建摄像头源
+    pipeline << buildCameraSource(config) << " ! ";
+    
+    // 添加颜色空间转换和缩放，确保与LVGL像素格式对齐
+    pipeline << "videoconvert ! "
+             << "videoscale ! "
+             << "video/x-raw,format=" << config.target_pixel_format
+             << ",width=" << width << ",height=" << height << " ! "
+             << "queue "
+             << "max-size-buffers=2 "      // 减少缓冲区降低延迟
+             << "max-size-time=0 "
+             << "leaky=downstream "        // 丢弃旧帧防止堆积
+             << "! ";
+    
+    // 使用appsink进行软件合成
+    pipeline << "appsink name=video_appsink "
+             << "emit-signals=true "       // 启用新样本信号
+             << "sync=false "              // 异步模式降低延迟
+             << "max-buffers=2 "           // 最多缓冲2帧
+             << "drop=true "               // 丢弃过多的帧
+             << "caps=video/x-raw,format=" << config.target_pixel_format
+             << ",width=" << width << ",height=" << height;
+    
+    std::cout << "构建AppSink软件合成管道 (LVGL兼容): " << pipeline.str() << std::endl;
+    return pipeline.str();
+}
+
+// AppSink新样本回调 - 线程安全的帧处理
+GstFlowReturn DeepStreamManager::newSampleCallback(GstAppSink* appsink, gpointer user_data) {
+    DeepStreamManager* manager = static_cast<DeepStreamManager*>(user_data);
+    
+    // 获取新样本
+    GstSample* sample = gst_app_sink_pull_sample(appsink);
+    if (!sample) {
+        return GST_FLOW_OK;
+    }
+    
+    // 获取缓冲区
+    GstBuffer* buffer = gst_sample_get_buffer(sample);
+    if (!buffer) {
+        gst_sample_unref(sample);
+        return GST_FLOW_OK;
+    }
+    
+    // 映射缓冲区数据
+    GstMapInfo map_info;
+    if (!gst_buffer_map(buffer, &map_info, GST_MAP_READ)) {
+        gst_sample_unref(sample);
+        return GST_FLOW_OK;
+    }
+    
+    // 获取视频信息
+    GstCaps* caps = gst_sample_get_caps(sample);
+    if (caps) {
+        GstStructure* structure = gst_caps_get_structure(caps, 0);
+        gint width, height;
+        
+        if (gst_structure_get_int(structure, "width", &width) &&
+            gst_structure_get_int(structure, "height", &height)) {
+            
+            // 线程安全地合成帧到LVGL画布
+            manager->compositeFrameToLVGL(&map_info, width, height);
+        }
+    }
+    
+    // 清理资源
+    gst_buffer_unmap(buffer, &map_info);
+    gst_sample_unref(sample);
+    
+    return GST_FLOW_OK;
+}
+
+// 软件合成帧到LVGL画布 - 优化内存操作
+void DeepStreamManager::compositeFrameToLVGL(GstMapInfo* map_info, int width, int height) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
+    
+    try {
+        // 创建OpenCV Mat包装GStreamer数据，避免内存拷贝
+        cv::Mat frame;
+        
+        if (config_.target_pixel_format == "BGRA") {
+            // BGRA格式 - 直接包装数据
+            frame = cv::Mat(height, width, CV_8UC4, map_info->data);
+        } else if (config_.target_pixel_format == "BGR") {
+            // BGR格式
+            frame = cv::Mat(height, width, CV_8UC3, map_info->data);
+        } else {
+            // 其他格式暂时跳过
+            std::cout << "警告：不支持的像素格式 " << config_.target_pixel_format << std::endl;
+            return;
+        }
+        
+        // 检查帧数据有效性
+        if (!frame.empty() && frame.data) {
+            // 克隆帧数据用于后续处理
+            latest_frame_ = frame.clone();
+            new_frame_available_ = true;
+            
+            // TODO: 这里将来可以直接写入到LVGL画布
+            // 目前先存储到latest_frame_供其他组件使用
+        }
+        
+    } catch (const std::exception& e) {
+        std::cout << "合成帧到LVGL时发生异常: " << e.what() << std::endl;
+    }
+}
+
+// 设置AppSink回调函数
+void DeepStreamManager::setupAppSinkCallbacks() {
+    if (!pipeline_) {
+        std::cout << "错误：管道未创建，无法设置appsink回调" << std::endl;
+        return;
+    }
+    
+    // 查找appsink元素
+    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "video_appsink");
+    if (!appsink_) {
+        std::cout << "错误：未找到appsink元素" << std::endl;
+        return;
+    }
+    
+    // 设置appsink属性
+    g_object_set(G_OBJECT(appsink_),
+                 "emit-signals", TRUE,    // 启用信号
+                 "sync", FALSE,           // 异步模式
+                 "max-buffers", 2,        // 最大缓冲区数量
+                 "drop", TRUE,            // 丢弃旧帧
+                 NULL);
+    
+    // 连接新样本信号
+    g_signal_connect(appsink_, "new-sample", G_CALLBACK(newSampleCallback), this);
+    
+    std::cout << "AppSink回调函数设置完成" << std::endl;
+}
+
+// 获取最新合成帧（供外部访问）
+bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
+    
+    if (new_frame_available_ && !latest_frame_.empty()) {
+        frame = latest_frame_.clone();
+        new_frame_available_ = false;
+        return true;
+    }
+    return false;
 }
 
 } // namespace deepstream
