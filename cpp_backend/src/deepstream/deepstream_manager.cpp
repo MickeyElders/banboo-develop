@@ -621,15 +621,8 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
              << "video/x-raw(memory:NVMM),format=RGBA ! "
              << "nvdrmvideosink ";
     
-    // 关键：必须明确指定使用 card1 (nvidia-drm)
-    pipeline << "device=/dev/dri/card1 ";
-    
-    // 然后指定 plane-id
-    if (config.overlay.plane_id != -1) {
-        pipeline << "plane-id=" << config.overlay.plane_id << " ";
-    }
-    
-    // 位置参数
+    // 不指定 plane-id、device 等，让 nvdrmvideosink 自动选择
+    // 只设置位置和行为参数
     pipeline << "offset-x=" << offset_x << " "
              << "offset-y=" << offset_y << " "
              << "set-mode=false "
@@ -715,11 +708,7 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
         case VideoSinkMode::NVDRMVIDEOSINK:
         pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
                 << "nvdrmvideosink "
-                << "device=/dev/dri/card1 ";  // 关键！
-        if (config.overlay.plane_id != -1) {
-            pipeline << "plane-id=" << config.overlay.plane_id << " ";
-        }
-        pipeline << "offset-x=" << layout.offset_x << " "
+                << "offset-x=" << layout.offset_x << " "
                 << "offset-y=" << layout.offset_y << " "
                 << "set-mode=false "
                 << "sync=false";
