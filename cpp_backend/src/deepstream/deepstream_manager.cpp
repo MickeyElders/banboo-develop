@@ -1293,28 +1293,36 @@ void DeepStreamManager::canvasUpdateLoop() {
                     if (canvas_dsc && canvas_dsc->data) {
                         std::cout << "Canvas缓冲区获取成功，开始复制像素数据" << std::endl;
                         
-                        // 复制像素数据到canvas缓冲区
+                        // BGRA到ARGB格式转换和复制
                         const size_t pixel_count = 960 * 640;
-                        const size_t bytes_to_copy = pixel_count * 4; // BGRA, 4字节每像素
+                        uint32_t* canvas_buffer = (uint32_t*)canvas_dsc->data;
+                        uint8_t* src_data = display_frame.data;
                         
-                        if (display_frame.isContinuous()) {
-                            std::memcpy((void*)canvas_dsc->data, display_frame.data, bytes_to_copy);
-                            std::cout << "连续内存复制完成: " << bytes_to_copy << " 字节" << std::endl;
-                        } else {
-                            // 逐行复制
-                            for (int row = 0; row < display_frame.rows; ++row) {
-                                std::memcpy(
-                                    (uint8_t*)canvas_dsc->data + row * 960 * 4,
-                                    display_frame.ptr(row),
-                                    960 * 4
-                                );
-                            }
-                            std::cout << "逐行内存复制完成" << std::endl;
+                        std::cout << "开始BGRA到ARGB格式转换，像素数: " << pixel_count << std::endl;
+                        
+                        // 逐像素转换 BGRA -> ARGB
+                        for (size_t i = 0; i < pixel_count; i++) {
+                            uint8_t b = src_data[i * 4 + 0];  // Blue
+                            uint8_t g = src_data[i * 4 + 1];  // Green
+                            uint8_t r = src_data[i * 4 + 2];  // Red
+                            uint8_t a = src_data[i * 4 + 3];  // Alpha
+                            
+                            // LVGL ARGB8888格式: AARRGGBB
+                            canvas_buffer[i] = (a << 24) | (r << 16) | (g << 8) | b;
                         }
                         
-                        // 通知LVGL刷新canvas
+                        std::cout << "BGRA到ARGB格式转换完成" << std::endl;
+                        
+                        // 验证转换结果
+                        uint32_t first_pixel = canvas_buffer[0];
+                        uint32_t center_pixel = canvas_buffer[pixel_count / 2];
+                        std::cout << "转换后第一个像素ARGB: 0x" << std::hex << first_pixel << std::dec << std::endl;
+                        std::cout << "转换后中心像素ARGB: 0x" << std::hex << center_pixel << std::dec << std::endl;
+                        
+                        // 强制刷新canvas和显示
                         lv_obj_invalidate(canvas);
-                        std::cout << "Canvas刷新通知已发送" << std::endl;
+                        lv_refr_now(NULL);  // 立即刷新显示
+                        std::cout << "Canvas刷新和立即更新完成" << std::endl;
                     } else {
                         std::cout << "错误：Canvas缓冲区获取失败" << std::endl;
                     }

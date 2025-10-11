@@ -36,11 +36,18 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     
     // 创建真正的LVGL canvas用于appsink软件合成
     camera_canvas_ = lv_canvas_create(camera_panel_);
-    lv_obj_set_width(camera_canvas_, lv_pct(100));
-    lv_obj_set_flex_grow(camera_canvas_, 1);  // 占据大部分空间
+    lv_obj_set_width(camera_canvas_, 960);      // 固定宽度960像素
+    lv_obj_set_height(camera_canvas_, 640);     // 固定高度640像素
+    lv_obj_set_flex_grow(camera_canvas_, 1);    // 占据大部分空间
     
     // 为canvas分配缓冲区 (960x640, BGRA格式, 32位/像素)
     static uint32_t canvas_buffer[960 * 640];  // 静态缓冲区避免栈溢出
+    
+    // 初始化缓冲区为测试图案（有助于调试）
+    for (int i = 0; i < 960 * 640; i++) {
+        canvas_buffer[i] = 0xFF0000FF;  // 红色测试图案
+    }
+    
     lv_canvas_set_buffer(camera_canvas_, canvas_buffer, 960, 640, LV_COLOR_FORMAT_ARGB8888);
     
     // 设置canvas样式
@@ -51,10 +58,11 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_set_style_pad_all(camera_canvas_, 0, 0);
     lv_obj_clear_flag(camera_canvas_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 初始化canvas为黑色背景
-    lv_canvas_fill_bg(camera_canvas_, lv_color_black(), LV_OPA_COVER);
+    // 强制使Canvas可见
+    lv_obj_add_flag(camera_canvas_, LV_OBJ_FLAG_VISIBLE);
+    lv_obj_clear_flag(camera_canvas_, LV_OBJ_FLAG_HIDDEN);
     
-    std::cout << "Camera canvas created for appsink software composition (960x640 BGRA)" << std::endl;
+    std::cout << "Camera canvas created for appsink software composition (960x640 ARGB8888)" << std::endl;
     
     // 半透明控制覆盖层 - 保持控件可见但不遮挡视频
     lv_obj_t* control_overlay = lv_obj_create(camera_panel_);
