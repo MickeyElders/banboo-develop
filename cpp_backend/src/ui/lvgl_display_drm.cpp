@@ -18,6 +18,10 @@
 #include <xf86drmMode.h>
 #endif
 
+#ifdef ENABLE_GBM
+#include <gbm.h>
+#endif
+
 namespace bamboo_cut {
 namespace ui {
 
@@ -644,15 +648,19 @@ void gbm_display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px
         std::cout << "[GBM] 创建LVGL framebuffer成功: " << drm_width << "x" << drm_height << std::endl;
     }
     
-    // 映射framebuffer用于写入
-    if (!current_fb->map) {
-        current_fb->map = mmap(nullptr, current_fb->size, PROT_READ | PROT_WRITE, MAP_SHARED, -1, 0);
-        if (current_fb->map == MAP_FAILED) {
-            std::cerr << "[GBM] framebuffer映射失败" << std::endl;
-            current_fb->map = nullptr;
+    // 映射framebuffer用于写入 - 修复段错误：使用正确的GBM buffer映射
+    if (!current_fb->map && current_fb->bo) {
+        // 使用gbm_bo_map来正确映射GBM buffer
+        uint32_t stride;
+        void* map_data;
+        current_fb->map = gbm_bo_map(current_fb->bo, 0, 0, drm_width, drm_height,
+                                     GBM_BO_TRANSFER_WRITE, &stride, &map_data);
+        if (!current_fb->map) {
+            std::cerr << "[GBM] GBM framebuffer映射失败" << std::endl;
             lv_display_flush_ready(disp);
             return;
         }
+        std::cout << "[GBM] framebuffer映射成功: " << current_fb->map << " stride: " << stride << std::endl;
     }
     
     // 复制像素数据到GBM framebuffer

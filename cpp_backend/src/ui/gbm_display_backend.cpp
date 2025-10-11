@@ -485,16 +485,20 @@ void GBMDisplayBackend::releaseFramebuffer(GBMFramebuffer* fb) {
     
     std::lock_guard<std::mutex> lock(drm_mutex_);
     
-    if (fb->map) {
-        munmap(fb->map, fb->size);
+    // 使用gbm_bo_unmap来正确释放GBM映射
+    if (fb->map && fb->bo) {
+        gbm_bo_unmap(fb->bo, fb->map);
+        fb->map = nullptr;
     }
     
     if (fb->fb_id > 0) {
         drmModeRmFB(drm_fd_, fb->fb_id);
+        fb->fb_id = 0;
     }
     
     if (fb->bo) {
         gbm_bo_destroy(fb->bo);
+        fb->bo = nullptr;
     }
     
     delete fb;
