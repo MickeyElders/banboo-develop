@@ -440,9 +440,9 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
         return false;
     }
     
-    std::cout << "[DRM] 开始非独占DRM初始化尝试 #" << init_attempt_count << std::endl;
+    std::cout << "[DRM] 开始LVGL独占DRM初始化尝试 #" << init_attempt_count << std::endl;
     
-    // 🔧 修复：使用只读模式打开DRM设备，避免独占
+    // 🔧 恢复：使用读写模式打开DRM设备，LVGL需要独占控制
     const char* drm_devices[] = {
         "/dev/dri/card1",  // nvidia-drm或tegra_drm
     };
