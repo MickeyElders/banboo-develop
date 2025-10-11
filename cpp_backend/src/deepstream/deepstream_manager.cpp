@@ -703,25 +703,18 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     std::ostringstream pipeline;
     
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width
+    // 临时使用测试源代替摄像头，验证 DRM 显示
+    pipeline << "videotestsrc pattern=smpte ! "  // SMPTE 彩条测试图案
+             << "video/x-raw,width=" << config.camera_width
              << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw(memory:NVMM),format=RGBA ! "
-             << "nvdrmvideosink ";
-    
-    // 不指定 plane-id、device 等，让 nvdrmvideosink 自动选择
-    // 只设置位置和行为参数
-    pipeline << "offset-x=" << offset_x << " "
+             << ",framerate=" << config.camera_fps << "/1 ! "
+             << "videoconvert ! "  // 使用普通 videoconvert，不需要 NVMM
+             << "video/x-raw,format=BGRx ! "  // DRM 兼容格式
+             << "nvdrmvideosink "
+             << "offset-x=" << offset_x << " "
              << "offset-y=" << offset_y << " "
              << "set-mode=false "
-             << "show-preroll-frame=false "
              << "sync=false";
-             
-    if (config.overlay.enable_scaling) {
-        pipeline << " enable-last-sample=false";
-    }
     
     return pipeline.str();
 }
