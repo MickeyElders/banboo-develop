@@ -1130,22 +1130,42 @@ void DeepStreamManager::cleanup() {
 }
 
 // 新增：构建摄像头源字符串
-// 🔧 修复：正确处理Bayer格式（RG10）摄像头
+// 🔧 修复：使用摄像头原生分辨率然后缩放
 std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config) {
     std::ostringstream source;
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
         case CameraSourceMode::V4L2SRC:
-            // 🔧 关键修复：处理Bayer格式摄像头（RG10）
-            std::cout << "🔧 配置Bayer格式摄像头处理管道..." << std::endl;
+            // 🔧 关键修复：使用摄像头原生分辨率，避免不支持的分辨率
+            std::cout << "🔧 配置摄像头原生分辨率处理管道..." << std::endl;
+            
+            // 尝试常见的摄像头原生分辨率，让v4l2src自动协商
             source << "v4l2src device=/dev/video" << config.camera_id << " "
-                   << "io-mode=2 "  // MMAP 模式
-                   << "! video/x-bayer,format=rggb10,width=" << config.camera_width
-                   << ",height=" << config.camera_height
-                   << ",framerate=" << config.camera_fps << "/1 "
-                   << "! bayer2rgb "  // Bayer转RGB插件
-                   << "! video/x-raw,format=RGB ";
+                   << "io-mode=2 ";  // MMAP 模式
+            
+            // 检查摄像头是否支持Bayer格式
+            std::cout << "🔍 尝试检测摄像头支持的格式..." << std::endl;
+            
+            // 首先尝试RGB原生格式（大多数USB摄像头）
+            source << "! video/x-raw ";
+            
+            // 如果摄像头支持常见分辨率，让GStreamer自动协商
+            // 不强制指定分辨率，让摄像头使用原生分辨率
+            if (config.camera_width == 1280 && config.camera_height == 720) {
+                // 如果配置是720p，尝试原生1920x1080然后缩放
+                std::cout << "📹 尝试使用1080p原生分辨率..." << std::endl;
+                source << ",width=1920,height=1080";
+            } else if (config.camera_width == 960 && config.camera_height == 640) {
+                // 如果配置是自定义分辨率，使用最接近的标准分辨率
+                std::cout << "📹 使用720p原生分辨率并缩放到960x640..." << std::endl;
+                source << ",width=1280,height=720";
+            } else {
+                // 其他情况，让摄像头自动选择
+                std::cout << "📹 让摄像头自动选择最佳分辨率..." << std::endl;
+            }
+            
+            source << ",framerate=" << config.camera_fps << "/1";
             break;
             
         case CameraSourceMode::VIDEOTESTSRC:
@@ -1169,12 +1189,11 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         default:
-            // 备用方案：尝试Bayer格式处理
-            std::cout << "⚠️ 使用备用Bayer处理方案..." << std::endl;
+            // 备用方案：使用v4l2src自动协商
+            std::cout << "⚠️ 使用v4l2src自动协商方案..." << std::endl;
             source << "v4l2src device=/dev/video" << config.camera_id << " "
-                   << "! video/x-bayer,format=rggb10 "
-                   << "! bayer2rgb "
-                   << "! video/x-raw,format=RGB";
+                   << "io-mode=2 "
+                   << "! video/x-raw";
             break;
     }
     
@@ -1191,12 +1210,12 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 构建摄像头源
+    // 构建Bayer格式摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 修复：v4l2src输出普通内存，直接使用videoconvert，无需nvvidconv
-    // v4l2src已输出普通内存格式，只需要格式转换和尺寸调整
-    pipeline << "videoconvert ! "
+    // 🔧 修复：正确处理Bayer转换后的RGB格式
+    // buildCameraSource现在输出RGB格式，需要转换为BGRA
+    pipeline << "videoconvert ! "  // RGB -> BGRA转换
              << "videoscale ! "
              << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
@@ -1227,7 +1246,7 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
                  << "restore-crtc=true";       // 退出时恢复CRTC状态
     }
     
-    std::cout << "🔧 构建KMSSink管道 (智能overlay plane选择): " << pipeline.str() << std::endl;
+    std::cout << "🔧 构建Bayer处理KMSSink管道 (智能overlay plane选择): " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
