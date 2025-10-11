@@ -59,7 +59,6 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_clear_flag(camera_canvas_, LV_OBJ_FLAG_SCROLLABLE);
     
     // 强制使Canvas可见
-    lv_obj_add_flag(camera_canvas_, LV_OBJ_FLAG_VISIBLE);
     lv_obj_clear_flag(camera_canvas_, LV_OBJ_FLAG_HIDDEN);
     
     std::cout << "Camera canvas created for appsink software composition (960x640 ARGB8888)" << std::endl;
