@@ -250,25 +250,52 @@ uint32_t GBMDisplayBackend::findPrimaryPlane() {
         return 0;
     }
     
+    std::cout << "📊 总计可用planes: " << plane_resources->count_planes << std::endl;
+    
+    uint32_t fallback_plane = 0;  // 备用plane
+    
     for (uint32_t i = 0; i < plane_resources->count_planes; i++) {
         uint32_t plane_id = plane_resources->planes[i];
         drmModePlane* plane = drmModeGetPlane(drm_fd_, plane_id);
         
         if (plane) {
+            std::cout << "🔍 检查plane " << plane_id << " (可能的CRTC掩码: 0x" << std::hex << plane->possible_crtcs << std::dec << ")" << std::endl;
+            
+            // 首先检查这个plane是否支持当前CRTC
+            bool supports_crtc = false;
+            for (int c = 0; c < drm_resources_->count_crtcs; c++) {
+                if (drm_resources_->crtcs[c] == config_.crtc_id || config_.crtc_id == 0) {
+                    if (plane->possible_crtcs & (1 << c)) {
+                        supports_crtc = true;
+                        if (config_.crtc_id == 0) {
+                            config_.crtc_id = drm_resources_->crtcs[c];  // 自动选择CRTC
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            if (!supports_crtc) {
+                std::cout << "  - plane " << plane_id << " 不支持目标CRTC，跳过" << std::endl;
+                drmModeFreePlane(plane);
+                continue;
+            }
+            
             // 检查plane类型
             drmModeObjectProperties* props = drmModeObjectGetProperties(drm_fd_, plane_id, DRM_MODE_OBJECT_PLANE);
             if (props) {
+                bool is_primary = false;
                 for (uint32_t j = 0; j < props->count_props; j++) {
                     drmModePropertyRes* prop = drmModeGetProperty(drm_fd_, props->props[j]);
                     if (prop && strcmp(prop->name, "type") == 0) {
                         uint64_t plane_type = props->prop_values[j];
-                        if (plane_type == 1) {  // DRM_PLANE_TYPE_PRIMARY
-                            std::cout << "✅ 找到primary plane: " << plane_id << std::endl;
-                            drmModeFreeProperty(prop);
-                            drmModeFreeObjectProperties(props);
-                            drmModeFreePlane(plane);
-                            drmModeFreePlaneResources(plane_resources);
-                            return plane_id;
+                        std::cout << "  - plane " << plane_id << " 类型: " << plane_type << std::endl;
+                        
+                        // nvidia-drm可能使用不同的类型值，同时检查多种可能性
+                        if (plane_type == 1 ||                    // 标准DRM_PLANE_TYPE_PRIMARY
+                            plane_type == DRM_PLANE_TYPE_PRIMARY || // 如果定义了常量
+                            (i == 0 && plane_type == 0)) {        // nvidia-drm可能第一个plane就是primary且类型为0
+                            is_primary = true;
                         }
                         drmModeFreeProperty(prop);
                         break;
@@ -276,12 +303,34 @@ uint32_t GBMDisplayBackend::findPrimaryPlane() {
                     if (prop) drmModeFreeProperty(prop);
                 }
                 drmModeFreeObjectProperties(props);
+                
+                if (is_primary) {
+                    std::cout << "✅ 找到primary plane: " << plane_id << " (支持CRTC " << config_.crtc_id << ")" << std::endl;
+                    drmModeFreePlane(plane);
+                    drmModeFreePlaneResources(plane_resources);
+                    return plane_id;
+                }
             }
+            
+            // 如果没有明确的类型信息，保存第一个支持CRTC的plane作为备用
+            if (fallback_plane == 0) {
+                fallback_plane = plane_id;
+                std::cout << "  - 保存plane " << plane_id << " 作为备用primary plane" << std::endl;
+            }
+            
             drmModeFreePlane(plane);
         }
     }
     
     drmModeFreePlaneResources(plane_resources);
+    
+    // 如果没有找到明确的primary plane，使用备用的
+    if (fallback_plane > 0) {
+        std::cout << "⚠️ 未找到明确的primary plane，使用备用plane: " << fallback_plane << std::endl;
+        return fallback_plane;
+    }
+    
+    std::cout << "❌ 没有找到任何可用的primary plane" << std::endl;
     return 0;
 }
 
