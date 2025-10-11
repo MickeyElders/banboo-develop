@@ -1260,26 +1260,23 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     
     std::ostringstream pipeline;
     
+    // 🔧 关键修复：使用摄像头原生分辨率然后缩放到目标尺寸
+    std::cout << "🔧 构建原生分辨率AppSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
+    
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
-        // 🔧 关键修复：正确处理Bayer格式（RG10）摄像头
-        std::cout << "🔧 构建Bayer格式AppSink管道..." << std::endl;
-        pipeline << "v4l2src device=/dev/video" << config.camera_id << " "
-                 << "io-mode=2 "  // MMAP 模式
-                 << "! video/x-bayer,format=rggb10,width=" << config.camera_width
-                 << ",height=" << config.camera_height
-                 << ",framerate=" << config.camera_fps << "/1 "
-                 << "! bayer2rgb "  // Bayer转RGB插件
-                 << "! video/x-raw,format=RGB "
-                 << "! videoconvert "  // RGB -> BGRA转换
-                 << "! videoscale "
-                 << "! video/x-raw,format=BGRA,width=" << width << ",height=" << height << " "
-                 << "! queue max-size-buffers=2 leaky=downstream "
-                 << "! appsink name=video_appsink "
+        
+        // 使用摄像头原生分辨率，然后缩放
+        pipeline << buildCameraSource(config) << " ! "
+                 << "videoconvert ! "  // 统一转换为标准RGB格式
+                 << "videoscale ! "    // 缩放到目标尺寸
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+                 << "queue max-size-buffers=2 leaky=downstream ! "
+                 << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
                  
     } else if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
-        // ✅ 测试源
+        // ✅ 测试源直接使用目标分辨率
         pipeline << "videotestsrc pattern=18 is-live=true "
                  << "! video/x-raw,format=BGRA"
                  << ",width=" << width << ",height=" << height
@@ -1287,17 +1284,17 @@ std::string DeepStreamManager::buildAppSinkPipeline(
                  << "! appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=1 drop=false";
     } else {
-        // 其他源（使用通用Bayer处理）
+        // 其他源（文件源等）
         pipeline << buildCameraSource(config) << " ! "
-                 << "videoconvert ! "  // RGB -> BGRA转换
-                 << "videoscale ! "
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " "
-                 << "! queue max-size-buffers=2 leaky=downstream "
-                 << "! appsink name=video_appsink "
+                 << "videoconvert ! "  // 确保格式兼容
+                 << "videoscale ! "    // 缩放到目标尺寸
+                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+                 << "queue max-size-buffers=2 leaky=downstream ! "
+                 << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
     }
     
-    std::cout << "🔧 构建Bayer处理AppSink管道: " << pipeline.str() << std::endl;
+    std::cout << "🔧 构建原生分辨率AppSink管道: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
