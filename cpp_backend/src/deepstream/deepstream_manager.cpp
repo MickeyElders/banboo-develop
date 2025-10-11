@@ -618,13 +618,12 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     std::ostringstream pipeline;
     
     // 使用 nvdrmvideosink（DRM叠加平面模式，独立于LVGL显示层）
-    // 使用RGBA格式以确保与nvdrmvideosink的最佳兼容性
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert ! "  // 格式转换器
-             << "video/x-raw(memory:NVMM),format=RGBA ! "  // 转换为RGBA格式
+             << "nvvideoconvert ! "
+             << "video/x-raw(memory:NVMM),format=RGBA ! "
              << "nvdrmvideosink ";
              
     // 使用正确的nvdrmvideosink属性
@@ -632,21 +631,23 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
         pipeline << "plane-id=" << config.overlay.plane_id << " ";
     }
     
-    
-    // 添加位置参数
-    pipeline << "offset-x=" << offset_x << " "
-            << "offset-y=" << offset_y << " ";
-
-    // 取消注释conn-id，并移除zorder（nvdrmvideosink不支持zorder属性）
     if (config.overlay.connector_id != -1) {
         pipeline << "conn-id=" << config.overlay.connector_id << " ";
     }
+    
     if (config.overlay.crtc_id != -1) {
         pipeline << "crtc-id=" << config.overlay.crtc_id << " ";
     }
-
+    
+    // 添加位置参数
+    pipeline << "offset-x=" << offset_x << " "
+             << "offset-y=" << offset_y << " ";
+    
+    // 其他设置（nvdrmvideosink不支持zorder属性，层级由DRM硬件平面类型决定）
     pipeline << "set-mode=false "
-    // 如果启用硬件缩放，添加缩放参数
+             << "show-preroll-frame=false "
+             << "sync=false";
+             
     if (config.overlay.enable_scaling) {
         pipeline << " enable-last-sample=false";
     }
@@ -730,10 +731,6 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
             if (config.overlay.plane_id != -1) {
                 pipeline << "plane-id=" << config.overlay.plane_id << " ";
             }
-            // 省略conn-id，让nvdrmvideosink自动选择连接器
-            // if (config.overlay.connector_id != -1) {
-            //     pipeline << "conn-id=" << config.overlay.connector_id << " ";
-            // }
             // 添加位置参数
             pipeline << "offset-x=" << layout.offset_x << " "
                     << "offset-y=" << layout.offset_y << " ";
