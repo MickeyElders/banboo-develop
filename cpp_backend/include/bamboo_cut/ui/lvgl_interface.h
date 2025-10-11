@@ -628,9 +628,14 @@ private:
 };
 
 /**
- * @brief LVGL显示刷新回调 (v9 API)
+ * @brief LVGL显示刷新回调 (v9 API) - 独占DRM模式
  */
 void display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
+
+/**
+ * @brief LVGL GBM共享显示刷新回调 (v9 API) - GBM共享模式
+ */
+void gbm_display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 
 /**
  * @brief LVGL输入设备读取回调 (v9 API)
@@ -654,10 +659,16 @@ bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
                         uint32_t& stride, uint32_t& buffer_size);
 
 /**
- * @brief 复制像素数据
+ * @brief 复制像素数据 - 独占DRM模式
  */
 void copyPixelData(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
                   uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
+
+/**
+ * @brief 复制像素数据到GBM framebuffer - GBM共享模式
+ */
+void copyPixelDataToGBM(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
+                        uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
 
 /**
  * @brief 设置DRM显示

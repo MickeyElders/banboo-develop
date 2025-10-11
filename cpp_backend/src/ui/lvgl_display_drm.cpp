@@ -4,6 +4,7 @@
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"
+#include "bamboo_cut/ui/gbm_display_backend.h"
 #include <iostream>
 #include <fcntl.h>
 #include <unistd.h>
@@ -788,14 +789,102 @@ void cleanupDRMResources(int drm_fd, uint32_t fb_id, drmModeCrtc* crtc,
 #endif
 }
 
-void copyPixelData(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
-                  uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size) {
+// GBM共享模式显示刷新回调函数
+void gbm_display_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
+#ifdef ENABLE_LVGL
+    static uint32_t flush_count = 0;
+    flush_count++;
+    
+    // 详细的调试信息（仅在前几次调用或定期显示）
+    if (flush_count <= 5 || flush_count % 60 == 0) {
+        std::cout << "[GBM] flush_cb调用 #" << flush_count
+                  << " area(" << (area ? area->x1 : -1) << "," << (area ? area->y1 : -1)
+                  << " to " << (area ? area->x2 : -1) << "," << (area ? area->y2 : -1)
+                  << ") px_map=" << (px_map ? "valid" : "null") << std::endl;
+    }
+    
+    // 参数验证
+    if (!disp || !area || !px_map) {
+        std::cerr << "[GBM] flush_cb参数无效: disp=" << disp << " area=" << area << " px_map=" << px_map << std::endl;
+        if (disp) lv_display_flush_ready(disp);
+        return;
+    }
+    
+    // 获取GBM后端管理器
+    auto& gbm_manager = GBMBackendManager::getInstance();
+    auto* gbm_backend = gbm_manager.getBackend();
+    
+    if (!gbm_backend || !gbm_backend->isDRMResourceAvailable()) {
+        if (flush_count <= 5) {
+            std::cerr << "[GBM] GBM后端不可用，跳过刷新" << std::endl;
+        }
+        lv_display_flush_ready(disp);
+        return;
+    }
+    
+    // 获取显示尺寸
+    auto config = gbm_manager.getSharedConfig();
+    uint32_t drm_width = config.width;
+    uint32_t drm_height = config.height;
+    
+    // 区域边界检查
+    if (area->x1 < 0 || area->y1 < 0 ||
+        area->x2 >= (int32_t)drm_width || area->y2 >= (int32_t)drm_height ||
+        area->x1 > area->x2 || area->y1 > area->y2) {
+        std::cerr << "[GBM] 无效的区域边界: (" << area->x1 << "," << area->y1
+                  << ") to (" << area->x2 << "," << area->y2 << ")" << std::endl;
+        lv_display_flush_ready(disp);
+        return;
+    }
+    
+    // 创建或获取GBM framebuffer
+    static GBMFramebuffer* current_fb = nullptr;
+    if (!current_fb) {
+        current_fb = gbm_backend->createLVGLFramebuffer(drm_width, drm_height);
+        if (!current_fb) {
+            std::cerr << "[GBM] 创建LVGL framebuffer失败" << std::endl;
+            lv_display_flush_ready(disp);
+            return;
+        }
+        std::cout << "[GBM] 创建LVGL framebuffer成功: " << drm_width << "x" << drm_height << std::endl;
+    }
+    
+    // 映射framebuffer用于写入
+    if (!current_fb->map) {
+        current_fb->map = mmap(nullptr, current_fb->size, PROT_READ | PROT_WRITE, MAP_SHARED, -1, 0);
+        if (current_fb->map == MAP_FAILED) {
+            std::cerr << "[GBM] framebuffer映射失败" << std::endl;
+            current_fb->map = nullptr;
+            lv_display_flush_ready(disp);
+            return;
+        }
+    }
+    
+    // 复制像素数据到GBM framebuffer
+    uint32_t* framebuffer = static_cast<uint32_t*>(current_fb->map);
+    copyPixelDataToGBM(area, px_map, framebuffer, drm_width, drm_height, current_fb->stride, current_fb->size);
+    
+    // 提交framebuffer到primary plane
+    if (!gbm_backend->commitLVGLFrame(current_fb)) {
+        std::cerr << "[GBM] 提交LVGL帧失败" << std::endl;
+    }
+    
+    // 等待VSync（可选，用于同步）
+    gbm_backend->waitForVSync();
+    
+    // 通知LVGL刷新完成
+    lv_display_flush_ready(disp);
+#endif
+}
+
+void copyPixelDataToGBM(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
+                        uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size) {
 #ifdef ENABLE_LVGL
     // 严格的区域边界检查
     if (area->x1 < 0 || area->y1 < 0 ||
         area->x2 >= (int32_t)drm_width || area->y2 >= (int32_t)drm_height ||
         area->x1 > area->x2 || area->y1 > area->y2) {
-        std::cerr << "[DRM] Invalid area bounds: (" << area->x1 << "," << area->y1
+        std::cerr << "[GBM] Invalid area bounds: (" << area->x1 << "," << area->y1
                   << ") to (" << area->x2 << "," << area->y2 << ")" << std::endl;
         return;
     }

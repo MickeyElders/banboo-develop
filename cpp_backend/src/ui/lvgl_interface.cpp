@@ -6,6 +6,7 @@
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"
+#include "bamboo_cut/ui/gbm_display_backend.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -520,8 +521,123 @@ void LVGLInterface::uiLoop() {
 // DRM显示初始化方法
 bool LVGLInterface::initializeWaylandOrDRMDisplay() {
 #ifdef ENABLE_LVGL
-    std::cout << "[LVGLInterface] 使用DRM显示驱动..." << std::endl;
+    std::cout << "[LVGLInterface] 使用GBM共享DRM显示驱动..." << std::endl;
     return initializeDisplay();
+#else
+    return false;
+#endif
+}
+
+bool LVGLInterface::initializeDisplay() {
+#ifdef ENABLE_LVGL
+    std::cout << "[LVGLInterface] 初始化GBM共享DRM显示后端..." << std::endl;
+    
+    // 初始化GBM后端管理器
+    DRMSharedConfig gbm_config;
+    gbm_config.width = config_.screen_width;
+    gbm_config.height = config_.screen_height;
+    gbm_config.connector_id = 0;  // 自动检测
+    gbm_config.crtc_id = 0;      // 自动检测
+    gbm_config.primary_plane_id = 0;   // 自动检测primary plane (LVGL)
+    gbm_config.overlay_plane_id = 44;  // 用户指定的overlay plane (GStreamer)
+    
+    auto& gbm_manager = GBMBackendManager::getInstance();
+    if (!gbm_manager.initialize(gbm_config)) {
+        std::cerr << "[LVGLInterface] GBM后端管理器初始化失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "[LVGLInterface] GBM后端管理器初始化成功" << std::endl;
+    
+    // 获取GBM后端实例
+    auto* gbm_backend = gbm_manager.getBackend();
+    if (!gbm_backend) {
+        std::cerr << "[LVGLInterface] 无法获取GBM后端实例" << std::endl;
+        return false;
+    }
+    
+    // 计算显示缓冲区大小
+    uint32_t buf_size = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
+    
+    // 创建LVGL显示驱动
+    if (!createLVGLDisplay(buf_size)) {
+        std::cerr << "[LVGLInterface] LVGL显示驱动创建失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "[LVGLInterface] GBM共享DRM显示初始化完成" << std::endl;
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool LVGLInterface::createLVGLDisplay(uint32_t buf_size) {
+#ifdef ENABLE_LVGL
+    std::cout << "[LVGLInterface] 创建LVGL显示驱动..." << std::endl;
+    
+    // 设置显示缓冲区
+    if (!setupLVGLDisplayBuffer(buf_size)) {
+        std::cerr << "[LVGLInterface] 显示缓冲区设置失败" << std::endl;
+        return false;
+    }
+    
+    // 创建显示驱动 (LVGL v9 API)
+    display_ = lv_display_create(config_.screen_width, config_.screen_height);
+    if (!display_) {
+        std::cerr << "[LVGLInterface] 创建显示驱动失败" << std::endl;
+        return false;
+    }
+    
+    // 设置显示缓冲区 (LVGL v9 API)
+    lv_display_set_buffers(display_, disp_buf1_, disp_buf2_, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+    // 设置刷新回调函数 - 使用GBM共享模式回调
+    lv_display_set_flush_cb(display_, gbm_display_flush_cb);
+    
+    std::cout << "[LVGLInterface] LVGL显示驱动创建成功，使用GBM共享模式刷新回调" << std::endl;
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool LVGLInterface::setupLVGLDisplayBuffer(uint32_t buf_size) {
+#ifdef ENABLE_LVGL
+    std::cout << "[LVGLInterface] 设置LVGL显示缓冲区 (大小: " << buf_size << " bytes)" << std::endl;
+    
+    try {
+        // 释放之前的缓冲区
+        if (disp_buf1_) {
+            delete[] reinterpret_cast<uint32_t*>(disp_buf1_);
+            disp_buf1_ = nullptr;
+        }
+        if (disp_buf2_) {
+            delete[] reinterpret_cast<uint32_t*>(disp_buf2_);
+            disp_buf2_ = nullptr;
+        }
+        
+        // 分配新的缓冲区
+        size_t pixel_count = buf_size / sizeof(lv_color_t);
+        disp_buf1_ = reinterpret_cast<lv_color_t*>(new uint32_t[pixel_count]);
+        disp_buf2_ = reinterpret_cast<lv_color_t*>(new uint32_t[pixel_count]);
+        
+        if (!disp_buf1_ || !disp_buf2_) {
+            std::cerr << "[LVGLInterface] 显示缓冲区内存分配失败" << std::endl;
+            return false;
+        }
+        
+        // 清空缓冲区
+        std::memset(disp_buf1_, 0, buf_size);
+        std::memset(disp_buf2_, 0, buf_size);
+        
+        std::cout << "[LVGLInterface] 显示缓冲区设置完成" << std::endl;
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[LVGLInterface] 显示缓冲区设置异常: " << e.what() << std::endl;
+        return false;
+    }
 #else
     return false;
 #endif

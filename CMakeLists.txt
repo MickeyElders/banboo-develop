@@ -392,6 +392,44 @@ else()
     endif()
 endif()
 
+# GBM和EGL - GBM显示后端需要的库
+if(ENABLE_DRM)
+    # 查找GBM库
+    find_library(GBM_LIBRARY gbm
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+    find_path(GBM_INCLUDE_DIR gbm.h
+        PATHS /usr/include /usr/local/include)
+    
+    if(GBM_LIBRARY AND GBM_INCLUDE_DIR)
+        message(STATUS "Found GBM: ${GBM_LIBRARY}")
+        set(ENABLE_GBM ON)
+        set(GBM_LIBRARIES ${GBM_LIBRARY})
+        include_directories(${GBM_INCLUDE_DIR})
+    else()
+        message(WARNING "GBM not found - GBM显示后端将被禁用")
+        set(ENABLE_GBM OFF)
+    endif()
+    
+    # 查找EGL库
+    find_library(EGL_LIBRARY EGL
+        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+    find_path(EGL_INCLUDE_DIR EGL/egl.h
+        PATHS /usr/include /usr/local/include)
+    
+    if(EGL_LIBRARY AND EGL_INCLUDE_DIR)
+        message(STATUS "Found EGL: ${EGL_LIBRARY}")
+        set(ENABLE_EGL ON)
+        set(EGL_LIBRARIES ${EGL_LIBRARY})
+        include_directories(${EGL_INCLUDE_DIR})
+    else()
+        message(WARNING "EGL not found - EGL功能将被禁用")
+        set(ENABLE_EGL OFF)
+    endif()
+else()
+    set(ENABLE_GBM OFF)
+    set(ENABLE_EGL OFF)
+endif()
+
 # 移除Python绑定相关配置 - 项目现在是纯C++架构
 set(ENABLE_PYBIND11 OFF)
 set(ENABLE_PYTHON OFF)
@@ -527,6 +565,7 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/ui/lvgl_updates.cpp
     cpp_backend/src/ui/lvgl_events.cpp
     cpp_backend/src/ui/lvgl_display_drm.cpp
+    cpp_backend/src/ui/gbm_display_backend.cpp
     cpp_backend/src/ui/xvfb_manager.cpp
     cpp_backend/src/ui/lvgl_panels/header_panel.cpp
     cpp_backend/src/ui/lvgl_panels/camera_panel.cpp
@@ -652,6 +691,8 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
     $<$<BOOL:${ENABLE_NVIDIA_DRM}>:ENABLE_NVIDIA_DRM>
     $<$<BOOL:${ENABLE_TEGRA_DRM}>:ENABLE_TEGRA_DRM>
+    $<$<BOOL:${ENABLE_GBM}>:ENABLE_GBM>
+    $<$<BOOL:${ENABLE_EGL}>:ENABLE_EGL>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
@@ -690,6 +731,15 @@ endif()
 
 if(ENABLE_DRM)
     target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
+endif()
+
+# GBM和EGL库 - GBM显示后端需要的库
+if(ENABLE_GBM)
+    target_link_libraries(bamboo_integrated ${GBM_LIBRARIES})
+endif()
+
+if(ENABLE_EGL)
+    target_link_libraries(bamboo_integrated ${EGL_LIBRARIES})
 endif()
 
 # LVGL库 - 确保正确链接
@@ -790,6 +840,8 @@ message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
 message(STATUS "  libdrm: ${ENABLE_DRM}")
 message(STATUS "    - NVIDIA DRM: ${ENABLE_NVIDIA_DRM}")
 message(STATUS "    - Tegra DRM: ${ENABLE_TEGRA_DRM}")
+message(STATUS "  GBM: ${ENABLE_GBM}")
+message(STATUS "  EGL: ${ENABLE_EGL}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
 message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
 message(STATUS "")
