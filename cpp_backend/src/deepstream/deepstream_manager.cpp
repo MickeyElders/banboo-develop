@@ -144,7 +144,27 @@ bool DeepStreamManager::startSinglePipelineMode() {
     
     // 等待LVGL完全初始化后再启动DeepStream
     std::cout << "等待LVGL完全初始化..." << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(3000));  // 等待3秒确保LVGL完全初始化
+    
+    if (lvgl_interface_) {
+        auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
+        int wait_count = 0;
+        const int MAX_WAIT_SECONDS = 10;
+        
+        while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            wait_count++;
+            std::cout << "等待LVGL初始化完成... (" << (wait_count * 0.5) << "秒)" << std::endl;
+        }
+        
+        if (lvgl_if->isFullyInitialized()) {
+            std::cout << "✅ LVGL已完全初始化，继续启动DeepStream管道" << std::endl;
+        } else {
+            std::cout << "⚠️ 警告：LVGL初始化超时，继续启动DeepStream管道" << std::endl;
+        }
+    } else {
+        std::cout << "警告：LVGL接口不可用，使用固定延迟" << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+    }
     
     for (int retry = 0; retry < MAX_RETRIES; retry++) {
         if (retry > 0) {
@@ -999,23 +1019,11 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     // 构建摄像头源
     pipeline << buildCameraSource(config) << " ! ";
     
-    // 🔧 修复：nvvidconv无法输出BGRA格式到系统内存，使用videoconvert
-    if (config.camera_source == CameraSourceMode::NVARGUSCAMERA) {
-        // 对于真实摄像头（NVMM格式），使用nvvidconv转换到系统内存，再用videoconvert转换格式
-        // 第一步：nvvidconv转换到系统内存（但保持原格式）
-        pipeline << "nvvidconv ! "
-                 << "video/x-raw ! ";
-        
-        // 第二步：使用videoconvert转换到BGRA格式 + 尺寸调整
-        pipeline << "videoconvert ! "
-                 << "videoscale ! "
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
-    } else {
-        // 对于测试源（普通内存），直接使用软件转换
-        pipeline << "videoconvert ! "
-                 << "videoscale ! "
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
-    }
+    // 🔧 修复：v4l2src输出普通内存，直接使用videoconvert，无需nvvidconv
+    // v4l2src已输出普通内存格式，只需要格式转换和尺寸调整
+    pipeline << "videoconvert ! "
+             << "videoscale ! "
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! ";
     
     pipeline << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度

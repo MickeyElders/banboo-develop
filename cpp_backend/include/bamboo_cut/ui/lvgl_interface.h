@@ -131,6 +131,12 @@ public:
     bool isRunning() const { return running_.load(); }
 
     /**
+     * @brief 检查LVGL界面是否完全初始化
+     * @return true 如果界面完全初始化且可以安全使用，false 否则
+     */
+    bool isFullyInitialized() const;
+
+    /**
      * @brief 获取摄像头画布对象（用于appsink软件合成）
      */
     lv_obj_t* getCameraCanvas() const { return camera_canvas_; }

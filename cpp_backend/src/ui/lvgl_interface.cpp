@@ -422,6 +422,30 @@ void LVGLInterface::stop() {
 #endif
 }
 
+bool LVGLInterface::isFullyInitialized() const {
+#ifdef ENABLE_LVGL
+    // 检查基础组件是否已初始化
+    if (!running_.load() || !display_ || !main_screen_) {
+        return false;
+    }
+    
+    // 检查主要面板是否已创建
+    if (!header_panel_ || !camera_panel_ || !control_panel_ || !footer_panel_) {
+        return false;
+    }
+    
+    // 检查关键控件是否已创建
+    if (!camera_canvas_) {
+        return false;
+    }
+    
+    // 所有检查都通过，认为已完全初始化
+    return true;
+#else
+    return false;
+#endif
+}
+
 void LVGLInterface::uiLoop() {
 #ifdef ENABLE_LVGL
     std::cout << "[LVGLInterface] UI主循环开始" << std::endl;

@@ -791,8 +791,29 @@ private:
             return false;
         }
         
+        // 使用新的LVGL初始化检查机制
         std::cout << "等待LVGL完全初始化..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2)); // 延迟2秒确保LVGL完全就绪
+        
+        if (lvgl_interface_ptr_) {
+            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_ptr_);
+            int wait_count = 0;
+            const int MAX_WAIT_SECONDS = 20;  // 最大等待10秒
+            
+            while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                wait_count++;
+                std::cout << "等待LVGL初始化完成... (InferenceWorker: " << (wait_count * 0.5) << "秒)" << std::endl;
+            }
+            
+            if (lvgl_if->isFullyInitialized()) {
+                std::cout << "✅ LVGL已完全初始化，继续启动DeepStream" << std::endl;
+            } else {
+                std::cout << "⚠️ 警告：LVGL初始化超时，继续启动DeepStream" << std::endl;
+            }
+        } else {
+            std::cout << "警告：LVGL接口不可用，使用固定延迟" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
         
         std::cout << "启动DeepStream管理器..." << std::endl;
         if (!deepstream_manager_->start()) {
