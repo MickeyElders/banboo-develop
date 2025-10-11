@@ -387,16 +387,46 @@ uint32_t GBMDisplayBackend::findOverlayPlane() {
 bool GBMDisplayBackend::setupCRTCMode() {
     std::cout << "🔧 设置CRTC模式..." << std::endl;
     
+    // 首先确保连接器已初始化
     if (!connector_) {
-        std::cerr << "❌ 连接器未初始化" << std::endl;
+        std::cout << "🔧 连接器未初始化，重新查找连接器..." << std::endl;
+        config_.connector_id = findConnector();
+        if (config_.connector_id == 0) {
+            std::cerr << "❌ 无法找到活跃连接器" << std::endl;
+            return false;
+        }
+    }
+    
+    if (!connector_) {
+        std::cerr << "❌ 连接器仍未初始化" << std::endl;
         return false;
     }
     
     // 查找CRTC
     if (config_.crtc_id == 0) {
-        for (int i = 0; i < drm_resources_->count_crtcs; i++) {
-            config_.crtc_id = drm_resources_->crtcs[i];
-            break;  // 使用第一个可用的CRTC
+        // 尝试从连接器的编码器获取CRTC
+        if (connector_->encoder_id) {
+            drmModeEncoder* encoder = drmModeGetEncoder(drm_fd_, connector_->encoder_id);
+            if (encoder && encoder->crtc_id) {
+                config_.crtc_id = encoder->crtc_id;
+                std::cout << "🔧 从编码器获取CRTC: " << config_.crtc_id << std::endl;
+                drmModeFreeEncoder(encoder);
+            } else {
+                if (encoder) drmModeFreeEncoder(encoder);
+                // 如果编码器没有CRTC，使用第一个可用的
+                for (int i = 0; i < drm_resources_->count_crtcs; i++) {
+                    config_.crtc_id = drm_resources_->crtcs[i];
+                    std::cout << "🔧 使用第一个可用CRTC: " << config_.crtc_id << std::endl;
+                    break;
+                }
+            }
+        } else {
+            // 没有编码器，使用第一个可用的CRTC
+            for (int i = 0; i < drm_resources_->count_crtcs; i++) {
+                config_.crtc_id = drm_resources_->crtcs[i];
+                std::cout << "🔧 使用第一个可用CRTC: " << config_.crtc_id << std::endl;
+                break;
+            }
         }
     }
     
@@ -405,10 +435,18 @@ bool GBMDisplayBackend::setupCRTCMode() {
         return false;
     }
     
-    std::cout << "🎯 CRTC配置: " << config_.crtc_id << std::endl;
+    std::cout << "🎯 CRTC配置完成: " << config_.crtc_id << std::endl;
+    std::cout << "🎯 连接器配置: " << config_.connector_id << std::endl;
+    std::cout << "🎯 显示模式: " << config_.width << "x" << config_.height << "@" << mode_.vrefresh << "Hz" << std::endl;
     
-    // 注意：在共享模式下，我们不立即设置CRTC模式
-    // 而是让LVGL在初始化时设置，我们只是预留资源
+    // 在共享模式下，确认CRTC和连接器的映射关系
+    // 这不会干扰LVGL的独占控制，只是验证配置有效性
+    drmModeCrtc* current_crtc = drmModeGetCrtc(drm_fd_, config_.crtc_id);
+    if (current_crtc) {
+        std::cout << "🔧 当前CRTC状态: valid=" << (current_crtc->mode_valid ? "true" : "false") << std::endl;
+        drmModeFreeCrtc(current_crtc);
+    }
+    
     std::cout << "✅ CRTC模式配置完成（共享模式）" << std::endl;
     
     return true;
