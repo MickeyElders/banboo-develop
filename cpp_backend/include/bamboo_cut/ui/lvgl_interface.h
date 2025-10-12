@@ -647,103 +647,13 @@ void input_read_cb(lv_indev_t* indev, lv_indev_data_t* data);
  */
 void wayland_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 
-// === DRM辅助函数声明 ===
+// === Wayland辅助函数声明 ===
 
 /**
- * @brief 初始化DRM设备
+ * @brief 检测Wayland环境可用性
+ * @return true如果Wayland环境可用，false否则
  */
-bool initializeDRMDevice(int& drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
-                        drmModeConnector*& connector, uint32_t*& framebuffer,
-                        uint32_t& fb_handle, int& init_attempt_count,
-                        uint32_t& drm_width, uint32_t& drm_height,
-                        uint32_t& stride, uint32_t& buffer_size);
-
-/**
- * @brief 复制像素数据 - 独占DRM模式
- */
-void copyPixelData(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
-                  uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
-
-/**
- * @brief 复制像素数据到GBM framebuffer - GBM共享模式
- */
-void copyPixelDataToGBM(const lv_area_t* area, const uint8_t* px_map, uint32_t* framebuffer,
-                        uint32_t drm_width, uint32_t drm_height, uint32_t stride, uint32_t buffer_size);
-
-/**
- * @brief 设置DRM显示
- */
-bool setupDRMDisplay(int drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
-                    drmModeConnector*& connector, uint32_t*& framebuffer,
-                    uint32_t& fb_handle, uint32_t& drm_width, uint32_t& drm_height,
-                    uint32_t& stride, uint32_t& buffer_size);
-
-/**
- * @brief 清理DRM资源
- */
-void cleanupDRMResources(int drm_fd, uint32_t fb_id, drmModeCrtc* crtc,
-                        drmModeConnector* connector, uint32_t* framebuffer,
-                        uint32_t fb_handle, uint32_t buffer_size);
-
-/**
- * @brief 查找合适的CRTC
- */
-bool findSuitableCRTC(int drm_fd, drmModeRes* resources, drmModeConnector* connector,
-                     drmModeCrtc*& crtc);
-
-/**
- * @brief 创建帧缓冲区
- */
-bool createFramebuffer(int drm_fd, uint32_t drm_width, uint32_t drm_height,
-                      uint32_t& fb_id, uint32_t& fb_handle, uint32_t*& framebuffer,
-                      uint32_t& stride, uint32_t& buffer_size);
-
-/**
- * @brief 检测DRM驱动类型
- */
-bool detectDRMDriverType(int drm_fd, std::string& driver_name);
-
-/**
- * @brief 设置CRTC模式
- */
-bool setCRTCMode(int drm_fd, drmModeCrtc* crtc, uint32_t fb_id,
-                drmModeConnector* connector, drmModeModeInfo* mode);
-
-/**
- * @brief 共享模式DRM设置（不独占CRTC）
- */
-bool setupDRMDisplayShared(int drm_fd, uint32_t& fb_id, drmModeCrtc*& crtc,
-                          drmModeConnector*& connector, uint32_t*& framebuffer,
-                          uint32_t& fb_handle, uint32_t& drm_width, uint32_t& drm_height,
-                          uint32_t& stride, uint32_t& buffer_size);
-
-/**
- * @brief 创建系统内存framebuffer（避免DRM冲突）
- */
-bool createSystemFramebuffer(uint32_t width, uint32_t height, uint32_t*& framebuffer,
-                           uint32_t& stride, uint32_t& buffer_size);
-
-// === NVIDIA-DRM迁移相关函数 ===
-
-/**
- * @brief 检测DRM驱动类型(无参数版本)
- * @return 驱动名称字符串 ("nvidia-drm", "tegra-drm", 或 "unknown")
- */
-std::string detectDRMDriverType();
-
-/**
- * @brief 运行DRM渲染功能验证测试
- * @return true 测试通过，false 测试失败
- *
- * 该函数执行完整的DRM渲染功能验证，包括：
- * - 帧缓冲区初始化测试
- * - 显示输出配置验证
- * - GPU加速支持检测
- * - 图形性能基准测试
- * - 界面元素渲染验证
- * - 内存优化效果测试
- */
-bool runDRMRenderTest();
+bool isWaylandEnvironmentAvailable();
 
 /**
  * @brief 运行触摸交互功能验证测试
@@ -769,7 +679,7 @@ bool runTouchInteractionTest();
  * - 控件布局对齐验证
  * - 动画效果流畅性测试
  * - 整体视觉质量评估
- * - NVIDIA-DRM特定优化验证
+ * - Wayland特定优化验证
  */
 bool runInterfaceDisplayTest();
 

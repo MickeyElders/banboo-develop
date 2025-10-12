@@ -15,8 +15,8 @@
 #include <thread>
 #include <opencv2/opencv.hpp>
 
-// 包含DRM资源协调器头文件
-#include "bamboo_cut/drm/drm_resource_coordinator.h"
+// DRM资源协调器已移除，使用Wayland架构
+// #include "bamboo_cut/drm/drm_resource_coordinator.h"  // 已删除
 
 namespace bamboo_cut {
 namespace deepstream {
