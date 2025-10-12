@@ -87,6 +87,7 @@ help:
 	@echo ""
 	@echo "$(GREEN)NVIDIA-DRM 迁移验证:$(NC)"
 	@echo "  enable-nvidia-drm- 启用NVIDIA-DRM驱动（替换tegra_drm）"
+	@echo "  force-nvidia-drm - 强制迁移nvidia-drm（处理顽固的tegra_drm）"
 	@echo "  nvidia-drm-test  - 运行完整的NVIDIA-DRM迁移验证测试"
 	@echo "  nvidia-drm-report- 生成NVIDIA-DRM迁移状态报告"
 	@echo "  nvidia-drm-complete - 运行完整的迁移验证流程"
@@ -591,6 +592,14 @@ enable-nvidia-drm:
 	@read -p "继续启用NVIDIA-DRM? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
 	sudo deploy/scripts/enable_nvidia_drm.sh
 
+force-nvidia-drm:
+	@echo "$(BLUE)[INFO]$(NC) 强制迁移到NVIDIA-DRM驱动..."
+	@chmod +x deploy/scripts/force_nvidia_drm.sh
+	@echo "$(RED)[DANGER]$(NC) 此操作将强制修改系统驱动，可能影响图形显示"
+	@echo "$(YELLOW)[WARNING]$(NC) 建议先备份重要数据，操作需要重启系统"
+	@read -p "确认强制迁移到NVIDIA-DRM? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	sudo deploy/scripts/force_nvidia_drm.sh
+
 nvidia-drm-test: nvidia_drm_migration_test.cpp
 	@echo "$(BLUE)[INFO]$(NC) 构建NVIDIA-DRM迁移验证工具..."
 	$(CXX) $(CXXFLAGS) -o nvidia_drm_migration_test nvidia_drm_migration_test.cpp \
@@ -624,7 +633,7 @@ nvidia-drm-complete: nvidia-drm-test nvidia-drm-report
 	@echo "  验证报告: nvidia_drm_migration_report.txt"
 	@echo "  状态报告: nvidia_drm_status.txt"
 
-.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test enable-nvidia-drm nvidia-drm-test nvidia-drm-report nvidia-drm-complete
+.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test enable-nvidia-drm force-nvidia-drm nvidia-drm-test nvidia-drm-report nvidia-drm-complete
 
 # === 开发辅助 ===
 dev-run:

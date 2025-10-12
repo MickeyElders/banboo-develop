@@ -42,39 +42,83 @@ systemctl stop display-manager 2>/dev/null || true
 systemctl stop gdm 2>/dev/null || true
 systemctl stop lightdm 2>/dev/null || true
 
-# 卸载tegra_drm模块
+# 卸载tegra_drm模块 - 增强版本
 if [ "$TEGRA_LOADED" = true ]; then
-    echo -e "${YELLOW}[卸载]${NC} 卸载tegra_drm模块..."
+    echo -e "${YELLOW}[卸载]${NC} 强制卸载tegra_drm模块..."
     
-    # 查找依赖tegra_drm的模块
-    DEPENDENT_MODULES=$(lsmod | grep tegra_drm | awk '{print $4}' | tr ',' ' ')
+    # 停止所有可能使用DRM的进程
+    echo "  停止可能使用DRM的进程..."
+    pkill -f "Xorg" 2>/dev/null || true
+    pkill -f "wayland" 2>/dev/null || true
+    pkill -f "weston" 2>/dev/null || true
+    pkill -f "lvgl" 2>/dev/null || true
+    pkill -f "bamboo" 2>/dev/null || true
+    sleep 2
     
-    # 卸载依赖模块
-    for module in $DEPENDENT_MODULES; do
-        if [ ! -z "$module" ]; then
-            echo "  卸载依赖模块: $module"
-            rmmod "$module" 2>/dev/null || true
+    # 强制卸载所有依赖模块
+    echo "  强制卸载依赖模块..."
+    MODULES_TO_REMOVE="cec drm_kms_helper nvhwpm host1x"
+    for module in $MODULES_TO_REMOVE; do
+        if lsmod | grep -q "^$module "; then
+            echo "    强制卸载: $module"
+            rmmod -f "$module" 2>/dev/null || true
         fi
     done
     
-    # 卸载tegra_drm
-    echo "  卸载 tegra_drm"
-    rmmod tegra_drm 2>/dev/null || true
+    # 多次尝试卸载tegra_drm
+    echo "  强制卸载 tegra_drm..."
+    for i in {1..5}; do
+        if lsmod | grep -q "^tegra_drm "; then
+            echo "    尝试 $i/5: 卸载 tegra_drm"
+            rmmod -f tegra_drm 2>/dev/null || true
+            sleep 1
+        else
+            echo "    tegra_drm 已成功卸载"
+            break
+        fi
+    done
     
-    # 黑名单tegra_drm
-    echo "blacklist tegra_drm" > /etc/modprobe.d/blacklist-tegra-drm.conf
-    echo -e "${GREEN}  tegra_drm 已卸载并加入黑名单${NC}"
+    # 永久禁用tegra_drm
+    echo "  永久禁用tegra_drm..."
+    cat > /etc/modprobe.d/blacklist-tegra-drm.conf << EOF
+# 禁用 tegra_drm 模块
+blacklist tegra_drm
+install tegra_drm /bin/true
+EOF
+    
+    echo -e "${GREEN}  tegra_drm 强制卸载完成${NC}"
 fi
 
-# 配置NVIDIA驱动参数
+# 配置NVIDIA驱动参数 - 增强版本
 echo -e "${YELLOW}[配置]${NC} 配置nvidia-drm模块参数..."
 
-# 创建nvidia-drm配置文件
+# 移除旧的nvidia模块
+echo "  移除旧的nvidia模块..."
+modprobe -r nvidia_drm 2>/dev/null || true
+modprobe -r nvidia_modeset 2>/dev/null || true
+modprobe -r nvidia_uvm 2>/dev/null || true
+modprobe -r nvidia 2>/dev/null || true
+
+# 创建强化的nvidia-drm配置文件
 cat > /etc/modprobe.d/nvidia-drm.conf << EOF
-# NVIDIA DRM 模块配置
-options nvidia-drm modeset=1
+# NVIDIA DRM 模块配置 - 强化版本
+options nvidia-drm modeset=1 fbdev=1
 options nvidia NVreg_DeviceFileUID=0 NVreg_DeviceFileGID=44 NVreg_DeviceFileMode=0664
 options nvidia NVreg_PreserveVideoMemoryAllocations=1
+options nvidia NVreg_EnableMSI=1
+options nvidia NVreg_UsePageAttributeTable=1
+
+# 确保nvidia-drm优先加载
+softdep drm pre: nvidia-drm
+EOF
+
+# 同时更新modules文件确保启动时加载
+echo "  更新模块加载配置..."
+cat > /etc/modules-load.d/nvidia-drm.conf << EOF
+# NVIDIA DRM 模块自动加载
+nvidia
+nvidia_uvm
+nvidia_drm
 EOF
 
 echo -e "${GREEN}  nvidia-drm 配置完成${NC}"
