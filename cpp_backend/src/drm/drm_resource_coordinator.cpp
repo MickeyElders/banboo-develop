@@ -372,43 +372,106 @@ bool DRMResourceCoordinator::scanDRMResources() {
 }
 
 uint32_t DRMResourceCoordinator::detectPrimaryPlane(int drm_fd, uint32_t crtc_id) {
-    for (const auto& info : plane_info_) {
-        if (info.plane_type == 1) { // Primary plane type = 1
+    // 直接扫描Plane资源，不依赖预缓存的plane_info_
+    drmModePlaneRes* plane_res = drmModeGetPlaneResources(drm_fd);
+    if (!plane_res) {
+        std::cerr << "❌ 无法获取Plane资源" << std::endl;
+        return 0;
+    }
+    
+    std::cout << "🔍 [DRM协调器] 搜索Primary Plane (总计 " << plane_res->count_planes << " 个planes)" << std::endl;
+    
+    for (uint32_t i = 0; i < plane_res->count_planes; i++) {
+        uint32_t plane_id = plane_res->planes[i];
+        uint32_t plane_type = getPlaneType(drm_fd, plane_id);
+        
+        std::cout << "  检查Plane " << plane_id << " 类型: " << plane_type << std::endl;
+        
+        if (plane_type == 1) { // Primary plane type = 1
             // 检查这个plane是否支持目标CRTC
-            int crtc_index = -1;
-            for (size_t i = 0; i < available_crtcs_.size(); i++) {
-                if (available_crtcs_[i] == crtc_id) {
-                    crtc_index = static_cast<int>(i);
-                    break;
+            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_id);
+            if (plane) {
+                // 计算CRTC索引
+                int crtc_index = -1;
+                for (size_t j = 0; j < available_crtcs_.size(); j++) {
+                    if (available_crtcs_[j] == crtc_id) {
+                        crtc_index = static_cast<int>(j);
+                        break;
+                    }
                 }
-            }
-            
-            if (crtc_index >= 0 && (info.possible_crtcs & (1 << crtc_index))) {
-                return info.plane_id;
+                
+                bool supports_crtc = (crtc_index >= 0 && (plane->possible_crtcs & (1 << crtc_index)));
+                std::cout << "    CRTC " << crtc_id << " 支持: " << (supports_crtc ? "✅" : "❌")
+                          << " (possible_crtcs: 0x" << std::hex << plane->possible_crtcs << std::dec << ")" << std::endl;
+                
+                drmModeFreePlane(plane);
+                
+                if (supports_crtc) {
+                    drmModeFreePlaneResources(plane_res);
+                    std::cout << "✅ 找到Primary Plane: " << plane_id << std::endl;
+                    return plane_id;
+                }
             }
         }
     }
+    
+    drmModeFreePlaneResources(plane_res);
+    std::cout << "❌ 未找到可用的Primary Plane" << std::endl;
     return 0;
 }
 
 std::vector<uint32_t> DRMResourceCoordinator::detectOverlayPlanes(int drm_fd, uint32_t crtc_id) {
     std::vector<uint32_t> overlay_planes;
     
-    for (const auto& info : plane_info_) {
-        if (info.plane_type == 0 && info.status == ResourceStatus::FREE) { // Overlay plane type = 0
+    // 直接扫描Plane资源，不依赖预缓存的plane_info_
+    drmModePlaneRes* plane_res = drmModeGetPlaneResources(drm_fd);
+    if (!plane_res) {
+        std::cerr << "❌ 无法获取Plane资源" << std::endl;
+        return overlay_planes;
+    }
+    
+    std::cout << "🔍 [DRM协调器] 搜索Overlay Planes (总计 " << plane_res->count_planes << " 个planes)" << std::endl;
+    
+    for (uint32_t i = 0; i < plane_res->count_planes; i++) {
+        uint32_t plane_id = plane_res->planes[i];
+        uint32_t plane_type = getPlaneType(drm_fd, plane_id);
+        
+        if (plane_type == 0) { // Overlay plane type = 0
             // 检查这个plane是否支持目标CRTC
-            int crtc_index = -1;
-            for (size_t i = 0; i < available_crtcs_.size(); i++) {
-                if (available_crtcs_[i] == crtc_id) {
-                    crtc_index = static_cast<int>(i);
-                    break;
+            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_id);
+            if (plane) {
+                // 计算CRTC索引
+                int crtc_index = -1;
+                for (size_t j = 0; j < available_crtcs_.size(); j++) {
+                    if (available_crtcs_[j] == crtc_id) {
+                        crtc_index = static_cast<int>(j);
+                        break;
+                    }
+                }
+                
+                bool supports_crtc = (crtc_index >= 0 && (plane->possible_crtcs & (1 << crtc_index)));
+                bool is_free = (plane->crtc_id == 0 && plane->fb_id == 0);
+                
+                std::cout << "  检查Overlay Plane " << plane_id
+                          << " CRTC支持: " << (supports_crtc ? "✅" : "❌")
+                          << " 空闲: " << (is_free ? "✅" : "❌") << std::endl;
+                
+                drmModeFreePlane(plane);
+                
+                if (supports_crtc && is_free) {
+                    overlay_planes.push_back(plane_id);
+                    std::cout << "✅ 找到可用Overlay Plane: " << plane_id << std::endl;
                 }
             }
-            
-            if (crtc_index >= 0 && (info.possible_crtcs & (1 << crtc_index))) {
-                overlay_planes.push_back(info.plane_id);
-            }
         }
+    }
+    
+    drmModeFreePlaneResources(plane_res);
+    
+    if (overlay_planes.empty()) {
+        std::cout << "❌ 未找到可用的Overlay Plane" << std::endl;
+    } else {
+        std::cout << "✅ 总计找到 " << overlay_planes.size() << " 个可用Overlay Planes" << std::endl;
     }
     
     return overlay_planes;

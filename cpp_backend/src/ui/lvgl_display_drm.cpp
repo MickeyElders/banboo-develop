@@ -56,8 +56,9 @@ bool LVGLInterface::detectDisplayResolution(int& width, int& height) {
 #ifdef ENABLE_LVGL
     std::cout << "[LVGLInterface] 正在检测DRM显示器分辨率..." << std::endl;
     
-    // 优先尝试nvidia-drm设备，然后回退到tegra_drm
+    // 修复：优先尝试card0（nvidia-drm），然后回退到card1
     const char* drm_devices[] = {
+        "/dev/dri/card0",  // 主要nvidia-drm设备
         "/dev/dri/card1",  // 备用nvidia-drm或tegra_drm
     };
     
