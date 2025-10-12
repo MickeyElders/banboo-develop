@@ -12,8 +12,9 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
+// Wayland架构下移除DRM头文件依赖
+// #include <xf86drm.h>
+// #include <xf86drmMode.h>
 #include <thread>
 #include <chrono>
 #include <set>
@@ -605,234 +606,16 @@ bool DeepStreamManager::configureDRMOverlay(const DRMOverlayConfig& overlay_conf
 DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
     DRMOverlayConfig config;
     
-    // 尝试打开nvidia-drm设备，按优先级顺序
-    int drm_fd = -1;
-    const char* drm_devices[] = {
-        "/dev/dri/card1",
-    };
+    // Wayland架构下不再需要DRM设备检测
+    std::cout << "🎯 Wayland架构：跳过DRM设备检测，使用waylandsink硬件渲染" << std::endl;
     
-    for (int i = 0; i < 1; i++) {  // 只检查一个设备
-        drm_fd = open(drm_devices[i], O_RDWR);
-        if (drm_fd >= 0) {
-            // 检查是否是nvidia-drm设备
-            drmVersionPtr version = drmGetVersion(drm_fd);
-            if (version) {
-                std::cout << "🔍 检查DRM设备 " << drm_devices[i] << ": 驱动=" << version->name << std::endl;
-                if (strcmp(version->name, "nvidia-drm") == 0) {
-                    std::cout << "✅ 找到nvidia-drm设备: " << drm_devices[i] << std::endl;
-                    drmFreeVersion(version);
-                    break;
-                }
-                drmFreeVersion(version);
-            }
-            close(drm_fd);
-            drm_fd = -1;
-        }
-    }
+    // 返回默认配置，表示不支持DRM overlay
+    std::cout << "📱 建议使用waylandsink替代nvdrmvideosink" << std::endl;
+    return config;
     
-    if (drm_fd < 0) {
-        std::cerr << "❌ 无法找到可用的nvidia-drm设备" << std::endl;
-        return config;
-    }
-    
-    std::cout << "🔍 开始智能检测DRM叠加平面（跳过LVGL占用的plane）..." << std::endl;
-    
-    // 获取DRM资源
-    drmModeRes* resources = drmModeGetResources(drm_fd);
-    if (!resources) {
-        std::cerr << "❌ 无法获取DRM资源" << std::endl;
-        close(drm_fd);
-        return config;
-    }
-    
-    std::cout << "📊 找到 " << resources->count_crtcs << " 个CRTC, "
-              << resources->count_connectors << " 个连接器" << std::endl;
-    
-    // 🔧 新增：检测当前LVGL占用的CRTC和primary plane
-    std::set<uint32_t> occupied_crtcs;
-    std::set<uint32_t> occupied_planes;
-    
-    std::cout << "🔍 检测LVGL占用的资源..." << std::endl;
-    for (int i = 0; i < resources->count_crtcs; i++) {
-        drmModeCrtc* crtc = drmModeGetCrtc(drm_fd, resources->crtcs[i]);
-        if (crtc) {
-            // 如果CRTC有有效的模式和framebuffer，说明被LVGL占用
-            if (crtc->mode_valid && crtc->buffer_id > 0) {
-                occupied_crtcs.insert(resources->crtcs[i]);
-                std::cout << "⚠️  检测到LVGL占用CRTC: " << resources->crtcs[i]
-                         << " (fb_id=" << crtc->buffer_id << ")" << std::endl;
-            }
-            drmModeFreeCrtc(crtc);
-        }
-    }
-    
-    // 查找活跃但未被LVGL占用的CRTC
-    uint32_t active_crtc_id = 0;
-    int active_crtc_index = -1;
-    
-    for (int i = 0; i < resources->count_crtcs; i++) {
-        uint32_t crtc_id = resources->crtcs[i];
-        
-        // 跳过被LVGL占用的CRTC
-        if (occupied_crtcs.find(crtc_id) != occupied_crtcs.end()) {
-            std::cout << "⏭️  跳过LVGL占用的CRTC: " << crtc_id << std::endl;
-            continue;
-        }
-        
-        drmModeCrtc* crtc = drmModeGetCrtc(drm_fd, crtc_id);
-        if (crtc) {
-            // 寻找可用的CRTC（优先选择已配置的）
-            if (crtc->mode_valid || active_crtc_id == 0) {
-                active_crtc_id = crtc_id;
-                active_crtc_index = i;
-                std::cout << "✅ 找到可用CRTC: " << active_crtc_id
-                         << " (索引: " << i << ", mode_valid=" << crtc->mode_valid << ")" << std::endl;
-                if (crtc->mode_valid) {
-                    drmModeFreeCrtc(crtc);
-                    break;  // 优先使用已配置的CRTC
-                }
-            }
-            drmModeFreeCrtc(crtc);
-        }
-    }
-    
-    // 如果所有CRTC都被占用，使用第一个CRTC（多层渲染到同一个CRTC）
-    if (active_crtc_id == 0 && resources->count_crtcs > 0) {
-        active_crtc_id = resources->crtcs[0];
-        active_crtc_index = 0;
-        std::cout << "📌 所有CRTC都被占用，使用第一个CRTC进行多层渲染: "
-                 << active_crtc_id << " (索引: " << active_crtc_index << ")" << std::endl;
-    }
-    
-    // 🔧 新增：检测已占用的plane
-    drmModePlaneRes* plane_resources = drmModeGetPlaneResources(drm_fd);
-    if (plane_resources) {
-        std::cout << "🔍 检测已占用的plane..." << std::endl;
-        for (uint32_t i = 0; i < plane_resources->count_planes; i++) {
-            uint32_t plane_id = plane_resources->planes[i];
-            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_id);
-            
-            if (plane && (plane->crtc_id > 0 || plane->fb_id > 0)) {
-                occupied_planes.insert(plane_id);
-                std::cout << "⚠️  检测到已占用plane: " << plane_id
-                         << " (crtc_id=" << plane->crtc_id << ", fb_id=" << plane->fb_id << ")" << std::endl;
-            }
-            if (plane) drmModeFreePlane(plane);
-        }
-        
-        std::cout << "🔍 开始智能选择可用的overlay plane（跳过已占用的）..." << std::endl;
-        std::cout << "📊 总共 " << plane_resources->count_planes << " 个平面，已占用 "
-                 << occupied_planes.size() << " 个" << std::endl;
-        
-        for (uint32_t i = 0; i < plane_resources->count_planes; i++) {
-            uint32_t plane_id = plane_resources->planes[i];
-            
-            // 🔧 关键修复：跳过已占用的plane
-            if (occupied_planes.find(plane_id) != occupied_planes.end()) {
-                std::cout << "⏭️  跳过已占用plane: " << plane_id << std::endl;
-                continue;
-            }
-            
-            drmModePlane* plane = drmModeGetPlane(drm_fd, plane_id);
-            if (plane) {
-                std::cout << "🔍 检查plane " << plane_id << ": possible_crtcs=0x"
-                          << std::hex << plane->possible_crtcs << std::dec
-                          << ", crtc_id=" << plane->crtc_id
-                          << ", fb_id=" << plane->fb_id;
-                
-                // 检查平面是否真正空闲
-                bool is_truly_free = (plane->crtc_id == 0 && plane->fb_id == 0);
-                if (!is_truly_free) {
-                    std::cout << " [状态异常，跳过]" << std::endl;
-                    drmModeFreePlane(plane);
-                    continue;
-                }
-                
-                // 检查possible_crtcs位掩码是否与目标CRTC匹配
-                if (active_crtc_index >= 0 && (plane->possible_crtcs & (1 << active_crtc_index))) {
-                    
-                    // 检查平面类型
-                    drmModeObjectProperties* props = drmModeObjectGetProperties(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE);
-                    bool is_overlay = false;
-                    bool is_primary = false;
-                    uint64_t plane_type = 0;
-                    
-                    if (props) {
-                        for (uint32_t j = 0; j < props->count_props; j++) {
-                            drmModePropertyRes* prop = drmModeGetProperty(drm_fd, props->props[j]);
-                            if (prop && strcmp(prop->name, "type") == 0) {
-                                plane_type = props->prop_values[j];
-                                
-                                // NVIDIA DRM plane类型：0=Overlay, 1=Primary, 2=Cursor
-                                if (plane_type == 0) {
-                                    is_overlay = true;
-                                    std::cout << " [OVERLAY✅]";
-                                } else if (plane_type == 1) {
-                                    is_primary = true;
-                                    std::cout << " [PRIMARY❌]";  // Primary通常被LVGL使用
-                                } else if (plane_type == 2) {
-                                    std::cout << " [CURSOR❌]";   // Cursor plane不适合视频
-                                } else {
-                                    std::cout << " [TYPE=" << plane_type << "❓]";
-                                }
-                                drmModeFreeProperty(prop);
-                                break;
-                            }
-                            if (prop) drmModeFreeProperty(prop);
-                        }
-                        drmModeFreeObjectProperties(props);
-                    }
-                    
-                    // 🔧 关键逻辑：只选择overlay plane，跳过primary plane
-                    if (is_overlay && !is_primary) {
-                        // 找到合适的叠加平面
-                        config.plane_id = plane_id;
-                        config.crtc_id = active_crtc_id;
-                        
-                        // 查找连接到此CRTC的连接器
-                        for (int j = 0; j < resources->count_connectors; j++) {
-                            drmModeConnector* connector = drmModeGetConnector(drm_fd, resources->connectors[j]);
-                            if (connector && connector->connection == DRM_MODE_CONNECTED) {
-                                config.connector_id = resources->connectors[j];
-                                drmModeFreeConnector(connector);
-                                break;
-                            }
-                            if (connector) drmModeFreeConnector(connector);
-                        }
-                        
-                        std::cout << " -> 🎯 选中此overlay plane!" << std::endl;
-                        std::cout << "✅ 检测到可用DRM叠加平面: plane_id=" << config.plane_id
-                                  << ", crtc_id=" << config.crtc_id
-                                  << ", connector_id=" << config.connector_id << std::endl;
-                        std::cout << "📋 多层显示验证: LVGL使用primary plane，DeepStream使用overlay plane "
-                                 << config.plane_id << std::endl;
-                        
-                        drmModeFreePlane(plane);
-                        break;
-                    } else if (is_primary) {
-                        std::cout << " [跳过primary，避免与LVGL冲突]" << std::endl;
-                    } else {
-                        std::cout << " [类型不适合视频显示]" << std::endl;
-                    }
-                } else {
-                    std::cout << " [CRTC不兼容]" << std::endl;
-                }
-                
-                drmModeFreePlane(plane);
-            }
-        }
-        drmModeFreePlaneResources(plane_resources);
-    }
-    
-    drmModeFreeResources(resources);
-    close(drm_fd);
-    
-    if (config.plane_id == -1) {
-        std::cerr << "❌ 未找到可用的DRM叠加平面（所有overlay plane都被占用或不兼容）" << std::endl;
-        std::cout << "💡 建议：检查是否有其他应用占用了overlay plane，或使用appsink软件合成模式" << std::endl;
-    } else {
-        std::cout << "🎉 智能overlay plane检测完成！" << std::endl;
-    }
+    // Wayland架构下不再进行DRM plane检测
+    std::cout << "🎯 Wayland架构：跳过DRM plane检测和资源管理" << std::endl;
+    std::cout << "📱 建议使用waylandsink进行视频显示" << std::endl;
     
     return config;
 }
@@ -876,107 +659,16 @@ bool DeepStreamManager::setupDRMOverlayPlane() {
     }
 }
 
-// 🔧 新增：验证多层显示设置的函数
+// 🔧 新增：验证多层显示设置的函数（Wayland架构）
 bool DeepStreamManager::verifyMultiLayerDisplaySetup() {
-    std::cout << "🔍 验证多层显示设置..." << std::endl;
+    std::cout << "🎯 Wayland架构：跳过多层显示验证" << std::endl;
+    std::cout << "✅ Wayland合成器自动处理多层显示管理" << std::endl;
     
-    int drm_fd = open("/dev/dri/card1", O_RDWR);
-    if (drm_fd < 0) {
-        std::cerr << "❌ 无法打开DRM设备进行验证" << std::endl;
-        return false;
-    }
+    // 在Wayland架构下，合成器负责所有窗口层次管理
+    // LVGL作为Wayland客户端，DeepStream使用waylandsink
+    // 不需要手动管理DRM plane
     
-    // 获取所有plane的当前状态
-    drmModePlaneRes* plane_resources = drmModeGetPlaneResources(drm_fd);
-    if (!plane_resources) {
-        std::cerr << "❌ 无法获取plane资源进行验证" << std::endl;
-        close(drm_fd);
-        return false;
-    }
-    
-    std::cout << "📊 当前DRM Plane使用状态：" << std::endl;
-    bool found_primary = false, found_overlay = false;
-    
-    for (uint32_t i = 0; i < plane_resources->count_planes; i++) {
-        uint32_t plane_id = plane_resources->planes[i];
-        drmModePlane* plane = drmModeGetPlane(drm_fd, plane_id);
-        
-        if (plane) {
-            std::cout << "  Plane " << plane_id << ": ";
-            
-            // 获取plane类型
-            drmModeObjectProperties* props = drmModeObjectGetProperties(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE);
-            if (props) {
-                for (uint32_t j = 0; j < props->count_props; j++) {
-                    drmModePropertyRes* prop = drmModeGetProperty(drm_fd, props->props[j]);
-                    if (prop && strcmp(prop->name, "type") == 0) {
-                        uint64_t plane_type = props->prop_values[j];
-                        
-                        if (plane_type == 0) {
-                            std::cout << "OVERLAY ";
-                            if (plane->crtc_id > 0 || plane->fb_id > 0) {
-                                std::cout << "(已占用)";
-                                if (plane_id == static_cast<uint32_t>(config_.overlay.plane_id)) {
-                                    std::cout << " <- DeepStream将使用";
-                                }
-                            } else {
-                                std::cout << "(空闲)";
-                            }
-                            found_overlay = true;
-                        } else if (plane_type == 1) {
-                            std::cout << "PRIMARY ";
-                            if (plane->crtc_id > 0 || plane->fb_id > 0) {
-                                std::cout << "(已占用, 可能是LVGL)";
-                                found_primary = true;
-                            } else {
-                                std::cout << "(空闲)";
-                            }
-                        } else if (plane_type == 2) {
-                            std::cout << "CURSOR ";
-                            if (plane->crtc_id > 0 || plane->fb_id > 0) {
-                                std::cout << "(已占用)";
-                            } else {
-                                std::cout << "(空闲)";
-                            }
-                        }
-                        
-                        drmModeFreeProperty(prop);
-                        break;
-                    }
-                    if (prop) drmModeFreeProperty(prop);
-                }
-                drmModeFreeObjectProperties(props);
-            }
-            
-            std::cout << " crtc_id=" << plane->crtc_id << " fb_id=" << plane->fb_id << std::endl;
-            drmModeFreePlane(plane);
-        }
-    }
-    
-    drmModeFreePlaneResources(plane_resources);
-    close(drm_fd);
-    
-    // 验证多层显示配置
-    bool config_valid = true;
-    if (!found_primary) {
-        std::cout << "⚠️  警告：未检测到活跃的PRIMARY plane（LVGL可能未正常初始化）" << std::endl;
-        config_valid = false;
-    } else {
-        std::cout << "✅ 检测到活跃的PRIMARY plane（LVGL正常运行）" << std::endl;
-    }
-    
-    if (!found_overlay) {
-        std::cout << "⚠️  警告：未检测到可用的OVERLAY plane" << std::endl;
-        config_valid = false;
-    } else {
-        std::cout << "✅ 检测到可用的OVERLAY plane" << std::endl;
-    }
-    
-    if (config_valid) {
-        std::cout << "🎉 多层显示配置验证通过：PRIMARY(LVGL) + OVERLAY(DeepStream)" << std::endl;
-    }
-    
-    return config_valid;
+    return true;  // Wayland架构下总是返回成功
 }
 
 VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& config) {

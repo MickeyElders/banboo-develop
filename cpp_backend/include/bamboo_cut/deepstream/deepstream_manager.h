@@ -250,12 +250,6 @@ public:
      * @brief 停止Canvas更新线程
      */
     void stopCanvasUpdateThread();
-    
-    /**
-     * @brief 检查Wayland环境可用性
-     * @return 是否Wayland环境可用
-     */
-    bool checkWaylandEnvironment();
 
 private:
     /**
