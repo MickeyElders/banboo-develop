@@ -13,7 +13,7 @@ namespace bamboo_cut {
 namespace drm {
 
 // 静态成员定义
-std::unique_ptr<DRMResourceCoordinator> DRMResourceCoordinator::instance_;
+std::unique_ptr<DRMResourceCoordinator, DRMResourceCoordinator::Deleter> DRMResourceCoordinator::instance_;
 std::mutex DRMResourceCoordinator::instance_mutex_;
 
 DRMResourceCoordinator::DRMResourceCoordinator()
@@ -38,7 +38,7 @@ DRMResourceCoordinator* DRMResourceCoordinator::getInstance() {
     std::lock_guard<std::mutex> lock(instance_mutex_);
     
     if (!instance_) {
-        instance_ = std::unique_ptr<DRMResourceCoordinator>(new DRMResourceCoordinator());
+        instance_ = std::unique_ptr<DRMResourceCoordinator, Deleter>(new DRMResourceCoordinator());
     }
     
     return instance_.get();

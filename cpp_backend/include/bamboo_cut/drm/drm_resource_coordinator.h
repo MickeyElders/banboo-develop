@@ -197,8 +197,16 @@ private:
      */
     bool validateResourcePlan();
 
+public:
+    // 自定义删除器，用于单例模式
+    struct Deleter {
+        void operator()(DRMResourceCoordinator* ptr) {
+            delete ptr;
+        }
+    };
+
 private:
-    static std::unique_ptr<DRMResourceCoordinator> instance_;
+    static std::unique_ptr<DRMResourceCoordinator, Deleter> instance_;
     static std::mutex instance_mutex_;
     
     // 线程安全保护
