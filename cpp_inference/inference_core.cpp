@@ -13,6 +13,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 using namespace nvinfer1;
 using namespace cv;
@@ -77,7 +78,7 @@ bool BambooDetector::initialize(const DetectorConfig& config) {
         input_binding_index_ = -1;
         output_binding_index_ = -1;
         
-        // 新API: 使用getTensorName和getIOTensorName
+        // 尝试新API
         int32_t nbIOTensors = engine_->getNbIOTensors();
         for (int32_t i = 0; i < nbIOTensors; ++i) {
             const char* name = engine_->getIOTensorName(i);
@@ -85,19 +86,6 @@ bool BambooDetector::initialize(const DetectorConfig& config) {
                 input_binding_index_ = i;
             } else if (name && strcmp(name, output_name) == 0) {
                 output_binding_index_ = i;
-            }
-        }
-        
-        // 如果新API失败，尝试旧API作为备用
-        if (input_binding_index_ == -1 || output_binding_index_ == -1) {
-            // 旧API备用方案
-            for (int32_t i = 0; i < engine_->getNbBindings(); ++i) {
-                const char* name = engine_->getBindingName(i);
-                if (name && strcmp(name, input_name) == 0) {
-                    input_binding_index_ = i;
-                } else if (name && strcmp(name, output_name) == 0) {
-                    output_binding_index_ = i;
-                }
             }
         }
         
@@ -135,9 +123,8 @@ bool BambooDetector::buildEngineFromOnnx(const std::string& onnx_path, const std
             return false;
         }
         
-        // 创建网络
-        const auto explicitBatch = 1U << static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
-        auto network = std::unique_ptr<INetworkDefinition>(builder->createNetworkV2(explicitBatch));
+        // 创建网络 - 使用新API
+        auto network = std::unique_ptr<INetworkDefinition>(builder->createNetworkV2(0U));
         if (!network) {
             std::cerr << "[BambooDetector] 创建网络失败" << std::endl;
             return false;
@@ -249,18 +236,12 @@ bool BambooDetector::allocateBuffers() {
         // 获取输入输出尺寸 - TensorRT 10.x 兼容
         nvinfer1::Dims input_dims, output_dims;
         
-        // 新API优先
+        // 使用新API获取张量形状
         const char* input_name = engine_->getIOTensorName(input_binding_index_);
         const char* output_name = engine_->getIOTensorName(output_binding_index_);
         
-        if (input_name && output_name) {
-            input_dims = engine_->getTensorShape(input_name);
-            output_dims = engine_->getTensorShape(output_name);
-        } else {
-            // 备用旧API
-            input_dims = engine_->getBindingDimensions(input_binding_index_);
-            output_dims = engine_->getBindingDimensions(output_binding_index_);
-        }
+        input_dims = engine_->getTensorShape(input_name);
+        output_dims = engine_->getTensorShape(output_name);
         
         // 计算输入输出大小
         size_t input_size = 1;
@@ -311,21 +292,13 @@ bool BambooDetector::warmupModel() {
             cudaMemcpyAsync(input_device_buffer_, input_host_buffer_.data(), input_size_, 
                            cudaMemcpyHostToDevice, stream_);
             
-            // 执行推理 - TensorRT 10.x 兼容
-            void* bindings[] = {input_device_buffer_, output_device_buffer_};
-            
-            // 新API优先
+            // 执行推理 - TensorRT 10.x
             const char* input_name = engine_->getIOTensorName(input_binding_index_);
             const char* output_name = engine_->getIOTensorName(output_binding_index_);
             
-            if (input_name && output_name) {
-                context_->setTensorAddress(input_name, input_device_buffer_);
-                context_->setTensorAddress(output_name, output_device_buffer_);
-                context_->enqueueV3(stream_);
-            } else {
-                // 备用旧API
-                context_->enqueueV2(bindings, stream_, nullptr);
-            }
+            context_->setTensorAddress(input_name, input_device_buffer_);
+            context_->setTensorAddress(output_name, output_device_buffer_);
+            context_->enqueueV3(stream_);
             
             // 复制输出数据到CPU
             cudaMemcpyAsync(output_host_buffer_.data(), output_device_buffer_, output_size_,
@@ -438,9 +411,13 @@ bool BambooDetector::runInference(const cv::Mat& preprocessed_image) {
         cudaMemcpyAsync(input_device_buffer_, input_host_buffer_.data(), input_size_,
                        cudaMemcpyHostToDevice, stream_);
         
-        // 执行推理
-        void* bindings[] = {input_device_buffer_, output_device_buffer_};
-        bool success = context_->enqueueV2(bindings, stream_, nullptr);
+        // 执行推理 - TensorRT 10.x
+        const char* input_name = engine_->getIOTensorName(input_binding_index_);
+        const char* output_name = engine_->getIOTensorName(output_binding_index_);
+        
+        context_->setTensorAddress(input_name, input_device_buffer_);
+        context_->setTensorAddress(output_name, output_device_buffer_);
+        bool success = context_->enqueueV3(stream_);
         
         if (!success) {
             std::cerr << "[BambooDetector] 推理执行失败" << std::endl;
@@ -552,13 +529,14 @@ void BambooDetector::cleanup() {
             stream_ = nullptr;
         }
         
+        // TensorRT 10.x 使用智能指针，不需要手动调用destroy()
         if (context_) {
-            context_->destroy();
+            delete context_;
             context_ = nullptr;
         }
         
         if (engine_) {
-            engine_->destroy();
+            delete engine_;
             engine_ = nullptr;
         }
         
