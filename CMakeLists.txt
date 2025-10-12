@@ -572,6 +572,8 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/ui/lvgl_panels/control_panel.cpp
     cpp_backend/src/ui/lvgl_panels/footer_panel.cpp
     cpp_backend/src/ui/lvgl_panels/status_panel.cpp
+    cpp_backend/src/drm/drm_resource_coordinator.cpp
+    cpp_backend/src/drm/drm_diagnostics.cpp
     cpp_backend/src/utils/config_loader.cpp
     cpp_backend/src/utils/system_monitor.cpp
     cpp_backend/src/utils/jetson_monitor.cpp

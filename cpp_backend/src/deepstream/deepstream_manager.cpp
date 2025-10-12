@@ -6,6 +6,7 @@
 #include "bamboo_cut/deepstream/deepstream_manager.h"
 #include "bamboo_cut/ui/lvgl_interface.h"
 #include "bamboo_cut/ui/xvfb_manager.h"
+#include "bamboo_cut/drm/drm_resource_coordinator.h"
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
@@ -38,7 +39,8 @@ DeepStreamManager::DeepStreamManager()
     , lvgl_interface_(nullptr)
     , canvas_update_running_(false)
     , running_(false)
-    , initialized_(false) {
+    , initialized_(false)
+    , has_overlay_config_(false) {
 }
 
 DeepStreamManager::DeepStreamManager(void* lvgl_interface)
@@ -52,7 +54,8 @@ DeepStreamManager::DeepStreamManager(void* lvgl_interface)
     , lvgl_interface_(lvgl_interface)
     , canvas_update_running_(false)
     , running_(false)
-    , initialized_(false) {
+    , initialized_(false)
+    , has_overlay_config_(false) {
     
     std::cout << "DeepStreamManager 构造函数完成（支持LVGL界面集成）" << std::endl;
 }
@@ -1034,7 +1037,14 @@ std::string DeepStreamManager::buildSplitScreenPipeline(
         case VideoSinkMode::WAYLANDSINK:
             return buildWaylandSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::KMSSINK:
-            return buildKMSSinkPipeline(config, offset_x, offset_y, width, height);
+            // 🔧 新增：检查是否有协调器分配的Overlay配置
+            if (has_overlay_config_ && overlay_config_.isValid()) {
+                std::cout << "🎯 [DeepStream] 使用协调器分配的Overlay配置构建KMSSink管道" << std::endl;
+                return buildKMSSinkPipelineWithOverlay(config, offset_x, offset_y, width, height);
+            } else {
+                std::cout << "📱 [DeepStream] 使用标准KMSSink管道" << std::endl;
+                return buildKMSSinkPipeline(config, offset_x, offset_y, width, height);
+            }
         case VideoSinkMode::APPSINK:
         default:
             return buildAppSinkPipeline(config, offset_x, offset_y, width, height);
@@ -1818,6 +1828,92 @@ void DeepStreamManager::canvasUpdateLoop() {
     }
     
     std::cout << "Canvas更新循环已退出" << std::endl;
+}
+
+// 新增：设置DRM Overlay配置
+void DeepStreamManager::setOverlayConfig(const bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation& alloc) {
+    std::cout << "🎯 [DeepStream] 接收到Overlay配置..." << std::endl;
+    
+    if (alloc.isValid() && !alloc.is_primary) {
+        has_overlay_config_ = true;
+        overlay_config_ = alloc;
+        
+        // 将DRM协调器的ResourceAllocation转换为DeepStream的DRMOverlayConfig
+        config_.overlay.plane_id = alloc.plane_id;
+        config_.overlay.crtc_id = alloc.crtc_id;
+        config_.overlay.connector_id = alloc.connector_id;
+        config_.overlay.z_order = 1;  // 默认在LVGL之上
+        config_.overlay.enable_scaling = true;
+        
+        // 切换到KMSSink硬件渲染模式
+        config_.sink_mode = VideoSinkMode::KMSSINK;
+        
+        std::cout << "✅ [DeepStream] Overlay配置已设置:" << std::endl;
+        std::cout << "  📌 Plane ID: " << alloc.plane_id << std::endl;
+        std::cout << "  📌 CRTC ID: " << alloc.crtc_id << std::endl;
+        std::cout << "  📌 Connector ID: " << alloc.connector_id << std::endl;
+        std::cout << "  📌 模式: KMSSink硬件渲染" << std::endl;
+    } else {
+        has_overlay_config_ = false;
+        std::cout << "❌ [DeepStream] 无效的Overlay配置，保持AppSink模式" << std::endl;
+    }
+}
+
+// 新增：构建使用Overlay的KMSSink管道
+std::string DeepStreamManager::buildKMSSinkPipelineWithOverlay(
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
+    std::ostringstream pipeline;
+    
+    std::cout << "🔧 [DeepStream] 构建KMSSink Overlay管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
+    
+    // 配置Xvfb环境以支持nvarguscamerasrc
+    bamboo_cut::ui::XvfbManager::setupEnvironment();
+    
+    // 构建摄像头源
+    pipeline << buildCameraSource(config) << " ! ";
+    
+    // 使用NV12格式，让GStreamer自动协商内存类型和缩放
+    std::cout << "🎯 [DeepStream] 使用NV12格式，硬件加速缩放到目标尺寸" << std::endl;
+    
+    // NVMM到标准内存转换，保持NV12格式并缩放
+    pipeline << "nvvidconv ! "
+             << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
+             << "queue "
+             << "max-size-buffers=4 "
+             << "max-size-time=0 "
+             << "leaky=downstream "
+             << "! ";
+    
+    // 使用协调器分配的Overlay Plane实现硬件分层显示
+    if (has_overlay_config_ && overlay_config_.isValid()) {
+        std::cout << "🎯 [DeepStream] 使用协调器分配的Overlay Plane: " << overlay_config_.plane_id << std::endl;
+        pipeline << "kmssink name=kmssink0 "
+                 << "driver-name=nvidia-drm "
+                 << "plane-id=" << overlay_config_.plane_id << " "
+                 << "connector-id=" << overlay_config_.connector_id << " "
+                 << "force-modesetting=false "  // 不改变LVGL的模式设置
+                 << "can-scale=true "           // 启用硬件缩放
+                 << "sync=false "               // 低延迟模式
+                 << "restore-crtc=false";       // 不恢复CRTC，保持协调器管理
+    } else {
+        std::cout << "⚠️  [DeepStream] 协调器未提供有效Overlay配置，使用默认设置" << std::endl;
+        pipeline << "kmssink name=kmssink0 "
+                 << "driver-name=nvidia-drm "
+                 << "plane-id=-1 "              // 自动检测
+                 << "connector-id=-1 "          // 自动检测
+                 << "force-modesetting=false "
+                 << "can-scale=true "
+                 << "sync=false "
+                 << "restore-crtc=false";
+    }
+    
+    std::cout << "🔧 [DeepStream] KMSSink Overlay管道: " << pipeline.str() << std::endl;
+    return pipeline.str();
 }
 
 } // namespace deepstream

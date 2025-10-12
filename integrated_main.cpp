@@ -232,6 +232,10 @@ public:
 #include "bamboo_cut/deepstream/deepstream_manager.h"
 #include "bamboo_cut/ui/lvgl_interface.h"
 
+// DRM资源协调器
+#include "bamboo_cut/drm/drm_resource_coordinator.h"
+#include "bamboo_cut/drm/drm_diagnostics.h"
+
 // 使用真实的命名空间
 using namespace bamboo_cut;
 
@@ -574,6 +578,10 @@ private:
     bool use_mock_data_ = false;
     void* lvgl_interface_ptr_ = nullptr;  // 用于存储LVGL界面指针
     
+    // DRM Overlay配置
+    bool has_overlay_ = false;
+    bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation overlay_config_;
+    
     // 性能统计
     int processed_frames_ = 0;
     std::chrono::steady_clock::time_point last_stats_time_;
@@ -586,6 +594,19 @@ public:
     // 设置LVGL界面指针
     void setLVGLInterface(void* lvgl_interface) {
         lvgl_interface_ptr_ = lvgl_interface;
+    }
+    
+    // 设置Overlay配置
+    void setOverlayConfig(const bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation& alloc) {
+        if (alloc.isValid() && !alloc.is_primary) {
+            has_overlay_ = true;
+            overlay_config_ = alloc;
+            
+            std::cout << "✅ [推理系统] DeepStream Overlay配置已设置:" << std::endl;
+            overlay_config_.print();
+        } else {
+            std::cout << "❌ [推理系统] 无效的Overlay配置" << std::endl;
+        }
     }
     
     ~InferenceWorkerThread() {
@@ -724,16 +745,16 @@ private:
     
     // === DeepStream 管理器初始化方法 ===
     bool initializeDeepStreamManager() {
-        std::cout << "初始化 DeepStream 管理器..." << std::endl;
+        std::cout << "🎬 [DeepStream] 初始化 DeepStream 管理器..." << std::endl;
         
         try {
             // 创建 DeepStream 管理器实例（如果有LVGL界面指针则传入）
             if (lvgl_interface_ptr_) {
                 deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>(lvgl_interface_ptr_);
-                std::cout << "DeepStream管理器已连接LVGL界面" << std::endl;
+                std::cout << "🔗 [DeepStream] 管理器已连接LVGL界面" << std::endl;
             } else {
                 deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
-                std::cout << "DeepStream管理器创建（无LVGL界面连接）" << std::endl;
+                std::cout << "⚠️  [DeepStream] 管理器创建（无LVGL界面连接）" << std::endl;
             }
             
             // 配置 DeepStream 参数
@@ -752,25 +773,41 @@ private:
             config.camera_fps = 30;      // 确保30fps提高稳定性
             config.test_pattern = 0;     // 使用smpte标准彩条图案
             
+            // 根据Overlay配置设置Sink模式
+            if (has_overlay_ && overlay_config_.isValid()) {
+                std::cout << "🎯 [DeepStream] 检测到Overlay配置，配置KMSSink硬件渲染..." << std::endl;
+                
+                // 传递Overlay配置给DeepStreamManager
+                deepstream_manager_->setOverlayConfig(overlay_config_);
+                
+                std::cout << "✅ [DeepStream] Overlay配置已传递给管理器" << std::endl;
+            } else {
+                std::cout << "📱 [DeepStream] 无Overlay配置，将使用AppSink软件合成" << std::endl;
+            }
+            
             // 初始化 DeepStream 管理器 (但暂不启动)
             if (!deepstream_manager_->initialize(config)) {
-                std::cout << "DeepStream 管理器初始化失败" << std::endl;
+                std::cout << "❌ [DeepStream] 管理器初始化失败" << std::endl;
                 return false;
             }
             
-            // 使用默认配置的sink模式（在头文件中已设置为APPSINK）
-            std::cout << "使用默认配置的sink模式..." << std::endl;
-            
-            std::cout << "DeepStream 管理器初始化完成 (延迟启动模式)" << std::endl;
+            std::cout << "✅ [DeepStream] 管理器初始化完成 (延迟启动模式)" << std::endl;
             
             // 显示当前sink模式
             auto current_mode = deepstream_manager_->getCurrentSinkMode();
             const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
-            std::cout << "✅ 当前sink模式: " << mode_names[static_cast<int>(current_mode)] << " (避免DRM冲突)" << std::endl;
+            std::cout << "📺 [DeepStream] 当前sink模式: " << mode_names[static_cast<int>(current_mode)];
+            
+            if (has_overlay_ && current_mode == deepstream::SinkMode::KMSSINK) {
+                std::cout << " (硬件Overlay渲染)" << std::endl;
+            } else {
+                std::cout << " (软件合成模式)" << std::endl;
+            }
+            
             return true;
             
         } catch (const std::exception& e) {
-            std::cout << "DeepStream 管理器初始化异常: " << e.what() << std::endl;
+            std::cout << "❌ [DeepStream] 管理器初始化异常: " << e.what() << std::endl;
             return false;
         }
     }
@@ -979,37 +1016,102 @@ private:
 public:
     bool initialize() {
         std::cout << "=================================" << std::endl;
-        std::cout << "Bamboo Recognition System Integrated Startup" << std::endl;
+        std::cout << "Bamboo Recognition System" << std::endl;
+        std::cout << "DRM资源协调模式" << std::endl;
         std::cout << "=================================" << std::endl;
         
         // 设置信号处理
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // 初始化UI管理器
-        ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
-        if (!ui_manager_->initialize()) {
-            std::cout << "UI system initialization failed" << std::endl;
-            return false;
+        // === 步骤1: DRM协调器初始化 (必须在LVGL之前) ===
+        std::cout << "\n🔧 [DRM协调器] 步骤1: 在LVGL之前初始化..." << std::endl;
+        auto* coordinator = bamboo_cut::drm::DRMResourceCoordinator::getInstance();
+        if (!coordinator->initializeBeforeLVGL()) {
+            std::cout << "⚠️  [DRM协调器] 初始化失败，系统将以软件合成模式运行" << std::endl;
+            // 不是致命错误，继续执行以允许软件合成模式
+        } else {
+            std::cout << "✅ [DRM协调器] 初始化成功，DRM资源扫描完成" << std::endl;
+            
+            // 显示DRM系统状态
+            int drm_fd = coordinator->getSharedDrmFd();
+            if (drm_fd >= 0) {
+                bamboo_cut::drm::DRMDiagnostics::printSystemDRMState(drm_fd);
+            }
         }
         
-        // 初始化推理工作线程
+        // === 步骤2: LVGL初始化 (将获取DRM Master权限) ===
+        std::cout << "\n🎨 [LVGL] 步骤2: 初始化UI管理器..." << std::endl;
+        ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
+        if (!ui_manager_->initialize()) {
+            std::cout << "❌ [LVGL] UI system initialization failed" << std::endl;
+            return false;  // LVGL失败是致命错误
+        }
+        std::cout << "✅ [LVGL] UI系统初始化成功，已获取DRM Master权限" << std::endl;
+        
+        // === 步骤3: 注册LVGL资源 ===
+        std::cout << "\n📋 [DRM协调器] 步骤3: 注册LVGL资源..." << std::endl;
+        // TODO: 需要从LVGL获取其DRM FD
+        // 目前LVGL使用独立的DRM连接，需要后续集成
+        if (coordinator->isInitialized()) {
+            // 使用默认的Primary Plane配置
+            coordinator->registerLVGLResources();
+            std::cout << "✅ [DRM协调器] LVGL资源注册完成" << std::endl;
+        }
+        
+        // === 步骤4: 分配DeepStream Overlay资源 ===
+        std::cout << "\n🎬 [DRM协调器] 步骤4: 为DeepStream分配Overlay资源..." << std::endl;
+        bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation ds_alloc;
+        bool has_overlay = coordinator->allocateOverlayForDeepStream(ds_alloc);
+        
+        if (has_overlay && ds_alloc.isValid()) {
+            std::cout << "✅ [DRM协调器] DeepStream Overlay资源分配成功:" << std::endl;
+            ds_alloc.print();
+        } else {
+            std::cout << "⚠️  [DRM协调器] Overlay资源不可用，DeepStream将降级到AppSink模式" << std::endl;
+        }
+        
+        // === 步骤5: DeepStream初始化 ===
+        std::cout << "\n🚀 [推理系统] 步骤5: 初始化推理工作线程..." << std::endl;
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         
         // 传递LVGL界面指针给推理工作线程
         #ifdef ENABLE_LVGL
         if (ui_manager_ && ui_manager_->getLVGLInterface()) {
             inference_worker_->setLVGLInterface(ui_manager_->getLVGLInterface());
-            std::cout << "LVGL界面指针已传递给推理工作线程" << std::endl;
+            std::cout << "🔗 [集成] LVGL界面指针已传递给推理工作线程" << std::endl;
         }
         #endif
         
+        // 传递Overlay配置给DeepStream
+        if (has_overlay && ds_alloc.isValid()) {
+            inference_worker_->setOverlayConfig(ds_alloc);
+            std::cout << "🎯 [集成] DeepStream将使用硬件Overlay渲染" << std::endl;
+        } else {
+            std::cout << "📱 [集成] DeepStream降级到AppSink软件合成模式" << std::endl;
+        }
+        
         if (!inference_worker_->initialize()) {
-            std::cout << "Inference system initialization failed" << std::endl;
+            std::cout << "❌ [推理系统] Inference system initialization failed" << std::endl;
             return false;
         }
         
-        std::cout << "Integrated system initialization complete" << std::endl;
+        // === 最终验证 ===
+        std::cout << "\n🔍 [验证] DRM资源分配验证..." << std::endl;
+        if (coordinator->isInitialized()) {
+            // 检查资源冲突
+            coordinator->checkResourceConflict();
+            
+            // 显示最终的资源分配状态
+            int drm_fd = coordinator->getSharedDrmFd();
+            if (drm_fd >= 0) {
+                bamboo_cut::drm::DRMDiagnostics::monitorResourceUsage(drm_fd);
+            }
+        }
+        
+        std::cout << "\n=================================" << std::endl;
+        std::cout << "✅ DRM资源协调系统初始化完成" << std::endl;
+        std::cout << "=================================" << std::endl;
         return true;
     }
     

@@ -15,6 +15,13 @@
 #include <thread>
 #include <opencv2/opencv.hpp>
 
+// 前向声明DRM资源分配结构
+namespace bamboo_cut {
+namespace drm {
+    struct ResourceAllocation;
+}
+}
+
 namespace bamboo_cut {
 namespace deepstream {
 
@@ -234,6 +241,12 @@ public:
      * @brief 停止Canvas更新线程
      */
     void stopCanvasUpdateThread();
+    
+    /**
+     * @brief 设置DRM Overlay配置（由协调器调用）
+     * @param alloc DRM资源分配信息
+     */
+    void setOverlayConfig(const bamboo_cut::drm::ResourceAllocation& alloc);
 
 private:
     /**
@@ -262,6 +275,11 @@ private:
      * @brief 构建kmssink管道
      */
     std::string buildKMSSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
+    
+    /**
+     * @brief 构建使用Overlay的KMSSink管道
+     */
+    std::string buildKMSSinkPipelineWithOverlay(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
     
     /**
      * @brief 构建摄像头源字符串
@@ -373,6 +391,10 @@ private:
     // 🔧 线程安全保护
     mutable std::mutex drm_mutex_;      // DRM资源访问互斥锁
     mutable std::mutex pipeline_mutex_; // GStreamer管道操作互斥锁
+    
+    // DRM Overlay配置（由协调器设置）
+    bool has_overlay_config_;
+    bamboo_cut::drm::ResourceAllocation overlay_config_;
     
     bool running_;
     bool initialized_;
