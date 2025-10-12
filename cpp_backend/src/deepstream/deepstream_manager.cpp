@@ -4,9 +4,7 @@
  */
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
-#include "bamboo_cut/ui/lvgl_interface.h"
-#include "bamboo_cut/ui/xvfb_manager.h"
-#include "bamboo_cut/drm/drm_resource_coordinator.h"
+#include "bamboo_cut/ui/lvgl_wayland_interface.h"
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
@@ -40,7 +38,7 @@ DeepStreamManager::DeepStreamManager()
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)
-    , has_overlay_config_(false) {
+    , wayland_available_(false) {
 }
 
 DeepStreamManager::DeepStreamManager(void* lvgl_interface)
@@ -55,7 +53,7 @@ DeepStreamManager::DeepStreamManager(void* lvgl_interface)
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)
-    , has_overlay_config_(false) {
+    , wayland_available_(false) {
     
     std::cout << "DeepStreamManager 构造函数完成（支持LVGL界面集成）" << std::endl;
 }
@@ -67,56 +65,62 @@ DeepStreamManager::~DeepStreamManager() {
 }
 
 bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
-    std::cout << "初始化 DeepStream 系统..." << std::endl;
+    std::cout << "[DeepStreamManager] 初始化Wayland视频系统..." << std::endl;
     
     config_ = config;
     
-    // 初始化 GStreamer
+    // 强制使用waylandsink模式（简化架构）
+    if (config_.sink_mode != VideoSinkMode::WAYLANDSINK) {
+        std::cout << "[DeepStreamManager] 强制切换到waylandsink模式" << std::endl;
+        config_.sink_mode = VideoSinkMode::WAYLANDSINK;
+    }
+    
+    // 初始化GStreamer
     if (!gst_is_initialized()) {
         gst_init(nullptr, nullptr);
-        std::cout << "GStreamer 初始化完成" << std::endl;
+        std::cout << "[DeepStreamManager] GStreamer初始化完成" << std::endl;
     }
     
-    // 检查视频输出sink可用性
-    const char* sink_names[] = {"appsink", "kmssink", "nvdrmvideosink", "waylandsink"};
-    const char* sink_descriptions[] = {
-        "appsink (软件合成到LVGL画布，推荐)",
-        "kmssink (KMS多层渲染模式)",
-        "nvdrmvideosink (DRM叠加平面模式)",
-        "waylandsink (Wayland合成器模式)"
+    // 检查关键插件可用性
+    const char* required_plugins[] = {"nvarguscamerasrc", "nvvidconv", "waylandsink"};
+    const char* plugin_descriptions[] = {
+        "nvarguscamerasrc (NVIDIA摄像头源)",
+        "nvvidconv (NVIDIA视频转换)",
+        "waylandsink (Wayland显示)"
     };
     
-    bool found_sink = false;
-    for (int i = 0; i < 4; i++) {
-        GstElementFactory *factory = gst_element_factory_find(sink_names[i]);
+    bool all_plugins_available = true;
+    for (int i = 0; i < 3; i++) {
+        GstElementFactory* factory = gst_element_factory_find(required_plugins[i]);
         if (factory) {
-            std::cout << "✓ 可用: " << sink_descriptions[i] << std::endl;
+            std::cout << "[DeepStreamManager] ✓ " << plugin_descriptions[i] << std::endl;
             gst_object_unref(factory);
-            found_sink = true;
+        } else {
+            std::cerr << "[DeepStreamManager] ✗ " << plugin_descriptions[i] << " 不可用" << std::endl;
+            all_plugins_available = false;
         }
     }
     
-    if (!found_sink) {
-        std::cerr << "警告: 未找到合适的视频sink" << std::endl;
+    if (!all_plugins_available) {
+        std::cerr << "[DeepStreamManager] 关键插件缺失，无法继续" << std::endl;
+        return false;
     }
     
-    // 设置DRM叠加平面
-    if (config_.sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
-        if (!setupDRMOverlayPlane()) {
-            std::cout << "DRM叠加平面设置失败，将回退到appsink软件合成模式" << std::endl;
-            config_.sink_mode = VideoSinkMode::APPSINK;
-        }
+    // 检查Wayland环境
+    if (!checkWaylandEnvironment()) {
+        std::cerr << "[DeepStreamManager] Wayland环境检查失败" << std::endl;
+        return false;
     }
     
-    // 计算视频布局
-    video_layout_ = calculateVideoLayout(config);
+    // 计算视频布局（简化版）
+    video_layout_ = calculateWaylandVideoLayout(config);
     
-    std::cout << "视频布局计算完成:" << std::endl;
-    std::cout << "  偏移: (" << video_layout_.offset_x << ", " << video_layout_.offset_y << ")" << std::endl;
-    std::cout << "  尺寸: " << video_layout_.width << "x" << video_layout_.height << std::endl;
-    std::cout << "  可用区域: " << video_layout_.available_width << "x" << video_layout_.available_height << std::endl;
+    std::cout << "[DeepStreamManager] Wayland视频布局:" << std::endl;
+    std::cout << "  窗口位置: (" << video_layout_.offset_x << ", " << video_layout_.offset_y << ")" << std::endl;
+    std::cout << "  窗口尺寸: " << video_layout_.width << "x" << video_layout_.height << std::endl;
     
     initialized_ = true;
+    std::cout << "[DeepStreamManager] Wayland视频系统初始化完成" << std::endl;
     return true;
 }
 
@@ -154,23 +158,23 @@ bool DeepStreamManager::startSinglePipelineMode() {
     
     try {
         if (lvgl_interface_) {
-            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
+            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_);
             int wait_count = 0;
             const int MAX_WAIT_SECONDS = 10;
             
             while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 wait_count++;
-                std::cout << "等待LVGL初始化完成... (" << (wait_count * 0.5) << "秒)" << std::endl;
+                std::cout << "等待LVGL Wayland初始化完成... (" << (wait_count * 0.5) << "秒)" << std::endl;
             }
             
             if (lvgl_if->isFullyInitialized()) {
-                std::cout << "✅ LVGL已完全初始化，继续启动DeepStream管道" << std::endl;
+                std::cout << "✅ LVGL Wayland已完全初始化，继续启动DeepStream管道" << std::endl;
             } else {
-                std::cout << "⚠️ 警告：LVGL初始化超时，继续启动DeepStream管道" << std::endl;
+                std::cout << "⚠️ 警告：LVGL Wayland初始化超时，继续启动DeepStream管道" << std::endl;
             }
         } else {
-            std::cout << "警告：LVGL接口不可用，使用固定延迟" << std::endl;
+            std::cout << "警告：LVGL Wayland接口不可用，使用固定延迟" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(3000));
         }
         
@@ -1037,14 +1041,9 @@ std::string DeepStreamManager::buildSplitScreenPipeline(
         case VideoSinkMode::WAYLANDSINK:
             return buildWaylandSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::KMSSINK:
-            // 🔧 新增：检查是否有协调器分配的Overlay配置
-            if (has_overlay_config_ && overlay_config_.isValid()) {
-                std::cout << "🎯 [DeepStream] 使用协调器分配的Overlay配置构建KMSSink管道" << std::endl;
-                return buildKMSSinkPipelineWithOverlay(config, offset_x, offset_y, width, height);
-            } else {
-                std::cout << "📱 [DeepStream] 使用标准KMSSink管道" << std::endl;
-                return buildKMSSinkPipeline(config, offset_x, offset_y, width, height);
-            }
+            // Wayland架构下不再支持KMSSink，降级到AppSink
+            std::cout << "📱 [DeepStream] Wayland架构下降级到AppSink软件合成" << std::endl;
+            return buildAppSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::APPSINK:
         default:
             return buildAppSinkPipeline(config, offset_x, offset_y, width, height);
@@ -1060,9 +1059,8 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 🔧 修复：配置Xvfb环境以解决nvarguscamerasrc EGL初始化问题
-    std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
-    bamboo_cut::ui::XvfbManager::setupEnvironment();
+    // Wayland架构下不再需要Xvfb
+    std::cout << "🔧 Wayland架构下直接使用nvarguscamerasrc..." << std::endl;
     
     // 🔧 关键修复：使用BGRA格式，这是AR24在DRM中的实际对应格式
     pipeline << buildCameraSource(config) << " ! "
@@ -1094,16 +1092,60 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 使用 waylandsink（Wayland合成器模式）
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
-             << "video/x-raw(memory:NVMM),width=" << config.camera_width
-             << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "nvvideoconvert ! "
-             << "video/x-raw,format=RGBA ! "
-             << "waylandsink "
-             << "sync=false";  // 降低延迟
+    std::cout << "[DeepStreamManager] 构建优化的Wayland管道 ("
+              << width << "x" << height << ")..." << std::endl;
     
+    // 检查Wayland环境
+    const char* wayland_display = getenv("WAYLAND_DISPLAY");
+    if (!wayland_display) {
+        setenv("WAYLAND_DISPLAY", "wayland-0", 0);
+        std::cout << "[DeepStreamManager] 设置WAYLAND_DISPLAY=wayland-0" << std::endl;
+    }
+    
+    // 使用nvarguscamerasrc（现在可以在Wayland下正常工作）
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ";
+    
+    // 摄像头输出配置
+    pipeline << "! video/x-raw(memory:NVMM)"
+             << ",width=" << config.camera_width
+             << ",height=" << config.camera_height
+             << ",framerate=" << config.camera_fps << "/1"
+             << ",format=NV12 ";
+    
+    // 可选：AI推理插件
+    if (!config.nvinfer_config.empty()) {
+        pipeline << "! nvinfer config-file-path=" << config.nvinfer_config << " ";
+    }
+    
+    // 硬件加速格式转换和缩放
+    pipeline << "! nvvidconv ";
+    
+    // 输出格式和尺寸
+    pipeline << "! video/x-raw"
+             << ",format=RGBA"
+             << ",width=" << width
+             << ",height=" << height << " ";
+    
+    // Wayland sink配置
+    pipeline << "! waylandsink ";
+    
+    // 窗口位置和尺寸配置（非全屏模式）
+    if (width != 1920 || height != 1200) {  // 非全屏
+        pipeline << "render-rectangle=\"<"
+                 << offset_x << "," << offset_y << ","
+                 << width << "," << height << ">\" ";
+    }
+    
+    // 性能优化参数
+    pipeline << "sync=false ";        // 低延迟模式
+    pipeline << "async=true ";        // 异步模式
+    
+    // 指定Wayland显示
+    if (wayland_display) {
+        pipeline << "display=" << wayland_display;
+    }
+    
+    std::cout << "[DeepStreamManager] Wayland管道构建完成" << std::endl;
     return pipeline.str();
 }
 
@@ -1323,9 +1365,8 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // 🔧 修复：配置Xvfb环境以解决nvarguscamerasrc EGL初始化问题
-    std::cout << "🔧 设置Xvfb环境以支持nvarguscamerasrc..." << std::endl;
-    bamboo_cut::ui::XvfbManager::setupEnvironment();
+    // Wayland架构下不再需要Xvfb
+    std::cout << "🔧 Wayland架构下直接使用nvarguscamerasrc..." << std::endl;
     
     // 🔧 关键修复：使用nvarguscamerasrc + GBM共享DRM资源
     std::cout << "🔧 构建GBM共享DRM的KMSSink管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
@@ -1710,7 +1751,7 @@ void DeepStreamManager::canvasUpdateLoop() {
                 std::cout << "处理新帧: " << latest_frame_.cols << "x" << latest_frame_.rows
                          << " 通道数:" << latest_frame_.channels() << std::endl;
                          
-                auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_);
+                auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_);
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
                 
                 if (canvas) {
@@ -1830,90 +1871,63 @@ void DeepStreamManager::canvasUpdateLoop() {
     std::cout << "Canvas更新循环已退出" << std::endl;
 }
 
-// 新增：设置DRM Overlay配置
-void DeepStreamManager::setOverlayConfig(const bamboo_cut::drm::ResourceAllocation& alloc) {
-    std::cout << "🎯 [DeepStream] 接收到Overlay配置..." << std::endl;
+// 检查Wayland环境可用性
+bool DeepStreamManager::checkWaylandEnvironment() {
+    std::cout << "🎯 [DeepStream] 检查Wayland环境..." << std::endl;
     
-    if (alloc.isValid() && !alloc.is_primary) {
-        has_overlay_config_ = true;
-        overlay_config_ = alloc;
-        
-        // 将DRM协调器的ResourceAllocation转换为DeepStream的DRMOverlayConfig
-        config_.overlay.plane_id = alloc.plane_id;
-        config_.overlay.crtc_id = alloc.crtc_id;
-        config_.overlay.connector_id = alloc.connector_id;
-        config_.overlay.z_order = 1;  // 默认在LVGL之上
-        config_.overlay.enable_scaling = true;
-        
-        // 切换到KMSSink硬件渲染模式
-        config_.sink_mode = VideoSinkMode::KMSSINK;
-        
-        std::cout << "✅ [DeepStream] Overlay配置已设置:" << std::endl;
-        std::cout << "  📌 Plane ID: " << alloc.plane_id << std::endl;
-        std::cout << "  📌 CRTC ID: " << alloc.crtc_id << std::endl;
-        std::cout << "  📌 Connector ID: " << alloc.connector_id << std::endl;
-        std::cout << "  📌 模式: KMSSink硬件渲染" << std::endl;
-    } else {
-        has_overlay_config_ = false;
-        std::cout << "❌ [DeepStream] 无效的Overlay配置，保持AppSink模式" << std::endl;
+    // 检查WAYLAND_DISPLAY环境变量
+    const char* wayland_display = getenv("WAYLAND_DISPLAY");
+    if (!wayland_display) {
+        setenv("WAYLAND_DISPLAY", "wayland-0", 0);
+        wayland_display = getenv("WAYLAND_DISPLAY");
+        std::cout << "[DeepStream] 设置WAYLAND_DISPLAY=" << wayland_display << std::endl;
     }
+    
+    // 检查XDG_RUNTIME_DIR
+    const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
+    if (!runtime_dir) {
+        setenv("XDG_RUNTIME_DIR", "/run/user/1000", 0);
+        runtime_dir = getenv("XDG_RUNTIME_DIR");
+        std::cout << "[DeepStream] 设置XDG_RUNTIME_DIR=" << runtime_dir << std::endl;
+    }
+    
+    // 验证Wayland socket是否存在
+    std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
+    if (access(socket_path.c_str(), F_OK) != 0) {
+        std::cout << "⚠️ [DeepStream] Wayland socket不存在: " << socket_path << std::endl;
+        wayland_available_ = false;
+        return false;
+    }
+    
+    wayland_available_ = true;
+    std::cout << "✅ [DeepStream] Wayland环境配置成功" << std::endl;
+    return true;
 }
 
-// 新增：构建使用Overlay的KMSSink管道
-std::string DeepStreamManager::buildKMSSinkPipelineWithOverlay(
-    const DeepStreamConfig& config,
-    int offset_x,
-    int offset_y,
-    int width,
-    int height) {
+
+// 新增：简化的Wayland视频布局计算
+VideoLayout DeepStreamManager::calculateWaylandVideoLayout(const DeepStreamConfig& config) {
+    VideoLayout layout;
     
-    std::ostringstream pipeline;
+    std::cout << "[DeepStreamManager] 计算Wayland视频布局..." << std::endl;
     
-    std::cout << "🔧 [DeepStream] 构建KMSSink Overlay管道 (缩放到 " << width << "x" << height << ")..." << std::endl;
+    // 计算可用区域（减去顶部和底部栏）
+    layout.available_width = config.screen_width;
+    layout.available_height = config.screen_height - config.header_height - config.footer_height;
     
-    // 配置Xvfb环境以支持nvarguscamerasrc
-    bamboo_cut::ui::XvfbManager::setupEnvironment();
+    // 摄像头面板位置（左侧70%区域）
+    layout.width = static_cast<int>(layout.available_width * 0.70f);  // 70%宽度给摄像头
+    layout.height = layout.available_height;  // 全高度
     
-    // 构建摄像头源
-    pipeline << buildCameraSource(config) << " ! ";
+    // 窗口位置（跳过头部面板）
+    layout.offset_x = 0;  // 左对齐
+    layout.offset_y = config.header_height;  // 头部面板下方
     
-    // 使用NV12格式，让GStreamer自动协商内存类型和缩放
-    std::cout << "🎯 [DeepStream] 使用NV12格式，硬件加速缩放到目标尺寸" << std::endl;
+    std::cout << "[DeepStreamManager] 布局计算完成: "
+              << layout.width << "x" << layout.height
+              << " at (" << layout.offset_x << "," << layout.offset_y << ")" << std::endl;
     
-    // NVMM到标准内存转换，保持NV12格式并缩放
-    pipeline << "nvvidconv ! "
-             << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
-             << "queue "
-             << "max-size-buffers=4 "
-             << "max-size-time=0 "
-             << "leaky=downstream "
-             << "! ";
-    
-    // 使用协调器分配的Overlay Plane实现硬件分层显示
-    if (has_overlay_config_ && overlay_config_.isValid()) {
-        std::cout << "🎯 [DeepStream] 使用协调器分配的Overlay Plane: " << overlay_config_.plane_id << std::endl;
-        pipeline << "kmssink name=kmssink0 "
-                 << "driver-name=nvidia-drm "
-                 << "plane-id=" << overlay_config_.plane_id << " "
-                 << "connector-id=" << overlay_config_.connector_id << " "
-                 << "force-modesetting=false "  // 不改变LVGL的模式设置
-                 << "can-scale=true "           // 启用硬件缩放
-                 << "sync=false "               // 低延迟模式
-                 << "restore-crtc=false";       // 不恢复CRTC，保持协调器管理
-    } else {
-        std::cout << "⚠️  [DeepStream] 协调器未提供有效Overlay配置，使用默认设置" << std::endl;
-        pipeline << "kmssink name=kmssink0 "
-                 << "driver-name=nvidia-drm "
-                 << "plane-id=-1 "              // 自动检测
-                 << "connector-id=-1 "          // 自动检测
-                 << "force-modesetting=false "
-                 << "can-scale=true "
-                 << "sync=false "
-                 << "restore-crtc=false";
-    }
-    
-    std::cout << "🔧 [DeepStream] KMSSink Overlay管道: " << pipeline.str() << std::endl;
-    return pipeline.str();
+    return layout;
 }
 
 } // namespace deepstream

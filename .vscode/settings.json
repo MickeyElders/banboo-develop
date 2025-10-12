@@ -81,6 +81,8 @@
         "regex": "cpp",
         "array": "cpp",
         "csignal": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "numeric": "cpp",
+        "set": "cpp"
     }
 }

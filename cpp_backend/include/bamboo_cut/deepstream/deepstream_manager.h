@@ -229,6 +229,19 @@ public:
     bool verifyMultiLayerDisplaySetup();
     
     /**
+     * @brief 检查Wayland环境
+     * @return 是否环境正常
+     */
+    bool checkWaylandEnvironment();
+    
+    /**
+     * @brief 计算Wayland视频布局
+     * @param config DeepStream配置
+     * @return 计算出的视频布局
+     */
+    VideoLayout calculateWaylandVideoLayout(const DeepStreamConfig& config);
+    
+    /**
      * @brief 启动Canvas更新线程
      */
     void startCanvasUpdateThread();
@@ -239,10 +252,10 @@ public:
     void stopCanvasUpdateThread();
     
     /**
-     * @brief 设置DRM Overlay配置（由协调器调用）
-     * @param alloc DRM资源分配信息
+     * @brief 检查Wayland环境可用性
+     * @return 是否Wayland环境可用
      */
-    void setOverlayConfig(const bamboo_cut::drm::ResourceAllocation& alloc);
+    bool checkWaylandEnvironment();
 
 private:
     /**
@@ -272,10 +285,6 @@ private:
      */
     std::string buildKMSSinkPipeline(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
     
-    /**
-     * @brief 构建使用Overlay的KMSSink管道
-     */
-    std::string buildKMSSinkPipelineWithOverlay(const DeepStreamConfig& config, int offset_x, int offset_y, int width, int height);
     
     /**
      * @brief 构建摄像头源字符串
@@ -388,9 +397,8 @@ private:
     mutable std::mutex drm_mutex_;      // DRM资源访问互斥锁
     mutable std::mutex pipeline_mutex_; // GStreamer管道操作互斥锁
     
-    // DRM Overlay配置（由协调器设置）
-    bool has_overlay_config_;
-    bamboo_cut::drm::ResourceAllocation overlay_config_;
+    // Wayland环境配置
+    bool wayland_available_;
     
     bool running_;
     bool initialized_;

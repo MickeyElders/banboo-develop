@@ -230,11 +230,7 @@ public:
 #include "bamboo_cut/inference/bamboo_detector.h"
 #include "bamboo_cut/core/data_bridge.h"
 #include "bamboo_cut/deepstream/deepstream_manager.h"
-#include "bamboo_cut/ui/lvgl_interface.h"
-
-// DRM资源协调器
-#include "bamboo_cut/drm/drm_resource_coordinator.h"
-#include "bamboo_cut/drm/drm_diagnostics.h"
+#include "bamboo_cut/ui/lvgl_wayland_interface.h"
 
 // 使用真实的命名空间
 using namespace bamboo_cut;
@@ -578,9 +574,8 @@ private:
     bool use_mock_data_ = false;
     void* lvgl_interface_ptr_ = nullptr;  // 用于存储LVGL界面指针
     
-    // DRM Overlay配置
-    bool has_overlay_ = false;
-    bamboo_cut::drm::ResourceAllocation overlay_config_;
+    // Wayland配置 - 替代DRM Overlay
+    bool wayland_available_ = false;
     
     // 性能统计
     int processed_frames_ = 0;
@@ -596,17 +591,17 @@ public:
         lvgl_interface_ptr_ = lvgl_interface;
     }
     
-    // 设置Overlay配置
-    void setOverlayConfig(const bamboo_cut::drm::ResourceAllocation& alloc) {
-        if (alloc.isValid() && !alloc.is_primary) {
-            has_overlay_ = true;
-            overlay_config_ = alloc;
-            
-            std::cout << "✅ [推理系统] DeepStream Overlay配置已设置:" << std::endl;
-            overlay_config_.print();
-        } else {
-            std::cout << "❌ [推理系统] 无效的Overlay配置" << std::endl;
+    // 检查Wayland环境
+    bool checkWaylandEnvironment() {
+        const char* wayland_display = getenv("WAYLAND_DISPLAY");
+        if (!wayland_display) {
+            wayland_display = "wayland-0";
+            setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
+        
+        std::cout << "✅ [推理系统] Wayland环境已配置: " << wayland_display << std::endl;
+        wayland_available_ = true;
+        return true;
     }
     
     ~InferenceWorkerThread() {
@@ -773,16 +768,12 @@ private:
             config.camera_fps = 30;      // 确保30fps提高稳定性
             config.test_pattern = 0;     // 使用smpte标准彩条图案
             
-            // 根据Overlay配置设置Sink模式
-            if (has_overlay_ && overlay_config_.isValid()) {
-                std::cout << "🎯 [DeepStream] 检测到Overlay配置，配置KMSSink硬件渲染..." << std::endl;
-                
-                // 传递Overlay配置给DeepStreamManager
-                deepstream_manager_->setOverlayConfig(overlay_config_);
-                
-                std::cout << "✅ [DeepStream] Overlay配置已传递给管理器" << std::endl;
+            // 检查Wayland环境并配置waylandsink
+            if (checkWaylandEnvironment()) {
+                std::cout << "🎯 [DeepStream] 检测到Wayland环境，配置waylandsink渲染..." << std::endl;
+                std::cout << "✅ [DeepStream] Wayland配置已设置" << std::endl;
             } else {
-                std::cout << "📱 [DeepStream] 无Overlay配置，将使用AppSink软件合成" << std::endl;
+                std::cout << "📱 [DeepStream] 无Wayland环境，将使用AppSink软件合成" << std::endl;
             }
             
             // 初始化 DeepStream 管理器 (但暂不启动)
@@ -798,8 +789,8 @@ private:
             const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
             std::cout << "📺 [DeepStream] 当前sink模式: " << mode_names[static_cast<int>(current_mode)];
             
-            if (has_overlay_ && current_mode == deepstream::VideoSinkMode::KMSSINK) {
-                std::cout << " (硬件Overlay渲染)" << std::endl;
+            if (wayland_available_ && current_mode == deepstream::VideoSinkMode::WAYLANDSINK) {
+                std::cout << " (Wayland硬件渲染)" << std::endl;
             } else {
                 std::cout << " (软件合成模式)" << std::endl;
             }
@@ -819,27 +810,27 @@ private:
             return false;
         }
         
-        // 使用新的LVGL初始化检查机制
-        std::cout << "等待LVGL完全初始化..." << std::endl;
+        // 使用新的LVGL Wayland接口初始化检查机制
+        std::cout << "等待LVGL Wayland完全初始化..." << std::endl;
         
         if (lvgl_interface_ptr_) {
-            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLInterface*>(lvgl_interface_ptr_);
+            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
             int wait_count = 0;
-            const int MAX_WAIT_SECONDS = 20;  // 最大等待10秒
+            const int MAX_WAIT_SECONDS = 20;  // 最大等待20秒
             
             while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 wait_count++;
-                std::cout << "等待LVGL初始化完成... (InferenceWorker: " << (wait_count * 0.5) << "秒)" << std::endl;
+                std::cout << "等待LVGL Wayland初始化完成... (InferenceWorker: " << (wait_count * 0.5) << "秒)" << std::endl;
             }
             
             if (lvgl_if->isFullyInitialized()) {
-                std::cout << "✅ LVGL已完全初始化，继续启动DeepStream" << std::endl;
+                std::cout << "✅ LVGL Wayland已完全初始化，继续启动DeepStream" << std::endl;
             } else {
-                std::cout << "⚠️ 警告：LVGL初始化超时，继续启动DeepStream" << std::endl;
+                std::cout << "⚠️ 警告：LVGL Wayland初始化超时，继续启动DeepStream" << std::endl;
             }
         } else {
-            std::cout << "警告：LVGL接口不可用，使用固定延迟" << std::endl;
+            std::cout << "警告：LVGL Wayland接口不可用，使用固定延迟" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(2));
         }
         
@@ -871,8 +862,8 @@ class LVGLUIManager {
 private:
     IntegratedDataBridge* data_bridge_;
     
-    // 使用优化的LVGL界面实现
-    std::unique_ptr<bamboo_cut::ui::LVGLInterface> lvgl_interface_;
+    // 使用Wayland优化的LVGL界面实现
+    std::unique_ptr<bamboo_cut::ui::LVGLWaylandInterface> lvgl_wayland_interface_;
     
     // 兼容性方法映射
     bool initialized_ = false;
@@ -905,10 +896,10 @@ public:
         std::cout << "FPS Updated: " << fps << std::endl;
     }
     
-    // 获取LVGL界面指针（用于传递给DeepStreamManager）
+    // 获取LVGL Wayland界面指针（用于传递给DeepStreamManager）
     void* getLVGLInterface() {
         #ifdef ENABLE_LVGL
-        return lvgl_interface_.get();
+        return lvgl_wayland_interface_.get();
         #else
         return nullptr;
         #endif
@@ -919,40 +910,44 @@ public:
         
         #ifdef ENABLE_LVGL
         try {
-            // 创建共享的DataBridge (创建一个简单的包装器)
-            auto shared_bridge = std::make_shared<core::DataBridge>();
+            // 检查Weston是否运行
+            if (!checkWaylandCompositor()) {
+                std::cout << "错误: Weston合成器未运行，请先启动Weston" << std::endl;
+                return false;
+            }
             
-            // 创建优化的LVGL界面实例
-            lvgl_interface_ = std::make_unique<bamboo_cut::ui::LVGLInterface>(shared_bridge);
+            // 创建Wayland优化的LVGL界面实例
+            lvgl_wayland_interface_ = std::make_unique<bamboo_cut::ui::LVGLWaylandInterface>();
             
-            // 配置LVGL
-            bamboo_cut::ui::LVGLConfig config;
+            // 配置LVGL Wayland
+            bamboo_cut::ui::LVGLWaylandConfig config;
             config.screen_width = 1280;
             config.screen_height = 800;
             config.refresh_rate = 60;
             config.enable_touch = true;
             config.touch_device = "/dev/input/event0";
+            config.wayland_display = "wayland-0";
             
-            std::cout << "正在初始化LVGL界面..." << std::endl;
-            if (!lvgl_interface_->initialize(config)) {
-                std::cout << "LVGL interface initialization failed" << std::endl;
+            std::cout << "正在初始化LVGL Wayland界面..." << std::endl;
+            if (!lvgl_wayland_interface_->initialize(config)) {
+                std::cout << "LVGL Wayland interface initialization failed" << std::endl;
                 return false;
             }
             
-            std::cout << "LVGL界面初始化成功，正在启动界面线程..." << std::endl;
+            std::cout << "LVGL Wayland界面初始化成功，正在启动界面线程..." << std::endl;
             // 启动界面线程
-            if (!lvgl_interface_->start()) {
-                std::cout << "LVGL interface start failed" << std::endl;
+            if (!lvgl_wayland_interface_->start()) {
+                std::cout << "LVGL Wayland interface start failed" << std::endl;
                 return false;
             }
             
             // 给界面线程一些时间来稳定启动
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            std::cout << "LVGL界面线程启动完成" << std::endl;
+            std::cout << "LVGL Wayland界面线程启动完成" << std::endl;
             
-            std::cout << "Optimized LVGL interface created successfully" << std::endl;
+            std::cout << "Wayland优化的LVGL界面创建成功" << std::endl;
         } catch (const std::exception& e) {
-            std::cout << "LVGL interface creation exception: " << e.what() << std::endl;
+            std::cout << "LVGL Wayland interface creation exception: " << e.what() << std::endl;
             return false;
         }
         #else
@@ -973,10 +968,10 @@ public:
         std::cout << "LVGL main loop started with optimized interface" << std::endl;
         
         #ifdef ENABLE_LVGL
-        if (lvgl_interface_ && lvgl_interface_->isRunning()) {
-            std::cout << "Using optimized LVGL interface main loop" << std::endl;
-            // LVGL界面已经在自己的线程中运行，这里只需要等待
-            while (!g_shutdown_requested && lvgl_interface_->isRunning()) {
+        if (lvgl_wayland_interface_ && lvgl_wayland_interface_->isRunning()) {
+            std::cout << "Using Wayland优化的LVGL interface main loop" << std::endl;
+            // LVGL Wayland界面已经在自己的线程中运行，这里只需要等待
+            while (!g_shutdown_requested && lvgl_wayland_interface_->isRunning()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
         }
@@ -994,13 +989,35 @@ public:
 private:
     void cleanup() {
         #ifdef ENABLE_LVGL
-        if (lvgl_interface_) {
-            lvgl_interface_->stop();
-            lvgl_interface_.reset();
+        if (lvgl_wayland_interface_) {
+            lvgl_wayland_interface_->stop();
+            lvgl_wayland_interface_.reset();
         }
         #endif
         
         initialized_ = false;
+    }
+
+private:
+    // 检查Wayland合成器状态
+    bool checkWaylandCompositor() {
+        // 检查WAYLAND_DISPLAY环境变量
+        const char* wayland_display = getenv("WAYLAND_DISPLAY");
+        if (!wayland_display) {
+            wayland_display = "wayland-0";
+            setenv("WAYLAND_DISPLAY", wayland_display, 1);
+        }
+        
+        // 检查Wayland socket文件
+        std::string socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
+        std::ifstream socket_file(socket_path);
+        if (!socket_file.good()) {
+            std::cout << "Wayland socket不存在: " << socket_path << std::endl;
+            return false;
+        }
+        
+        std::cout << "✅ Wayland合成器检测成功: " << wayland_display << std::endl;
+        return true;
     }
 };
 
@@ -1017,80 +1034,46 @@ public:
     bool initialize() {
         std::cout << "=================================" << std::endl;
         std::cout << "Bamboo Recognition System" << std::endl;
-        std::cout << "DRM资源协调模式" << std::endl;
+        std::cout << "Wayland架构模式" << std::endl;
         std::cout << "=================================" << std::endl;
         
         // 设置信号处理
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // 🔧 关键修复：调整初始化顺序 - LVGL先初始化获取Master权限
-        // === 步骤1: LVGL初始化 (先获取DRM Master权限) ===
-        std::cout << "\n🎨 [LVGL] 步骤1: 初始化UI管理器..." << std::endl;
+        // === 步骤1: 检查Weston合成器状态 ===
+        std::cout << "\n🔍 [Wayland] 步骤1: 检查Weston合成器..." << std::endl;
+        if (!checkWaylandCompositor()) {
+            std::cout << "❌ [Wayland] Weston合成器未运行，请先启动Weston" << std::endl;
+            std::cout << "请运行: sudo systemctl start weston 或使用安装脚本" << std::endl;
+            return false;
+        }
+        std::cout << "✅ [Wayland] Weston合成器运行正常" << std::endl;
+        
+        // === 步骤2: LVGL Wayland界面初始化 ===
+        std::cout << "\n🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面..." << std::endl;
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
-            std::cout << "❌ [LVGL] UI system initialization failed" << std::endl;
-            return false;  // LVGL失败是致命错误
+            std::cout << "❌ [LVGL] LVGL Wayland界面初始化失败" << std::endl;
+            return false;
         }
-        std::cout << "✅ [LVGL] UI系统初始化成功，已获取DRM Master权限" << std::endl;
+        std::cout << "✅ [LVGL] LVGL Wayland界面初始化成功" << std::endl;
         
-        // === 步骤2: DRM协调器使用LVGL的共享FD进行初始化 ===
-        std::cout << "\n🔧 [DRM协调器] 步骤2: 使用LVGL共享FD初始化..." << std::endl;
-        auto* coordinator = bamboo_cut::drm::DRMResourceCoordinator::getInstance();
-        
-        // 获取LVGL的DRM FD（从GBM后端获取）
-        int lvgl_drm_fd = -1;
-        #ifdef ENABLE_LVGL
-        if (ui_manager_ && ui_manager_->getLVGLInterface()) {
-            auto& gbm_manager = bamboo_cut::ui::GBMBackendManager::getInstance();
-            auto* gbm_backend = gbm_manager.getBackend();
-            if (gbm_backend) {
-                lvgl_drm_fd = gbm_backend->getDRMFd();
-                std::cout << "🔗 获取LVGL DRM FD: " << lvgl_drm_fd << std::endl;
-            }
-        }
-        #endif
-        
-        if (!coordinator->initializeAfterLVGL(lvgl_drm_fd)) {
-            std::cout << "⚠️  [DRM协调器] 初始化失败，系统将以软件合成模式运行" << std::endl;
-            // 不是致命错误，继续执行以允许软件合成模式
-        } else {
-            std::cout << "✅ [DRM协调器] 使用共享FD初始化成功" << std::endl;
-            
-            // 显示DRM系统状态
-            if (lvgl_drm_fd >= 0) {
-                bamboo_cut::drm::DRMDiagnostics::printSystemDRMState(lvgl_drm_fd);
-            }
-        }
-        
-        // === 步骤3: 分配DeepStream Overlay资源 ===
-        std::cout << "\n🎬 [DRM协调器] 步骤3: 为DeepStream分配Overlay资源..." << std::endl;
-        bamboo_cut::drm::ResourceAllocation ds_alloc;
-        bool has_overlay = coordinator->allocateOverlayForDeepStream(ds_alloc);
-        
-        if (has_overlay && ds_alloc.isValid()) {
-            std::cout << "✅ [DRM协调器] DeepStream Overlay资源分配成功:" << std::endl;
-            ds_alloc.print();
-        } else {
-            std::cout << "⚠️  [DRM协调器] Overlay资源不可用，DeepStream将降级到AppSink模式" << std::endl;
-        }
-        
-        // === 步骤4: DeepStream初始化 ===
-        std::cout << "\n🚀 [推理系统] 步骤4: 初始化推理工作线程..." << std::endl;
+        // === 步骤3: DeepStream Wayland配置 ===
+        std::cout << "\n🎬 [DeepStream] 步骤3: 初始化DeepStream Wayland模式..." << std::endl;
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         
-        // 传递LVGL界面指针给推理工作线程
+        // 传递LVGL Wayland界面指针给推理工作线程
         #ifdef ENABLE_LVGL
         if (ui_manager_ && ui_manager_->getLVGLInterface()) {
             inference_worker_->setLVGLInterface(ui_manager_->getLVGLInterface());
-            std::cout << "🔗 [集成] LVGL界面指针已传递给推理工作线程" << std::endl;
+            std::cout << "🔗 [集成] LVGL Wayland界面指针已传递给推理工作线程" << std::endl;
         }
         #endif
         
-        // 传递Overlay配置给DeepStream
-        if (has_overlay && ds_alloc.isValid()) {
-            inference_worker_->setOverlayConfig(ds_alloc);
-            std::cout << "🎯 [集成] DeepStream将使用硬件Overlay渲染" << std::endl;
+        // 检查Wayland环境配置
+        if (inference_worker_->checkWaylandEnvironment()) {
+            std::cout << "🎯 [集成] DeepStream将使用waylandsink硬件渲染" << std::endl;
         } else {
             std::cout << "📱 [集成] DeepStream降级到AppSink软件合成模式" << std::endl;
         }
@@ -1100,45 +1083,30 @@ public:
             return false;
         }
         
-        // === 最终验证 ===
-        std::cout << "\n🔍 [验证] DRM资源分配验证..." << std::endl;
-        if (coordinator->isInitialized()) {
-            // 检查资源冲突
-            coordinator->checkResourceConflict();
-            
-            // 显示最终的资源分配状态
-            int drm_fd = coordinator->getSharedDrmFd();
-            if (drm_fd >= 0) {
-                bamboo_cut::drm::DRMDiagnostics::monitorResourceUsage(drm_fd);
-            }
-        }
-        
         std::cout << "\n=================================" << std::endl;
-        std::cout << "✅ DRM资源协调系统初始化完成" << std::endl;
+        std::cout << "✅ Wayland架构系统初始化完成" << std::endl;
         std::cout << "=================================" << std::endl;
         return true;
     }
     
     void run() {
-        std::cout << "Starting integrated system..." << std::endl;
+        std::cout << "Starting Wayland integrated system..." << std::endl;
         
-        // 🔧 恢复启动顺序：LVGL优先获得DRM独占控制权
-        std::cout << "🔧 LVGL优先启动，获得DRM独占控制权..." << std::endl;
+        // Wayland架构：等待LVGL Wayland界面稳定
+        std::cout << "🔧 等待LVGL Wayland界面完全启动..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(2)); // 给LVGL Wayland充足时间连接到Weston
         
-        std::cout << "等待LVGL完全初始化并获得DRM控制..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2)); // 给LVGL充足时间获得DRM控制
-        
-        // 然后启动推理工作线程，GStreamer将在appsink模式下工作
-        std::cout << "现在启动推理线程（appsink模式）..." << std::endl;
+        // 启动推理工作线程，GStreamer将使用waylandsink
+        std::cout << "现在启动推理线程（waylandsink模式）..." << std::endl;
         if (!inference_worker_->start()) {
             std::cout << "Inference thread startup failed" << std::endl;
             return;
         }
         
-        std::cout << "推理线程已启动，系统完全就绪" << std::endl;
+        std::cout << "推理线程已启动，Wayland系统完全就绪" << std::endl;
         std::cout << "Press Ctrl+C to exit system" << std::endl;
         
-        // 主线程运行UI (阻塞) - LVGL现在是次要的
+        // 主线程运行UI (阻塞)
         ui_manager_->runMainLoop();
         
         std::cout << "Starting system shutdown..." << std::endl;
@@ -1155,6 +1123,28 @@ public:
         cleanup_output_redirection();
         
         std::cout << "System shutdown complete" << std::endl;
+    }
+
+private:
+    // 检查Wayland合成器状态
+    bool checkWaylandCompositor() {
+        // 检查WAYLAND_DISPLAY环境变量
+        const char* wayland_display = getenv("WAYLAND_DISPLAY");
+        if (!wayland_display) {
+            wayland_display = "wayland-0";
+            setenv("WAYLAND_DISPLAY", wayland_display, 1);
+        }
+        
+        // 检查Wayland socket文件
+        std::string socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
+        std::ifstream socket_file(socket_path);
+        if (!socket_file.good()) {
+            std::cout << "Wayland socket不存在: " << socket_path << std::endl;
+            return false;
+        }
+        
+        std::cout << "✅ Wayland合成器检测成功: " << wayland_display << std::endl;
+        return true;
     }
 };
 

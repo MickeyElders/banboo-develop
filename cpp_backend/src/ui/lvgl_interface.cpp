@@ -6,8 +6,6 @@
  */
 
 #include "bamboo_cut/ui/lvgl_interface.h"
-#include "bamboo_cut/ui/gbm_display_backend.h"
-#include "bamboo_cut/ui/egl_context_manager.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -531,42 +529,17 @@ bool LVGLInterface::initializeWaylandOrDRMDisplay() {
 
 bool LVGLInterface::initializeDisplay() {
 #ifdef ENABLE_LVGL
-    std::cout << "[LVGLInterface] 初始化GBM共享DRM显示后端..." << std::endl;
+    std::cout << "[LVGLInterface] 警告：旧版LVGL DRM接口已弃用" << std::endl;
+    std::cout << "[LVGLInterface] 请使用新的LVGLWaylandInterface" << std::endl;
     
-    // 初始化GBM后端管理器 - 修复配置
-    DRMSharedConfig gbm_config;
-    gbm_config.width = config_.screen_width;
-    gbm_config.height = config_.screen_height;
-    gbm_config.connector_id = 63;  // 使用modetest检测到的正确Connector ID
-    gbm_config.crtc_id = 43;      // 指定正确的CRTC ID
-    gbm_config.primary_plane_id = 44;   // 指定Primary Plane为44 (LVGL)
-    gbm_config.overlay_plane_id = 57;   // 修复：使用Plane 57作为Overlay (GStreamer)
-    
-    auto& gbm_manager = GBMBackendManager::getInstance();
-    if (!gbm_manager.initialize(gbm_config)) {
-        std::cerr << "[LVGLInterface] GBM后端管理器初始化失败" << std::endl;
-        return false;
-    }
-    
-    std::cout << "[LVGLInterface] GBM后端管理器初始化成功" << std::endl;
-    
-    // 获取GBM后端实例
-    auto* gbm_backend = gbm_manager.getBackend();
-    if (!gbm_backend) {
-        std::cerr << "[LVGLInterface] 无法获取GBM后端实例" << std::endl;
-        return false;
-    }
-    
-    // 计算显示缓冲区大小
+    // 创建基本的LVGL显示驱动（兼容性模式）
     uint32_t buf_size = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
-    
-    // 创建LVGL显示驱动
     if (!createLVGLDisplay(buf_size)) {
         std::cerr << "[LVGLInterface] LVGL显示驱动创建失败" << std::endl;
         return false;
     }
     
-    std::cout << "[LVGLInterface] GBM共享DRM显示初始化完成" << std::endl;
+    std::cout << "[LVGLInterface] 兼容性显示初始化完成" << std::endl;
     return true;
 #else
     return false;
@@ -593,8 +566,8 @@ bool LVGLInterface::createLVGLDisplay(uint32_t buf_size) {
     // 设置显示缓冲区 (LVGL v9 API)
     lv_display_set_buffers(display_, disp_buf1_, disp_buf2_, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
-    // 设置刷新回调函数 - 使用GBM共享模式回调
-    lv_display_set_flush_cb(display_, gbm_display_flush_cb);
+    // 设置空的刷新回调函数（兼容性模式）
+    lv_display_set_flush_cb(display_, nullptr);
     
     std::cout << "[LVGLInterface] LVGL显示驱动创建成功，使用GBM共享模式刷新回调" << std::endl;
     return true;

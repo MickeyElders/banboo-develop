@@ -1,0 +1,81 @@
+# Wayland视频系统配置文件
+# 用于Bamboo Recognition System的Wayland架构
+
+wayland:
+  # Wayland环境配置
+  display: "wayland-0"           # Wayland显示名称
+  runtime_dir: "/run/user/1000"  # XDG运行时目录
+  
+  # 视频窗口配置
+  video_window:
+    fullscreen: false            # 是否全屏显示
+    x: 0                        # 窗口X坐标
+    y: 80                       # 窗口Y坐标（跳过头部面板）
+    width: 960                  # 窗口宽度
+    height: 640                 # 窗口高度
+    
+  # 性能优化配置
+  performance:
+    sync: false                 # 关闭vsync（低延迟）
+    async: true                 # 启用异步渲染
+    buffer_mode: "auto"         # 缓冲模式
+    
+  # DeepStream管道配置
+  deepstream:
+    # 摄像头源配置
+    camera:
+      sensor_id: 0              # 摄像头传感器ID
+      width: 1920               # 摄像头分辨率宽度
+      height: 1080              # 摄像头分辨率高度
+      framerate: 30             # 帧率
+      format: "NV12"            # 像素格式
+      
+    # AI推理配置（可选）
+    inference:
+      enabled: false            # 是否启用AI推理
+      config_file: ""           # nvinfer配置文件路径
+      
+    # 视频处理配置
+    processing:
+      output_format: "RGBA"     # 输出像素格式
+      scaling: "hardware"       # 缩放方式（hardware/software）
+      
+# LVGL Wayland配置
+lvgl:
+  # Wayland后端配置
+  wayland:
+    display: "wayland-0"
+    window_title: "Bamboo Recognition System"
+    
+  # 屏幕配置
+  screen:
+    width: 1920
+    height: 1200
+    
+  # 输入设备配置
+  input:
+    touch_enabled: true
+    mouse_enabled: true
+    keyboard_enabled: true
+    
+  # 主题配置
+  theme:
+    background_color: 0x1A1F26
+    primary_color: 0x5B9BD5
+    success_color: 0x7FB069
+    warning_color: 0xE6A055
+    error_color: 0xD67B7B
+
+# 布局配置
+layout:
+  header_height: 80            # 头部面板高度
+  footer_height: 60            # 底部面板高度
+  camera_panel_width_ratio: 0.7  # 摄像头面板宽度比例
+  control_panel_width_ratio: 0.3 # 控制面板宽度比例
+  
+# 调试配置
+debug:
+  enable_verbose_logging: true
+  log_gstreamer_messages: true
+  log_wayland_events: false
+  log_performance_metrics: true

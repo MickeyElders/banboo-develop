@@ -344,91 +344,58 @@ else()
     set(ENABLE_JSON OFF)
 endif()
 
-# libdrm - DRM/KMS硬件加速显示支持 (nvidia-drm + tegra-drm)
-pkg_check_modules(DRM QUIET libdrm)
-if(DRM_FOUND)
-    message(STATUS "Found libdrm: ${DRM_VERSION}")
-    set(ENABLE_DRM ON)
-    include_directories(${DRM_INCLUDE_DIRS})
-    link_directories(${DRM_LIBRARY_DIRS})
+# Wayland - 标准Wayland Compositor架构 (替代DRM直接访问)
+pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
+pkg_check_modules(WAYLAND_EGL REQUIRED wayland-egl)
+pkg_check_modules(WAYLAND_PROTOCOLS QUIET wayland-protocols)
+
+if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND)
+    message(STATUS "Found Wayland client: ${WAYLAND_CLIENT_VERSION}")
+    message(STATUS "Found Wayland EGL: ${WAYLAND_EGL_VERSION}")
+    set(ENABLE_WAYLAND ON)
+    include_directories(${WAYLAND_CLIENT_INCLUDE_DIRS} ${WAYLAND_EGL_INCLUDE_DIRS})
+    link_directories(${WAYLAND_CLIENT_LIBRARY_DIRS} ${WAYLAND_EGL_LIBRARY_DIRS})
     
-    # 检查是否支持NVIDIA DRM
-    if(TARGET_ARCH STREQUAL "aarch64")
-        # Jetson平台可能同时支持nvidia-drm和tegra-drm
-        message(STATUS "Jetson平台: 支持nvidia-drm和tegra-drm双驱动")
-        set(ENABLE_NVIDIA_DRM ON)
-        set(ENABLE_TEGRA_DRM ON)
-    else()
-        # x86_64平台主要支持nvidia-drm
-        message(STATUS "x86_64平台: 主要支持nvidia-drm")
-        set(ENABLE_NVIDIA_DRM ON)
-        set(ENABLE_TEGRA_DRM OFF)
+    if(WAYLAND_PROTOCOLS_FOUND)
+        message(STATUS "Found Wayland protocols: ${WAYLAND_PROTOCOLS_VERSION}")
     endif()
 else()
-    # 手动查找libdrm
-    find_library(DRM_LIBRARY drm
-        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
-    find_path(DRM_INCLUDE_DIR xf86drm.h
-        PATHS /usr/include /usr/local/include /usr/include/libdrm)
-    
-    if(DRM_LIBRARY AND DRM_INCLUDE_DIR)
-        message(STATUS "Found libdrm manually: ${DRM_LIBRARY}")
-        set(ENABLE_DRM ON)
-        set(DRM_LIBRARIES ${DRM_LIBRARY})
-        include_directories(${DRM_INCLUDE_DIR})
-        
-        # 设置驱动支持标志
-        set(ENABLE_NVIDIA_DRM ON)
-        if(TARGET_ARCH STREQUAL "aarch64")
-            set(ENABLE_TEGRA_DRM ON)
-        else()
-            set(ENABLE_TEGRA_DRM OFF)
-        endif()
-    else()
-        message(WARNING "libdrm not found - DRM/KMS硬件加速将被禁用，使用优化framebuffer")
-        set(ENABLE_DRM OFF)
-        set(ENABLE_NVIDIA_DRM OFF)
-        set(ENABLE_TEGRA_DRM OFF)
-    endif()
+    message(FATAL_ERROR "Wayland client libraries not found - 请先安装 libwayland-dev")
 endif()
 
-# GBM和EGL - GBM显示后端需要的库
-if(ENABLE_DRM)
-    # 查找GBM库
-    find_library(GBM_LIBRARY gbm
-        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
-    find_path(GBM_INCLUDE_DIR gbm.h
-        PATHS /usr/include /usr/local/include)
-    
-    if(GBM_LIBRARY AND GBM_INCLUDE_DIR)
-        message(STATUS "Found GBM: ${GBM_LIBRARY}")
-        set(ENABLE_GBM ON)
-        set(GBM_LIBRARIES ${GBM_LIBRARY})
-        include_directories(${GBM_INCLUDE_DIR})
-    else()
-        message(WARNING "GBM not found - GBM显示后端将被禁用")
-        set(ENABLE_GBM OFF)
-    endif()
-    
-    # 查找EGL库
-    find_library(EGL_LIBRARY EGL
-        PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
-    find_path(EGL_INCLUDE_DIR EGL/egl.h
-        PATHS /usr/include /usr/local/include)
-    
-    if(EGL_LIBRARY AND EGL_INCLUDE_DIR)
-        message(STATUS "Found EGL: ${EGL_LIBRARY}")
-        set(ENABLE_EGL ON)
-        set(EGL_LIBRARIES ${EGL_LIBRARY})
-        include_directories(${EGL_INCLUDE_DIR})
-    else()
-        message(WARNING "EGL not found - EGL功能将被禁用")
-        set(ENABLE_EGL OFF)
-    endif()
+# 查找EGL库 (Wayland需要EGL支持)
+find_library(EGL_LIBRARY EGL
+    PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+find_path(EGL_INCLUDE_DIR EGL/egl.h
+    PATHS /usr/include /usr/local/include)
+
+if(EGL_LIBRARY AND EGL_INCLUDE_DIR)
+    message(STATUS "Found EGL: ${EGL_LIBRARY}")
+    set(ENABLE_EGL ON)
+    set(EGL_LIBRARIES ${EGL_LIBRARY})
+    include_directories(${EGL_INCLUDE_DIR})
 else()
-    set(ENABLE_GBM OFF)
-    set(ENABLE_EGL OFF)
+    message(FATAL_ERROR "EGL not found - Wayland需要EGL支持")
 endif()
+
+# xkbcommon - Wayland键盘输入支持
+pkg_check_modules(XKBCOMMON QUIET xkbcommon)
+if(XKBCOMMON_FOUND)
+    message(STATUS "Found xkbcommon: ${XKBCOMMON_VERSION}")
+    set(ENABLE_XKBCOMMON ON)
+    include_directories(${XKBCOMMON_INCLUDE_DIRS})
+    link_directories(${XKBCOMMON_LIBRARY_DIRS})
+else()
+    message(WARNING "xkbcommon not found - 键盘输入可能受限")
+    set(ENABLE_XKBCOMMON OFF)
+endif()
+
+# 禁用DRM直接访问相关功能
+set(ENABLE_DRM OFF)
+set(ENABLE_NVIDIA_DRM OFF)
+set(ENABLE_TEGRA_DRM OFF)
+set(ENABLE_GBM OFF)
+message(STATUS "DRM直接访问已禁用 - 使用Wayland架构")
 
 # 移除Python绑定相关配置 - 项目现在是纯C++架构
 set(ENABLE_PYBIND11 OFF)
@@ -536,8 +503,8 @@ endif()
 # 源文件收集
 # ================================
 
-# C++后端源文件 - 基于原有CMakeLists.txt的精确配置
-# 确保Logger实现文件被正确包含
+# C++后端源文件 - Wayland迁移后的精确配置
+# 移除所有DRM相关源文件，添加Wayland接口
 set(CPP_BACKEND_SOURCES
     cpp_backend/src/utils/logger.cpp
     cpp_backend/src/core/system_utils.cpp
@@ -562,22 +529,44 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/inference/ghost_conv.cpp
     cpp_backend/src/deepstream/deepstream_manager.cpp
     cpp_backend/src/ui/lvgl_interface.cpp
+    cpp_backend/src/ui/lvgl_wayland_interface.cpp
     cpp_backend/src/ui/lvgl_updates.cpp
     cpp_backend/src/ui/lvgl_events.cpp
-    cpp_backend/src/ui/lvgl_display_drm.cpp
-    cpp_backend/src/ui/gbm_display_backend.cpp
-    cpp_backend/src/ui/xvfb_manager.cpp
     cpp_backend/src/ui/lvgl_panels/header_panel.cpp
     cpp_backend/src/ui/lvgl_panels/camera_panel.cpp
     cpp_backend/src/ui/lvgl_panels/control_panel.cpp
     cpp_backend/src/ui/lvgl_panels/footer_panel.cpp
     cpp_backend/src/ui/lvgl_panels/status_panel.cpp
-    cpp_backend/src/drm/drm_resource_coordinator.cpp
-    cpp_backend/src/drm/drm_diagnostics.cpp
     cpp_backend/src/utils/config_loader.cpp
     cpp_backend/src/utils/system_monitor.cpp
     cpp_backend/src/utils/jetson_monitor.cpp
 )
+
+# 添加lv_drivers Wayland源文件 (如果存在)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers")
+    set(LV_DRIVERS_WAYLAND_SOURCES
+        third_party/lv_drivers/wayland/wayland.c
+        third_party/lv_drivers/indev/wayland_pointer.c
+        third_party/lv_drivers/indev/wayland_pointeraxis.c
+        third_party/lv_drivers/indev/wayland_keyboard.c
+        third_party/lv_drivers/indev/wayland_touch.c
+    )
+    
+    # 过滤存在的lv_drivers源文件
+    set(VALID_LV_DRIVERS_SOURCES)
+    foreach(src ${LV_DRIVERS_WAYLAND_SOURCES})
+        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
+            list(APPEND VALID_LV_DRIVERS_SOURCES ${src})
+            message(STATUS "Found lv_drivers source: ${src}")
+        endif()
+    endforeach()
+    
+    if(VALID_LV_DRIVERS_SOURCES)
+        list(APPEND CPP_BACKEND_SOURCES ${VALID_LV_DRIVERS_SOURCES})
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers)
+        message(STATUS "Added lv_drivers Wayland sources: ${VALID_LV_DRIVERS_SOURCES}")
+    endif()
+endif()
 
 # 条件包含CUDA相关文件
 if(ENABLE_CUDA)
@@ -677,11 +666,13 @@ add_executable(bamboo_integrated
 # 确保只有我们的主程序是默认构建目标
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bamboo_integrated)
 
-# 编译定义
+# 编译定义 - Wayland架构
 target_compile_definitions(bamboo_integrated PRIVATE
     INTEGRATED_BUILD=1
     LV_CONF_INCLUDE_SIMPLE=1
-    USE_FRAMEBUFFER
+    USE_WAYLAND=1
+    LV_USE_WAYLAND=1
+    ENABLE_WAYLAND=1
     $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
     $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
     $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
@@ -690,11 +681,9 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_GSTREAMER}>:ENABLE_GSTREAMER>
     $<$<BOOL:${ENABLE_LVGL}>:ENABLE_LVGL>
     $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
-    $<$<BOOL:${ENABLE_DRM}>:ENABLE_DRM>
-    $<$<BOOL:${ENABLE_NVIDIA_DRM}>:ENABLE_NVIDIA_DRM>
-    $<$<BOOL:${ENABLE_TEGRA_DRM}>:ENABLE_TEGRA_DRM>
-    $<$<BOOL:${ENABLE_GBM}>:ENABLE_GBM>
+    $<$<BOOL:${ENABLE_WAYLAND}>:ENABLE_WAYLAND>
     $<$<BOOL:${ENABLE_EGL}>:ENABLE_EGL>
+    $<$<BOOL:${ENABLE_XKBCOMMON}>:ENABLE_XKBCOMMON>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
 
@@ -731,17 +720,22 @@ if(ENABLE_JSON)
     target_link_libraries(bamboo_integrated nlohmann_json::nlohmann_json)
 endif()
 
-if(ENABLE_DRM)
-    target_link_libraries(bamboo_integrated ${DRM_LIBRARIES})
+# Wayland库 - 标准Wayland客户端架构
+if(ENABLE_WAYLAND)
+    target_link_libraries(bamboo_integrated
+        ${WAYLAND_CLIENT_LIBRARIES}
+        ${WAYLAND_EGL_LIBRARIES}
+    )
 endif()
 
-# GBM和EGL库 - GBM显示后端需要的库
-if(ENABLE_GBM)
-    target_link_libraries(bamboo_integrated ${GBM_LIBRARIES})
-endif()
-
+# EGL库 - Wayland需要EGL支持
 if(ENABLE_EGL)
     target_link_libraries(bamboo_integrated ${EGL_LIBRARIES})
+endif()
+
+# xkbcommon库 - Wayland键盘输入支持
+if(ENABLE_XKBCOMMON)
+    target_link_libraries(bamboo_integrated ${XKBCOMMON_LIBRARIES})
 endif()
 
 # LVGL库 - 确保正确链接
@@ -839,13 +833,22 @@ message(STATUS "  CUDA: ${ENABLE_CUDA}")
 message(STATUS "  TensorRT: ${ENABLE_TENSORRT}")
 message(STATUS "  libmodbus: ${ENABLE_MODBUS}")
 message(STATUS "  nlohmann_json: ${ENABLE_JSON}")
-message(STATUS "  libdrm: ${ENABLE_DRM}")
-message(STATUS "    - NVIDIA DRM: ${ENABLE_NVIDIA_DRM}")
-message(STATUS "    - Tegra DRM: ${ENABLE_TEGRA_DRM}")
-message(STATUS "  GBM: ${ENABLE_GBM}")
+message(STATUS "  Wayland: ${ENABLE_WAYLAND}")
+message(STATUS "    - wayland-client: ${WAYLAND_CLIENT_VERSION}")
+message(STATUS "    - wayland-egl: ${WAYLAND_EGL_VERSION}")
+if(WAYLAND_PROTOCOLS_FOUND)
+message(STATUS "    - wayland-protocols: ${WAYLAND_PROTOCOLS_VERSION}")
+endif()
 message(STATUS "  EGL: ${ENABLE_EGL}")
+message(STATUS "  xkbcommon: ${ENABLE_XKBCOMMON}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
 message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
+message(STATUS "")
+message(STATUS "架构迁移:")
+message(STATUS "  DRM直接访问: 已移除")
+message(STATUS "  GBM显示后端: 已移除")
+message(STATUS "  Wayland合成器: 已启用")
+message(STATUS "  lv_drivers/wayland: 已集成")
 message(STATUS "")
 message(STATUS "组件模块:")
 message(STATUS "  cpp_backend: 已集成")
