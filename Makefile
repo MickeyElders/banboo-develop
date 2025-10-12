@@ -86,6 +86,7 @@ help:
 	@echo "  camera-fix-test  - 测试摄像头修复后功能 (使用 SENSOR_ID=X)"
 	@echo ""
 	@echo "$(GREEN)NVIDIA-DRM 迁移验证:$(NC)"
+	@echo "  enable-nvidia-drm- 启用NVIDIA-DRM驱动（替换tegra_drm）"
 	@echo "  nvidia-drm-test  - 运行完整的NVIDIA-DRM迁移验证测试"
 	@echo "  nvidia-drm-report- 生成NVIDIA-DRM迁移状态报告"
 	@echo "  nvidia-drm-complete - 运行完整的迁移验证流程"
@@ -582,7 +583,14 @@ camera-fix-test: test_camera_fix.cpp
 	@echo "$(CYAN)[TESTING]$(NC) 运行摄像头修复测试 (sensor-id=$(or $(SENSOR_ID),0))..."
 	sudo ./camera_fix_test $(or $(SENSOR_ID),0)
 
-# NVIDIA-DRM Migration Validation
+# NVIDIA-DRM Migration and Validation
+enable-nvidia-drm:
+	@echo "$(BLUE)[INFO]$(NC) 启用NVIDIA-DRM驱动..."
+	@chmod +x deploy/scripts/enable_nvidia_drm.sh
+	@echo "$(YELLOW)[WARNING]$(NC) 此操作将修改系统驱动配置，请确认继续..."
+	@read -p "继续启用NVIDIA-DRM? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	sudo deploy/scripts/enable_nvidia_drm.sh
+
 nvidia-drm-test: nvidia_drm_migration_test.cpp
 	@echo "$(BLUE)[INFO]$(NC) 构建NVIDIA-DRM迁移验证工具..."
 	$(CXX) $(CXXFLAGS) -o nvidia_drm_migration_test nvidia_drm_migration_test.cpp \
@@ -616,7 +624,7 @@ nvidia-drm-complete: nvidia-drm-test nvidia-drm-report
 	@echo "  验证报告: nvidia_drm_migration_report.txt"
 	@echo "  状态报告: nvidia_drm_status.txt"
 
-.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test nvidia-drm-test nvidia-drm-report nvidia-drm-complete
+.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test enable-nvidia-drm nvidia-drm-test nvidia-drm-report nvidia-drm-complete
 
 # === 开发辅助 ===
 dev-run:
