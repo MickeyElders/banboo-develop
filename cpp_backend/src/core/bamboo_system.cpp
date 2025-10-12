@@ -223,8 +223,8 @@ bool BambooSystem::reloadConfig(const SystemConfig& config) {
         // TODO: 更新推理配置
     }
     
-    if (ui_interface_) {
-        // TODO: 更新界面配置
+    if (ui_wayland_interface_) {
+        // TODO: 更新Wayland界面配置
     }
     
     if (modbus_interface_) {
@@ -485,14 +485,14 @@ void BambooSystem::monitorSystemHealth() {
         handleSystemError("推理线程异常停止");
     }
     
-    if (ui_interface_) {
+    if (ui_wayland_interface_) {
         try {
-            if (!ui_interface_->isRunning()) {
-                // 界面异常不影响核心功能
-                utils::Logger::getInstance().log(utils::LogLevel::WARN, "界面线程异常");
+            if (!ui_wayland_interface_->isRunning()) {
+                // Wayland界面异常不影响核心功能
+                utils::Logger::getInstance().log(utils::LogLevel::WARN, "Wayland界面线程异常");
             }
         } catch (const std::exception& e) {
-            utils::Logger::getInstance().log(utils::LogLevel::WARN, "界面线程监控异常: " + std::string(e.what()));
+            utils::Logger::getInstance().log(utils::LogLevel::WARN, "Wayland界面线程监控异常: " + std::string(e.what()));
         }
     }
     
