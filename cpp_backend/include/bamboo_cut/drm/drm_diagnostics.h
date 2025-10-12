@@ -59,6 +59,14 @@ private:
     static const char* getPlaneTypeName(uint64_t type);
     static void printCrtcStatus(int drm_fd, uint32_t crtc_id);
     static void printConnectorStatus(int drm_fd, uint32_t connector_id);
+    
+    // 内部实现方法
+    static void printDRMDriverInfo(int drm_fd);
+    static void printCRTCInfo(int drm_fd);
+    static void printPlaneInfo(int drm_fd);
+    static void printConnectorInfo(int drm_fd);
+    static uint32_t getPlaneType(int drm_fd, uint32_t plane_id);
+    static void checkMemoryUsage();
 };
 
 } // namespace drm

@@ -51,8 +51,8 @@ void DRMDiagnostics::printSystemDRMState(int drm_fd) {
  * @brief 验证资源分配
  */
 void DRMDiagnostics::verifyResourceAllocation(
-    const DRMResourceCoordinator::ResourceAllocation& lvgl_res,
-    const DRMResourceCoordinator::ResourceAllocation& ds_res) {
+    const ResourceAllocation& lvgl_res,
+    const ResourceAllocation& ds_res) {
     
     std::cout << "\n========== 资源分配验证 ==========" << std::endl;
     
