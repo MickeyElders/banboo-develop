@@ -32,8 +32,8 @@ public:
      * @param ds_res DeepStream资源分配
      */
     static void verifyResourceAllocation(
-        const DRMResourceCoordinator::ResourceAllocation& lvgl_res,
-        const DRMResourceCoordinator::ResourceAllocation& ds_res);
+        const ResourceAllocation& lvgl_res,
+        const ResourceAllocation& ds_res);
     
     /**
      * 监控运行时资源使用情况
