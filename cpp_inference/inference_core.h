@@ -103,7 +103,7 @@ struct DetectionResult {
         std::string result = "DetectionResult(";
         result += "points=" + std::to_string(points.size());
         result += ", time=" + std::to_string(processing_time_ms) + "ms";
-        result += ", success=" + (success ? "true" : "false");
+        result += std::string(", success=") + (success ? "true" : "false");
         if (!error_message.empty()) {
             result += ", error=\"" + error_message + "\"";
         }

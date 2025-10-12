@@ -70,9 +70,36 @@ bool BambooDetector::initialize(const DetectorConfig& config) {
             return false;
         }
         
-        // 获取绑定索引
-        input_binding_index_ = engine_->getBindingIndex("images");
-        output_binding_index_ = engine_->getBindingIndex("output");
+        // 获取绑定索引 - TensorRT 10.x 兼容
+        const char* input_name = "images";
+        const char* output_name = "output";
+        
+        input_binding_index_ = -1;
+        output_binding_index_ = -1;
+        
+        // 新API: 使用getTensorName和getIOTensorName
+        int32_t nbIOTensors = engine_->getNbIOTensors();
+        for (int32_t i = 0; i < nbIOTensors; ++i) {
+            const char* name = engine_->getIOTensorName(i);
+            if (name && strcmp(name, input_name) == 0) {
+                input_binding_index_ = i;
+            } else if (name && strcmp(name, output_name) == 0) {
+                output_binding_index_ = i;
+            }
+        }
+        
+        // 如果新API失败，尝试旧API作为备用
+        if (input_binding_index_ == -1 || output_binding_index_ == -1) {
+            // 旧API备用方案
+            for (int32_t i = 0; i < engine_->getNbBindings(); ++i) {
+                const char* name = engine_->getBindingName(i);
+                if (name && strcmp(name, input_name) == 0) {
+                    input_binding_index_ = i;
+                } else if (name && strcmp(name, output_name) == 0) {
+                    output_binding_index_ = i;
+                }
+            }
+        }
         
         if (input_binding_index_ == -1 || output_binding_index_ == -1) {
             std::cerr << "[BambooDetector] 获取绑定索引失败" << std::endl;
@@ -136,8 +163,8 @@ bool BambooDetector::buildEngineFromOnnx(const std::string& onnx_path, const std
             return false;
         }
         
-        // 设置最大工作空间
-        config->setMaxWorkspaceSize(1ULL << 30); // 1GB
+        // 设置内存池大小 - TensorRT 10.x 新API
+        config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1ULL << 30); // 1GB
         
         // 启用FP16精度
         if (config_.use_fp16 && builder->platformHasFastFp16()) {
@@ -219,9 +246,21 @@ bool BambooDetector::loadEngine(const std::string& engine_path) {
 // 分配缓冲区
 bool BambooDetector::allocateBuffers() {
     try {
-        // 获取输入输出尺寸
-        auto input_dims = engine_->getBindingDimensions(input_binding_index_);
-        auto output_dims = engine_->getBindingDimensions(output_binding_index_);
+        // 获取输入输出尺寸 - TensorRT 10.x 兼容
+        nvinfer1::Dims input_dims, output_dims;
+        
+        // 新API优先
+        const char* input_name = engine_->getIOTensorName(input_binding_index_);
+        const char* output_name = engine_->getIOTensorName(output_binding_index_);
+        
+        if (input_name && output_name) {
+            input_dims = engine_->getTensorShape(input_name);
+            output_dims = engine_->getTensorShape(output_name);
+        } else {
+            // 备用旧API
+            input_dims = engine_->getBindingDimensions(input_binding_index_);
+            output_dims = engine_->getBindingDimensions(output_binding_index_);
+        }
         
         // 计算输入输出大小
         size_t input_size = 1;
@@ -272,9 +311,21 @@ bool BambooDetector::warmupModel() {
             cudaMemcpyAsync(input_device_buffer_, input_host_buffer_.data(), input_size_, 
                            cudaMemcpyHostToDevice, stream_);
             
-            // 执行推理
+            // 执行推理 - TensorRT 10.x 兼容
             void* bindings[] = {input_device_buffer_, output_device_buffer_};
-            context_->enqueueV2(bindings, stream_, nullptr);
+            
+            // 新API优先
+            const char* input_name = engine_->getIOTensorName(input_binding_index_);
+            const char* output_name = engine_->getIOTensorName(output_binding_index_);
+            
+            if (input_name && output_name) {
+                context_->setTensorAddress(input_name, input_device_buffer_);
+                context_->setTensorAddress(output_name, output_device_buffer_);
+                context_->enqueueV3(stream_);
+            } else {
+                // 备用旧API
+                context_->enqueueV2(bindings, stream_, nullptr);
+            }
             
             // 复制输出数据到CPU
             cudaMemcpyAsync(output_host_buffer_.data(), output_device_buffer_, output_size_,
