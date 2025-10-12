@@ -3,9 +3,10 @@
 # C++推理后端 + LVGL界面 + Modbus通信的完整一体化系统
 
 .PHONY: all install clean test deploy start stop restart status logs \
-        install-deps install-system-deps install-lvgl build-lvgl-from-source \
+        install-deps install-system-deps install-wayland-deps install-lvgl build-lvgl-from-source \
         install-service enable-service disable-service \
-        check-system build-system install-system setup-config \
+        check-system check-wayland build-system install-system setup-config setup-wayland \
+        start-weston stop-weston weston-status \
         build-debug test-system backup
 
 # === 系统配置 ===
@@ -94,8 +95,9 @@ help:
 	@echo ""
 	@echo "$(GREEN)安装命令:$(NC)"
 	@echo "  install          - 完整安装系统"
-	@echo "  install-deps     - 安装所有依赖(系统+LVGL)"
+	@echo "  install-deps     - 安装所有依赖(系统+Wayland+LVGL)"
 	@echo "  install-system-deps - 仅安装系统依赖"
+	@echo "  install-wayland-deps - 安装Wayland环境和Weston"
 	@echo "  install-lvgl     - 检查并安装LVGL"
 	@echo "  install-system   - 安装编译好的系统"
 	@echo "  install-service  - 安装systemd服务"
@@ -109,8 +111,16 @@ help:
 	@echo "  enable-service   - 启用开机自启"
 	@echo "  disable-service  - 禁用开机自启"
 	@echo ""
+	@echo "$(GREEN)Wayland环境管理:$(NC)"
+	@echo "  setup-wayland    - 配置Wayland环境和Weston服务"
+	@echo "  start-weston     - 启动Weston合成器"
+	@echo "  stop-weston      - 停止Weston合成器"
+	@echo "  weston-status    - 查看Weston状态"
+	@echo "  check-wayland    - 检查Wayland环境完整性"
+	@echo ""
 	@echo "$(GREEN)维护命令:$(NC)"
 	@echo "  check-system     - 检查系统环境"
+	@echo "  check-wayland    - 检查Wayland环境"
 	@echo "  setup-config     - 设置配置文件"
 	@echo "  test             - 运行系统测试"
 	@echo "  backup           - 备份当前系统"
@@ -153,8 +163,91 @@ check-system:
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统环境检查通过"
 
 # === 依赖安装 ===
-install-deps: install-system-deps install-lvgl9-auto
+install-deps: install-system-deps install-wayland-deps install-lvgl9-auto
 	@echo "$(GREEN)[SUCCESS]$(NC) 所有依赖安装完成"
+
+# === Wayland环境配置 ===
+install-wayland-deps:
+	@echo "$(BLUE)[INFO]$(NC) 配置Wayland环境..."
+	@sudo apt-get install -y \
+		weston \
+		libwayland-dev \
+		libwayland-egl1 \
+		wayland-protocols \
+		libxkbcommon-dev
+	@echo "$(BLUE)[INFO]$(NC) 配置Weston服务..."
+	@sudo mkdir -p /etc/weston
+	@echo "[core]" | sudo tee /etc/weston/weston.ini > /dev/null
+	@echo "backend=drm-backend.so" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "idle-time=0" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "[output]" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "name=HDMI-A-1" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "mode=1920x1200@60" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "[input-method]" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "path=/usr/lib/weston/weston-keyboard" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@if [ ! -f "/etc/systemd/system/weston.service" ]; then \
+		echo "$(BLUE)[INFO]$(NC) 创建Weston systemd服务..."; \
+		echo "[Unit]" | sudo tee /etc/systemd/system/weston.service > /dev/null; \
+		echo "Description=Weston Wayland Compositor" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "After=multi-user.target" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "[Service]" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Type=simple" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "User=root" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Group=root" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "ExecStart=/usr/bin/weston --config=/etc/weston/weston.ini --log=/var/log/weston.log" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Environment=WAYLAND_DISPLAY=wayland-0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Restart=always" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "RestartSec=5" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "[Install]" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		sudo systemctl daemon-reload; \
+	fi
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境配置完成"
+
+setup-wayland: install-wayland-deps
+	@echo "$(BLUE)[INFO]$(NC) 启用Weston服务..."
+	@sudo systemctl enable weston.service
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston服务已启用"
+
+start-weston:
+	@echo "$(BLUE)[INFO]$(NC) 启动Weston合成器..."
+	@sudo systemctl start weston.service
+	@sleep 3
+	@if sudo systemctl is-active --quiet weston.service; then \
+		echo "$(GREEN)[SUCCESS]$(NC) Weston启动成功"; \
+	else \
+		echo "$(RED)[ERROR]$(NC) Weston启动失败"; \
+		sudo journalctl -u weston.service --no-pager -n 20; \
+		exit 1; \
+	fi
+
+stop-weston:
+	@echo "$(BLUE)[INFO]$(NC) 停止Weston合成器..."
+	@sudo systemctl stop weston.service
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston已停止"
+
+weston-status:
+	@echo "$(CYAN)=== Weston状态 ===$(NC)"
+	@sudo systemctl status weston.service --no-pager -l
+	@echo ""
+	@echo "$(CYAN)=== Wayland Socket ===$(NC)"
+	@ls -la /run/user/0/wayland-* 2>/dev/null || echo "Wayland socket不存在"
+
+check-wayland:
+	@echo "$(BLUE)[INFO]$(NC) 检查Wayland环境..."
+	@echo -n "Weston服务状态: "
+	@sudo systemctl is-active weston.service 2>/dev/null || echo "未运行"
+	@echo -n "Wayland socket: "
+	@ls /run/user/0/wayland-0 2>/dev/null && echo "存在" || echo "不存在"
+	@echo -n "Wayland库: "
+	@pkg-config --exists wayland-client && echo "已安装" || echo "未安装"
+	@echo -n "EGL库: "
+	@ldconfig -p | grep -q "libEGL" && echo "已安装" || echo "未安装"
 
 install-system-deps:
 	@echo "$(BLUE)[INFO]$(NC) 安装系统依赖..."
@@ -178,7 +271,12 @@ install-system-deps:
 		libjpeg-dev \
 		libfontconfig1-dev \
 		libharfbuzz-dev \
-		libdrm-dev
+		libdrm-dev \
+		weston \
+		libwayland-dev \
+		libwayland-egl1 \
+		wayland-protocols \
+		libxkbcommon-dev
 	@if lspci | grep -i nvidia >/dev/null 2>&1; then \
 		echo "$(BLUE)[INFO]$(NC) 检测到NVIDIA GPU，检查CUDA环境..."; \
 		if [ -d "/usr/local/cuda" ]; then \
