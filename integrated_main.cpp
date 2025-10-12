@@ -1051,12 +1051,17 @@ public:
         
         // === 步骤3: 注册LVGL资源 ===
         std::cout << "\n📋 [DRM协调器] 步骤3: 注册LVGL资源..." << std::endl;
-        // TODO: 需要从LVGL获取其DRM FD
-        // 目前LVGL使用独立的DRM连接，需要后续集成
+        
+        // 延迟一下，让LVGL完全初始化DRM资源
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        
+        // 注册LVGL的DRM资源使用情况
         if (coordinator->isInitialized()) {
-            // 使用默认的Primary Plane配置
-            coordinator->registerLVGLResources();
-            std::cout << "✅ [DRM协调器] LVGL资源注册完成" << std::endl;
+            if (!coordinator->registerLVGLResources(-1)) { // 使用-1表示使用协调器自己的DRM FD检测
+                std::cout << "⚠️  [DRM协调器] LVGL资源注册失败，但继续执行" << std::endl;
+            } else {
+                std::cout << "✅ [DRM协调器] LVGL资源注册完成" << std::endl;
+            }
         }
         
         // === 步骤4: 分配DeepStream Overlay资源 ===
