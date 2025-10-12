@@ -8,11 +8,12 @@
 
 #include <cstdint>
 
+// 包含 DRM 协调器头文件以获取 ResourceAllocation 类型
+#include "drm_resource_coordinator.h"
+
 // 前向声明，避免循环依赖
 namespace bamboo_cut {
 namespace drm {
-
-class DRMResourceCoordinator;
 
 /**
  * DRM诊断工具类
