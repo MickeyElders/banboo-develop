@@ -1831,7 +1831,7 @@ void DeepStreamManager::canvasUpdateLoop() {
 }
 
 // 新增：设置DRM Overlay配置
-void DeepStreamManager::setOverlayConfig(const bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation& alloc) {
+void DeepStreamManager::setOverlayConfig(const bamboo_cut::drm::ResourceAllocation& alloc) {
     std::cout << "🎯 [DeepStream] 接收到Overlay配置..." << std::endl;
     
     if (alloc.isValid() && !alloc.is_primary) {

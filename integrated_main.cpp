@@ -580,7 +580,7 @@ private:
     
     // DRM Overlay配置
     bool has_overlay_ = false;
-    bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation overlay_config_;
+    bamboo_cut::drm::ResourceAllocation overlay_config_;
     
     // 性能统计
     int processed_frames_ = 0;
@@ -597,7 +597,7 @@ public:
     }
     
     // 设置Overlay配置
-    void setOverlayConfig(const bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation& alloc) {
+    void setOverlayConfig(const bamboo_cut::drm::ResourceAllocation& alloc) {
         if (alloc.isValid() && !alloc.is_primary) {
             has_overlay_ = true;
             overlay_config_ = alloc;
@@ -798,7 +798,7 @@ private:
             const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
             std::cout << "📺 [DeepStream] 当前sink模式: " << mode_names[static_cast<int>(current_mode)];
             
-            if (has_overlay_ && current_mode == deepstream::SinkMode::KMSSINK) {
+            if (has_overlay_ && current_mode == deepstream::VideoSinkMode::KMSSINK) {
                 std::cout << " (硬件Overlay渲染)" << std::endl;
             } else {
                 std::cout << " (软件合成模式)" << std::endl;
@@ -1061,7 +1061,7 @@ public:
         
         // === 步骤4: 分配DeepStream Overlay资源 ===
         std::cout << "\n🎬 [DRM协调器] 步骤4: 为DeepStream分配Overlay资源..." << std::endl;
-        bamboo_cut::drm::DRMResourceCoordinator::ResourceAllocation ds_alloc;
+        bamboo_cut::drm::ResourceAllocation ds_alloc;
         bool has_overlay = coordinator->allocateOverlayForDeepStream(ds_alloc);
         
         if (has_overlay && ds_alloc.isValid()) {

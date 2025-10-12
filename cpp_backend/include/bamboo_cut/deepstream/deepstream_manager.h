@@ -15,12 +15,8 @@
 #include <thread>
 #include <opencv2/opencv.hpp>
 
-// 前向声明DRM资源分配结构
-namespace bamboo_cut {
-namespace drm {
-    struct ResourceAllocation;
-}
-}
+// 包含DRM资源协调器头文件
+#include "bamboo_cut/drm/drm_resource_coordinator.h"
 
 namespace bamboo_cut {
 namespace deepstream {

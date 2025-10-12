@@ -149,6 +149,11 @@ public:
      * @brief 获取系统DRM状态诊断信息
      */
     void printSystemDRMState();
+    
+    /**
+     * @brief 检查是否已初始化
+     */
+    bool isInitialized() const { return initialized_; }
 
 private:
     // 单例相关
