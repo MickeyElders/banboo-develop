@@ -181,10 +181,20 @@ auto-setup-environment:
 		echo "$(YELLOW)[WARNING]$(NC) Weston服务未配置，正在自动配置..."; \
 		$(MAKE) setup-wayland; \
 	fi
-	@# 3. 检查Weston是否运行
-	@if ! systemctl is-active --quiet weston.service 2>/dev/null; then \
+	@# 3. 智能检查Weston运行状态
+	@WESTON_RUNNING=false; \
+	if pgrep -x weston >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到Weston进程正在运行"; \
+		WESTON_RUNNING=true; \
+	elif systemctl is-active --quiet weston.service 2>/dev/null; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到Weston服务正在运行"; \
+		WESTON_RUNNING=true; \
+	fi; \
+	if [ "$$WESTON_RUNNING" = "false" ]; then \
 		echo "$(YELLOW)[WARNING]$(NC) Weston未运行，正在启动..."; \
 		$(MAKE) start-weston; \
+	else \
+		echo "$(GREEN)[SUCCESS]$(NC) Weston已在运行，跳过启动"; \
 	fi
 	@# 4. 验证Wayland环境
 	@if [ ! -S "/run/user/0/wayland-0" ]; then \
@@ -195,7 +205,7 @@ auto-setup-environment:
 			exit 1; \
 		fi; \
 	fi
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境自动配置完成"
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境检查完成"
 
 # === Wayland环境配置 ===
 install-wayland-deps:
