@@ -13,14 +13,9 @@
 #include <mutex>
 #include <chrono>
 
-// 检查是否有lv_drivers支持
-#ifdef LV_USE_WAYLAND
-    #include "lv_drivers/wayland/wayland.h"
-    #define HAS_WAYLAND_DRIVER 1
-#else
-    #define HAS_WAYLAND_DRIVER 0
-    #warning "lv_drivers Wayland driver not found, using fallback implementation"
-#endif
+// 暂时使用fallback实现，等待lv_drivers集成
+#define HAS_WAYLAND_DRIVER 0
+#warning "Using fallback LVGL implementation without lv_drivers"
 
 namespace bamboo_cut {
 namespace ui {
@@ -303,25 +298,6 @@ bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
-#if HAS_WAYLAND_DRIVER
-    // 使用lv_drivers/wayland驱动
-    lv_wayland_init();
-    
-    display_ = lv_wayland_create_window(
-        config_.window_width, 
-        config_.window_height,
-        config_.fullscreen ? "LVGL Bamboo (Fullscreen)" : "LVGL Bamboo",
-        nullptr
-    );
-    
-    if (!display_) {
-        std::cerr << "创建Wayland窗口失败" << std::endl;
-        return false;
-    }
-    
-    display_initialized_ = true;
-    return true;
-#else
     // Fallback实现：创建基本显示缓冲区
     static lv_color_t* buf1 = nullptr;
     static lv_color_t* buf2 = nullptr;
@@ -351,19 +327,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     
     display_initialized_ = true;
     return true;
-#endif
 }
 
 bool LVGLWaylandInterface::Impl::initializeInput() {
-#if HAS_WAYLAND_DRIVER
-    // 使用lv_drivers的Wayland输入
-    touch_indev_ = lv_wayland_get_touchpad(display_);
-    pointer_indev_ = lv_wayland_get_pointer(display_);
-    keyboard_indev_ = lv_wayland_get_keyboard(display_);
-    
-    input_initialized_ = true;
-    return true;
-#else
     // Fallback实现：创建虚拟输入设备
     static lv_indev_drv_t touch_drv;
     lv_indev_drv_init(&touch_drv);
@@ -377,7 +343,6 @@ bool LVGLWaylandInterface::Impl::initializeInput() {
     
     input_initialized_ = true;
     return true;
-#endif
 }
 
 void LVGLWaylandInterface::Impl::initializeTheme() {
