@@ -529,14 +529,8 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/inference/ghost_conv.cpp
     cpp_backend/src/deepstream/deepstream_manager.cpp
     cpp_backend/src/ui/lvgl_wayland_interface.cpp
-    cpp_backend/src/ui/lvgl_panel_styles.cpp
     cpp_backend/src/ui/lvgl_updates.cpp
     cpp_backend/src/ui/lvgl_events.cpp
-    cpp_backend/src/ui/lvgl_panels/header_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/camera_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/control_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/footer_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/status_panel.cpp
     cpp_backend/src/utils/config_loader.cpp
     cpp_backend/src/utils/system_monitor.cpp
     cpp_backend/src/utils/jetson_monitor.cpp
