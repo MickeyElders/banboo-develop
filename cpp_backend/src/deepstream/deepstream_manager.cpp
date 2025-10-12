@@ -794,7 +794,7 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
         std::cout << "[DeepStreamManager] 设置WAYLAND_DISPLAY=wayland-0" << std::endl;
     }
     
-    // 使用nvarguscamerasrc（现在可以在Wayland下正常工作）
+    // 使用nvarguscamerasrc
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ";
     
     // 摄像头输出配置
@@ -804,9 +804,11 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
              << ",framerate=" << config.camera_fps << "/1"
              << ",format=NV12 ";
     
-    // 可选：AI推理插件
-    if (!config.nvinfer_config.empty()) {
+    // 🔧 修复：只在配置文件存在时才添加nvinfer
+    if (!config.nvinfer_config.empty() && access(config.nvinfer_config.c_str(), F_OK) == 0) {
         pipeline << "! nvinfer config-file-path=" << config.nvinfer_config << " ";
+    } else {
+        std::cout << "[DeepStreamManager] 跳过nvinfer（配置文件不存在）" << std::endl;
     }
     
     // 硬件加速格式转换和缩放
@@ -818,15 +820,8 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
              << ",width=" << width
              << ",height=" << height << " ";
     
-    // Wayland sink配置
+    // 🔧 修复：移除render-rectangle，waylandsink不支持此属性
     pipeline << "! waylandsink ";
-    
-    // 窗口位置和尺寸配置（非全屏模式）
-    if (width != 1920 || height != 1200) {  // 非全屏
-        pipeline << "render-rectangle=\"<"
-                 << offset_x << "," << offset_y << ","
-                 << width << "," << height << ">\" ";
-    }
     
     // 性能优化参数
     pipeline << "sync=false ";        // 低延迟模式
