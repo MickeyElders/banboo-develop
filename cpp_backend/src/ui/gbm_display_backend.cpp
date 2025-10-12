@@ -525,7 +525,8 @@ GBMFramebuffer* GBMDisplayBackend::createLVGLFramebuffer(uint32_t width, uint32_
     fb->stride = stride;
     fb->size = size;
     fb->bo = bo;
-    fb->map = nullptr;  // 按需映射
+    fb->map = nullptr;      // 按需映射
+    fb->map_data = nullptr; // GBM映射数据初始化
     
     std::cout << "✅ LVGL framebuffer创建成功: fb_id=" << fb_id << std::endl;
     
@@ -558,9 +559,10 @@ void GBMDisplayBackend::releaseFramebuffer(GBMFramebuffer* fb) {
     std::lock_guard<std::mutex> lock(drm_mutex_);
     
     // 使用gbm_bo_unmap来正确释放GBM映射
-    if (fb->map && fb->bo) {
-        gbm_bo_unmap(fb->bo, fb->map);
+    if (fb->map && fb->bo && fb->map_data) {
+        gbm_bo_unmap(fb->bo, fb->map_data);
         fb->map = nullptr;
+        fb->map_data = nullptr;
     }
     
     if (fb->fb_id > 0) {

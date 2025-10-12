@@ -41,6 +41,7 @@ struct GBMFramebuffer {
     uint32_t stride;              // 行步长
     uint32_t size;                // 缓冲区大小
     void* map;                    // 内存映射地址
+    void* map_data;               // GBM映射数据（用于gbm_bo_unmap）
     gbm_bo* bo;                   // GBM buffer object
 };
 
