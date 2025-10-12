@@ -28,10 +28,9 @@ DRMResourceCoordinator::DRMResourceCoordinator()
 DRMResourceCoordinator::~DRMResourceCoordinator() {
     std::cout << "🔧 [DRM协调器] 析构函数调用" << std::endl;
     
-    if (shared_drm_fd_ >= 0) {
-        close(shared_drm_fd_);
-        shared_drm_fd_ = -1;
-    }
+    // 🔧 关键修复：不关闭共享的DRM FD，因为它属于LVGL
+    // LVGL负责管理DRM FD的生命周期
+    shared_drm_fd_ = -1;
 }
 
 DRMResourceCoordinator* DRMResourceCoordinator::getInstance() {
@@ -44,42 +43,45 @@ DRMResourceCoordinator* DRMResourceCoordinator::getInstance() {
     return instance_.get();
 }
 
-bool DRMResourceCoordinator::initializeBeforeLVGL() {
+bool DRMResourceCoordinator::initializeAfterLVGL(int lvgl_drm_fd) {
     std::lock_guard<std::mutex> lock(resource_mutex_);
     
-    std::cout << "🔧 [DRM协调器] 在LVGL之前初始化..." << std::endl;
+    std::cout << "🔧 [DRM协调器] 在LVGL之后初始化..." << std::endl;
     
     if (initialized_) {
         std::cout << "✅ [DRM协调器] 已经初始化，跳过" << std::endl;
         return true;
     }
     
-    // 1. 查找并打开DRM设备
-    shared_drm_fd_ = findDRMDevice();
-    if (shared_drm_fd_ < 0) {
-        std::cerr << "❌ [DRM协调器] 无法找到可用的DRM设备" << std::endl;
+    // 🔧 关键修复：使用LVGL已经获得Master权限的共享FD
+    if (lvgl_drm_fd < 0) {
+        std::cerr << "❌ [DRM协调器] LVGL DRM FD无效: " << lvgl_drm_fd << std::endl;
         return false;
     }
     
-    std::cout << "✅ DRM设备已打开，FD=" << shared_drm_fd_ << std::endl;
+    shared_drm_fd_ = lvgl_drm_fd;
+    std::cout << "✅ 使用LVGL共享DRM FD=" << shared_drm_fd_ << " (已有Master权限)" << std::endl;
     
-    // 2. 不获取DRM Master权限 - 让LVGL自己获取
-    std::cout << "🔧 [DRM协调器] 跳过Master权限获取，由LVGL负责" << std::endl;
-    
-    // 3. 扫描DRM资源
+    // 1. 扫描DRM资源（使用共享FD）
     if (!scanDRMResources()) {
         std::cerr << "❌ [DRM协调器] DRM资源扫描失败" << std::endl;
         return false;
     }
     
-    // 4. 验证资源分配策略
+    // 2. 注册LVGL资源（自动检测）
+    if (!registerLVGLResources(lvgl_drm_fd)) {
+        std::cerr << "❌ [DRM协调器] LVGL资源注册失败" << std::endl;
+        return false;
+    }
+    
+    // 3. 验证资源分配策略
     if (!validateResourcePlan()) {
         std::cerr << "❌ [DRM协调器] 资源分配策略验证失败" << std::endl;
         return false;
     }
     
     initialized_ = true;
-    std::cout << "✅ [DRM协调器] 初始化完成" << std::endl;
+    std::cout << "✅ [DRM协调器] 使用共享FD初始化完成" << std::endl;
     
     return true;
 }

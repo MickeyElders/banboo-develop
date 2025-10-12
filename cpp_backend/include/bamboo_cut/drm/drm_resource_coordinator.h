@@ -90,14 +90,15 @@ public:
     static DRMResourceCoordinator* getInstance();
     
     /**
-     * @brief 在LVGL初始化前进行预初始化
-     * 
-     * 扫描所有可用的DRM资源，但不立即获取Master权限
-     * 提前规划资源分配策略
-     * 
+     * @brief 在LVGL初始化后进行DRM资源协调
+     *
+     * 使用LVGL已经获得的Master权限进行资源管理
+     * 扫描并协调DRM资源分配
+     *
+     * @param lvgl_drm_fd LVGL使用的DRM文件描述符
      * @return true 初始化成功，false 失败
      */
-    bool initializeBeforeLVGL();
+    bool initializeAfterLVGL(int lvgl_drm_fd);
     
     /**
      * @brief 注册LVGL使用的DRM资源

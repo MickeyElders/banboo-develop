@@ -1024,24 +1024,9 @@ public:
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // === 步骤1: DRM协调器初始化 (必须在LVGL之前) ===
-        std::cout << "\n🔧 [DRM协调器] 步骤1: 在LVGL之前初始化..." << std::endl;
-        auto* coordinator = bamboo_cut::drm::DRMResourceCoordinator::getInstance();
-        if (!coordinator->initializeBeforeLVGL()) {
-            std::cout << "⚠️  [DRM协调器] 初始化失败，系统将以软件合成模式运行" << std::endl;
-            // 不是致命错误，继续执行以允许软件合成模式
-        } else {
-            std::cout << "✅ [DRM协调器] 初始化成功，DRM资源扫描完成" << std::endl;
-            
-            // 显示DRM系统状态
-            int drm_fd = coordinator->getSharedDrmFd();
-            if (drm_fd >= 0) {
-                bamboo_cut::drm::DRMDiagnostics::printSystemDRMState(drm_fd);
-            }
-        }
-        
-        // === 步骤2: LVGL初始化 (将获取DRM Master权限) ===
-        std::cout << "\n🎨 [LVGL] 步骤2: 初始化UI管理器..." << std::endl;
+        // 🔧 关键修复：调整初始化顺序 - LVGL先初始化获取Master权限
+        // === 步骤1: LVGL初始化 (先获取DRM Master权限) ===
+        std::cout << "\n🎨 [LVGL] 步骤1: 初始化UI管理器..." << std::endl;
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
             std::cout << "❌ [LVGL] UI system initialization failed" << std::endl;
@@ -1049,23 +1034,37 @@ public:
         }
         std::cout << "✅ [LVGL] UI系统初始化成功，已获取DRM Master权限" << std::endl;
         
-        // === 步骤3: 注册LVGL资源 ===
-        std::cout << "\n📋 [DRM协调器] 步骤3: 注册LVGL资源..." << std::endl;
+        // === 步骤2: DRM协调器使用LVGL的共享FD进行初始化 ===
+        std::cout << "\n🔧 [DRM协调器] 步骤2: 使用LVGL共享FD初始化..." << std::endl;
+        auto* coordinator = bamboo_cut::drm::DRMResourceCoordinator::getInstance();
         
-        // 延迟一下，让LVGL完全初始化DRM资源
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // 获取LVGL的DRM FD（从GBM后端获取）
+        int lvgl_drm_fd = -1;
+        #ifdef ENABLE_LVGL
+        if (ui_manager_ && ui_manager_->getLVGLInterface()) {
+            auto& gbm_manager = bamboo_cut::ui::GBMBackendManager::getInstance();
+            auto* gbm_backend = gbm_manager.getBackend();
+            if (gbm_backend) {
+                lvgl_drm_fd = gbm_backend->getDRMFd();
+                std::cout << "🔗 获取LVGL DRM FD: " << lvgl_drm_fd << std::endl;
+            }
+        }
+        #endif
         
-        // 注册LVGL的DRM资源使用情况
-        if (coordinator->isInitialized()) {
-            if (!coordinator->registerLVGLResources(-1)) { // 使用-1表示使用协调器自己的DRM FD检测
-                std::cout << "⚠️  [DRM协调器] LVGL资源注册失败，但继续执行" << std::endl;
-            } else {
-                std::cout << "✅ [DRM协调器] LVGL资源注册完成" << std::endl;
+        if (!coordinator->initializeAfterLVGL(lvgl_drm_fd)) {
+            std::cout << "⚠️  [DRM协调器] 初始化失败，系统将以软件合成模式运行" << std::endl;
+            // 不是致命错误，继续执行以允许软件合成模式
+        } else {
+            std::cout << "✅ [DRM协调器] 使用共享FD初始化成功" << std::endl;
+            
+            // 显示DRM系统状态
+            if (lvgl_drm_fd >= 0) {
+                bamboo_cut::drm::DRMDiagnostics::printSystemDRMState(lvgl_drm_fd);
             }
         }
         
-        // === 步骤4: 分配DeepStream Overlay资源 ===
-        std::cout << "\n🎬 [DRM协调器] 步骤4: 为DeepStream分配Overlay资源..." << std::endl;
+        // === 步骤3: 分配DeepStream Overlay资源 ===
+        std::cout << "\n🎬 [DRM协调器] 步骤3: 为DeepStream分配Overlay资源..." << std::endl;
         bamboo_cut::drm::ResourceAllocation ds_alloc;
         bool has_overlay = coordinator->allocateOverlayForDeepStream(ds_alloc);
         
@@ -1076,8 +1075,8 @@ public:
             std::cout << "⚠️  [DRM协调器] Overlay资源不可用，DeepStream将降级到AppSink模式" << std::endl;
         }
         
-        // === 步骤5: DeepStream初始化 ===
-        std::cout << "\n🚀 [推理系统] 步骤5: 初始化推理工作线程..." << std::endl;
+        // === 步骤4: DeepStream初始化 ===
+        std::cout << "\n🚀 [推理系统] 步骤4: 初始化推理工作线程..." << std::endl;
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         
         // 传递LVGL界面指针给推理工作线程
