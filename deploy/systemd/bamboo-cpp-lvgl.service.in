@@ -1,9 +1,8 @@
 [Unit]
 Description=AI Bamboo Recognition System - C++ LVGL Wayland Edition
 Documentation=https://github.com/bamboo-industries/bamboo-recognition
-After=network.target multi-user.target weston.service
-Wants=multi-user.target weston.service
-Requires=weston.service
+After=network.target multi-user.target
+Wants=multi-user.target
 
 [Service]
 Type=simple
@@ -43,9 +42,10 @@ ExecStartPre=/bin/bash -c 'pkill -9 bamboo_cu || true'
 ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video0 2>/dev/null); do kill -9 $p; done || true'
 ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video1 2>/dev/null); do kill -9 $p; done || true'
 ExecStartPre=/bin/bash -c 'systemctl restart nvargus-daemon'
-# 确保Weston运行
-ExecStartPre=/bin/bash -c 'systemctl is-active --quiet weston.service || systemctl start weston.service'
-ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/user/0/wayland-0 ]; do sleep 1; done"'
+# 检查并启动Weston(如果可用)
+ExecStartPre=/bin/bash -c 'if systemctl list-unit-files | grep -q weston.service; then systemctl is-active --quiet weston.service || systemctl start weston.service; fi'
+ExecStartPre=/bin/bash -c 'if [ -f /usr/bin/weston ] && [ ! -S /run/user/0/wayland-0 ]; then echo "启动Weston合成器..."; /usr/bin/weston --backend=drm-backend.so --idle-time=0 --log=/var/log/weston.log & sleep 5; fi'
+ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/user/0/wayland-0 ] && [ -f /usr/bin/weston ]; do sleep 1; done" || echo "Wayland socket不可用，继续使用fallback模式"'
 ExecStartPre=/bin/sleep 3
 
 # 改进停止命令
