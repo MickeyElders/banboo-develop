@@ -321,7 +321,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     lv_display_set_buffers(display_, buf1, buf2, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     
     // 设置刷新回调（空实现，因为没有真实的Wayland驱动）
-    lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, lv_color_t* color_p) {
+    lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
         lv_display_flush_ready(disp);
     });
     
@@ -331,15 +331,14 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
 
 bool LVGLWaylandInterface::Impl::initializeInput() {
     // Fallback实现：创建虚拟输入设备
-    static lv_indev_drv_t touch_drv;
-    lv_indev_drv_init(&touch_drv);
-    touch_drv.type = LV_INDEV_TYPE_POINTER;
-    touch_drv.read_cb = [](lv_indev_drv_t* drv, lv_indev_data_t* data) {
-        // 空实现，没有真实的触摸输入
-        data->state = LV_INDEV_STATE_RELEASED;
-    };
-    
-    touch_indev_ = lv_indev_drv_register(&touch_drv);
+    touch_indev_ = lv_indev_create();
+    if (touch_indev_) {
+        lv_indev_set_type(touch_indev_, LV_INDEV_TYPE_POINTER);
+        lv_indev_set_read_cb(touch_indev_, [](lv_indev_t* indev, lv_indev_data_t* data) {
+            // 空实现，没有真实的触摸输入
+            data->state = LV_INDEV_STATE_RELEASED;
+        });
+    }
     
     input_initialized_ = true;
     return true;
@@ -401,7 +400,7 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     size_t canvas_buf_size = (camera_width - 20) * ((config_.screen_height - 120) - 20);
     canvas_buf = (lv_color_t*)malloc(canvas_buf_size * sizeof(lv_color_t));
     if (canvas_buf) {
-        lv_canvas_set_buffer(camera_canvas_, canvas_buf, camera_width - 20, (config_.screen_height - 120) - 20, LV_IMG_CF_TRUE_COLOR);
+        lv_canvas_set_buffer(camera_canvas_, canvas_buf, camera_width - 20, (config_.screen_height - 120) - 20, LV_COLOR_FORMAT_RGB888);
         lv_canvas_fill_bg(camera_canvas_, lv_color_hex(0x333333), LV_OPA_COVER);
     }
     
