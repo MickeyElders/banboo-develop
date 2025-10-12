@@ -63,14 +63,8 @@ bool DRMResourceCoordinator::initializeBeforeLVGL() {
     
     std::cout << "✅ DRM设备已打开，FD=" << shared_drm_fd_ << std::endl;
     
-    // 2. 检查DRM Master权限
-    if (drmSetMaster(shared_drm_fd_) != 0) {
-        std::cout << "⚠️  [DRM协调器] 暂时无法获取DRM Master权限（正常，LVGL会稍后获取）" << std::endl;
-    } else {
-        std::cout << "✅ DRM Master权限" << std::endl;
-        // 立即释放，让LVGL获取
-        drmDropMaster(shared_drm_fd_);
-    }
+    // 2. 不获取DRM Master权限 - 让LVGL自己获取
+    std::cout << "🔧 [DRM协调器] 跳过Master权限获取，由LVGL负责" << std::endl;
     
     // 3. 扫描DRM资源
     if (!scanDRMResources()) {
@@ -483,19 +477,36 @@ uint32_t DRMResourceCoordinator::getPlaneType(int drm_fd, uint32_t plane_id) {
         return 0; // 默认为Overlay
     }
     
+    // 首先尝试标准的type属性
+    uint32_t type_value = 0;
+    bool found_type = false;
+    
     for (uint32_t i = 0; i < props->count_props; i++) {
         drmModePropertyRes* prop = drmModeGetProperty(drm_fd, props->props[i]);
         if (prop && strcmp(prop->name, "type") == 0) {
-            uint64_t value = props->prop_values[i];
+            type_value = static_cast<uint32_t>(props->prop_values[i]);
+            found_type = true;
             drmModeFreeProperty(prop);
-            drmModeFreeObjectProperties(props);
-            return static_cast<uint32_t>(value);
+            break;
         }
         if (prop) drmModeFreeProperty(prop);
     }
     
     drmModeFreeObjectProperties(props);
-    return 0;
+    
+    // NVIDIA DRM驱动特殊处理：当type=0时，需要基于Plane ID来判断
+    if (found_type && type_value == 0) {
+        // 根据用户反馈：Plane 44是LVGL使用的Primary，Plane 57是可用的Overlay
+        if (plane_id == 44) {
+            std::cout << "🔧 [NVIDIA DRM] 检测到Plane 44，根据LVGL使用情况判定为Primary Plane" << std::endl;
+            return 1; // 强制识别为Primary
+        }
+        
+        // Plane 57和其他ID保持为Overlay
+        return 0;
+    }
+    
+    return type_value;
 }
 
 ResourceStatus DRMResourceCoordinator::checkPlaneStatus(int drm_fd, uint32_t plane_id) {

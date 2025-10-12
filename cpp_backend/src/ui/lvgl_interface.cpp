@@ -533,14 +533,14 @@ bool LVGLInterface::initializeDisplay() {
 #ifdef ENABLE_LVGL
     std::cout << "[LVGLInterface] 初始化GBM共享DRM显示后端..." << std::endl;
     
-    // 初始化GBM后端管理器
+    // 初始化GBM后端管理器 - 修复配置
     DRMSharedConfig gbm_config;
     gbm_config.width = config_.screen_width;
     gbm_config.height = config_.screen_height;
     gbm_config.connector_id = 63;  // 使用modetest检测到的正确Connector ID
-    gbm_config.crtc_id = 0;      // 自动检测
-    gbm_config.primary_plane_id = 0;   // 自动检测primary plane (LVGL)
-    gbm_config.overlay_plane_id = 44;  // 用户指定的overlay plane (GStreamer)
+    gbm_config.crtc_id = 43;      // 指定正确的CRTC ID
+    gbm_config.primary_plane_id = 44;   // 指定Primary Plane为44 (LVGL)
+    gbm_config.overlay_plane_id = 57;   // 修复：使用Plane 57作为Overlay (GStreamer)
     
     auto& gbm_manager = GBMBackendManager::getInstance();
     if (!gbm_manager.initialize(gbm_config)) {
