@@ -529,6 +529,7 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/inference/ghost_conv.cpp
     cpp_backend/src/deepstream/deepstream_manager.cpp
     cpp_backend/src/ui/lvgl_wayland_interface.cpp
+    cpp_backend/src/ui/lvgl_panel_styles.cpp
     cpp_backend/src/ui/lvgl_updates.cpp
     cpp_backend/src/ui/lvgl_events.cpp
     cpp_backend/src/ui/lvgl_panels/header_panel.cpp

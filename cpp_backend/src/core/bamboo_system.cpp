@@ -311,21 +311,32 @@ bool BambooSystem::initializeSubsystems() {
             std::cout << "[BambooSystem] AI推理模块已初始化" << std::endl;
         }
         
-        // 初始化LVGL界面
+        // 初始化LVGL Wayland界面
         if (config_.system_params.enable_ui_interface) {
 #ifdef ENABLE_LVGL
             try {
-                ui_interface_ = std::make_unique<ui::LVGLInterface>(data_bridge_);
-                if (ui_interface_->initialize(config_.ui_config)) {
+                ui_wayland_interface_ = std::make_unique<ui::LVGLWaylandInterface>();
+                
+                // 转换配置结构
+                ui::LVGLWaylandConfig wayland_config;
+                wayland_config.screen_width = config_.ui_config.screen_width;
+                wayland_config.screen_height = config_.ui_config.screen_height;
+                wayland_config.refresh_rate = 60; // 默认刷新率
+                wayland_config.enable_touch = true;
+                wayland_config.touch_device = "/dev/input/event0";
+                wayland_config.wayland_display = "wayland-0";
+                wayland_config.fullscreen = true;
+                
+                if (ui_wayland_interface_->initialize(wayland_config)) {
                     system_info_.ui_interface_active = true;
-                    std::cout << "[BambooSystem] LVGL界面模块已初始化" << std::endl;
+                    std::cout << "[BambooSystem] LVGL Wayland界面模块已初始化" << std::endl;
                 } else {
-                    std::cerr << "[BambooSystem] LVGL界面初始化失败" << std::endl;
-                    ui_interface_.reset(); // 清理失败的界面对象
+                    std::cerr << "[BambooSystem] LVGL Wayland界面初始化失败" << std::endl;
+                    ui_wayland_interface_.reset(); // 清理失败的界面对象
                 }
             } catch (const std::exception& e) {
-                std::cerr << "[BambooSystem] LVGL界面初始化异常: " << e.what() << std::endl;
-                ui_interface_.reset();
+                std::cerr << "[BambooSystem] LVGL Wayland界面初始化异常: " << e.what() << std::endl;
+                ui_wayland_interface_.reset();
             }
 #else
             std::cout << "[BambooSystem] LVGL未启用，跳过界面初始化" << std::endl;
@@ -369,16 +380,16 @@ bool BambooSystem::startSubsystems() {
             return false;
         }
         
-        // 启动LVGL界面
-        if (ui_interface_) {
+        // 启动LVGL Wayland界面
+        if (ui_wayland_interface_) {
             try {
-                if (!ui_interface_->start()) {
-                    std::cerr << "[BambooSystem] 界面线程启动失败" << std::endl;
+                if (!ui_wayland_interface_->start()) {
+                    std::cerr << "[BambooSystem] Wayland界面线程启动失败" << std::endl;
                     // 界面启动失败不影响核心功能
                 }
             } catch (const std::exception& e) {
-                std::cerr << "[BambooSystem] 界面线程启动异常: " << e.what() << std::endl;
-                ui_interface_.reset();
+                std::cerr << "[BambooSystem] Wayland界面线程启动异常: " << e.what() << std::endl;
+                ui_wayland_interface_.reset();
             }
         }
         
@@ -416,14 +427,14 @@ void BambooSystem::stopSubsystems() {
         modbus_interface_.reset();
     }
     
-    // 停止LVGL界面
-    if (ui_interface_) {
+    // 停止LVGL Wayland界面
+    if (ui_wayland_interface_) {
         try {
-            ui_interface_->stop();
+            ui_wayland_interface_->stop();
         } catch (const std::exception& e) {
-            std::cerr << "[BambooSystem] 停止LVGL界面异常: " << e.what() << std::endl;
+            std::cerr << "[BambooSystem] 停止LVGL Wayland界面异常: " << e.what() << std::endl;
         }
-        ui_interface_.reset();
+        ui_wayland_interface_.reset();
     }
     
     // 停止推理线程
