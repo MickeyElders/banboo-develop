@@ -85,6 +85,11 @@ help:
 	@echo "  camera-fix-quick - 应用快速非交互式摄像头修复"
 	@echo "  camera-fix-test  - 测试摄像头修复后功能 (使用 SENSOR_ID=X)"
 	@echo ""
+	@echo "$(GREEN)NVIDIA-DRM 迁移验证:$(NC)"
+	@echo "  nvidia-drm-test  - 运行完整的NVIDIA-DRM迁移验证测试"
+	@echo "  nvidia-drm-report- 生成NVIDIA-DRM迁移状态报告"
+	@echo "  nvidia-drm-complete - 运行完整的迁移验证流程"
+	@echo ""
 	@echo "$(GREEN)安装命令:$(NC)"
 	@echo "  install          - 完整安装系统"
 	@echo "  install-deps     - 安装所有依赖(系统+LVGL)"
@@ -577,7 +582,41 @@ camera-fix-test: test_camera_fix.cpp
 	@echo "$(CYAN)[TESTING]$(NC) 运行摄像头修复测试 (sensor-id=$(or $(SENSOR_ID),0))..."
 	sudo ./camera_fix_test $(or $(SENSOR_ID),0)
 
-.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test
+# NVIDIA-DRM Migration Validation
+nvidia-drm-test: nvidia_drm_migration_test.cpp
+	@echo "$(BLUE)[INFO]$(NC) 构建NVIDIA-DRM迁移验证工具..."
+	$(CXX) $(CXXFLAGS) -o nvidia_drm_migration_test nvidia_drm_migration_test.cpp \
+		$(GSTREAMER_LIBS) $(EGL_LIBS) $(PTHREAD_LIBS) -ldrm -lm
+	@echo "$(CYAN)[TESTING]$(NC) 运行NVIDIA-DRM迁移完整验证..."
+	sudo ./nvidia_drm_migration_test
+
+nvidia-drm-report:
+	@echo "$(CYAN)[REPORT]$(NC) 生成NVIDIA-DRM迁移状态报告..."
+	@echo "=== NVIDIA-DRM 迁移状态报告 ===" > nvidia_drm_status.txt
+	@echo "生成时间: $$(date)" >> nvidia_drm_status.txt
+	@echo "" >> nvidia_drm_status.txt
+	@echo "=== 驱动模块状态 ===" >> nvidia_drm_status.txt
+	@lsmod | grep -E "nvidia|tegra|drm" >> nvidia_drm_status.txt 2>/dev/null || echo "未找到相关模块" >> nvidia_drm_status.txt
+	@echo "" >> nvidia_drm_status.txt
+	@echo "=== DRM设备状态 ===" >> nvidia_drm_status.txt
+	@ls -la /dev/dri/ >> nvidia_drm_status.txt 2>/dev/null || echo "DRM设备不存在" >> nvidia_drm_status.txt
+	@echo "" >> nvidia_drm_status.txt
+	@echo "=== EGL环境 ===" >> nvidia_drm_status.txt
+	@echo "EGL_PLATFORM=$$EGL_PLATFORM" >> nvidia_drm_status.txt
+	@echo "__EGL_VENDOR_LIBRARY_DIRS=$$__EGL_VENDOR_LIBRARY_DIRS" >> nvidia_drm_status.txt
+	@echo "" >> nvidia_drm_status.txt
+	@echo "=== 系统信息 ===" >> nvidia_drm_status.txt
+	@uname -a >> nvidia_drm_status.txt
+	@echo "$(GREEN)[SUCCESS]$(NC) 状态报告已保存到: nvidia_drm_status.txt"
+	@cat nvidia_drm_status.txt
+
+nvidia-drm-complete: nvidia-drm-test nvidia-drm-report
+	@echo "$(GREEN)[COMPLETE]$(NC) NVIDIA-DRM迁移验证全部完成！"
+	@echo "查看完整报告:"
+	@echo "  验证报告: nvidia_drm_migration_report.txt"
+	@echo "  状态报告: nvidia_drm_status.txt"
+
+.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test nvidia-drm-test nvidia-drm-report nvidia-drm-complete
 
 # === 开发辅助 ===
 dev-run:
