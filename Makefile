@@ -6,7 +6,7 @@
         install-deps install-system-deps install-wayland-deps install-lvgl build-lvgl-from-source \
         install-service enable-service disable-service \
         check-system check-wayland build-system install-system setup-config setup-wayland \
-        start-weston stop-weston weston-status \
+        start-weston stop-weston weston-status auto-setup-environment \
         build-debug test-system backup
 
 # === 系统配置 ===
@@ -39,9 +39,9 @@ NC := \033[0m
 
 # === 主要目标 ===
 
-all: check-system install-deps build-system
+all: check-system auto-setup-environment install-deps build-system
 	@echo "$(CYAN)=== AI竹子识别系统构建完成 (v$(VERSION)) ===$(NC)"
-	@echo "$(GREEN)C++ LVGL一体化工业级嵌入式架构$(NC)"
+	@echo "$(GREEN)C++ LVGL Wayland一体化工业级嵌入式架构$(NC)"
 	@echo "使用 'make deploy' 完成系统部署"
 
 install: all install-system install-service
@@ -49,10 +49,12 @@ install: all install-system install-service
 	@echo "服务名称: $(SERVICE_NAME)"
 	@echo "安装目录: $(INSTALL_DIR)"
 	@echo "可执行文件: $(INSTALL_DIR)/bin/$(BINARY_NAME)"
+	@echo "Wayland环境: 已自动配置"
 	@echo "使用 'make start' 启动系统"
 
-deploy: install enable-service start
+deploy: auto-setup-environment install enable-service start
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统部署完成！"
+	@echo "Wayland环境已自动配置并启动"
 
 help:
 	@echo "$(CYAN)===============================================$(NC)"
@@ -165,6 +167,35 @@ check-system:
 # === 依赖安装 ===
 install-deps: install-system-deps install-wayland-deps install-lvgl9-auto
 	@echo "$(GREEN)[SUCCESS]$(NC) 所有依赖安装完成"
+
+# === 自动环境配置 ===
+auto-setup-environment:
+	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境..."
+	@# 1. 检查Wayland依赖是否安装
+	@if ! command -v weston >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston未安装，正在自动安装..."; \
+		$(MAKE) install-wayland-deps; \
+	fi
+	@# 2. 检查Weston服务是否配置
+	@if [ ! -f "/etc/systemd/system/weston.service" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston服务未配置，正在自动配置..."; \
+		$(MAKE) setup-wayland; \
+	fi
+	@# 3. 检查Weston是否运行
+	@if ! systemctl is-active --quiet weston.service 2>/dev/null; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston未运行，正在启动..."; \
+		$(MAKE) start-weston; \
+	fi
+	@# 4. 验证Wayland环境
+	@if [ ! -S "/run/user/0/wayland-0" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Wayland socket不存在，等待Weston完全启动..."; \
+		sleep 5; \
+		if [ ! -S "/run/user/0/wayland-0" ]; then \
+			echo "$(RED)[ERROR]$(NC) Wayland环境配置失败"; \
+			exit 1; \
+		fi; \
+	fi
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境自动配置完成"
 
 # === Wayland环境配置 ===
 install-wayland-deps:
