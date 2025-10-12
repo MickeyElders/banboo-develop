@@ -78,6 +78,13 @@ help:
 	@echo "  unified-test     - 测试统一架构和环境"
 	@echo "  unified-clean    - 清理统一架构构建文件"
 	@echo ""
+	@echo "$(GREEN)摄像头诊断工具:$(NC)"
+	@echo "  camera-diag      - 运行完整摄像头诊断"
+	@echo "  camera-test      - 测试摄像头访问 (使用 SENSOR_ID=X 指定sensor)"
+	@echo "  camera-fix       - 运行综合交互式摄像头修复脚本"
+	@echo "  camera-fix-quick - 应用快速非交互式摄像头修复"
+	@echo "  camera-fix-test  - 测试摄像头修复后功能 (使用 SENSOR_ID=X)"
+	@echo ""
 	@echo "$(GREEN)安装命令:$(NC)"
 	@echo "  install          - 完整安装系统"
 	@echo "  install-deps     - 安装所有依赖(系统+LVGL)"
@@ -523,6 +530,54 @@ unified-clean:
 	@echo "$(BLUE)[INFO]$(NC) 清理统一架构构建文件..."
 	@rm -f simple_unified_main
 	@echo "$(GREEN)[SUCCESS]$(NC) 清理完成"
+
+# === 摄像头诊断工具 ===
+GSTREAMER_LIBS := $(shell pkg-config --cflags --libs gstreamer-1.0)
+EGL_LIBS := -lEGL
+PTHREAD_LIBS := -lpthread
+
+camera-diag: cpp_backend/src/utils/camera_diagnostics.cpp
+	@echo "$(BLUE)[INFO]$(NC) 构建摄像头诊断工具..."
+	$(CXX) $(CXXFLAGS) -o camera_diagnostics \
+		cpp_backend/src/utils/camera_diagnostics.cpp \
+		$(GSTREAMER_LIBS) $(EGL_LIBS) $(PTHREAD_LIBS)
+	@echo "$(CYAN)[RUNNING]$(NC) 运行摄像头诊断..."
+	sudo ./camera_diagnostics
+
+camera-test: cpp_backend/src/utils/camera_diagnostics.cpp
+	@echo "$(BLUE)[INFO]$(NC) 构建摄像头测试工具..."
+	$(CXX) $(CXXFLAGS) -o camera_diagnostics \
+		cpp_backend/src/utils/camera_diagnostics.cpp \
+		$(GSTREAMER_LIBS) $(EGL_LIBS) $(PTHREAD_LIBS)
+	@echo "$(CYAN)[TESTING]$(NC) 测试摄像头访问 (sensor-id=$(or $(SENSOR_ID),0))..."
+	sudo ./camera_diagnostics test $(or $(SENSOR_ID),0)
+
+camera-fix:
+	@echo "$(CYAN)[FIXING]$(NC) 运行综合摄像头修复脚本..."
+	./deploy/scripts/camera_fix.sh
+
+camera-fix-quick:
+	@echo "$(BLUE)[INFO]$(NC) 应用快速摄像头修复..."
+	@echo "1. 停止冲突进程..."
+	-sudo pkill nvargus-daemon 2>/dev/null || true
+	-sudo pkill gst-launch-1.0 2>/dev/null || true
+	@echo "2. 重启nvargus-daemon..."
+	-sudo systemctl restart nvargus-daemon 2>/dev/null || true
+	@echo "3. 设置设备权限..."
+	sudo chmod 666 /dev/video* 2>/dev/null || true
+	sudo chmod 666 /dev/nvhost-* 2>/dev/null || true
+	@echo "4. 设置EGL环境..."
+	@echo "export EGL_PLATFORM=drm" >> ~/.bashrc
+	@echo "export __EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" >> ~/.bashrc
+	@echo "$(GREEN)[SUCCESS]$(NC) 快速修复已应用，请运行 'source ~/.bashrc' 并重试"
+
+camera-fix-test: test_camera_fix.cpp
+	@echo "$(BLUE)[INFO]$(NC) 构建摄像头修复测试工具..."
+	$(CXX) $(CXXFLAGS) -o camera_fix_test test_camera_fix.cpp $(GSTREAMER_LIBS)
+	@echo "$(CYAN)[TESTING]$(NC) 运行摄像头修复测试 (sensor-id=$(or $(SENSOR_ID),0))..."
+	sudo ./camera_fix_test $(or $(SENSOR_ID),0)
+
+.PHONY: camera-diag camera-test camera-fix camera-fix-quick camera-fix-test
 
 # === 开发辅助 ===
 dev-run:
