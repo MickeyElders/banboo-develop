@@ -1008,15 +1008,25 @@ private:
             setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
         
-        // 检查Wayland socket文件
-        std::string socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
-        std::ifstream socket_file(socket_path);
-        if (!socket_file.good()) {
+        // 🔧 修复：优先使用XDG_RUNTIME_DIR环境变量
+        const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
+        if (!runtime_dir) {
+            runtime_dir = "/run/user/0";  // 默认使用root的runtime目录
+            setenv("XDG_RUNTIME_DIR", runtime_dir, 1);
+        }
+        
+        // 构建socket路径
+        std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
+        
+        // 🔧 修复：使用access()检查socket文件（正确的方法）
+        if (access(socket_path.c_str(), F_OK) != 0) {
             std::cout << "Wayland socket不存在: " << socket_path << std::endl;
+            std::cout << "错误代码: " << strerror(errno) << std::endl;
             return false;
         }
         
         std::cout << "✅ Wayland合成器检测成功: " << wayland_display << std::endl;
+        std::cout << "   Socket路径: " << socket_path << std::endl;
         return true;
     }
 };
@@ -1135,10 +1145,18 @@ private:
             setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
         
-        // 检查Wayland socket文件
-        std::string socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
-        std::ifstream socket_file(socket_path);
-        if (!socket_file.good()) {
+        // 🔧 修复：优先使用XDG_RUNTIME_DIR环境变量
+        const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
+        if (!runtime_dir) {
+            runtime_dir = "/run/user/0";
+            setenv("XDG_RUNTIME_DIR", runtime_dir, 1);
+        }
+        
+        // 构建socket路径
+        std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
+        
+        // 🔧 修复：使用access()检查socket文件
+        if (access(socket_path.c_str(), F_OK) != 0) {
             std::cout << "Wayland socket不存在: " << socket_path << std::endl;
             return false;
         }
