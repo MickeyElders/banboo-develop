@@ -378,6 +378,56 @@ else()
     message(FATAL_ERROR "EGL not found - Wayland需要EGL支持")
 endif()
 
+# 查找GBM库 (DRM EGL后端需要)
+find_library(GBM_LIBRARY gbm
+    PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+find_path(GBM_INCLUDE_DIR gbm.h
+    PATHS /usr/include /usr/local/include)
+
+if(GBM_LIBRARY AND GBM_INCLUDE_DIR)
+    message(STATUS "Found GBM: ${GBM_LIBRARY}")
+    set(ENABLE_GBM ON)
+    set(GBM_LIBRARIES ${GBM_LIBRARY})
+    include_directories(${GBM_INCLUDE_DIR})
+    list(APPEND EGL_LIBRARIES ${GBM_LIBRARY})
+else()
+    message(FATAL_ERROR "GBM not found - DRM EGL后端需要GBM支持")
+endif()
+
+# 查找OpenGL ES库 (DRM EGL渲染需要)
+find_library(GLES2_LIBRARY GLESv2
+    PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+find_path(GLES2_INCLUDE_DIR GLES2/gl2.h
+    PATHS /usr/include /usr/local/include)
+
+if(GLES2_LIBRARY AND GLES2_INCLUDE_DIR)
+    message(STATUS "Found OpenGL ES: ${GLES2_LIBRARY}")
+    set(ENABLE_GLES2 ON)
+    set(GLES2_LIBRARIES ${GLES2_LIBRARY})
+    include_directories(${GLES2_INCLUDE_DIR})
+    list(APPEND EGL_LIBRARIES ${GLES2_LIBRARY})
+else()
+    message(FATAL_ERROR "OpenGL ES not found - DRM EGL渲染需要OpenGL ES支持")
+endif()
+
+# 查找DRM库 (DRM直接访问需要)
+find_library(DRM_LIBRARY drm
+    PATHS /usr/lib /usr/local/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu)
+find_path(DRM_INCLUDE_DIR libdrm/drm.h
+    PATHS /usr/include /usr/local/include)
+
+if(DRM_LIBRARY AND DRM_INCLUDE_DIR)
+    message(STATUS "Found DRM: ${DRM_LIBRARY}")
+    message(STATUS "DRM include dir: ${DRM_INCLUDE_DIR}")
+    set(ENABLE_DRM_LIB ON)
+    set(DRM_LIBRARIES ${DRM_LIBRARY})
+    include_directories(${DRM_INCLUDE_DIR})
+    include_directories(${DRM_INCLUDE_DIR}/libdrm)
+    list(APPEND EGL_LIBRARIES ${DRM_LIBRARY})
+else()
+    message(FATAL_ERROR "DRM library not found - DRM EGL后端需要libdrm支持")
+endif()
+
 # xkbcommon - Wayland键盘输入支持
 pkg_check_modules(XKBCOMMON QUIET xkbcommon)
 if(XKBCOMMON_FOUND)
@@ -390,12 +440,12 @@ else()
     set(ENABLE_XKBCOMMON OFF)
 endif()
 
-# 禁用DRM直接访问相关功能
-set(ENABLE_DRM OFF)
+# 启用DRM EGL共享架构（替代DRM直接访问）
+set(ENABLE_DRM OFF)  # 禁用旧的DRM直接访问
 set(ENABLE_NVIDIA_DRM OFF)
 set(ENABLE_TEGRA_DRM OFF)
-set(ENABLE_GBM OFF)
-message(STATUS "DRM直接访问已禁用 - 使用Wayland架构")
+# ENABLE_GBM, ENABLE_GLES2, ENABLE_DRM_LIB 在上面已设置
+message(STATUS "DRM直接访问已禁用 - 使用DRM EGL共享架构")
 
 # 移除Python绑定相关配置 - 项目现在是纯C++架构
 set(ENABLE_PYBIND11 OFF)
