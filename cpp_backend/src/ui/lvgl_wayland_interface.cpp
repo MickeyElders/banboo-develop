@@ -24,8 +24,10 @@
 #include <GLES2/gl2ext.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
-#include <xdg-shell-client-protocol.h>
 #include <vector>
+
+// 暂时移除xdg-shell，使用简化的Wayland实现
+// #include <xdg-shell-client-protocol.h>
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
@@ -54,14 +56,11 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
-    // Wayland EGL后端
+    // Wayland EGL后端 - 简化实现（不依赖xdg-shell）
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
     struct wl_compositor* wl_compositor_ = nullptr;
-    struct xdg_wm_base* xdg_wm_base_ = nullptr;
     struct wl_surface* wl_surface_ = nullptr;
-    struct xdg_surface* xdg_surface_ = nullptr;
-    struct xdg_toplevel* xdg_toplevel_ = nullptr;
     struct wl_egl_window* wl_egl_window_ = nullptr;
     
     EGLDisplay egl_display_ = EGL_NO_DISPLAY;
@@ -112,13 +111,9 @@ public:
     void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
     void cleanup();
     
-    // Wayland辅助函数
+    // Wayland辅助函数 - 简化实现
     static void registryHandler(void* data, struct wl_registry* registry, uint32_t id, const char* interface, uint32_t version);
     static void registryRemover(void* data, struct wl_registry* registry, uint32_t id);
-    static void xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial);
-    static void xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial);
-    static void xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel, int32_t width, int32_t height, struct wl_array* states);
-    static void xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel);
     EGLConfig chooseEGLConfig();
     void handleWaylandEvents();
     
@@ -652,29 +647,8 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     
-    // ✅ 修复：使用现代xdg-shell协议
-    if (xdg_wm_base_) {
-        xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
-        if (xdg_surface_) {
-            static const struct xdg_surface_listener xdg_surface_listener = {
-                xdgSurfaceConfigure
-            };
-            xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
-            
-            xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
-            if (xdg_toplevel_) {
-                static const struct xdg_toplevel_listener xdg_toplevel_listener = {
-                    xdgToplevelConfigure,
-                    xdgToplevelClose
-                };
-                xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
-                xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
-                
-                // 提交surface
-                wl_surface_commit(wl_surface_);
-            }
-        }
-    }
+    // ✅ 简化实现：直接提交surface（不使用shell）
+    wl_surface_commit(wl_surface_);
     
     wayland_egl_initialized_ = true;
     return true;
@@ -747,48 +721,15 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
     if (strcmp(interface, "wl_compositor") == 0) {
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, 1));
-    } else if (strcmp(interface, "xdg_wm_base") == 0) {
-        impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
-            wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
-        
-        // 添加xdg_wm_base监听器
-        static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-            xdgWmBasePing
-        };
-        xdg_wm_base_add_listener(impl->xdg_wm_base_, &xdg_wm_base_listener, impl);
     }
+    // 简化实现：只绑定compositor，不使用shell
 }
 
 void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry* registry, uint32_t id) {
     // 处理全局对象移除（可选实现）
 }
 
-// ✅ 新增：xdg-shell协议回调函数实现
-void LVGLWaylandInterface::Impl::xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial) {
-    xdg_wm_base_pong(xdg_wm_base, serial);
-}
-
-void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
-    xdg_surface_ack_configure(xdg_surface, serial);
-}
-
-void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel,
-                                                      int32_t width, int32_t height, struct wl_array* states) {
-    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    
-    // 如果合成器建议新尺寸，可以在这里处理窗口大小调整
-    if (width > 0 && height > 0) {
-        // 可选：更新窗口尺寸
-        if (impl->wl_egl_window_) {
-            wl_egl_window_resize(impl->wl_egl_window_, width, height, 0, 0);
-        }
-    }
-}
-
-void LVGLWaylandInterface::Impl::xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel) {
-    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    impl->should_stop_.store(true);
-}
+// 简化实现：移除xdg-shell协议回调函数
 
 // ✅ 新增：Wayland事件处理函数
 void LVGLWaylandInterface::Impl::handleWaylandEvents() {
@@ -974,25 +915,10 @@ void LVGLWaylandInterface::Impl::cleanup() {
         wl_egl_window_ = nullptr;
     }
     
-    // 清理Wayland资源
-    if (xdg_toplevel_) {
-        xdg_toplevel_destroy(xdg_toplevel_);
-        xdg_toplevel_ = nullptr;
-    }
-    
-    if (xdg_surface_) {
-        xdg_surface_destroy(xdg_surface_);
-        xdg_surface_ = nullptr;
-    }
-    
+    // 清理Wayland资源 - 简化实现
     if (wl_surface_) {
         wl_surface_destroy(wl_surface_);
         wl_surface_ = nullptr;
-    }
-    
-    if (xdg_wm_base_) {
-        xdg_wm_base_destroy(xdg_wm_base_);
-        xdg_wm_base_ = nullptr;
     }
     
     if (wl_compositor_) {
