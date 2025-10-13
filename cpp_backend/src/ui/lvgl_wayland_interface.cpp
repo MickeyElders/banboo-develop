@@ -156,10 +156,19 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     pImpl_->config_ = config;
     
     // 检查Wayland环境
+    std::lock_guard<std::mutex> lock(pImpl_->ui_mutex_);
+    
+    pImpl_->config_ = config;
+    
+    // 检查Wayland环境
     if (!pImpl_->checkWaylandEnvironment()) {
         std::cerr << "Wayland环境不可用" << std::endl;
         return false;
     }
+    
+    // 🆕 Jetson Orin NX特定：等待Weston完全就绪
+    std::cout << "🔧 [Jetson] 等待Weston合成器完全初始化..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     
     // 初始化LVGL
     if (!lv_is_initialized()) {
@@ -902,23 +911,28 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "⏳ 等待xdg_surface configure事件..." << std::endl;
     
     // 减少等待时间和次数，避免长时间占用
-    for (int i = 0; i < 20; i++) {
-        wl_display_dispatch_pending(wl_display_);
-        wl_display_flush(wl_display_);
-        
-        // 每次循环都检查错误状态
-        error_code = wl_display_get_error(wl_display_);
-        if (error_code != 0) {
-            std::cerr << "❌ 等待configure过程中发生错误: " << error_code << std::endl;
+    for (int i = 0; i < 10; i++) {
+        // roundtrip会：
+        // 1. 发送所有待处理的请求到服务器
+        // 2. 等待服务器处理完成
+        // 3. 读取并分发所有事件
+        // 4. 返回时保证所有事件都已处理
+        if (wl_display_roundtrip(wl_display_) < 0) {
+            int error_code = wl_display_get_error(wl_display_);
+            std::cerr << "❌ Wayland roundtrip失败，错误码: " << error_code << std::endl;
             return false;
         }
         
+        // 检查configure事件是否已收到
         if (configure_received_.load()) {
-            std::cout << "✅ Configure事件已在第" << i << "次尝试中接收" << std::endl;
+            std::cout << "✅ Configure事件已在第" << (i + 1) << "次roundtrip中接收" << std::endl;
             break;
         }
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));  // 减少等待时间
+        // 如果还没收到，短暂等待后重试
+        if (i < 9) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
     }
     
     if (!configure_received_.load()) {
