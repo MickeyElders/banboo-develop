@@ -609,21 +609,30 @@ public:
     }
     
     bool initialize() {
-        std::cout << "Initializing inference system..." << std::endl;
+        std::cout << "🔧 [推理系统] 初始化推理系统（单一TensorRT架构）..." << std::endl;
         
-        // 初始化检测器 (使用真实的BambooDetector)
+        // 🔧 新架构：DeepStream nvinfer负责AI推理，BambooDetector仅用于后处理
+        std::cout << "📋 [架构] DeepStream nvinfer -> 硬件AI推理" << std::endl;
+        std::cout << "📋 [架构] BambooDetector -> 结果后处理（禁用TensorRT）" << std::endl;
+        
+        // 初始化检测器 (仅用于后处理，禁用TensorRT)
         if (!initializeDetector()) {
-            std::cout << "Detector initialization failed, using simulation mode" << std::endl;
+            std::cout << "⚠️ [BambooDetector] 检测器初始化失败，使用模拟模式" << std::endl;
             use_mock_data_ = true;
+        } else {
+            std::cout << "✅ [BambooDetector] 检测器初始化成功（后处理模式）" << std::endl;
         }
         
-        // 初始化 DeepStream 管理器
+        // 初始化 DeepStream 管理器 (负责主要AI推理)
         if (!initializeDeepStreamManager()) {
-            std::cout << "DeepStream manager initialization failed, using simulation mode" << std::endl;
+            std::cout << "❌ [DeepStream] 管理器初始化失败，使用模拟模式" << std::endl;
             use_mock_data_ = true;
+        } else {
+            std::cout << "✅ [DeepStream] 管理器初始化成功（nvinfer TensorRT推理）" << std::endl;
         }
         
-        std::cout << "Inference system initialization complete (simulation mode: " << (use_mock_data_ ? "yes" : "no") << ")" << std::endl;
+        std::cout << "🎯 [推理系统] 初始化完成 (模拟模式: " << (use_mock_data_ ? "是" : "否") << ")" << std::endl;
+        std::cout << "💡 [架构] 使用单一TensorRT实例，避免资源冲突" << std::endl;
         return true; // 总是返回成功，确保UI能够启动
     }
     
@@ -724,18 +733,28 @@ private:
         }
     }
     
-    // === 初始化方法 (使用真实的BambooDetector) ===
+    // === 初始化方法 (禁用TensorRT，避免与DeepStream nvinfer冲突) ===
     bool initializeDetector() {
+        std::cout << "🔧 [BambooDetector] 禁用TensorRT初始化，避免与DeepStream nvinfer冲突" << std::endl;
+        
         inference::DetectorConfig config;
         config.model_path = "/opt/bamboo-cut/models/bamboo_detection.onnx";
         config.confidence_threshold = 0.85f;
         config.nms_threshold = 0.45f;
         config.input_size = cv::Size(640, 640);
         config.use_gpu = true;
-        config.use_tensorrt = true;
+        config.use_tensorrt = false;  // 🔧 关键修复：禁用TensorRT，让DeepStream nvinfer独占
         
         detector_ = std::make_unique<inference::BambooDetector>(config);
-        return detector_->initialize();
+        bool result = detector_->initialize();
+        
+        if (result) {
+            std::cout << "✅ [BambooDetector] 检测器初始化成功（OpenCV DNN模式，避免TensorRT冲突）" << std::endl;
+        } else {
+            std::cout << "⚠️ [BambooDetector] 检测器初始化失败" << std::endl;
+        }
+        
+        return result;
     }
     
     // === DeepStream 管理器初始化方法 ===

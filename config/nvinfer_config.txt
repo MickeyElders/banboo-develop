@@ -1,0 +1,66 @@
+################################################################################
+# Copyright (c) 2018-2023, NVIDIA CORPORATION. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+################################################################################
+
+# nvinfer配置文件 - 竹子识别AI推理
+# 使用DeepStream内置解析器，支持ONNX模型
+
+[property]
+gpu-id=0
+net-scale-factor=0.0039215697906911373
+model-color-format=0
+onnx-file=/opt/bamboo-cut/models/bamboo_detection.onnx
+model-engine-file=/opt/bamboo-cut/models/bamboo_detection.onnx_b1_gpu0_fp16.engine
+#int8-calib-file=/opt/bamboo-cut/models/calibration.cache
+labelfile-path=/opt/bamboo-cut/config/labels.txt
+batch-size=1
+network-mode=2
+num-detected-classes=80
+interval=0
+gie-unique-id=1
+process-mode=1
+network-type=0
+cluster-mode=2
+maintain-aspect-ratio=1
+parse-bbox-func-name=NvDsInferParseYolo
+custom-lib-path=/opt/nvidia/deepstream/deepstream/lib/libnvdsinfer_custom_impl_Yolo.so
+engine-create-func-name=NvDsInferYoloCudaEngineGet
+
+[class-attrs-all]
+nms-iou-threshold=0.4
+pre-cluster-threshold=0.25
+topk=300
+
+# 竹子检测类别配置
+[class-attrs-0]
+threshold=0.7
+
+[class-attrs-1] 
+threshold=0.7
+
+[class-attrs-2]
+threshold=0.7
+
+[class-attrs-3]
+threshold=0.7
+
+[class-attrs-4]
+threshold=0.7

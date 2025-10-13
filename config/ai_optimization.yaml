@@ -89,7 +89,7 @@ hardware_acceleration:
 # 检测器优化配置
 detector_optimization:
   # 模型配置
-  model_path: "/opt/bamboo-cut/models/bamboo_detector.onnx"
+  model_path: "/opt/bamboo-cut/models/bamboo_detection.onnx"
   input_width: 640
   input_height: 640
   

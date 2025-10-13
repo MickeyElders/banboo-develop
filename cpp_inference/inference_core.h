@@ -23,8 +23,8 @@ namespace nvinfer1 {
  * 检测器配置结构
  */
 struct DetectorConfig {
-    std::string model_path = "./models/best.pt";           // 模型文件路径
-    std::string engine_path = "./models/best.engine";     // 引擎文件路径
+    std::string model_path = "/opt/bamboo-cut/models/bamboo_detection.onnx";           // 模型文件路径
+    std::string engine_path = "/opt/bamboo-cut/models/bamboo_detection.onnx_b1_gpu0_fp16.engine";     // 引擎文件路径
     float confidence_threshold = 0.5f;                    // 置信度阈值
     float nms_threshold = 0.4f;                          // NMS阈值
     int max_detections = 100;                            // 最大检测数量

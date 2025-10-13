@@ -112,7 +112,7 @@ struct DeepStreamConfig {
         , video_height_ratio(1.0f)
         , camera_id(0)
         , camera_id_2(1)
-        , nvinfer_config("/opt/bamboo-cut/config/nvinfer_config.txt")
+        , nvinfer_config("config/nvinfer_config.txt")
         , dual_mode(DualCameraMode::SINGLE_CAMERA)
         , camera_width(1280)
         , camera_height(720)

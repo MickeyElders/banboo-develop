@@ -37,8 +37,8 @@ struct DetectorConfig {
     bool use_gpu;                  // 使用GPU加速
     bool use_tensorrt;             // 使用TensorRT优化
     
-    DetectorConfig() 
-        : model_path("models/best.pt")
+    DetectorConfig()
+        : model_path("/opt/bamboo-cut/models/bamboo_detection.onnx")
         , confidence_threshold(0.85f)
         , nms_threshold(0.45f)
         , input_size(640, 640)
