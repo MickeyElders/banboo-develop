@@ -1520,6 +1520,11 @@ LVGLWaylandInterface::Impl::~Impl() {
 } // namespace ui
 } // namespace bamboo_cut
 
+// 🆕 实现获取内部实现指针的方法
+void* LVGLWaylandInterface::getImpl() {
+    return pImpl_.get();
+}
+
 // 🆕 实现获取Wayland对象的方法，用于DeepStream Subsurface创建
 void* LVGLWaylandInterface::getWaylandDisplay() {
     return pImpl_ ? pImpl_->wl_display_ : nullptr;
