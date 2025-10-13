@@ -107,10 +107,9 @@ public:
     // 🆕 新增：Wayland Subsurface架构支持方法
     
     /**
-     * @brief 暴露内部实现类以供DeepStream访问
+     * @brief 获取内部实现类指针以供DeepStream访问
      */
-    class Impl;
-    Impl* getImpl() { return pImpl_.get(); }
+    void* getImpl();
     
     /**
      * @brief 获取Wayland Display对象
