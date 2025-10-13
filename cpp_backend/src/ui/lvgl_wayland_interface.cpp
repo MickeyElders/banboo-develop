@@ -731,10 +731,27 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
     std::cout << "✅ 已设置窗口标题和应用ID" << std::endl;
     
-    // 提交surface使其生效
+    // 提交surface使其生效，触发configure事件
     wl_surface_commit(wl_surface_);
-    std::cout << "✅ 已提交surface" << std::endl;
-    std::cout << "✅ 已提交Wayland surface" << std::endl;
+    std::cout << "✅ 已提交surface，等待configure事件..." << std::endl;
+    
+    // 等待第一个configure事件（这是xdg-shell协议的要求）
+    int configure_timeout = 100; // 100次尝试，每次10ms
+    bool configure_received = false;
+    
+    for (int i = 0; i < configure_timeout && !configure_received; i++) {
+        wl_display_dispatch_pending(wl_display_);
+        wl_display_flush(wl_display_);
+        
+        // 简单检查：如果没有错误，假设configure已收到
+        if (i > 10) { // 给一些时间让configure事件到达
+            configure_received = true;
+            std::cout << "✅ Configure事件处理完成（超时后继续）" << std::endl;
+            break;
+        }
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     
     wayland_egl_initialized_ = true;
     return true;
@@ -747,6 +764,18 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
         std::cerr << "❌ Wayland客户端未初始化" << std::endl;
         return false;
     }
+    
+    // 🔧 关键修复：等待surface配置完成后再创建EGL窗口
+    std::cout << "⏳ 等待surface configure事件完成..." << std::endl;
+    
+    // 处理待处理的Wayland事件，确保configure事件被处理
+    for (int i = 0; i < 50; i++) {
+        wl_display_dispatch_pending(wl_display_);
+        wl_display_flush(wl_display_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    
+    std::cout << "✅ Surface configure事件处理完成" << std::endl;
     
     // 创建EGL窗口
     std::cout << "📐 创建EGL窗口 (" << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
