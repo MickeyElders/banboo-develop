@@ -804,11 +804,21 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
              << ",framerate=" << config.camera_fps << "/1"
              << ",format=NV12 ";
     
-    // 🔧 修复：只在配置文件存在时才添加nvinfer
-    if (!config.nvinfer_config.empty() && access(config.nvinfer_config.c_str(), F_OK) == 0) {
-        pipeline << "! nvinfer config-file-path=" << config.nvinfer_config << " ";
+    // 🔧 修复：检查并使用正确的nvinfer配置文件路径
+    std::string nvinfer_config_path = config.nvinfer_config;
+    if (nvinfer_config_path.empty() || access(nvinfer_config_path.c_str(), F_OK) != 0) {
+        // 尝试默认路径
+        nvinfer_config_path = "config/nvinfer_config.txt";
+        if (access(nvinfer_config_path.c_str(), F_OK) != 0) {
+            nvinfer_config_path = "/opt/bamboo-cut/config/nvinfer_config.txt";
+        }
+    }
+    
+    if (access(nvinfer_config_path.c_str(), F_OK) == 0) {
+        pipeline << "! nvinfer config-file-path=" << nvinfer_config_path << " ";
+        std::cout << "[DeepStreamManager] 使用nvinfer配置: " << nvinfer_config_path << std::endl;
     } else {
-        std::cout << "[DeepStreamManager] 跳过nvinfer（配置文件不存在）" << std::endl;
+        std::cout << "[DeepStreamManager] 跳过nvinfer（配置文件未找到: " << nvinfer_config_path << "）" << std::endl;
     }
     
     // 硬件加速格式转换和缩放
@@ -1592,19 +1602,20 @@ bool DeepStreamManager::checkWaylandEnvironment() {
 }
 
 
-// 新增：简化的Wayland视频布局计算
+// 新增：简化的Wayland视频布局计算（支持摄像头分辨率缩放）
 VideoLayout DeepStreamManager::calculateWaylandVideoLayout(const DeepStreamConfig& config) {
     VideoLayout layout;
     
     std::cout << "[DeepStreamManager] 计算Wayland视频布局..." << std::endl;
+    std::cout << "  摄像头输入: " << config.camera_width << "x" << config.camera_height << std::endl;
     
     // 计算可用区域（减去顶部和底部栏）
     layout.available_width = config.screen_width;
     layout.available_height = config.screen_height - config.header_height - config.footer_height;
     
-    // 摄像头面板位置（左侧70%区域）
-    layout.width = static_cast<int>(layout.available_width * 0.70f);  // 70%宽度给摄像头
-    layout.height = layout.available_height;  // 全高度
+    // 🔧 修复：目标显示尺寸（固定为960x640以匹配Canvas）
+    layout.width = 960;   // 固定宽度
+    layout.height = 640;  // 固定高度
     
     // 窗口位置（跳过头部面板）
     layout.offset_x = 0;  // 左对齐
@@ -1613,6 +1624,8 @@ VideoLayout DeepStreamManager::calculateWaylandVideoLayout(const DeepStreamConfi
     std::cout << "[DeepStreamManager] 布局计算完成: "
               << layout.width << "x" << layout.height
               << " at (" << layout.offset_x << "," << layout.offset_y << ")" << std::endl;
+    std::cout << "  缩放: " << config.camera_width << "x" << config.camera_height
+              << " -> " << layout.width << "x" << layout.height << std::endl;
     
     return layout;
 }

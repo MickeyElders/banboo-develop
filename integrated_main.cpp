@@ -782,10 +782,14 @@ private:
             config.camera_id = 0;
             config.camera_id_2 = 1;
             config.dual_mode = deepstream::DualCameraMode::SINGLE_CAMERA;
-            config.camera_width = 960;   // 匹配Canvas尺寸
-            config.camera_height = 640;  // 匹配Canvas尺寸
-            config.camera_fps = 30;      // 确保30fps提高稳定性
-            config.test_pattern = 0;     // 使用smpte标准彩条图案
+            
+            // 🔧 修复：使用摄像头支持的分辨率
+            config.camera_width = 1280;   // 使用摄像头原生支持的1280x720
+            config.camera_height = 720;   // 60fps高性能模式
+            config.camera_fps = 60;       // 使用60fps获得最佳性能
+            config.test_pattern = 0;      // 使用smpte标准彩条图案
+            
+            std::cout << "🎥 [摄像头] 使用支持的分辨率: " << config.camera_width << "x" << config.camera_height << "@" << config.camera_fps << "fps" << std::endl;
             
             // 检查Wayland环境并配置waylandsink
             if (checkWaylandEnvironment()) {
