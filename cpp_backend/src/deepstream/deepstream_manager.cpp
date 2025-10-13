@@ -1428,8 +1428,6 @@ void DeepStreamManager::canvasUpdateLoop() {
             
             if (!latest_frame_.empty()) {
                 #ifdef ENABLE_LVGL
-                std::cout << "处理新帧: " << latest_frame_.cols << "x" << latest_frame_.rows
-                         << " 通道数:" << latest_frame_.channels() << std::endl;
                          
                 auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_);
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
@@ -1481,8 +1479,6 @@ void DeepStreamManager::canvasUpdateLoop() {
                         const size_t pixel_count = 960 * 640;
                         const int step = display_frame.step[0];  // 行步长
                         
-                        std::cout << "OpenCV Mat step: " << step 
-                                 << ", expected: " << (960 * 4) << std::endl;
                         
                         // 🔧 修复4: 正确处理步长的像素转换
                         for (int y = 0; y < 640; y++) {
@@ -1505,7 +1501,6 @@ void DeepStreamManager::canvasUpdateLoop() {
                         // 刷新显示
                         lv_obj_invalidate(canvas);
                         lv_refr_now(NULL);
-                        std::cout << "Canvas刷新完成" << std::endl;
                     }
                 } else {
                     std::cout << "错误：Canvas对象获取失败" << std::endl;
