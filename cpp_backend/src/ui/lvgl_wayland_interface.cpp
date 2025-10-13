@@ -736,91 +736,47 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     // ✅ 修复：使用现代xdg-shell协议创建顶层窗口
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
-        std::cerr << "❌ 无法创建xdg surface" << std::endl;
         return false;
     }
-    std::cout << "✅ 已创建xdg surface" << std::endl;
     
-    // 设置xdg surface监听器
+    // 设置xdg_surface监听器
     static const struct xdg_surface_listener xdg_surface_listener = {
-        [](void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
-            auto* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-            std::cout << "📐 收到XDG surface配置, serial=" << serial << std::endl;
-            
-            xdg_surface_ack_configure(xdg_surface, serial);
-            
-            // 🔧 修复：使用原子变量和条件变量
-            impl->configure_received_.store(true);
-            impl->configure_cv_.notify_one();
-            
-            if (impl->wl_surface_) {
-                wl_surface_commit(impl->wl_surface_);
-            }
-        }
+        xdgSurfaceConfigure
     };
-
-    // 提交surface
-    wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
-
-    // 🔧 修复：真正等待configure事件
-    std::cout << "⏳ 等待xdg_surface configure事件..." << std::endl;
-
-    std::unique_lock<std::mutex> lock(configure_mutex_);
-    bool received = configure_cv_.wait_for(lock, std::chrono::seconds(3), 
-        [this]{ return configure_received_.load(); });
-
-    if (!received) {
-        std::cerr << "❌ 等待configure超时" << std::endl;
-        return false;
-    }
-
-    std::cout << "✅ Configure事件已正确接收" << std::endl;
+    xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     
-    // 创建toplevel角色
+    // 🔧 关键修复：立即创建toplevel角色
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
-        std::cerr << "❌ 无法创建xdg toplevel" << std::endl;
         return false;
     }
-    std::cout << "✅ 已创建xdg toplevel" << std::endl;
     
-    // 设置xdg toplevel监听器
+    // 设置toplevel监听器
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
-    std::cout << "✅ 已设置xdg toplevel监听器" << std::endl;
     
     // 设置窗口属性
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
-    std::cout << "✅ 已设置窗口标题和应用ID" << std::endl;
     
-    // 提交surface使其生效，触发configure事件
+    // 提交surface（现在合成器知道这是toplevel窗口了）
     wl_surface_commit(wl_surface_);
-    std::cout << "✅ 已提交surface，等待configure事件..." << std::endl;
+    wl_display_flush(wl_display_);
     
-    // 等待第一个configure事件（这是xdg-shell协议的要求）
-    int configure_timeout = 100; // 100次尝试，每次10ms
-    bool configure_received = false;
+    // 现在才等待configure事件
+    std::unique_lock<std::mutex> lock(configure_mutex_);
+    bool received = configure_cv_.wait_for(lock, std::chrono::seconds(3), 
+        [this]{ return configure_received_.load(); });
     
-    for (int i = 0; i < configure_timeout && !configure_received; i++) {
-        wl_display_dispatch_pending(wl_display_);
-        wl_display_flush(wl_display_);
-        
-        // 简单检查：如果没有错误，假设configure已收到
-        if (i > 10) { // 给一些时间让configure事件到达
-            configure_received = true;
-            std::cout << "✅ Configure事件处理完成（超时后继续）" << std::endl;
-            break;
-        }
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    if (!received) {
+        std::cerr << "❌ 等待configure超时" << std::endl;
+        return false;
     }
     
-    wayland_egl_initialized_ = true;
+    std::cout << "✅ Configure事件已正确接收" << std::endl;
     return true;
 }
 
