@@ -102,6 +102,7 @@ public:
     bool initializeDRMBackend();
     bool initializeEGL();
     bool initializeWaylandDisplay();
+    bool initializeFallbackDisplay();
     bool initializeInput();
     void initializeTheme();
     void createMainInterface();
