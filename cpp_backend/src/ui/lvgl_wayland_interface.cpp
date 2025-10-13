@@ -875,22 +875,26 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_top
     }
     
     // 打印窗口状态
-    uint32_t* state;
-    wl_array_for_each(state, states) {
-        uint32_t state_value = *state;
-        switch (state_value) {
-            case XDG_TOPLEVEL_STATE_MAXIMIZED:
-                std::cout << "🔲 窗口状态: 最大化" << std::endl;
-                break;
-            case XDG_TOPLEVEL_STATE_FULLSCREEN:
-                std::cout << "🔳 窗口状态: 全屏" << std::endl;
-                break;
-            case XDG_TOPLEVEL_STATE_ACTIVATED:
-                std::cout << "✨ 窗口状态: 激活" << std::endl;
-                break;
-            default:
-                std::cout << "❓ 窗口状态: " << state_value << std::endl;
-                break;
+    if (states && states->size > 0) {
+        uint32_t* state_data = static_cast<uint32_t*>(states->data);
+        size_t num_states = states->size / sizeof(uint32_t);
+        
+        for (size_t i = 0; i < num_states; i++) {
+            uint32_t state_value = state_data[i];
+            switch (state_value) {
+                case XDG_TOPLEVEL_STATE_MAXIMIZED:
+                    std::cout << "🔲 窗口状态: 最大化" << std::endl;
+                    break;
+                case XDG_TOPLEVEL_STATE_FULLSCREEN:
+                    std::cout << "🔳 窗口状态: 全屏" << std::endl;
+                    break;
+                case XDG_TOPLEVEL_STATE_ACTIVATED:
+                    std::cout << "✨ 窗口状态: 激活" << std::endl;
+                    break;
+                default:
+                    std::cout << "❓ 窗口状态: " << state_value << std::endl;
+                    break;
+            }
         }
     }
 }
