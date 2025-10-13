@@ -696,7 +696,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "✅ 已创建Wayland surface" << std::endl;
     
     // ✅ 修复：使用现代xdg-shell协议创建顶层窗口
-    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg surface" << std::endl;
         return false;
@@ -877,7 +877,8 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_top
     // 打印窗口状态
     uint32_t* state;
     wl_array_for_each(state, states) {
-        switch (*state) {
+        uint32_t state_value = *state;
+        switch (state_value) {
             case XDG_TOPLEVEL_STATE_MAXIMIZED:
                 std::cout << "🔲 窗口状态: 最大化" << std::endl;
                 break;
@@ -888,7 +889,7 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_top
                 std::cout << "✨ 窗口状态: 激活" << std::endl;
                 break;
             default:
-                std::cout << "❓ 窗口状态: " << *state << std::endl;
+                std::cout << "❓ 窗口状态: " << state_value << std::endl;
                 break;
         }
     }
