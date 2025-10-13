@@ -830,7 +830,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     
     // 🔧 关键修复：避免xdg_positioner错误 - 不要设置可能导致协议错误的属性
-    std::cout << "🔧 设置基础窗口属性（避免xdg_positioner错误）...\" << std::endl;
+    std::cout << "🔧 设置基础窗口属性（避免xdg_positioner错误）..." << std::endl;
     
     // 只设置最基本的窗口属性，避免触发xdg_positioner
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo");  // 使用简短标题
