@@ -619,14 +619,41 @@ public:
         
         auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
         
-        void* parent_display = lvgl_if->getWaylandDisplay();
-        void* parent_compositor = lvgl_if->getWaylandCompositor();
-        void* parent_subcompositor = lvgl_if->getWaylandSubcompositor();
-        void* parent_surface = lvgl_if->getWaylandSurface();
+        // 等待LVGL的Wayland对象完全初始化
+        int retry_count = 0;
+        const int MAX_RETRIES = 10;
+        
+        void* parent_display = nullptr;
+        void* parent_compositor = nullptr;
+        void* parent_subcompositor = nullptr;
+        void* parent_surface = nullptr;
+        
+        while (retry_count < MAX_RETRIES) {
+            parent_display = lvgl_if->getWaylandDisplay();
+            parent_compositor = lvgl_if->getWaylandCompositor();
+            parent_subcompositor = lvgl_if->getWaylandSubcompositor();
+            parent_surface = lvgl_if->getWaylandSurface();
+            
+            if (parent_display && parent_compositor && parent_subcompositor && parent_surface) {
+                std::cout << "✅ 已获取LVGL Wayland父窗口对象（重试" << retry_count << "次）" << std::endl;
+                break;
+            }
+            
+            std::cout << "⏳ 等待LVGL Wayland对象初始化...（第" << (retry_count + 1) << "次尝试）" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            retry_count++;
+        }
         
         if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
-            std::cerr << "❌ 无法获取LVGL Wayland对象" << std::endl;
-            return false;
+            std::cerr << "❌ 无法获取LVGL Wayland对象（已重试" << MAX_RETRIES << "次）" << std::endl;
+            std::cerr << "   Display: " << (parent_display ? "OK" : "NULL") << std::endl;
+            std::cerr << "   Compositor: " << (parent_compositor ? "OK" : "NULL") << std::endl;
+            std::cerr << "   Subcompositor: " << (parent_subcompositor ? "OK" : "NULL") << std::endl;
+            std::cerr << "   Surface: " << (parent_surface ? "OK" : "NULL") << std::endl;
+            
+            // 即使EGL失败，也要尝试继续运行DeepStream（使用AppSink模式）
+            std::cout << "🔄 EGL初始化失败，DeepStream将使用AppSink软件合成模式" << std::endl;
+            return true; // 允许系统继续运行，但使用AppSink模式
         }
         
         std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
