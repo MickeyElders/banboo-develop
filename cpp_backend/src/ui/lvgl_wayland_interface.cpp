@@ -347,7 +347,68 @@ bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
-    // Fallback实现：创建基本显示缓冲区
+    // 首先初始化DRM后端
+    std::cout << "正在初始化DRM后端..." << std::endl;
+    if (!initializeDRMBackend()) {
+        std::cerr << "DRM后端初始化失败，使用fallback模式" << std::endl;
+        return initializeFallbackDisplay();
+    }
+    
+    // 然后初始化EGL
+    std::cout << "正在初始化EGL..." << std::endl;
+    if (!initializeEGL()) {
+        std::cerr << "EGL初始化失败，使用fallback模式" << std::endl;
+        cleanup();
+        return initializeFallbackDisplay();
+    }
+    
+    // 创建LVGL显示设备
+    display_ = lv_display_create(config_.screen_width, config_.screen_height);
+    if (!display_) {
+        std::cerr << "LVGL显示创建失败" << std::endl;
+        cleanup();
+        return false;
+    }
+    
+    // 分配显示缓冲区
+    buffer_size_ = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
+    front_buffer_ = (lv_color_t*)malloc(buffer_size_);
+    back_buffer_ = (lv_color_t*)malloc(buffer_size_);
+    
+    if (!front_buffer_ || !back_buffer_) {
+        std::cerr << "显示缓冲区分配失败" << std::endl;
+        cleanup();
+        return false;
+    }
+    
+    // 设置LVGL缓冲区
+    lv_display_set_buffers(display_, front_buffer_, back_buffer_,
+                          buffer_size_, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+    // ✅ 关键修复：设置真正的flush回调
+    lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
+        // 从用户数据获取Impl实例
+        LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
+            lv_display_get_user_data(disp));
+        
+        if (impl) {
+            impl->flushDisplay(area, (lv_color_t*)color_p);
+        }
+        
+        lv_display_flush_ready(disp);
+    });
+    
+    // 设置用户数据，以便在回调中访问
+    lv_display_set_user_data(display_, this);
+    
+    display_initialized_ = true;
+    std::cout << "DRM EGL显示初始化成功" << std::endl;
+    return true;
+}
+
+bool LVGLWaylandInterface::Impl::initializeFallbackDisplay() {
+    std::cout << "使用fallback显示模式" << std::endl;
+    
     static lv_color_t* buf1 = nullptr;
     static lv_color_t* buf2 = nullptr;
     
@@ -356,7 +417,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     buf2 = (lv_color_t*)malloc(buf_size * sizeof(lv_color_t));
     
     if (!buf1 || !buf2) {
-        std::cerr << "显示缓冲区分配失败" << std::endl;
+        std::cerr << "Fallback显示缓冲区分配失败" << std::endl;
         return false;
     }
     
@@ -369,7 +430,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     
     lv_display_set_buffers(display_, buf1, buf2, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     
-    // 设置刷新回调（空实现，因为没有真实的Wayland驱动）
+    // 设置空的刷新回调
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
         lv_display_flush_ready(disp);
     });
