@@ -31,6 +31,23 @@ enum class DualCameraMode {
 };
 
 /**
+ * @brief Wayland Subsurface配置结构
+ * 用于创建DeepStream视频的子表面，附加到LVGL父窗口
+ */
+struct SubsurfaceConfig {
+    int offset_x = 0;         ///< 相对父窗口的X偏移量
+    int offset_y = 80;        ///< 相对父窗口的Y偏移量（跳过头部面板）
+    int width = 960;          ///< 视频宽度
+    int height = 640;         ///< 视频高度
+    bool use_sync_mode = true; ///< 与父窗口同步刷新（true=同步，false=异步）
+    
+    SubsurfaceConfig() = default;
+    
+    SubsurfaceConfig(int x, int y, int w, int h, bool sync = true)
+        : offset_x(x), offset_y(y), width(w), height(h), use_sync_mode(sync) {}
+};
+
+/**
  * @brief 视频输出模式
  */
 enum class VideoSinkMode {
@@ -159,6 +176,23 @@ public:
      * @brief 初始化DeepStream系统
      */
     bool initialize(const DeepStreamConfig& config);
+
+    /**
+     * @brief 使用Wayland Subsurface模式初始化
+     * @param parent_display LVGL的Wayland Display对象
+     * @param parent_compositor LVGL的Wayland Compositor对象
+     * @param parent_subcompositor LVGL的Wayland Subcompositor对象
+     * @param parent_surface LVGL的Wayland Surface对象（父表面）
+     * @param config Subsurface配置参数
+     * @return 成功返回true
+     */
+    bool initializeWithSubsurface(
+        void* parent_display,
+        void* parent_compositor,
+        void* parent_subcompositor,
+        void* parent_surface,
+        const SubsurfaceConfig& config
+    );
 
     /**
      * @brief 启动视频流和AI推理
@@ -386,6 +420,11 @@ private:
     void* lvgl_interface_;      // LVGL界面实例指针
     std::thread canvas_update_thread_;          // Canvas更新线程
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
+    
+    // 🆕 Wayland Subsurface成员变量
+    struct wl_surface* video_surface_ = nullptr;      // 视频子表面
+    struct wl_subsurface* video_subsurface_ = nullptr; // Subsurface对象
+    SubsurfaceConfig subsurface_config_;               // Subsurface配置
     
     // 🔧 线程安全保护
     mutable std::mutex drm_mutex_;      // DRM资源访问互斥锁

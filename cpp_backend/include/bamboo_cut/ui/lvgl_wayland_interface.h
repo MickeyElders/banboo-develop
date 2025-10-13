@@ -47,9 +47,9 @@ struct LVGLWaylandConfig {
 
 /**
  * @brief LVGL Wayland接口类
- * 
+ *
  * 提供标准Wayland客户端模式的LVGL界面
- * 替代原有的DRM直接访问方案
+ * 替代原有的DRM直接访问方案，支持Wayland Subsurface架构
  */
 class LVGLWaylandInterface {
 public:
@@ -103,6 +103,38 @@ public:
      * @return 可用返回true
      */
     static bool isWaylandEnvironmentAvailable();
+
+    // 🆕 新增：Wayland Subsurface架构支持方法
+    
+    /**
+     * @brief 暴露内部实现类以供DeepStream访问
+     */
+    class Impl;
+    Impl* getImpl() { return pImpl_.get(); }
+    
+    /**
+     * @brief 获取Wayland Display对象
+     * @return Wayland Display指针，用于DeepStream Subsurface创建
+     */
+    void* getWaylandDisplay();
+    
+    /**
+     * @brief 获取Wayland Compositor对象
+     * @return Wayland Compositor指针，用于创建子表面
+     */
+    void* getWaylandCompositor();
+    
+    /**
+     * @brief 获取Wayland Subcompositor对象
+     * @return Wayland Subcompositor指针，用于创建subsurface
+     */
+    void* getWaylandSubcompositor();
+    
+    /**
+     * @brief 获取Wayland Surface对象（父表面）
+     * @return Wayland Surface指针，用作subsurface的父表面
+     */
+    void* getWaylandSurface();
 
 private:
     // 内部实现指针

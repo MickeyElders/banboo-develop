@@ -39,7 +39,9 @@ DeepStreamManager::DeepStreamManager()
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)
-    , wayland_available_(false) {
+    , wayland_available_(false)
+    , video_surface_(nullptr)
+    , video_subsurface_(nullptr) {
 }
 
 DeepStreamManager::DeepStreamManager(void* lvgl_interface)
@@ -54,7 +56,9 @@ DeepStreamManager::DeepStreamManager(void* lvgl_interface)
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)
-    , wayland_available_(false) {
+    , wayland_available_(false)
+    , video_surface_(nullptr)
+    , video_subsurface_(nullptr) {
     
     std::cout << "DeepStreamManager 构造函数完成（支持LVGL界面集成）" << std::endl;
 }
@@ -65,17 +69,86 @@ DeepStreamManager::~DeepStreamManager() {
     cleanup();
 }
 
+bool DeepStreamManager::initializeWithSubsurface(
+    void* parent_display,
+    void* parent_compositor,
+    void* parent_subcompositor,
+    void* parent_surface,
+    const SubsurfaceConfig& config) {
+    
+    std::cout << "🎬 [DeepStream] 初始化Wayland Subsurface模式..." << std::endl;
+    
+    // 类型转换
+    auto* wl_display = static_cast<struct wl_display*>(parent_display);
+    auto* wl_compositor = static_cast<struct wl_compositor*>(parent_compositor);
+    auto* wl_subcompositor = static_cast<struct wl_subcompositor*>(parent_subcompositor);
+    auto* wl_parent_surface = static_cast<struct wl_surface*>(parent_surface);
+    
+    // 验证参数
+    if (!wl_display || !wl_compositor || !wl_subcompositor || !wl_parent_surface) {
+        std::cerr << "❌ [DeepStream] 无效的Wayland父窗口对象" << std::endl;
+        return false;
+    }
+    
+    subsurface_config_ = config;
+    
+    // 🔧 关键步骤1：创建视频表面
+    video_surface_ = wl_compositor_create_surface(wl_compositor);
+    if (!video_surface_) {
+        std::cerr << "❌ [DeepStream] 创建视频surface失败" << std::endl;
+        return false;
+    }
+    std::cout << "✅ [DeepStream] 创建视频surface" << std::endl;
+    
+    // 🔧 关键步骤2：创建subsurface并附加到父表面
+    video_subsurface_ = wl_subcompositor_get_subsurface(
+        wl_subcompositor, video_surface_, wl_parent_surface);
+    
+    if (!video_subsurface_) {
+        std::cerr << "❌ [DeepStream] 创建subsurface失败" << std::endl;
+        wl_surface_destroy(video_surface_);
+        video_surface_ = nullptr;
+        return false;
+    }
+    std::cout << "✅ [DeepStream] 创建subsurface并附加到父窗口" << std::endl;
+    
+    // 🔧 关键步骤3：设置subsurface位置
+    wl_subsurface_set_position(video_subsurface_, config.offset_x, config.offset_y);
+    std::cout << "📐 [DeepStream] Subsurface位置: ("
+              << config.offset_x << ", " << config.offset_y << ")" << std::endl;
+    
+    // 🔧 关键步骤4：设置同步模式
+    if (config.use_sync_mode) {
+        wl_subsurface_set_sync(video_subsurface_);
+        std::cout << "🔄 [DeepStream] 使用同步模式（与父窗口同步刷新）" << std::endl;
+    } else {
+        wl_subsurface_set_desync(video_subsurface_);
+        std::cout << "⚡ [DeepStream] 使用异步模式（独立刷新）" << std::endl;
+    }
+    
+    // 提交subsurface设置
+    wl_surface_commit(video_surface_);
+    wl_display_flush(wl_display);
+    
+    std::cout << "✅ [DeepStream] Wayland Subsurface初始化完成" << std::endl;
+    return true;
+}
+
 bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     std::cout << "[DeepStreamManager] 初始化Wayland视频系统..." << std::endl;
     
     config_ = config;
     
-    // 🔧 架构重构：强制使用appsink模式避免双xdg-shell窗口冲突
-    std::cout << "[DeepStreamManager] 🎯 架构重构：使用appsink模式" << std::endl;
-    std::cout << "[DeepStreamManager] 📋 原因：避免与LVGL的xdg-shell协议冲突" << std::endl;
+    // 🔧 架构重构：使用Wayland Subsurface模式替代appsink
+    std::cout << "[DeepStreamManager] 🎯 架构重构：迁移到Wayland Subsurface模式" << std::endl;
+    std::cout << "[DeepStreamManager] 📋 目标：零拷贝GPU硬件合成，提升性能" << std::endl;
     
-    if (config_.sink_mode != VideoSinkMode::APPSINK) {
-        std::cout << "[DeepStreamManager] 强制切换到appsink模式（架构重构）" << std::endl;
+    // 检查是否有可用的Subsurface配置
+    if (video_subsurface_) {
+        std::cout << "[DeepStreamManager] 检测到Subsurface配置，使用waylandsink模式" << std::endl;
+        config_.sink_mode = VideoSinkMode::WAYLANDSINK;
+    } else {
+        std::cout << "[DeepStreamManager] 未配置Subsurface，回退到appsink模式" << std::endl;
         config_.sink_mode = VideoSinkMode::APPSINK;
     }
     
@@ -263,6 +336,19 @@ bool DeepStreamManager::startSinglePipelineMode() {
             }
             bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
             
+            // 🔧 关键：在启动管道前，将waylandsink绑定到subsurface
+            if (video_subsurface_ && video_surface_) {
+                GstElement* waylandsink = gst_bin_get_by_name(GST_BIN(pipeline_), "video_sink");
+                if (waylandsink) {
+                    // 将waylandsink的输出绑定到我们的subsurface
+                    g_object_set(waylandsink, "wayland-surface", video_surface_, NULL);
+                    std::cout << "✅ [DeepStream] waylandsink已绑定到subsurface" << std::endl;
+                    gst_object_unref(waylandsink);
+                } else {
+                    std::cerr << "⚠️ [DeepStream] 未找到waylandsink元素" << std::endl;
+                }
+            }
+            
             // 🔧 改进：分阶段启动管道，降低段错误风险
             std::cout << "正在分阶段启动管道..." << std::endl;
             
@@ -362,13 +448,13 @@ bool DeepStreamManager::startSinglePipelineMode() {
         running_ = true;
         const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
         const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
-        std::cout << "🎯 DeepStream 管道启动成功 (" << mode_name << " 架构重构模式)" << std::endl;
-        std::cout << "📺 数据流: nvarguscamerasrc → nvinfer → appsink → LVGL Canvas" << std::endl;
+        std::cout << "🎯 DeepStream 管道启动成功 (" << mode_name << " Subsurface架构)" << std::endl;
+        std::cout << "📺 数据流: nvarguscamerasrc → nvinfer → waylandsink → subsurface → GPU合成" << std::endl;
         
-        // 如果使用appsink模式，设置回调函数
-        if (config_.sink_mode == VideoSinkMode::APPSINK) {
-            setupAppSinkCallbacks();
-        }
+        // ❌ AppSink回调已移除 - 使用Subsurface硬件合成
+        // if (config_.sink_mode == VideoSinkMode::APPSINK) {
+        //     setupAppSinkCallbacks();
+        // }
         
         return true;
         
@@ -506,10 +592,10 @@ bool DeepStreamManager::startSplitScreenMode() {
     const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
     std::cout << "双摄像头并排显示管道启动成功 (" << mode_name << ")" << std::endl;
     
-    // 如果使用appsink模式，设置回调函数
-    if (config_.sink_mode == VideoSinkMode::APPSINK) {
-        setupAppSinkCallbacks();
-    }
+    // ❌ AppSink回调已移除 - 使用Subsurface硬件合成
+    // if (config_.sink_mode == VideoSinkMode::APPSINK) {
+    //     setupAppSinkCallbacks();
+    // }
     
     return true;
 }
@@ -800,87 +886,40 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     
     std::ostringstream pipeline;
     
-    std::cout << "[DeepStreamManager] 构建优化的Wayland管道 ("
-              << width << "x" << height << ")..." << std::endl;
+    std::cout << "🔧 [DeepStream] 构建Subsurface Waylandsink管道..." << std::endl;
     
-    // 🔧 关键修复：为DeepStream创建独立的Wayland display名称
-    const char* wayland_display = getenv("WAYLAND_DISPLAY");
-    std::string deepstream_display_name;
-    
-    if (!wayland_display) {
-        deepstream_display_name = "wayland-0";
-        setenv("WAYLAND_DISPLAY", deepstream_display_name.c_str(), 0);
-        std::cout << "[DeepStreamManager] 设置WAYLAND_DISPLAY=" << deepstream_display_name << std::endl;
-    } else {
-        deepstream_display_name = std::string(wayland_display);
-        std::cout << "[DeepStreamManager] 使用现有WAYLAND_DISPLAY=" << deepstream_display_name << std::endl;
-    }
-    
-    // 🎯 关键解决方案：为DeepStream waylandsink设置独立的display标识
-    // 这避免了与LVGL Wayland客户端的协议冲突
-    std::string deepstream_display_id = "deepstream-" + deepstream_display_name;
-    std::cout << "[DeepStreamManager] 为waylandsink设置独立display标识: " << deepstream_display_id << std::endl;
-    
-    // 使用nvarguscamerasrc
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ";
-    
-    // 摄像头输出配置
-    pipeline << "! video/x-raw(memory:NVMM)"
+    // 摄像头源
+    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+             << "! video/x-raw(memory:NVMM)"
              << ",width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1"
              << ",format=NV12 ";
     
-    // 恢复nvstreammux为nvinfer创建batch元数据
-    pipeline << "! m.sink_0 ";
-    pipeline << "nvstreammux name=m batch-size=1 "
-             << "width=" << config.camera_width << " "
-             << "height=" << config.camera_height << " ";
-    
-    // 🔧 恢复nvinfer，使用正确的YOLO输出格式 (1x25200x85)
-    std::cout << "[DeepStreamManager] 恢复nvinfer推理，使用标准YOLO格式(1x25200x85)" << std::endl;
-    
-    // 🔧 修复：检查并使用正确的nvinfer配置文件路径
-    std::string nvinfer_config_path = config.nvinfer_config;
-    if (nvinfer_config_path.empty() || access(nvinfer_config_path.c_str(), F_OK) != 0) {
-        // 尝试默认路径
-        nvinfer_config_path = "config/nvinfer_config.txt";
-        if (access(nvinfer_config_path.c_str(), F_OK) != 0) {
-            nvinfer_config_path = "/opt/bamboo-cut/config/nvinfer_config.txt";
-        }
+    // 可选：AI推理
+    if (!config.nvinfer_config.empty() && access(config.nvinfer_config.c_str(), F_OK) == 0) {
+        pipeline << "! m.sink_0 "
+                 << "nvstreammux name=m batch-size=1 "
+                 << "width=" << config.camera_width << " "
+                 << "height=" << config.camera_height << " "
+                 << "! nvinfer config-file-path=" << config.nvinfer_config << " ";
     }
     
-    if (access(nvinfer_config_path.c_str(), F_OK) == 0) {
-        pipeline << "! nvinfer config-file-path=" << nvinfer_config_path << " ";
-        std::cout << "[DeepStreamManager] 使用nvinfer配置: " << nvinfer_config_path << std::endl;
-    } else {
-        std::cout << "[DeepStreamManager] 跳过nvinfer（配置文件未找到: " << nvinfer_config_path << "）" << std::endl;
-    }
-    
-    // 硬件加速格式转换和缩放（第一步：在NVMM内存中处理）
-    pipeline << "! nvvidconv ";
-    
-    // 第二步：从NVMM转换到标准内存，waylandsink需要标准内存格式
-    pipeline << "! video/x-raw,format=RGBA"
+    // 格式转换和缩放
+    pipeline << "! nvvidconv "
+             << "! video/x-raw,format=RGBA"
              << ",width=" << width
              << ",height=" << height << " ";
     
-    // 使用waylandsink进行Wayland显示
-    pipeline << "! waylandsink ";
+    // 🔧 关键：waylandsink渲染到subsurface
+    pipeline << "! waylandsink name=video_sink "
+             << "sync=false "
+             << "async=true ";
     
-    // EGL共享和dmabuf优化参数
-    pipeline << "sync=false ";           // 低延迟模式
-    pipeline << "async=true ";           // 异步模式
-    pipeline << "enable-last-sample=false "; // 减少内存使用
-    pipeline << "fullscreen=false ";     // 非全屏模式
+    // 注意：不设置display参数，waylandsink会自动使用WAYLAND_DISPLAY
     
-    // 🔧 关键修复：使用独立的display标识避免客户端冲突
-    pipeline << "display=" << deepstream_display_name << " ";
+    std::cout << "🔧 [DeepStream] Subsurface管道: " << pipeline.str() << std::endl;
     
-    // 🎯 移除不支持的属性，使用基本waylandsink配置
-    std::cout << "[DeepStreamManager] waylandsink使用独立display: " << deepstream_display_name << std::endl;
-    
-    std::cout << "[DeepStreamManager] Wayland管道构建完成" << std::endl;
     return pipeline.str();
 }
 
@@ -1023,6 +1062,19 @@ void DeepStreamManager::cleanup() {
     if (pipeline2_) {
         gst_object_unref(pipeline2_);
         pipeline2_ = nullptr;
+    }
+    
+    // 🔧 新增：清理Wayland Subsurface资源
+    if (video_subsurface_) {
+        wl_subsurface_destroy(video_subsurface_);
+        video_subsurface_ = nullptr;
+        std::cout << "✅ [DeepStream] 已清理video_subsurface_" << std::endl;
+    }
+    
+    if (video_surface_) {
+        wl_surface_destroy(video_surface_);
+        video_surface_ = nullptr;
+        std::cout << "✅ [DeepStream] 已清理video_surface_" << std::endl;
     }
 }
 
@@ -1198,80 +1250,19 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     return pipeline.str();
 }
 
-// AppSink新样本回调 - 线程安全的帧处理（禁用冗余日志）
-GstFlowReturn DeepStreamManager::newSampleCallback(GstAppSink* appsink, gpointer user_data) {
-    DeepStreamManager* manager = static_cast<DeepStreamManager*>(user_data);
-    
-    // 获取新样本
-    GstSample* sample = gst_app_sink_pull_sample(appsink);
-    if (!sample) {
-        return GST_FLOW_OK;
-    }
-    
-    // 获取缓冲区
-    GstBuffer* buffer = gst_sample_get_buffer(sample);
-    if (!buffer) {
-        gst_sample_unref(sample);
-        return GST_FLOW_OK;
-    }
-    
-    // 映射缓冲区数据
-    GstMapInfo map_info;
-    if (!gst_buffer_map(buffer, &map_info, GST_MAP_READ)) {
-        gst_sample_unref(sample);
-        return GST_FLOW_OK;
-    }
-    
-    // 获取视频信息
-    GstCaps* caps = gst_sample_get_caps(sample);
-    if (caps) {
-        GstStructure* structure = gst_caps_get_structure(caps, 0);
-        gint width, height;
-        
-        if (gst_structure_get_int(structure, "width", &width) &&
-            gst_structure_get_int(structure, "height", &height)) {
-            
-            // 线程安全地合成帧到LVGL画布（静默模式）
-            manager->compositeFrameToLVGL(&map_info, width, height);
-        }
-    }
-    
-    // 清理资源
-    gst_buffer_unmap(buffer, &map_info);
-    gst_sample_unref(sample);
-    
-    return GST_FLOW_OK;
-}
+// ❌ AppSink回调已移除 - 使用Wayland Subsurface硬件合成
+// GstFlowReturn DeepStreamManager::newSampleCallback(GstAppSink* appsink, gpointer user_data) {
+//     // 此函数已被Subsurface架构替代，不再需要CPU拷贝和手动合成
+//     return GST_FLOW_OK;
+// }
 
-// 软件合成帧到LVGL画布 - 优化内存操作（静默模式）
-void DeepStreamManager::compositeFrameToLVGL(GstMapInfo* map_info, int width, int height) {
-    std::lock_guard<std::mutex> lock(frame_mutex_);
-    
-    try {
-        // 检查数据大小是否合理 (BGRA格式应该是 width * height * 4)
-        size_t expected_size = width * height * 4;
-        if (map_info->size < expected_size) {
-            // 静默处理尺寸不匹配
-            return;
-        }
-        
-        // 创建OpenCV Mat包装GStreamer数据，避免内存拷贝
-        cv::Mat frame = cv::Mat(height, width, CV_8UC4, map_info->data);
-        
-        // 检查帧数据有效性
-        if (!frame.empty() && frame.data) {
-            // 克隆帧数据用于后续处理
-            latest_frame_ = frame.clone();
-            new_frame_available_ = true;
-        }
-        
-    } catch (const std::exception& e) {
-        // 静默处理异常
-    }
-}
+// ❌ 软件合成已移除 - 使用GPU硬件合成
+// void DeepStreamManager::compositeFrameToLVGL(GstMapInfo* map_info, int width, int height) {
+//     // 此函数已被Weston GPU合成器替代，实现零拷贝硬件加速
+// }
 
-// 设置AppSink回调函数
-void DeepStreamManager::setupAppSinkCallbacks() {
+// ❌ AppSink回调机制已移除 - 使用Wayland Subsurface硬件合成
+// void DeepStreamManager::setupAppSinkCallbacks() {
     if (!pipeline_) {
         std::cout << "错误：管道未创建，无法设置appsink回调" << std::endl;
         return;
@@ -1385,27 +1376,14 @@ bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
     return false;
 }
 
-void DeepStreamManager::startCanvasUpdateThread() {
-    if (canvas_update_running_ || !lvgl_interface_) {
-        return;
-    }
-    
-    canvas_update_running_ = true;
-    canvas_update_thread_ = std::thread(&DeepStreamManager::canvasUpdateLoop, this);
-    std::cout << "Canvas更新线程已启动" << std::endl;
-}
+// ❌ Canvas更新线程已移除 - 使用Weston GPU合成
+// void DeepStreamManager::startCanvasUpdateThread() {
+//     // Weston自动在GPU中合成视频和UI，不需要手动Canvas更新线程
+// }
 
-void DeepStreamManager::stopCanvasUpdateThread() {
-    if (!canvas_update_running_) {
-        return;
-    }
-    
-    canvas_update_running_ = false;
-    if (canvas_update_thread_.joinable()) {
-        canvas_update_thread_.join();
-    }
-    std::cout << "Canvas更新线程已停止" << std::endl;
-}
+// void DeepStreamManager::stopCanvasUpdateThread() {
+//     // Canvas更新线程已被GPU硬件合成替代
+// }
 
 void DeepStreamManager::canvasUpdateLoop() {
     std::cout << "Canvas更新循环开始运行" << std::endl;

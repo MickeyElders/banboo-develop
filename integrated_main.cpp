@@ -609,31 +609,54 @@ public:
     }
     
     bool initialize() {
-        std::cout << "🔧 [推理系统] 初始化推理系统（单一TensorRT架构）..." << std::endl;
+        std::cout << "🔧 [推理系统] 初始化Wayland Subsurface架构..." << std::endl;
         
-        // 🔧 新架构：DeepStream nvinfer负责AI推理，BambooDetector仅用于后处理
-        std::cout << "📋 [架构] DeepStream nvinfer -> 硬件AI推理" << std::endl;
-        std::cout << "📋 [架构] BambooDetector -> 结果后处理（禁用TensorRT）" << std::endl;
-        
-        // 初始化检测器 (仅用于后处理，禁用TensorRT)
-        if (!initializeDetector()) {
-            std::cout << "⚠️ [BambooDetector] 检测器初始化失败，使用模拟模式" << std::endl;
-            use_mock_data_ = true;
-        } else {
-            std::cout << "✅ [BambooDetector] 检测器初始化成功（后处理模式）" << std::endl;
+        // 获取LVGL的Wayland对象
+        if (!lvgl_interface_ptr_) {
+            std::cerr << "❌ LVGL接口未设置" << std::endl;
+            return false;
         }
         
-        // 初始化 DeepStream 管理器 (负责主要AI推理)
-        if (!initializeDeepStreamManager()) {
-            std::cout << "❌ [DeepStream] 管理器初始化失败，使用模拟模式" << std::endl;
-            use_mock_data_ = true;
-        } else {
-            std::cout << "✅ [DeepStream] 管理器初始化成功（nvinfer TensorRT推理）" << std::endl;
+        auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
+        
+        void* parent_display = lvgl_if->getWaylandDisplay();
+        void* parent_compositor = lvgl_if->getWaylandCompositor();
+        void* parent_subcompositor = lvgl_if->getWaylandSubcompositor();
+        void* parent_surface = lvgl_if->getWaylandSurface();
+        
+        if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
+            std::cerr << "❌ 无法获取LVGL Wayland对象" << std::endl;
+            return false;
         }
         
-        std::cout << "🎯 [推理系统] 初始化完成 (模拟模式: " << (use_mock_data_ ? "是" : "否") << ")" << std::endl;
-        std::cout << "💡 [架构] 使用单一TensorRT实例，避免资源冲突" << std::endl;
-        return true; // 总是返回成功，确保UI能够启动
+        std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
+        
+        // 创建DeepStream管理器（使用Subsurface）
+        deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+        
+        // 配置Subsurface
+        deepstream::SubsurfaceConfig subsurface_config;
+        subsurface_config.offset_x = 0;
+        subsurface_config.offset_y = 80;  // 跳过LVGL头部面板
+        subsurface_config.width = 960;
+        subsurface_config.height = 640;
+        subsurface_config.use_sync_mode = true;
+        
+        // 🔧 关键：使用Subsurface模式初始化
+        if (!deepstream_manager_->initializeWithSubsurface(
+                parent_display,
+                parent_compositor,
+                parent_subcompositor,
+                parent_surface,
+                subsurface_config)) {
+            std::cerr << "❌ DeepStream Subsurface初始化失败" << std::endl;
+            return false;
+        }
+        
+        std::cout << "✅ [推理系统] Wayland Subsurface架构初始化完成" << std::endl;
+        std::cout << "📺 视频将由Weston自动合成到LVGL窗口" << std::endl;
+        
+        return true;
     }
     
     bool start() {

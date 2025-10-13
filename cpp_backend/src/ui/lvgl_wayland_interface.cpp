@@ -56,10 +56,11 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
-    // Wayland EGL后端 - 现代xdg-shell协议实现
+    // Wayland EGL后端 - 现代xdg-shell协议实现 + Subsurface支持
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
     struct wl_compositor* wl_compositor_ = nullptr;
+    struct wl_subcompositor* wl_subcompositor_ = nullptr;  // 🆕 新增：subcompositor支持
     struct xdg_wm_base* xdg_wm_base_ = nullptr;
     struct wl_surface* wl_surface_ = nullptr;
     struct xdg_surface* xdg_surface_ = nullptr;
@@ -274,10 +275,6 @@ void LVGLWaylandInterface::uiThreadLoop() {
         auto now = std::chrono::steady_clock::now();
         loop_count++;
         
-        // 🔍 每600帧打印一次状态
-        if (loop_count <= 5 || loop_count % 600 == 0) {
-            std::cout << "🔄 UI循环 #" << loop_count << std::endl;
-        }
         
         // ✅ 关键修复：处理Wayland事件循环
         pImpl_->handleWaylandEvents();
@@ -924,7 +921,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     return true;
 }
 
-// Wayland registry回调函数
+// Wayland registry回调函数 - 支持subcompositor绑定
 void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry* registry,
                                                   uint32_t id, const char* interface, uint32_t version) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
@@ -935,7 +932,14 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, 1));
         std::cout << "✅ 绑定wl_compositor成功" << std::endl;
-    } else if (strcmp(interface, "xdg_wm_base") == 0) {
+    }
+    else if (strcmp(interface, "wl_subcompositor") == 0) {
+        // 🆕 关键：绑定subcompositor接口，用于创建subsurface
+        impl->wl_subcompositor_ = static_cast<struct wl_subcompositor*>(
+            wl_registry_bind(registry, id, &wl_subcompositor_interface, 1));
+        std::cout << "✅ 绑定wl_subcompositor成功（支持Subsurface架构）" << std::endl;
+    }
+    else if (strcmp(interface, "xdg_wm_base") == 0) {
         impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
             wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
         std::cout << "✅ 绑定xdg_wm_base成功" << std::endl;
@@ -1346,6 +1350,11 @@ void LVGLWaylandInterface::Impl::cleanup() {
         xdg_wm_base_ = nullptr;
     }
     
+    if (wl_subcompositor_) {
+        wl_subcompositor_destroy(wl_subcompositor_);
+        wl_subcompositor_ = nullptr;
+    }
+    
     if (wl_compositor_) {
         wl_compositor_destroy(wl_compositor_);
         wl_compositor_ = nullptr;
@@ -1510,3 +1519,20 @@ LVGLWaylandInterface::Impl::~Impl() {
 
 } // namespace ui
 } // namespace bamboo_cut
+
+// 🆕 实现获取Wayland对象的方法，用于DeepStream Subsurface创建
+void* LVGLWaylandInterface::getWaylandDisplay() {
+    return pImpl_ ? pImpl_->wl_display_ : nullptr;
+}
+
+void* LVGLWaylandInterface::getWaylandCompositor() {
+    return pImpl_ ? pImpl_->wl_compositor_ : nullptr;
+}
+
+void* LVGLWaylandInterface::getWaylandSubcompositor() {
+    return pImpl_ ? pImpl_->wl_subcompositor_ : nullptr;
+}
+
+void* LVGLWaylandInterface::getWaylandSurface() {
+    return pImpl_ ? pImpl_->wl_surface_ : nullptr;
+}
