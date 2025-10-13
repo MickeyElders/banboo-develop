@@ -17,16 +17,13 @@
 #include <fcntl.h>
 #include <errno.h>
 
-// EGL和DRM头文件
+// EGL和Wayland头文件
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include <libdrm/drm.h>
-#include <libdrm/drm_fourcc.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-#include <gbm.h>
+#include <wayland-client.h>
+#include <wayland-egl.h>
 #include <vector>
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
@@ -56,23 +53,19 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
-    // DRM EGL后端
-    int drm_fd_ = -1;
-    struct gbm_device* gbm_device_ = nullptr;
-    struct gbm_surface* gbm_surface_ = nullptr;
+    // Wayland EGL后端
+    struct wl_display* wl_display_ = nullptr;
+    struct wl_registry* wl_registry_ = nullptr;
+    struct wl_compositor* wl_compositor_ = nullptr;
+    struct wl_shell* wl_shell_ = nullptr;
+    struct wl_surface* wl_surface_ = nullptr;
+    struct wl_shell_surface* wl_shell_surface_ = nullptr;
+    struct wl_egl_window* wl_egl_window_ = nullptr;
+    
     EGLDisplay egl_display_ = EGL_NO_DISPLAY;
     EGLContext egl_context_ = EGL_NO_CONTEXT;
     EGLSurface egl_surface_ = EGL_NO_SURFACE;
     EGLConfig egl_config_;
-    
-    // DRM资源
-    drmModeRes* drm_resources_ = nullptr;
-    drmModeConnector* drm_connector_ = nullptr;
-    drmModeEncoder* drm_encoder_ = nullptr;
-    drmModeCrtc* drm_crtc_ = nullptr;
-    drmModeModeInfo drm_mode_;
-    uint32_t drm_crtc_id_ = 0;
-    uint32_t drm_connector_id_ = 0;
     
     // 显示缓冲区
     lv_color_t* front_buffer_ = nullptr;
@@ -99,15 +92,15 @@ public:
     bool wayland_initialized_ = false;
     bool display_initialized_ = false;
     bool input_initialized_ = false;
-    bool drm_initialized_ = false;
+    bool wayland_egl_initialized_ = false;
     bool egl_initialized_ = false;
     
     Impl() = default;
     ~Impl();
     
     bool checkWaylandEnvironment();
-    bool initializeDRMBackend();
-    bool initializeEGL();
+    bool initializeWaylandClient();
+    bool initializeWaylandEGL();
     bool initializeWaylandDisplay();
     bool initializeFallbackDisplay();
     bool initializeInput();
@@ -117,9 +110,9 @@ public:
     void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
     void cleanup();
     
-    // DRM辅助函数
-    bool findDRMResources();
-    bool setupDRMMode();
+    // Wayland辅助函数
+    static void registryHandler(void* data, struct wl_registry* registry, uint32_t id, const char* interface, uint32_t version);
+    static void registryRemover(void* data, struct wl_registry* registry, uint32_t id);
     EGLConfig chooseEGLConfig();
     
     // OpenGL渲染资源管理
@@ -360,17 +353,17 @@ bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
-    // 首先初始化DRM后端
-    std::cout << "正在初始化DRM后端..." << std::endl;
-    if (!initializeDRMBackend()) {
-        std::cerr << "DRM后端初始化失败，使用fallback模式" << std::endl;
+    // 首先初始化Wayland客户端
+    std::cout << "正在初始化Wayland客户端..." << std::endl;
+    if (!initializeWaylandClient()) {
+        std::cerr << "Wayland客户端初始化失败，使用fallback模式" << std::endl;
         return initializeFallbackDisplay();
     }
     
-    // 然后初始化EGL
-    std::cout << "正在初始化EGL..." << std::endl;
-    if (!initializeEGL()) {
-        std::cerr << "EGL初始化失败，使用fallback模式" << std::endl;
+    // 然后初始化Wayland EGL
+    std::cout << "正在初始化Wayland EGL..." << std::endl;
+    if (!initializeWaylandEGL()) {
+        std::cerr << "Wayland EGL初始化失败，使用fallback模式" << std::endl;
         cleanup();
         return initializeFallbackDisplay();
     }
@@ -415,7 +408,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     lv_display_set_user_data(display_, this);
     
     display_initialized_ = true;
-    std::cout << "DRM EGL显示初始化成功" << std::endl;
+    std::cout << "Wayland EGL显示初始化成功" << std::endl;
     return true;
 }
 
@@ -610,59 +603,71 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
     }
 }
 
-// DRM EGL后端实现
-bool LVGLWaylandInterface::Impl::initializeDRMBackend() {
-    // 打开DRM设备
-    drm_fd_ = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
-    if (drm_fd_ < 0) {
-        std::cerr << "无法打开DRM设备" << std::endl;
+// Wayland客户端实现
+bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
+    // 连接到Wayland显示服务器
+    wl_display_ = wl_display_connect(nullptr);
+    if (!wl_display_) {
+        std::cerr << "无法连接到Wayland显示服务器" << std::endl;
         return false;
     }
     
-    // 查找DRM资源
-    if (!findDRMResources()) {
-        close(drm_fd_);
-        drm_fd_ = -1;
+    // 获取registry并绑定全局对象
+    wl_registry_ = wl_display_get_registry(wl_display_);
+    if (!wl_registry_) {
+        std::cerr << "无法获取Wayland registry" << std::endl;
         return false;
     }
     
-    // 设置显示模式
-    if (!setupDRMMode()) {
-        cleanup();
+    static const struct wl_registry_listener registry_listener = {
+        registryHandler,
+        registryRemover
+    };
+    
+    wl_registry_add_listener(wl_registry_, &registry_listener, this);
+    
+    // 等待初始的roundtrip来获取所有全局对象
+    wl_display_dispatch(wl_display_);
+    wl_display_roundtrip(wl_display_);
+    
+    if (!wl_compositor_) {
+        std::cerr << "Wayland compositor不可用" << std::endl;
         return false;
     }
     
-    // 创建GBM设备
-    gbm_device_ = gbm_create_device(drm_fd_);
-    if (!gbm_device_) {
-        std::cerr << "GBM设备创建失败" << std::endl;
-        cleanup();
+    // 创建surface
+    wl_surface_ = wl_compositor_create_surface(wl_compositor_);
+    if (!wl_surface_) {
+        std::cerr << "无法创建Wayland surface" << std::endl;
         return false;
     }
     
-    // 创建GBM表面
-    gbm_surface_ = gbm_surface_create(gbm_device_,
-                                      config_.screen_width,
-                                      config_.screen_height,
-                                      GBM_FORMAT_XRGB8888,
-                                      GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
-    if (!gbm_surface_) {
-        std::cerr << "GBM表面创建失败" << std::endl;
-        cleanup();
-        return false;
+    // 如果有shell，创建shell surface
+    if (wl_shell_) {
+        wl_shell_surface_ = wl_shell_get_shell_surface(wl_shell_, wl_surface_);
+        if (wl_shell_surface_) {
+            wl_shell_surface_set_toplevel(wl_shell_surface_);
+        }
     }
     
-    drm_initialized_ = true;
+    wayland_egl_initialized_ = true;
     return true;
 }
 
-bool LVGLWaylandInterface::Impl::initializeEGL() {
-    if (!drm_initialized_) {
+bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
+    if (!wayland_egl_initialized_) {
+        return false;
+    }
+    
+    // 创建EGL窗口
+    wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
+    if (!wl_egl_window_) {
+        std::cerr << "无法创建Wayland EGL窗口" << std::endl;
         return false;
     }
     
     // 获取EGL显示
-    egl_display_ = eglGetDisplay((EGLNativeDisplayType)gbm_device_);
+    egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
     if (egl_display_ == EGL_NO_DISPLAY) {
         std::cerr << "EGL显示获取失败" << std::endl;
         return false;
@@ -692,7 +697,7 @@ bool LVGLWaylandInterface::Impl::initializeEGL() {
     
     // 创建EGL表面
     egl_surface_ = eglCreateWindowSurface(egl_display_, egl_config_,
-                                          (EGLNativeWindowType)gbm_surface_, nullptr);
+                                          (EGLNativeWindowType)wl_egl_window_, nullptr);
     if (egl_surface_ == EGL_NO_SURFACE) {
         std::cerr << "EGL表面创建失败" << std::endl;
         return false;
@@ -708,58 +713,22 @@ bool LVGLWaylandInterface::Impl::initializeEGL() {
     return true;
 }
 
-bool LVGLWaylandInterface::Impl::findDRMResources() {
-    drm_resources_ = drmModeGetResources(drm_fd_);
-    if (!drm_resources_) {
-        std::cerr << "获取DRM资源失败" << std::endl;
-        return false;
-    }
+// Wayland registry回调函数
+void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry* registry,
+                                                  uint32_t id, const char* interface, uint32_t version) {
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     
-    // 查找连接的显示器
-    for (int i = 0; i < drm_resources_->count_connectors; i++) {
-        drm_connector_ = drmModeGetConnector(drm_fd_, drm_resources_->connectors[i]);
-        if (drm_connector_ && drm_connector_->connection == DRM_MODE_CONNECTED) {
-            drm_connector_id_ = drm_connector_->connector_id;
-            break;
-        }
-        if (drm_connector_) {
-            drmModeFreeConnector(drm_connector_);
-            drm_connector_ = nullptr;
-        }
+    if (strcmp(interface, "wl_compositor") == 0) {
+        impl->wl_compositor_ = static_cast<struct wl_compositor*>(
+            wl_registry_bind(registry, id, &wl_compositor_interface, 1));
+    } else if (strcmp(interface, "wl_shell") == 0) {
+        impl->wl_shell_ = static_cast<struct wl_shell*>(
+            wl_registry_bind(registry, id, &wl_shell_interface, 1));
     }
-    
-    if (!drm_connector_) {
-        std::cerr << "未找到连接的显示器" << std::endl;
-        return false;
-    }
-    
-    // 查找编码器
-    if (drm_connector_->encoder_id) {
-        drm_encoder_ = drmModeGetEncoder(drm_fd_, drm_connector_->encoder_id);
-        if (drm_encoder_) {
-            drm_crtc_id_ = drm_encoder_->crtc_id;
-        }
-    }
-    
-    return true;
 }
 
-bool LVGLWaylandInterface::Impl::setupDRMMode() {
-    if (!drm_connector_ || drm_connector_->count_modes == 0) {
-        return false;
-    }
-    
-    // 使用第一个可用模式
-    drm_mode_ = drm_connector_->modes[0];
-    
-    // 获取CRTC
-    drm_crtc_ = drmModeGetCrtc(drm_fd_, drm_crtc_id_);
-    if (!drm_crtc_) {
-        std::cerr << "获取CRTC失败" << std::endl;
-        return false;
-    }
-    
-    return true;
+void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry* registry, uint32_t id) {
+    // 处理全局对象移除（可选实现）
 }
 
 EGLConfig LVGLWaylandInterface::Impl::chooseEGLConfig() {
@@ -821,12 +790,27 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
         for (int x = 0; x < w; x++) {
             lv_color_t pixel = color_p[y * w + x];
             
-            // 正确的颜色分量提取（根据LVGL v9.x格式）
+            // 根据LVGL v9.x的颜色结构直接访问
             int idx = (y * w + x) * 4;
-            rgba_data[idx + 0] = LV_COLOR_GET_R(pixel) << 3;  // R: 5bit -> 8bit
-            rgba_data[idx + 1] = LV_COLOR_GET_G(pixel) << 2;  // G: 6bit -> 8bit
-            rgba_data[idx + 2] = LV_COLOR_GET_B(pixel) << 3;  // B: 5bit -> 8bit
-            rgba_data[idx + 3] = 255;                         // A: 完全不透明
+            
+            #if LV_COLOR_DEPTH == 16
+                // RGB565格式
+                rgba_data[idx + 0] = (pixel.red & 0x1F) << 3;      // R: 5bit -> 8bit
+                rgba_data[idx + 1] = (pixel.green & 0x3F) << 2;    // G: 6bit -> 8bit
+                rgba_data[idx + 2] = (pixel.blue & 0x1F) << 3;     // B: 5bit -> 8bit
+            #elif LV_COLOR_DEPTH == 32
+                // ARGB8888格式
+                rgba_data[idx + 0] = pixel.red;
+                rgba_data[idx + 1] = pixel.green;
+                rgba_data[idx + 2] = pixel.blue;
+            #else
+                // 默认处理
+                rgba_data[idx + 0] = pixel.red << 3;
+                rgba_data[idx + 1] = pixel.green << 2;
+                rgba_data[idx + 2] = pixel.blue << 3;
+            #endif
+            
+            rgba_data[idx + 3] = 255;  // A: 完全不透明
         }
     }
     
@@ -903,44 +887,44 @@ void LVGLWaylandInterface::Impl::cleanup() {
         egl_initialized_ = false;
     }
     
-    // 清理GBM资源
-    if (gbm_surface_) {
-        gbm_surface_destroy(gbm_surface_);
-        gbm_surface_ = nullptr;
+    // 清理Wayland EGL资源
+    if (wl_egl_window_) {
+        wl_egl_window_destroy(wl_egl_window_);
+        wl_egl_window_ = nullptr;
     }
     
-    if (gbm_device_) {
-        gbm_device_destroy(gbm_device_);
-        gbm_device_ = nullptr;
+    // 清理Wayland资源
+    if (wl_shell_surface_) {
+        wl_shell_surface_destroy(wl_shell_surface_);
+        wl_shell_surface_ = nullptr;
     }
     
-    // 清理DRM资源
-    if (drm_crtc_) {
-        drmModeFreeCrtc(drm_crtc_);
-        drm_crtc_ = nullptr;
+    if (wl_surface_) {
+        wl_surface_destroy(wl_surface_);
+        wl_surface_ = nullptr;
     }
     
-    if (drm_encoder_) {
-        drmModeFreeEncoder(drm_encoder_);
-        drm_encoder_ = nullptr;
+    if (wl_shell_) {
+        wl_shell_destroy(wl_shell_);
+        wl_shell_ = nullptr;
     }
     
-    if (drm_connector_) {
-        drmModeFreeConnector(drm_connector_);
-        drm_connector_ = nullptr;
+    if (wl_compositor_) {
+        wl_compositor_destroy(wl_compositor_);
+        wl_compositor_ = nullptr;
     }
     
-    if (drm_resources_) {
-        drmModeFreeResources(drm_resources_);
-        drm_resources_ = nullptr;
+    if (wl_registry_) {
+        wl_registry_destroy(wl_registry_);
+        wl_registry_ = nullptr;
     }
     
-    if (drm_fd_ >= 0) {
-        close(drm_fd_);
-        drm_fd_ = -1;
+    if (wl_display_) {
+        wl_display_disconnect(wl_display_);
+        wl_display_ = nullptr;
     }
     
-    drm_initialized_ = false;
+    wayland_egl_initialized_ = false;
     
     // 清理显示缓冲区
     if (front_buffer_) {
