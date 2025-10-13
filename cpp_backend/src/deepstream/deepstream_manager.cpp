@@ -816,6 +816,12 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
              << ",framerate=" << config.camera_fps << "/1"
              << ",format=NV12 ";
     
+    // 添加nvstreammux为nvinfer创建batch元数据（修复NvDsBatchMeta错误）
+    pipeline << "! m.sink_0 ";
+    pipeline << "nvstreammux name=m batch-size=1 "
+             << "width=" << config.camera_width << " "
+             << "height=" << config.camera_height << " ";
+    
     // 🔧 修复：检查并使用正确的nvinfer配置文件路径
     std::string nvinfer_config_path = config.nvinfer_config;
     if (nvinfer_config_path.empty() || access(nvinfer_config_path.c_str(), F_OK) != 0) {
