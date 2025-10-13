@@ -1520,6 +1520,9 @@ LVGLWaylandInterface::Impl::~Impl() {
 } // namespace ui
 } // namespace bamboo_cut
 
+namespace bamboo_cut {
+namespace ui {
+
 // 🆕 实现获取内部实现指针的方法
 void* LVGLWaylandInterface::getImpl() {
     return pImpl_.get();
@@ -1541,3 +1544,6 @@ void* LVGLWaylandInterface::getWaylandSubcompositor() {
 void* LVGLWaylandInterface::getWaylandSurface() {
     return pImpl_ ? pImpl_->wl_surface_ : nullptr;
 }
+
+} // namespace ui
+} // namespace bamboo_cut
