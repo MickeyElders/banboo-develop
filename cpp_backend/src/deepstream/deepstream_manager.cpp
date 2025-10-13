@@ -20,6 +20,9 @@
 #include <set>
 #include <gst/app/gstappsink.h>
 
+// 🆕 新增：Wayland头文件包含
+#include <wayland-client.h>
+
 #ifdef ENABLE_LVGL
 #include <lvgl/lvgl.h>
 #endif
