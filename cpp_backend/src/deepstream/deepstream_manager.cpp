@@ -113,6 +113,18 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
         return false;
     }
     
+    // 设置EGL共享环境变量，解决NVMM缓冲区到EGLImage转换问题
+    std::cout << "[DeepStreamManager] 配置EGL共享环境..." << std::endl;
+    setenv("EGL_PLATFORM", "drm", 1);
+    setenv("__EGL_VENDOR_LIBRARY_DIRS", "/usr/lib/aarch64-linux-gnu/tegra-egl", 1);
+    setenv("EGL_EXTENSIONS", "EGL_EXT_image_dma_buf_import,EGL_EXT_image_dma_buf_import_modifiers", 1);
+    
+    // NVIDIA特定的EGL设置
+    setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
+    setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
+    
+    std::cout << "[DeepStreamManager] EGL共享环境配置完成" << std::endl;
+    
     // 计算视频布局（简化版）
     video_layout_ = calculateWaylandVideoLayout(config);
     
@@ -821,21 +833,23 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
         std::cout << "[DeepStreamManager] 跳过nvinfer（配置文件未找到: " << nvinfer_config_path << "）" << std::endl;
     }
     
-    // 硬件加速格式转换和缩放
+    // 硬件加速格式转换和缩放，使用dmabuf for EGL共享
     pipeline << "! nvvidconv ";
     
-    // 输出格式和尺寸
-    pipeline << "! video/x-raw"
+    // 输出格式和尺寸 - 使用NVMM内存进行EGL共享
+    pipeline << "! video/x-raw(memory:NVMM)"
              << ",format=RGBA"
              << ",width=" << width
              << ",height=" << height << " ";
     
-    // 🔧 修复：移除render-rectangle，waylandsink不支持此属性
+    // 使用waylandsink的EGL dmabuf导入功能
     pipeline << "! waylandsink ";
     
-    // 性能优化参数
-    pipeline << "sync=false ";        // 低延迟模式
-    pipeline << "async=true ";        // 异步模式
+    // EGL共享和dmabuf优化参数
+    pipeline << "sync=false ";           // 低延迟模式
+    pipeline << "async=true ";           // 异步模式
+    pipeline << "enable-last-sample=false "; // 减少内存使用
+    pipeline << "force-aspect-ratio=false "; // 允许任意缩放
     
     // 指定Wayland显示
     if (wayland_display) {

@@ -221,10 +221,15 @@ install-wayland-deps:
 	@echo "[core]" | sudo tee /etc/weston/weston.ini > /dev/null
 	@echo "backend=drm-backend.so" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "idle-time=0" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "use-pixman=false" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "[output]" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "name=HDMI-A-1" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "mode=1920x1200@60" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "[renderer]" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "egl-config-attribs=EGL_ALPHA_SIZE:8,EGL_RED_SIZE:8,EGL_GREEN_SIZE:8,EGL_BLUE_SIZE:8" | sudo tee -a /etc/weston/weston.ini > /dev/null
+	@echo "dmabuf-import=true" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "[input-method]" | sudo tee -a /etc/weston/weston.ini > /dev/null
 	@echo "path=/usr/lib/weston/weston-keyboard" | sudo tee -a /etc/weston/weston.ini > /dev/null
@@ -241,6 +246,9 @@ install-wayland-deps:
 		echo "ExecStart=/usr/bin/weston --config=/etc/weston/weston.ini --log=/var/log/weston.log" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
 		echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
 		echo "Environment=WAYLAND_DISPLAY=wayland-0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Environment=EGL_PLATFORM=drm" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Environment=__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
+		echo "Environment=EGL_EXTENSIONS=EGL_EXT_image_dma_buf_import,EGL_EXT_image_dma_buf_import_modifiers" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
 		echo "Restart=always" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
 		echo "RestartSec=5" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
 		echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
