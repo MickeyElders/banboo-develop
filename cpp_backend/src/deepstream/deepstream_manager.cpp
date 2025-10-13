@@ -79,20 +79,28 @@ bool DeepStreamManager::initializeWithSubsurface(
     void* parent_surface,
     const SubsurfaceConfig& config) {
     
-    // 类型转换
-    auto* wl_display = static_cast<struct wl_display*>(parent_display);
+    std::cout << "🎬 [DeepStream] 初始化Wayland Subsurface模式..." << std::endl;
     
-    // ✅ 健康检查
+    // 🔧 修复：正确的类型转换
+    auto* wl_display = static_cast<struct wl_display*>(parent_display);
+    auto* wl_compositor = static_cast<struct wl_compositor*>(parent_compositor);
+    auto* wl_subcompositor = static_cast<struct wl_subcompositor*>(parent_subcompositor);
+    auto* wl_parent_surface = static_cast<struct wl_surface*>(parent_surface);
+    
+    // 🔧 新增：检查父display健康状态
     if (wl_display) {
         int parent_error_code = wl_display_get_error(wl_display);
         if (parent_error_code != 0) {
             std::cerr << "❌ [DeepStream] 父Wayland display已损坏，错误码: " 
                       << parent_error_code << std::endl;
+            std::cerr << "🔄 [DeepStream] 降级到AppSink模式" << std::endl;
             
-            // ❌ 关键修复：不要降级到AppSink！
-            // AppSink模式需要LVGL Canvas，但Canvas依赖有效的Wayland窗口
-            std::cerr << "   无法使用AppSink，因为LVGL窗口未正确初始化" << std::endl;
-            return false;  // 完全失败
+            // 创建AppSink配置
+            config_.sink_mode = VideoSinkMode::APPSINK;
+            config_.screen_width = config.width;
+            config_.screen_height = config.height;
+            
+            return initialize(config_);  // 使用AppSink模式初始化
         }
     }
     

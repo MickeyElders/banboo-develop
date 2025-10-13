@@ -18,7 +18,7 @@
 #include <sys/types.h>  // for system types
 #include <cstdlib>      // for setenv()
 #include <fstream>      // for file operations
-
+#include <wayland-client.h>
 // OpenCV和图像处理
 #include <opencv2/opencv.hpp>
 
@@ -608,83 +608,84 @@ public:
         stop();
     }
     
-    bool initialize() {
-        std::cout << "🔧 [推理系统] 初始化Wayland Subsurface架构..." << std::endl;
+    bool InferenceWorkerThread::initialize() {
+    std::cout << "🔧 [推理系统] 初始化Wayland Subsurface架构..." << std::endl;
+    
+    // 获取LVGL的Wayland对象
+    if (!lvgl_interface_ptr_) {
+        std::cerr << "❌ LVGL接口未设置" << std::endl;
+        return false;
+    }
+    
+    auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
+    
+    // 等待LVGL的Wayland对象完全初始化
+    int retry_count = 0;
+    const int MAX_RETRIES = 10;
+    
+    void* parent_display = nullptr;
+    void* parent_compositor = nullptr;
+    void* parent_subcompositor = nullptr;
+    void* parent_surface = nullptr;
+    
+    while (retry_count < MAX_RETRIES) {
+        parent_display = lvgl_if->getWaylandDisplay();
+        parent_compositor = lvgl_if->getWaylandCompositor();
+        parent_subcompositor = lvgl_if->getWaylandSubcompositor();
+        parent_surface = lvgl_if->getWaylandSurface();
         
-        // 获取LVGL的Wayland对象
-        if (!lvgl_interface_ptr_) {
-            std::cerr << "❌ LVGL接口未设置" << std::endl;
-            return false;
+        if (parent_display && parent_compositor && parent_subcompositor && parent_surface) {
+            std::cout << "✅ 已获取LVGL Wayland父窗口对象（重试" << retry_count << "次）" << std::endl;
+            break;
         }
         
-        auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
+        std::cout << "⏳ 等待LVGL Wayland对象初始化...（第" << (retry_count + 1) << "次尝试）" << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        retry_count++;
+    }
+    
+    if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
+        std::cerr << "❌ 无法获取LVGL Wayland对象（已重试" << MAX_RETRIES << "次）" << std::endl;
+        std::cerr << "   Display: " << (parent_display ? "OK" : "NULL") << std::endl;
+        std::cerr << "   Compositor: " << (parent_compositor ? "OK" : "NULL") << std::endl;
+        std::cerr << "   Subcompositor: " << (parent_subcompositor ? "OK" : "NULL") << std::endl;
+        std::cerr << "   Surface: " << (parent_surface ? "OK" : "NULL") << std::endl;
         
-        // 等待LVGL的Wayland对象完全初始化
-        std::cout << "\n🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面..." << std::endl;
-        ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
-        if (!ui_manager_->initialize()) {
-            std::cout << "❌ [LVGL] LVGL Wayland界面初始化失败" << std::endl;
-            
-            // ❌ 关键修复：不要继续！Wayland窗口是必需的
-            std::cout << "   LVGL窗口创建失败，无法继续" << std::endl;
-            std::cout << "   请检查Weston状态: sudo systemctl status weston" << std::endl;
-            return false;
-        }
+        // 即使失败也允许继续，使用AppSink模式
+        std::cout << "🔄 DeepStream将使用AppSink软件合成模式" << std::endl;
         
-        // ✅ 验证LVGL窗口已成功创建
-        #ifdef ENABLE_LVGL
-        if (ui_manager_->getLVGLInterface()) {
-            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(
-                ui_manager_->getLVGLInterface());
-            
-            // 验证Wayland对象存在
-            void* display = lvgl_if->getWaylandDisplay();
-            void* surface = lvgl_if->getWaylandSurface();
-            
-            if (!display || !surface) {
-                std::cerr << "❌ LVGL Wayland对象不完整" << std::endl;
-                return false;
-            }
-            
-            // 验证连接健康
-            auto* wl_display = static_cast<struct wl_display*>(display);
-            if (wl_display_get_error(wl_display) != 0) {
-                std::cerr << "❌ LVGL Wayland连接已损坏" << std::endl;
-                return false;
-            }
-            
-            std::cout << "✅ LVGL顶层窗口创建成功" << std::endl;
-        }
-        #endif
-        
-        std::cout << "✅ [LVGL] LVGL Wayland界面初始化成功" << std::endl;
-        
-        // 创建DeepStream管理器（使用Subsurface）
-        deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
-        
-        // 配置Subsurface
-        deepstream::SubsurfaceConfig subsurface_config;
-        subsurface_config.offset_x = 0;
-        subsurface_config.offset_y = 80;  // 跳过LVGL头部面板
-        subsurface_config.width = 960;
-        subsurface_config.height = 640;
-        subsurface_config.use_sync_mode = true;
-        
-        // 🔧 关键：使用Subsurface模式初始化
-        if (!deepstream_manager_->initializeWithSubsurface(
-                parent_display,
-                parent_compositor,
-                parent_subcompositor,
-                parent_surface,
-                subsurface_config)) {
-            std::cerr << "❌ DeepStream Subsurface初始化失败" << std::endl;
-            return false;
-        }
-        
-        std::cout << "✅ [推理系统] Wayland Subsurface架构初始化完成" << std::endl;
-        std::cout << "📺 视频将由Weston自动合成到LVGL窗口" << std::endl;
-        
-        return true;
+        // 创建DeepStream管理器但不使用Subsurface
+        return initializeDeepStreamManager();
+    }
+    
+    std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
+    
+    // 创建DeepStream管理器（使用Subsurface）
+    deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+    
+    // 配置Subsurface
+    deepstream::SubsurfaceConfig subsurface_config;
+    subsurface_config.offset_x = 0;
+    subsurface_config.offset_y = 80;  // 跳过LVGL头部面板
+    subsurface_config.width = 960;
+    subsurface_config.height = 640;
+    subsurface_config.use_sync_mode = true;
+    
+    // 🔧 关键：使用Subsurface模式初始化
+    if (!deepstream_manager_->initializeWithSubsurface(
+            parent_display,
+            parent_compositor,
+            parent_subcompositor,
+            parent_surface,
+            subsurface_config)) {
+        std::cerr << "❌ DeepStream Subsurface初始化失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "✅ [推理系统] Wayland Subsurface架构初始化完成" << std::endl;
+    std::cout << "📺 视频将由Weston自动合成到LVGL窗口" << std::endl;
+    
+    return true;
     }
     
     bool start() {
