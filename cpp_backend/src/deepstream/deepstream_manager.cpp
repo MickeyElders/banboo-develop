@@ -833,16 +833,15 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
         std::cout << "[DeepStreamManager] 跳过nvinfer（配置文件未找到: " << nvinfer_config_path << "）" << std::endl;
     }
     
-    // 硬件加速格式转换和缩放，使用dmabuf for EGL共享
+    // 硬件加速格式转换和缩放（第一步：在NVMM内存中处理）
     pipeline << "! nvvidconv ";
     
-    // 输出格式和尺寸 - 使用NVMM内存进行EGL共享
-    pipeline << "! video/x-raw(memory:NVMM)"
-             << ",format=RGBA"
+    // 第二步：从NVMM转换到标准内存，waylandsink需要标准内存格式
+    pipeline << "! video/x-raw,format=RGBA"
              << ",width=" << width
              << ",height=" << height << " ";
     
-    // 使用waylandsink的EGL dmabuf导入功能
+    // 使用waylandsink进行Wayland显示
     pipeline << "! waylandsink ";
     
     // EGL共享和dmabuf优化参数
