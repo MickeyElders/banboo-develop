@@ -485,6 +485,18 @@ install-system:
 	@cd $(BUILD_DIR) && sudo make install
 	@sudo mkdir -p $(INSTALL_DIR)/logs
 	@sudo mkdir -p $(INSTALL_DIR)/backup
+	@echo "$(BLUE)[INFO]$(NC) 复制配置文件..."
+	@sudo mkdir -p $(INSTALL_DIR)/config
+	@sudo cp -r config/* $(INSTALL_DIR)/config/ 2>/dev/null || true
+	@echo "$(BLUE)[INFO]$(NC) 确保nvinfer配置文件和标签文件存在..."
+	@if [ -f "config/nvinfer_config.txt" ]; then \
+		sudo cp config/nvinfer_config.txt $(INSTALL_DIR)/config/; \
+		echo "$(GREEN)[SUCCESS]$(NC) nvinfer配置文件已复制"; \
+	fi
+	@if [ -f "config/labels.txt" ]; then \
+		sudo cp config/labels.txt $(INSTALL_DIR)/config/; \
+		echo "$(GREEN)[SUCCESS]$(NC) 标签文件已复制"; \
+	fi
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/logs
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/backup
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统安装完成"
