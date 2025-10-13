@@ -1435,7 +1435,7 @@ void DeepStreamManager::canvasUpdateLoop() {
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
                 
                 if (canvas) {
-                    std::cout << "Canvas对象获取成功" << std::endl;
+                    // Canvas对象获取成功（静默模式）
                     
                     // 🔧 修复1: 确保帧格式统一为BGRA
                     cv::Mat display_frame;
@@ -1456,31 +1456,25 @@ void DeepStreamManager::canvasUpdateLoop() {
                     // 🔧 修复3: 确保数据连续性
                     if (!display_frame.isContinuous()) {
                         display_frame = display_frame.clone();
-                        std::cout << "帧数据不连续，已克隆" << std::endl;
+                        // 帧数据不连续，已克隆（静默模式）
                     }
                     
                     // 验证数据
                     if (display_frame.channels() != 4 || 
                         display_frame.cols != 960 || 
                         display_frame.rows != 640) {
-                        std::cout << "错误：帧格式不正确" << std::endl;
+                        // 帧格式不正确（静默模式）
                         continue;
                     }
                     
                     // 调试：检查源数据
                     cv::Vec4b src_first = display_frame.at<cv::Vec4b>(0, 0);
                     cv::Vec4b src_center = display_frame.at<cv::Vec4b>(320, 480);
-                    std::cout << "源数据 - 第一个像素BGRA: [" 
-                             << (int)src_first[0] << "," << (int)src_first[1] 
-                             << "," << (int)src_first[2] << "," << (int)src_first[3] << "]" << std::endl;
-                    std::cout << "源数据 - 中心像素BGRA: [" 
-                             << (int)src_center[0] << "," << (int)src_center[1] 
-                             << "," << (int)src_center[2] << "," << (int)src_center[3] << "]" << std::endl;
-                    
+            
                     // 获取canvas缓冲区
                     lv_img_dsc_t* canvas_dsc = lv_canvas_get_image(canvas);
                     if (canvas_dsc && canvas_dsc->data) {
-                        std::cout << "Canvas缓冲区获取成功" << std::endl;
+                        // Canvas缓冲区获取成功（静默模式）
                         
                         uint32_t* canvas_buffer = (uint32_t*)canvas_dsc->data;
                         const uint8_t* src_data = display_frame.data;
