@@ -536,5 +536,276 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
     }
 }
 
+// DRM EGL后端实现
+bool LVGLWaylandInterface::Impl::initializeDRMBackend() {
+    // 打开DRM设备
+    drm_fd_ = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (drm_fd_ < 0) {
+        std::cerr << "无法打开DRM设备" << std::endl;
+        return false;
+    }
+    
+    // 查找DRM资源
+    if (!findDRMResources()) {
+        close(drm_fd_);
+        drm_fd_ = -1;
+        return false;
+    }
+    
+    // 设置显示模式
+    if (!setupDRMMode()) {
+        cleanup();
+        return false;
+    }
+    
+    // 创建GBM设备
+    gbm_device_ = gbm_create_device(drm_fd_);
+    if (!gbm_device_) {
+        std::cerr << "GBM设备创建失败" << std::endl;
+        cleanup();
+        return false;
+    }
+    
+    // 创建GBM表面
+    gbm_surface_ = gbm_surface_create(gbm_device_,
+                                      config_.screen_width,
+                                      config_.screen_height,
+                                      GBM_FORMAT_XRGB8888,
+                                      GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+    if (!gbm_surface_) {
+        std::cerr << "GBM表面创建失败" << std::endl;
+        cleanup();
+        return false;
+    }
+    
+    drm_initialized_ = true;
+    return true;
+}
+
+bool LVGLWaylandInterface::Impl::initializeEGL() {
+    if (!drm_initialized_) {
+        return false;
+    }
+    
+    // 获取EGL显示
+    egl_display_ = eglGetDisplay((EGLNativeDisplayType)gbm_device_);
+    if (egl_display_ == EGL_NO_DISPLAY) {
+        std::cerr << "EGL显示获取失败" << std::endl;
+        return false;
+    }
+    
+    // 初始化EGL
+    EGLint major, minor;
+    if (!eglInitialize(egl_display_, &major, &minor)) {
+        std::cerr << "EGL初始化失败" << std::endl;
+        return false;
+    }
+    
+    // 选择EGL配置
+    egl_config_ = chooseEGLConfig();
+    
+    // 创建EGL上下文
+    static const EGLint context_attribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+    
+    egl_context_ = eglCreateContext(egl_display_, egl_config_, EGL_NO_CONTEXT, context_attribs);
+    if (egl_context_ == EGL_NO_CONTEXT) {
+        std::cerr << "EGL上下文创建失败" << std::endl;
+        return false;
+    }
+    
+    // 创建EGL表面
+    egl_surface_ = eglCreateWindowSurface(egl_display_, egl_config_,
+                                          (EGLNativeWindowType)gbm_surface_, nullptr);
+    if (egl_surface_ == EGL_NO_SURFACE) {
+        std::cerr << "EGL表面创建失败" << std::endl;
+        return false;
+    }
+    
+    // 激活上下文
+    if (!eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_)) {
+        std::cerr << "EGL上下文激活失败" << std::endl;
+        return false;
+    }
+    
+    egl_initialized_ = true;
+    return true;
+}
+
+bool LVGLWaylandInterface::Impl::findDRMResources() {
+    drm_resources_ = drmModeGetResources(drm_fd_);
+    if (!drm_resources_) {
+        std::cerr << "获取DRM资源失败" << std::endl;
+        return false;
+    }
+    
+    // 查找连接的显示器
+    for (int i = 0; i < drm_resources_->count_connectors; i++) {
+        drm_connector_ = drmModeGetConnector(drm_fd_, drm_resources_->connectors[i]);
+        if (drm_connector_ && drm_connector_->connection == DRM_MODE_CONNECTED) {
+            drm_connector_id_ = drm_connector_->connector_id;
+            break;
+        }
+        if (drm_connector_) {
+            drmModeFreeConnector(drm_connector_);
+            drm_connector_ = nullptr;
+        }
+    }
+    
+    if (!drm_connector_) {
+        std::cerr << "未找到连接的显示器" << std::endl;
+        return false;
+    }
+    
+    // 查找编码器
+    if (drm_connector_->encoder_id) {
+        drm_encoder_ = drmModeGetEncoder(drm_fd_, drm_connector_->encoder_id);
+        if (drm_encoder_) {
+            drm_crtc_id_ = drm_encoder_->crtc_id;
+        }
+    }
+    
+    return true;
+}
+
+bool LVGLWaylandInterface::Impl::setupDRMMode() {
+    if (!drm_connector_ || drm_connector_->count_modes == 0) {
+        return false;
+    }
+    
+    // 使用第一个可用模式
+    drm_mode_ = drm_connector_->modes[0];
+    
+    // 获取CRTC
+    drm_crtc_ = drmModeGetCrtc(drm_fd_, drm_crtc_id_);
+    if (!drm_crtc_) {
+        std::cerr << "获取CRTC失败" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+EGLConfig LVGLWaylandInterface::Impl::chooseEGLConfig() {
+    EGLint config_attribs[] = {
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+        EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_BLUE_SIZE, 8,
+        EGL_ALPHA_SIZE, 8,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+    };
+    
+    EGLConfig config;
+    EGLint num_configs;
+    
+    if (!eglChooseConfig(egl_display_, config_attribs, &config, 1, &num_configs)) {
+        std::cerr << "EGL配置选择失败" << std::endl;
+        return nullptr;
+    }
+    
+    return config;
+}
+
+void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t* color_p) {
+    if (!egl_initialized_) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(render_mutex_);
+    
+    // 使用OpenGL ES渲染到屏幕
+    glViewport(0, 0, config_.screen_width, config_.screen_height);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    
+    // 这里应该将LVGL的颜色缓冲区渲染到OpenGL纹理
+    // 暂时留空，因为需要更复杂的纹理操作
+    
+    // 交换缓冲区
+    eglSwapBuffers(egl_display_, egl_surface_);
+}
+
+void LVGLWaylandInterface::Impl::cleanup() {
+    // 清理EGL资源
+    if (egl_initialized_) {
+        if (egl_display_ != EGL_NO_DISPLAY) {
+            eglMakeCurrent(egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            
+            if (egl_surface_ != EGL_NO_SURFACE) {
+                eglDestroySurface(egl_display_, egl_surface_);
+                egl_surface_ = EGL_NO_SURFACE;
+            }
+            
+            if (egl_context_ != EGL_NO_CONTEXT) {
+                eglDestroyContext(egl_display_, egl_context_);
+                egl_context_ = EGL_NO_CONTEXT;
+            }
+            
+            eglTerminate(egl_display_);
+            egl_display_ = EGL_NO_DISPLAY;
+        }
+        egl_initialized_ = false;
+    }
+    
+    // 清理GBM资源
+    if (gbm_surface_) {
+        gbm_surface_destroy(gbm_surface_);
+        gbm_surface_ = nullptr;
+    }
+    
+    if (gbm_device_) {
+        gbm_device_destroy(gbm_device_);
+        gbm_device_ = nullptr;
+    }
+    
+    // 清理DRM资源
+    if (drm_crtc_) {
+        drmModeFreeCrtc(drm_crtc_);
+        drm_crtc_ = nullptr;
+    }
+    
+    if (drm_encoder_) {
+        drmModeFreeEncoder(drm_encoder_);
+        drm_encoder_ = nullptr;
+    }
+    
+    if (drm_connector_) {
+        drmModeFreeConnector(drm_connector_);
+        drm_connector_ = nullptr;
+    }
+    
+    if (drm_resources_) {
+        drmModeFreeResources(drm_resources_);
+        drm_resources_ = nullptr;
+    }
+    
+    if (drm_fd_ >= 0) {
+        close(drm_fd_);
+        drm_fd_ = -1;
+    }
+    
+    drm_initialized_ = false;
+    
+    // 清理显示缓冲区
+    if (front_buffer_) {
+        free(front_buffer_);
+        front_buffer_ = nullptr;
+    }
+    
+    if (back_buffer_) {
+        free(back_buffer_);
+        back_buffer_ = nullptr;
+    }
+}
+
+// 析构函数实现
+LVGLWaylandInterface::Impl::~Impl() {
+    cleanup();
+}
+
 } // namespace ui
 } // namespace bamboo_cut
