@@ -27,8 +27,8 @@
 #include <wayland-egl.h>
 #include <vector>
 
-// 使用现代xdg-shell协议替代废弃的wl_shell
-#include "wayland-protocols/xdg-shell-client-protocol.h"
+#include <wayland-client-protocol.h>
+#include <xdg-shell-client-protocol.h>
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
