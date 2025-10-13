@@ -620,43 +620,44 @@ public:
         auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
         
         // 等待LVGL的Wayland对象完全初始化
-        int retry_count = 0;
-        const int MAX_RETRIES = 10;
-        
-        void* parent_display = nullptr;
-        void* parent_compositor = nullptr;
-        void* parent_subcompositor = nullptr;
-        void* parent_surface = nullptr;
-        
-        while (retry_count < MAX_RETRIES) {
-            parent_display = lvgl_if->getWaylandDisplay();
-            parent_compositor = lvgl_if->getWaylandCompositor();
-            parent_subcompositor = lvgl_if->getWaylandSubcompositor();
-            parent_surface = lvgl_if->getWaylandSurface();
+        std::cout << "\n🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面..." << std::endl;
+        ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
+        if (!ui_manager_->initialize()) {
+            std::cout << "❌ [LVGL] LVGL Wayland界面初始化失败" << std::endl;
             
-            if (parent_display && parent_compositor && parent_subcompositor && parent_surface) {
-                std::cout << "✅ 已获取LVGL Wayland父窗口对象（重试" << retry_count << "次）" << std::endl;
-                break;
+            // ❌ 关键修复：不要继续！Wayland窗口是必需的
+            std::cout << "   LVGL窗口创建失败，无法继续" << std::endl;
+            std::cout << "   请检查Weston状态: sudo systemctl status weston" << std::endl;
+            return false;
+        }
+        
+        // ✅ 验证LVGL窗口已成功创建
+        #ifdef ENABLE_LVGL
+        if (ui_manager_->getLVGLInterface()) {
+            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(
+                ui_manager_->getLVGLInterface());
+            
+            // 验证Wayland对象存在
+            void* display = lvgl_if->getWaylandDisplay();
+            void* surface = lvgl_if->getWaylandSurface();
+            
+            if (!display || !surface) {
+                std::cerr << "❌ LVGL Wayland对象不完整" << std::endl;
+                return false;
             }
             
-            std::cout << "⏳ 等待LVGL Wayland对象初始化...（第" << (retry_count + 1) << "次尝试）" << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            retry_count++;
-        }
-        
-        if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
-            std::cerr << "❌ 无法获取LVGL Wayland对象（已重试" << MAX_RETRIES << "次）" << std::endl;
-            std::cerr << "   Display: " << (parent_display ? "OK" : "NULL") << std::endl;
-            std::cerr << "   Compositor: " << (parent_compositor ? "OK" : "NULL") << std::endl;
-            std::cerr << "   Subcompositor: " << (parent_subcompositor ? "OK" : "NULL") << std::endl;
-            std::cerr << "   Surface: " << (parent_surface ? "OK" : "NULL") << std::endl;
+            // 验证连接健康
+            auto* wl_display = static_cast<struct wl_display*>(display);
+            if (wl_display_get_error(wl_display) != 0) {
+                std::cerr << "❌ LVGL Wayland连接已损坏" << std::endl;
+                return false;
+            }
             
-            // 即使EGL失败，也要尝试继续运行DeepStream（使用AppSink模式）
-            std::cout << "🔄 EGL初始化失败，DeepStream将使用AppSink软件合成模式" << std::endl;
-            return true; // 允许系统继续运行，但使用AppSink模式
+            std::cout << "✅ LVGL顶层窗口创建成功" << std::endl;
         }
+        #endif
         
-        std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
+        std::cout << "✅ [LVGL] LVGL Wayland界面初始化成功" << std::endl;
         
         // 创建DeepStream管理器（使用Subsurface）
         deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();

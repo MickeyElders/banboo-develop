@@ -390,6 +390,35 @@ bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
+    std::cout << "正在初始化Wayland客户端..." << std::endl;
+    
+    // ✅ 修复：在任何Wayland错误发生时，立即停止并报告
+    if (!initializeWaylandClient()) {
+        std::cerr << "❌ Wayland客户端初始化失败" << std::endl;
+        
+        // 🔧 关键修复：检查具体错误原因
+        if (wl_display_) {
+            int error_code = wl_display_get_error(wl_display_);
+            if (error_code == 1) {
+                std::cerr << "   错误原因: xdg_positioner协议错误" << std::endl;
+                std::cerr << "   可能原因: Weston内部状态冲突或其他客户端干扰" << std::endl;
+                std::cerr << "   建议: 重启Weston (sudo systemctl restart weston)" << std::endl;
+            } else if (error_code == 22) {
+                std::cerr << "   错误原因: EINVAL - 无效参数" << std::endl;
+                std::cerr << "   可能原因: Wayland对象使用顺序错误" << std::endl;
+            }
+        }
+        
+        // ❌ 不要降级到fallback！应该完全失败，让用户修复环境
+        return false;  // 让整个系统初始化失败
+    }
+    
+    // 继续EGL初始化...
+    if (!initializeWaylandEGL()) {
+        std::cerr << "❌ Wayland EGL初始化失败" << std::endl;
+        // 🔧 EGL失败可以降级，但Wayland窗口必须成功
+        return initializeFallbackDisplayWithWaylandObjects();
+    }
     // 首先初始化Wayland客户端
     std::cout << "正在初始化Wayland客户端..." << std::endl;
     if (!initializeWaylandClient()) {
@@ -675,6 +704,7 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
     }
 }
 
+
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "🔗 连接Wayland客户端..." << std::endl;
     
@@ -725,6 +755,21 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     std::cout << "✅ 已设置xdg_wm_base监听器" << std::endl;
     
+    // 🔧 关键修复：在创建任何surface之前，清理任何待处理的事件
+    std::cout << "🔧 清理待处理的Wayland事件..." << std::endl;
+    while (wl_display_prepare_read(wl_display_) != 0) {
+        wl_display_dispatch_pending(wl_display_);
+    }
+    wl_display_cancel_read(wl_display_);
+    wl_display_flush(wl_display_);
+    
+    // 🔧 检查连接健康状态
+    int error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ Wayland display在创建surface前已有错误: " << error_code << std::endl;
+        return false;
+    }
+    
     // 创建surface
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
@@ -733,13 +778,27 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 已创建Wayland surface" << std::endl;
     
-    // ✅ 修复：使用现代xdg-shell协议创建顶层窗口
+    // 🔧 立即检查是否有错误
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ 创建surface后发生错误: " << error_code << std::endl;
+        return false;
+    }
+    
+    // 创建xdg_surface
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg surface" << std::endl;
         return false;
     }
     std::cout << "✅ 已创建xdg surface" << std::endl;
+    
+    // 🔧 再次检查错误
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ 创建xdg_surface后发生错误: " << error_code << std::endl;
+        return false;
+    }
     
     // 设置xdg_surface监听器
     static const struct xdg_surface_listener xdg_surface_listener = {
@@ -755,6 +814,14 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 已创建xdg toplevel" << std::endl;
     
+    // 🔧 关键：检查是否有xdg_positioner错误
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ 创建toplevel后发生xdg_positioner错误: " << error_code << std::endl;
+        std::cerr << "   这通常是由于Weston内部窗口或其他客户端冲突导致" << std::endl;
+        return false;
+    }
+    
     // 设置toplevel监听器
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
@@ -766,8 +833,17 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
     
-    // 🔧 关键修复：提交前先处理一次事件，确保监听器注册完成
+    std::cout << "✅ 已设置窗口属性" << std::endl;
+    
+    // 🔧 关键修复：在提交前先同步一次
     wl_display_roundtrip(wl_display_);
+    
+    // 最后检查
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ 设置窗口属性后发生错误: " << error_code << std::endl;
+        return false;
+    }
     
     // 提交surface
     wl_surface_commit(wl_surface_);
@@ -775,8 +851,8 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     std::cout << "⏳ 等待xdg_surface configure事件..." << std::endl;
     
-    // 🔧 改进：主动处理事件直到收到configure
-    for (int i = 0; i < 30; i++) {  // 最多等待3秒
+    // 主动处理事件直到收到configure
+    for (int i = 0; i < 30; i++) {
         wl_display_dispatch_pending(wl_display_);
         wl_display_flush(wl_display_);
         
