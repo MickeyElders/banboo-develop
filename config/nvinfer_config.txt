@@ -44,8 +44,8 @@ parse-bbox-func-name=NvDsInferParseYolo
 #custom-lib-path=/opt/nvidia/deepstream/deepstream/lib/libnvdsinfer_custom_impl_Custom.so
 #engine-create-func-name=NvDsInferYoloCudaEngineGet
 
-## Output layer names for YOLOv8/YOLOv5 models
-output-blob-names=output0
+## Let DeepStream auto-detect output layers
+#output-blob-names=output0
 #coverage-blob-name=output0
 
 [class-attrs-all]
