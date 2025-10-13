@@ -136,6 +136,36 @@ bool DeepStreamManager::initializeWithSubsurface(
     wl_display_flush(wl_display);
     
     std::cout << "✅ [DeepStream] Wayland Subsurface初始化完成" << std::endl;
+
+    // 🔧 关键修复1：检查父display健康状态
+    auto* wl_display = static_cast<struct wl_display*>(parent_display);
+    if (wl_display) {
+        int error_code = wl_display_get_error(wl_display);
+        if (error_code != 0) {
+            std::cerr << "❌ 父Wayland display已损坏: " << error_code << std::endl;
+            std::cerr << "🔄 降级到AppSink模式" << std::endl;
+            
+            // 创建AppSink配置
+            deepstream::DeepStreamConfig config;
+            config.sink_mode = VideoSinkMode::APPSINK;
+            config.screen_width = subsurface_config_.width;
+            config.screen_height = subsurface_config_.height;
+            
+            return initialize(config);  // 使用AppSink模式初始化
+        }
+    }
+    
+    // 🔧 关键修复2：调用完整初始化流程
+    config_.sink_mode = VideoSinkMode::WAYLANDSINK;
+    config_.screen_width = subsurface_config_.width;
+    config_.screen_height = subsurface_config_.height;
+    
+    if (!initialize(config_)) {
+        std::cerr << "❌ DeepStream配置初始化失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "✅ Wayland Subsurface完整初始化成功" << std::endl;
     return true;
 }
 
