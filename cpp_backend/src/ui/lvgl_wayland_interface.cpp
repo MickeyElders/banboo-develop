@@ -22,8 +22,8 @@
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include <drm/drm.h>
-#include <drm/drm_fourcc.h>
+#include <libdrm/drm.h>
+#include <libdrm/drm_fourcc.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #include <gbm.h>
