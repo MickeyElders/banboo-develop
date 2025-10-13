@@ -851,23 +851,45 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     
+    // 🔧 关键修复：在提交surface前再次检查错误状态
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ 提交surface前发现xdg_positioner错误: " << error_code << std::endl;
+        return false;
+    }
+    
     // 提交surface
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
+    // 🔧 立即检查提交后的错误状态
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ 提交surface后发生xdg_positioner错误: " << error_code << std::endl;
+        std::cerr << "   这通常是因为Weston合成器状态冲突或其他客户端干扰" << std::endl;
+        return false;
+    }
+    
     std::cout << "⏳ 等待xdg_surface configure事件..." << std::endl;
     
-    // 主动处理事件直到收到configure
-    for (int i = 0; i < 30; i++) {
+    // 减少等待时间和次数，避免长时间占用
+    for (int i = 0; i < 20; i++) {
         wl_display_dispatch_pending(wl_display_);
         wl_display_flush(wl_display_);
+        
+        // 每次循环都检查错误状态
+        error_code = wl_display_get_error(wl_display_);
+        if (error_code != 0) {
+            std::cerr << "❌ 等待configure过程中发生错误: " << error_code << std::endl;
+            return false;
+        }
         
         if (configure_received_.load()) {
             std::cout << "✅ Configure事件已在第" << i << "次尝试中接收" << std::endl;
             break;
         }
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));  // 减少等待时间
     }
     
     if (!configure_received_.load()) {
