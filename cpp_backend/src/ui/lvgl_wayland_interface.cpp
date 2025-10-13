@@ -829,19 +829,25 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     
-    // 设置窗口属性
-    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
-    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
+    // 🔧 关键修复：避免xdg_positioner错误 - 不要设置可能导致协议错误的属性
+    std::cout << "🔧 设置基础窗口属性（避免xdg_positioner错误）...\" << std::endl;
     
-    std::cout << "✅ 已设置窗口属性" << std::endl;
+    // 只设置最基本的窗口属性，避免触发xdg_positioner
+    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo");  // 使用简短标题
+    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo");  // 使用简短ID
     
-    // 🔧 关键修复：在提交前先同步一次
+    std::cout << "✅ 已设置基础窗口属性" << std::endl;
+    
+    // 🔧 关键：不要立即设置窗口大小，让合成器决定
+    // 避免调用任何可能触发xdg_positioner的操作
+    
+    // 进行一次同步以确保属性已设置
     wl_display_roundtrip(wl_display_);
     
-    // 最后检查
+    // 检查设置属性后的错误状态
     error_code = wl_display_get_error(wl_display_);
     if (error_code != 0) {
-        std::cerr << "❌ 设置窗口属性后发生错误: " << error_code << std::endl;
+        std::cerr << "❌ 设置窗口属性后发生xdg_positioner错误: " << error_code << std::endl;
         return false;
     }
     
@@ -912,20 +918,25 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     // 🔧 关键修复：在xdg_surface configure完成后再创建EGL窗口
     std::cout << "⏳ 确保xdg_surface configure事件已完成..." << std::endl;
     
+    // 检查Wayland连接健康状态
+    int check_error_code = wl_display_get_error(wl_display_);
+    if (check_error_code != 0) {
+        std::cerr << "❌ Wayland连接已损坏，错误码: " << check_error_code << std::endl;
+        return false;  // 立即失败，不要继续使用损坏的连接
+    }
+    
     // 额外等待并处理任何剩余的Wayland事件
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 10; i++) {  // 减少等待次数
         wl_display_dispatch_pending(wl_display_);
         wl_display_flush(wl_display_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         
-        // 检查Wayland连接状态（使用不同的变量名）
-        int check_error_code = wl_display_get_error(wl_display_);  // 🔧 改名避免冲突
-        if (check_error_code != 0) {
-            std::cout << "⚠️ 检测到Wayland错误: " << check_error_code 
-                      << "，但继续创建EGL窗口" << std::endl;
-            break;
+        // 再次检查连接状态
+        int loop_error_code = wl_display_get_error(wl_display_);
+        if (loop_error_code != 0) {
+            std::cerr << "❌ EGL初始化期间检测到Wayland协议错误: " << loop_error_code << std::endl;
+            return false;
         }
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     
     // 🔧 关键：在创建EGL窗口前进行最后检查
