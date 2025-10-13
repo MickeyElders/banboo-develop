@@ -274,8 +274,8 @@ void LVGLWaylandInterface::uiThreadLoop() {
         auto now = std::chrono::steady_clock::now();
         loop_count++;
         
-        // 🔍 每60帧打印一次状态
-        if (loop_count <= 5 || loop_count % 60 == 0) {
+        // 🔍 每600帧打印一次状态
+        if (loop_count <= 5 || loop_count % 600 == 0) {
             std::cout << "🔄 UI循环 #" << loop_count << std::endl;
         }
         

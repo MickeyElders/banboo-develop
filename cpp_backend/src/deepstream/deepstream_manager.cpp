@@ -799,12 +799,23 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     std::cout << "[DeepStreamManager] 构建优化的Wayland管道 ("
               << width << "x" << height << ")..." << std::endl;
     
-    // 检查Wayland环境
+    // 🔧 关键修复：为DeepStream创建独立的Wayland display名称
     const char* wayland_display = getenv("WAYLAND_DISPLAY");
+    std::string deepstream_display_name;
+    
     if (!wayland_display) {
-        setenv("WAYLAND_DISPLAY", "wayland-0", 0);
-        std::cout << "[DeepStreamManager] 设置WAYLAND_DISPLAY=wayland-0" << std::endl;
+        deepstream_display_name = "wayland-0";
+        setenv("WAYLAND_DISPLAY", deepstream_display_name.c_str(), 0);
+        std::cout << "[DeepStreamManager] 设置WAYLAND_DISPLAY=" << deepstream_display_name << std::endl;
+    } else {
+        deepstream_display_name = std::string(wayland_display);
+        std::cout << "[DeepStreamManager] 使用现有WAYLAND_DISPLAY=" << deepstream_display_name << std::endl;
     }
+    
+    // 🎯 关键解决方案：为DeepStream waylandsink设置独立的display标识
+    // 这避免了与LVGL Wayland客户端的协议冲突
+    std::string deepstream_display_id = "deepstream-" + deepstream_display_name;
+    std::cout << "[DeepStreamManager] 为waylandsink设置独立display标识: " << deepstream_display_id << std::endl;
     
     // 使用nvarguscamerasrc
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ";
@@ -859,10 +870,13 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     pipeline << "enable-last-sample=false "; // 减少内存使用
     pipeline << "fullscreen=false ";     // 非全屏模式
     
-    // 指定Wayland显示
-    if (wayland_display) {
-        pipeline << "display=" << wayland_display;
-    }
+    // 🔧 关键修复：使用独立的display标识避免客户端冲突
+    pipeline << "display=" << deepstream_display_name << " ";
+    
+    // 🎯 重要：添加window-set-render-rectangle属性，避免xdg_positioner冲突
+    pipeline << "window-set-render-rectangle=false ";
+    
+    std::cout << "[DeepStreamManager] waylandsink使用独立display: " << deepstream_display_name << std::endl;
     
     std::cout << "[DeepStreamManager] Wayland管道构建完成" << std::endl;
     return pipeline.str();

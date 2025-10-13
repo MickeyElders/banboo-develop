@@ -1125,12 +1125,39 @@ public:
     void run() {
         std::cout << "Starting Wayland integrated system..." << std::endl;
         
-        // Wayland架构：等待LVGL Wayland界面稳定
-        std::cout << "🔧 等待LVGL Wayland界面完全启动..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2)); // 给LVGL Wayland充足时间连接到Weston
+        // 🔧 关键修复：优化Wayland客户端启动顺序，避免xdg_positioner冲突
+        std::cout << "🔧 等待LVGL Wayland界面完全启动和连接稳定..." << std::endl;
         
-        // 启动推理工作线程，GStreamer将使用waylandsink
-        std::cout << "现在启动推理线程（waylandsink模式）..." << std::endl;
+        #ifdef ENABLE_LVGL
+        if (ui_manager_ && ui_manager_->getLVGLInterface()) {
+            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(ui_manager_->getLVGLInterface());
+            int wait_count = 0;
+            const int MAX_WAIT_SECONDS = 15;
+            
+            while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                wait_count++;
+                std::cout << "⏳ 等待LVGL Wayland完全初始化... (" << (wait_count * 0.5) << "秒)" << std::endl;
+            }
+            
+            if (lvgl_if->isFullyInitialized()) {
+                std::cout << "✅ LVGL Wayland已完全初始化" << std::endl;
+            } else {
+                std::cout << "⚠️ 警告：LVGL初始化超时，但继续启动" << std::endl;
+            }
+        } else
+        #endif
+        {
+            std::cout << "📝 LVGL不可用，使用固定延迟" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        }
+        
+        // 🎯 关键：额外等待确保Wayland连接完全稳定
+        std::cout << "🔄 额外等待Wayland display连接稳定..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        
+        // 启动推理工作线程，GStreamer将使用独立的waylandsink连接
+        std::cout << "现在启动推理线程（独立waylandsink连接模式）..." << std::endl;
         if (!inference_worker_->start()) {
             std::cout << "Inference thread startup failed" << std::endl;
             return;
