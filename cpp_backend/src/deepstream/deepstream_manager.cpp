@@ -1273,13 +1273,15 @@ bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
 }
 
 // ❌ Canvas更新线程已移除 - 使用Weston GPU合成
-// void DeepStreamManager::startCanvasUpdateThread() {
-//     // Weston自动在GPU中合成视频和UI，不需要手动Canvas更新线程
-// }
+void DeepStreamManager::startCanvasUpdateThread() {
+    // Weston自动在GPU中合成视频和UI，不需要手动Canvas更新线程
+    std::cout << "📺 [DeepStream] Canvas更新线程已被Wayland Subsurface GPU合成替代" << std::endl;
+}
 
-// void DeepStreamManager::stopCanvasUpdateThread() {
-//     // Canvas更新线程已被GPU硬件合成替代
-// }
+void DeepStreamManager::stopCanvasUpdateThread() {
+    // Canvas更新线程已被GPU硬件合成替代
+    std::cout << "📺 [DeepStream] 停止Canvas更新线程（GPU合成模式下为空操作）" << std::endl;
+}
 
 void DeepStreamManager::canvasUpdateLoop() {
     std::cout << "Canvas更新循环开始运行" << std::endl;
