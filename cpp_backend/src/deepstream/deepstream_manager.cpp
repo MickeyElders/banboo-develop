@@ -1501,23 +1501,6 @@ void DeepStreamManager::canvasUpdateLoop() {
                             }
                         }
                         
-                        std::cout << "像素转换完成" << std::endl;
-                        
-                        // 验证转换结果
-                        uint32_t dst_first = canvas_buffer[0];
-                        uint32_t dst_center = canvas_buffer[320 * 960 + 480];
-                        
-                        std::cout << "目标数据 - 第一个像素ARGB: 0x" << std::hex << dst_first << std::dec;
-                        std::cout << " [A=" << ((dst_first >> 24) & 0xFF)
-                                 << ",R=" << ((dst_first >> 16) & 0xFF)
-                                 << ",G=" << ((dst_first >> 8) & 0xFF)
-                                 << ",B=" << (dst_first & 0xFF) << "]" << std::endl;
-                                 
-                        std::cout << "目标数据 - 中心像素ARGB: 0x" << std::hex << dst_center << std::dec;
-                        std::cout << " [A=" << ((dst_center >> 24) & 0xFF)
-                                 << ",R=" << ((dst_center >> 16) & 0xFF)
-                                 << ",G=" << ((dst_center >> 8) & 0xFF)
-                                 << ",B=" << (dst_center & 0xFF) << "]" << std::endl;
                         
                         // 刷新显示
                         lv_obj_invalidate(canvas);
