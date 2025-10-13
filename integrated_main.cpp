@@ -651,10 +651,7 @@ public:
         std::cerr << "   Subcompositor: " << (parent_subcompositor ? "OK" : "NULL") << std::endl;
         std::cerr << "   Surface: " << (parent_surface ? "OK" : "NULL") << std::endl;
         
-        // 即使失败也允许继续，使用AppSink模式
         std::cout << "🔄 DeepStream将使用AppSink软件合成模式" << std::endl;
-        
-        // 创建DeepStream管理器但不使用Subsurface
         return initializeDeepStreamManager();
     }
     
@@ -666,12 +663,12 @@ public:
     // 配置Subsurface
     deepstream::SubsurfaceConfig subsurface_config;
     subsurface_config.offset_x = 0;
-    subsurface_config.offset_y = 80;  // 跳过LVGL头部面板
+    subsurface_config.offset_y = 80;
     subsurface_config.width = 960;
     subsurface_config.height = 640;
     subsurface_config.use_sync_mode = true;
     
-    // 🔧 关键：使用Subsurface模式初始化
+    // 使用Subsurface模式初始化
     if (!deepstream_manager_->initializeWithSubsurface(
             parent_display,
             parent_compositor,
@@ -686,7 +683,7 @@ public:
     std::cout << "📺 视频将由Weston自动合成到LVGL窗口" << std::endl;
     
     return true;
-    }
+}
     
     bool start() {
         if (running_) return false;
