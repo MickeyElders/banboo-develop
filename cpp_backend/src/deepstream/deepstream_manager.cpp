@@ -81,11 +81,28 @@ bool DeepStreamManager::initializeWithSubsurface(
     
     std::cout << "🎬 [DeepStream] 初始化Wayland Subsurface模式..." << std::endl;
     
-    // 类型转换
+    // 类型转换 - 只声明一次
     auto* wl_display = static_cast<struct wl_display*>(parent_display);
     auto* wl_compositor = static_cast<struct wl_compositor*>(parent_compositor);
     auto* wl_subcompositor = static_cast<struct wl_subcompositor*>(parent_subcompositor);
     auto* wl_parent_surface = static_cast<struct wl_surface*>(parent_surface);
+    
+    // 🔧 新增：检查父display健康状态（使用已声明的wl_display变量）
+    if (wl_display) {
+        int parent_error_code = wl_display_get_error(wl_display);  // 🔧 改名避免冲突
+        if (parent_error_code != 0) {
+            std::cerr << "❌ [DeepStream] 父Wayland display已损坏，错误码: " 
+                      << parent_error_code << std::endl;
+            std::cerr << "🔄 [DeepStream] 降级到AppSink模式" << std::endl;
+            
+            // 创建AppSink配置
+            config_.sink_mode = VideoSinkMode::APPSINK;
+            config_.screen_width = config.width;
+            config_.screen_height = config.height;
+            
+            return initialize(config_);  // 使用AppSink模式初始化
+        }
+    }
     
     // 验证参数
     if (!wl_display || !wl_compositor || !wl_subcompositor || !wl_parent_surface) {
@@ -135,37 +152,17 @@ bool DeepStreamManager::initializeWithSubsurface(
     wl_surface_commit(wl_surface);
     wl_display_flush(wl_display);
     
-    std::cout << "✅ [DeepStream] Wayland Subsurface初始化完成" << std::endl;
-
-    // 🔧 关键修复1：检查父display健康状态
-    auto* wl_display = static_cast<struct wl_display*>(parent_display);
-    if (wl_display) {
-        int error_code = wl_display_get_error(wl_display);
-        if (error_code != 0) {
-            std::cerr << "❌ 父Wayland display已损坏: " << error_code << std::endl;
-            std::cerr << "🔄 降级到AppSink模式" << std::endl;
-            
-            // 创建AppSink配置
-            deepstream::DeepStreamConfig config;
-            config.sink_mode = VideoSinkMode::APPSINK;
-            config.screen_width = subsurface_config_.width;
-            config.screen_height = subsurface_config_.height;
-            
-            return initialize(config);  // 使用AppSink模式初始化
-        }
-    }
-    
-    // 🔧 关键修复2：调用完整初始化流程
+    // 🔧 关键修复：调用完整的initialize()流程
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;
-    config_.screen_width = subsurface_config_.width;
-    config_.screen_height = subsurface_config_.height;
+    config_.screen_width = config.width;
+    config_.screen_height = config.height;
     
     if (!initialize(config_)) {
-        std::cerr << "❌ DeepStream配置初始化失败" << std::endl;
+        std::cerr << "❌ [DeepStream] DeepStream配置初始化失败" << std::endl;
         return false;
     }
     
-    std::cout << "✅ Wayland Subsurface完整初始化成功" << std::endl;
+    std::cout << "✅ [DeepStream] Wayland Subsurface初始化完成" << std::endl;
     return true;
 }
 
