@@ -156,11 +156,6 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     pImpl_->config_ = config;
     
     // 检查Wayland环境
-    std::lock_guard<std::mutex> lock(pImpl_->ui_mutex_);
-    
-    pImpl_->config_ = config;
-    
-    // 检查Wayland环境
     if (!pImpl_->checkWaylandEnvironment()) {
         std::cerr << "Wayland环境不可用" << std::endl;
         return false;
