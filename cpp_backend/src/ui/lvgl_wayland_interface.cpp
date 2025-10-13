@@ -56,12 +56,15 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
-    // Wayland EGL后端 - 简化实现（不依赖xdg-shell）
+    // Wayland EGL后端 - 完整的shell协议实现
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
     struct wl_compositor* wl_compositor_ = nullptr;
+    struct wl_shell* wl_shell_ = nullptr;
     struct wl_surface* wl_surface_ = nullptr;
+    struct wl_shell_surface* wl_shell_surface_ = nullptr;
     struct wl_egl_window* wl_egl_window_ = nullptr;
+    struct wl_callback* frame_callback_ = nullptr;
     
     EGLDisplay egl_display_ = EGL_NO_DISPLAY;
     EGLContext egl_context_ = EGL_NO_CONTEXT;
@@ -111,11 +114,16 @@ public:
     void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
     void cleanup();
     
-    // Wayland辅助函数 - 简化实现
+    // Wayland辅助函数 - 完整的协议实现
     static void registryHandler(void* data, struct wl_registry* registry, uint32_t id, const char* interface, uint32_t version);
     static void registryRemover(void* data, struct wl_registry* registry, uint32_t id);
+    static void shellSurfacePing(void* data, struct wl_shell_surface* shell_surface, uint32_t serial);
+    static void shellSurfaceConfigure(void* data, struct wl_shell_surface* shell_surface, uint32_t edges, int32_t width, int32_t height);
+    static void shellSurfacePopupDone(void* data, struct wl_shell_surface* shell_surface);
+    static void frameCallback(void* data, struct wl_callback* callback, uint32_t time);
     EGLConfig chooseEGLConfig();
     void handleWaylandEvents();
+    void requestFrame();
     
     // OpenGL渲染资源管理
     bool initializeGLResources();
@@ -257,8 +265,17 @@ void LVGLWaylandInterface::uiThreadLoop() {
     auto last_update = std::chrono::steady_clock::now();
     const auto frame_time = std::chrono::milliseconds(1000 / pImpl_->config_.refresh_rate);
     
+    std::cout << "🚀 LVGL UI线程启动 (刷新率: " << pImpl_->config_.refresh_rate << "fps)" << std::endl;
+    
+    int loop_count = 0;
     while (!pImpl_->should_stop_.load()) {
         auto now = std::chrono::steady_clock::now();
+        loop_count++;
+        
+        // 🔍 每60帧打印一次状态
+        if (loop_count <= 5 || loop_count % 60 == 0) {
+            std::cout << "🔄 UI循环 #" << loop_count << std::endl;
+        }
         
         // ✅ 关键修复：处理Wayland事件循环
         pImpl_->handleWaylandEvents();
@@ -271,6 +288,9 @@ void LVGLWaylandInterface::uiThreadLoop() {
         
         // 更新Canvas（如果有新帧）
         if (pImpl_->new_frame_available_.load()) {
+            if (loop_count <= 5) {
+                std::cout << "🖼️ 更新Canvas帧" << std::endl;
+            }
             pImpl_->updateCanvasFromFrame();
             pImpl_->new_frame_available_.store(false);
         }
@@ -282,6 +302,8 @@ void LVGLWaylandInterface::uiThreadLoop() {
         }
         last_update = std::chrono::steady_clock::now();
     }
+    
+    std::cout << "🛑 LVGL UI线程停止" << std::endl;
 }
 
 void LVGLWaylandInterface::createUI() {
@@ -339,19 +361,23 @@ void LVGLWaylandInterface::cleanup() {
 // ========== Impl 类方法实现 ==========
 
 bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
+    std::cout << "🔍 检查Wayland环境..." << std::endl;
+    
     // 检查WAYLAND_DISPLAY环境变量
     const char* wayland_display = getenv("WAYLAND_DISPLAY");
     if (!wayland_display) {
-        std::cerr << "WAYLAND_DISPLAY环境变量未设置" << std::endl;
+        std::cerr << "❌ WAYLAND_DISPLAY环境变量未设置" << std::endl;
         return false;
     }
+    std::cout << "✅ WAYLAND_DISPLAY = " << wayland_display << std::endl;
     
     // 检查wayland socket是否存在
     std::string socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
     if (access(socket_path.c_str(), F_OK) != 0) {
-        std::cerr << "Wayland socket不存在: " << socket_path << std::endl;
+        std::cerr << "❌ Wayland socket不存在: " << socket_path << std::endl;
         return false;
     }
+    std::cout << "✅ Wayland socket存在: " << socket_path << std::endl;
     
     wayland_initialized_ = true;
     return true;
@@ -610,19 +636,23 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
 
 // Wayland客户端实现
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
+    std::cout << "🔗 连接Wayland客户端..." << std::endl;
+    
     // 连接到Wayland显示服务器
     wl_display_ = wl_display_connect(nullptr);
     if (!wl_display_) {
-        std::cerr << "无法连接到Wayland显示服务器" << std::endl;
+        std::cerr << "❌ 无法连接到Wayland显示服务器" << std::endl;
         return false;
     }
+    std::cout << "✅ 已连接到Wayland显示服务器" << std::endl;
     
     // 获取registry并绑定全局对象
     wl_registry_ = wl_display_get_registry(wl_display_);
     if (!wl_registry_) {
-        std::cerr << "无法获取Wayland registry" << std::endl;
+        std::cerr << "❌ 无法获取Wayland registry" << std::endl;
         return false;
     }
+    std::cout << "✅ 已获取Wayland registry" << std::endl;
     
     static const struct wl_registry_listener registry_listener = {
         registryHandler,
@@ -630,58 +660,99 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     
     wl_registry_add_listener(wl_registry_, &registry_listener, this);
+    std::cout << "🔄 正在发现Wayland全局对象..." << std::endl;
     
     // 等待初始的roundtrip来获取所有全局对象
     wl_display_dispatch(wl_display_);
     wl_display_roundtrip(wl_display_);
     
     if (!wl_compositor_) {
-        std::cerr << "Wayland compositor不可用" << std::endl;
+        std::cerr << "❌ Wayland compositor不可用" << std::endl;
         return false;
     }
+    std::cout << "✅ 已绑定Wayland compositor" << std::endl;
     
     // 创建surface
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
-        std::cerr << "无法创建Wayland surface" << std::endl;
+        std::cerr << "❌ 无法创建Wayland surface" << std::endl;
         return false;
     }
+    std::cout << "✅ 已创建Wayland surface" << std::endl;
     
-    // ✅ 简化实现：直接提交surface（不使用shell）
+    // ✅ 修复：使用wl_shell协议创建顶层窗口
+    if (wl_shell_) {
+        wl_shell_surface_ = wl_shell_get_shell_surface(wl_shell_, wl_surface_);
+        if (wl_shell_surface_) {
+            std::cout << "✅ 已创建shell surface" << std::endl;
+            
+            // 设置shell surface监听器
+            static const struct wl_shell_surface_listener shell_surface_listener = {
+                shellSurfacePing,
+                shellSurfaceConfigure,
+                shellSurfacePopupDone
+            };
+            wl_shell_surface_add_listener(wl_shell_surface_, &shell_surface_listener, this);
+            
+            // 🔧 关键：设置为顶层窗口角色
+            wl_shell_surface_set_toplevel(wl_shell_surface_);
+            std::cout << "✅ 已设置surface为顶层窗口" << std::endl;
+            
+            // 设置窗口标题
+            wl_shell_surface_set_title(wl_shell_surface_, "Bamboo Recognition System");
+            std::cout << "✅ 已设置窗口标题" << std::endl;
+        } else {
+            std::cerr << "❌ 无法创建shell surface" << std::endl;
+        }
+    } else {
+        std::cerr << "❌ wl_shell不可用" << std::endl;
+    }
+    
+    // 提交surface使其生效
     wl_surface_commit(wl_surface_);
+    std::cout << "✅ 已提交surface" << std::endl;
+    std::cout << "✅ 已提交Wayland surface" << std::endl;
     
     wayland_egl_initialized_ = true;
     return true;
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
+    std::cout << "🎨 初始化Wayland EGL..." << std::endl;
+    
     if (!wayland_egl_initialized_) {
+        std::cerr << "❌ Wayland客户端未初始化" << std::endl;
         return false;
     }
     
     // 创建EGL窗口
+    std::cout << "📐 创建EGL窗口 (" << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
     wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
     if (!wl_egl_window_) {
-        std::cerr << "无法创建Wayland EGL窗口" << std::endl;
+        std::cerr << "❌ 无法创建Wayland EGL窗口" << std::endl;
         return false;
     }
+    std::cout << "✅ EGL窗口创建成功" << std::endl;
     
     // 获取EGL显示
     egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
     if (egl_display_ == EGL_NO_DISPLAY) {
-        std::cerr << "EGL显示获取失败" << std::endl;
+        std::cerr << "❌ EGL显示获取失败" << std::endl;
         return false;
     }
+    std::cout << "✅ 已获取EGL显示" << std::endl;
     
     // 初始化EGL
     EGLint major, minor;
     if (!eglInitialize(egl_display_, &major, &minor)) {
-        std::cerr << "EGL初始化失败" << std::endl;
+        std::cerr << "❌ EGL初始化失败" << std::endl;
         return false;
     }
+    std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
     
     // 选择EGL配置
     egl_config_ = chooseEGLConfig();
+    std::cout << "✅ EGL配置选择完成" << std::endl;
     
     // 创建EGL上下文
     static const EGLint context_attribs[] = {
@@ -691,23 +762,35 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     
     egl_context_ = eglCreateContext(egl_display_, egl_config_, EGL_NO_CONTEXT, context_attribs);
     if (egl_context_ == EGL_NO_CONTEXT) {
-        std::cerr << "EGL上下文创建失败" << std::endl;
+        std::cerr << "❌ EGL上下文创建失败: " << eglGetError() << std::endl;
         return false;
     }
+    std::cout << "✅ EGL上下文创建成功" << std::endl;
     
     // 创建EGL表面
     egl_surface_ = eglCreateWindowSurface(egl_display_, egl_config_,
                                           (EGLNativeWindowType)wl_egl_window_, nullptr);
     if (egl_surface_ == EGL_NO_SURFACE) {
-        std::cerr << "EGL表面创建失败" << std::endl;
+        std::cerr << "❌ EGL表面创建失败: " << eglGetError() << std::endl;
         return false;
     }
+    std::cout << "✅ EGL表面创建成功" << std::endl;
     
     // 激活上下文
     if (!eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_)) {
-        std::cerr << "EGL上下文激活失败" << std::endl;
+        std::cerr << "❌ EGL上下文激活失败: " << eglGetError() << std::endl;
         return false;
     }
+    std::cout << "✅ EGL上下文激活成功" << std::endl;
+    
+    // 🔍 检查OpenGL版本和扩展
+    const char* gl_version = (const char*)glGetString(GL_VERSION);
+    const char* gl_vendor = (const char*)glGetString(GL_VENDOR);
+    const char* gl_renderer = (const char*)glGetString(GL_RENDERER);
+    std::cout << "🎮 OpenGL信息:" << std::endl;
+    std::cout << "  版本: " << (gl_version ? gl_version : "未知") << std::endl;
+    std::cout << "  厂商: " << (gl_vendor ? gl_vendor : "未知") << std::endl;
+    std::cout << "  渲染器: " << (gl_renderer ? gl_renderer : "未知") << std::endl;
     
     egl_initialized_ = true;
     return true;
@@ -718,38 +801,138 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
                                                   uint32_t id, const char* interface, uint32_t version) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     
+    std::cout << "🔍 发现Wayland接口: " << interface << " (id=" << id << ", version=" << version << ")" << std::endl;
+    
     if (strcmp(interface, "wl_compositor") == 0) {
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, 1));
+        std::cout << "✅ 绑定wl_compositor成功" << std::endl;
+    } else if (strcmp(interface, "wl_shell") == 0) {
+        impl->wl_shell_ = static_cast<struct wl_shell*>(
+            wl_registry_bind(registry, id, &wl_shell_interface, 1));
+        std::cout << "✅ 绑定wl_shell成功" << std::endl;
     }
-    // 简化实现：只绑定compositor，不使用shell
 }
 
 void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry* registry, uint32_t id) {
     // 处理全局对象移除（可选实现）
 }
 
-// 简化实现：移除xdg-shell协议回调函数
+// ✅ 新增：wl_shell协议回调函数实现
+void LVGLWaylandInterface::Impl::shellSurfacePing(void* data, struct wl_shell_surface* shell_surface, uint32_t serial) {
+    std::cout << "🏓 收到shell surface ping, serial=" << serial << std::endl;
+    wl_shell_surface_pong(shell_surface, serial);
+    std::cout << "✅ 已回复shell surface pong" << std::endl;
+}
+
+void LVGLWaylandInterface::Impl::shellSurfaceConfigure(void* data, struct wl_shell_surface* shell_surface,
+                                                       uint32_t edges, int32_t width, int32_t height) {
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    std::cout << "📐 Shell surface配置更改: " << width << "x" << height << " edges=" << edges << std::endl;
+    
+    // 如果合成器建议新尺寸，调整EGL窗口
+    if (width > 0 && height > 0 && impl->wl_egl_window_) {
+        wl_egl_window_resize(impl->wl_egl_window_, width, height, 0, 0);
+        std::cout << "✅ EGL窗口已调整大小: " << width << "x" << height << std::endl;
+    }
+}
+
+void LVGLWaylandInterface::Impl::shellSurfacePopupDone(void* data, struct wl_shell_surface* shell_surface) {
+    std::cout << "📱 Shell surface popup完成" << std::endl;
+}
+
+// ✅ 新增：frame回调函数 - 同步渲染
+void LVGLWaylandInterface::Impl::frameCallback(void* data, struct wl_callback* callback, uint32_t time) {
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    
+    static uint32_t last_time = 0;
+    if (last_time > 0) {
+        uint32_t delta = time - last_time;
+        if (delta > 0) {
+            float fps = 1000.0f / delta;
+            static int frame_count = 0;
+            frame_count++;
+            if (frame_count % 60 == 0) { // 每60帧打印一次
+                std::cout << "🎬 Wayland帧回调: " << fps << " fps (时间=" << time << "ms)" << std::endl;
+            }
+        }
+    }
+    last_time = time;
+    
+    // 销毁当前回调
+    if (callback) {
+        wl_callback_destroy(callback);
+    }
+    impl->frame_callback_ = nullptr;
+    
+    // 🔧 关键：请求下一帧回调
+    impl->requestFrame();
+}
+
+// ✅ 新增：请求frame回调函数
+void LVGLWaylandInterface::Impl::requestFrame() {
+    if (!wl_surface_) {
+        return;
+    }
+    
+    // 如果已有回调，先销毁
+    if (frame_callback_) {
+        wl_callback_destroy(frame_callback_);
+    }
+    
+    // 请求新的frame回调
+    frame_callback_ = wl_surface_frame(wl_surface_);
+    if (frame_callback_) {
+        static const struct wl_callback_listener frame_listener = {
+            frameCallback
+        };
+        wl_callback_add_listener(frame_callback_, &frame_listener, this);
+    }
+}
 
 // ✅ 新增：Wayland事件处理函数
 void LVGLWaylandInterface::Impl::handleWaylandEvents() {
+    static int event_count = 0;
+    
     if (!wl_display_) {
         return;
     }
     
+    // 🔍 详细的事件处理日志
+    event_count++;
+    if (event_count <= 10 || event_count % 120 == 0) { // 前10次和每2秒（60fps）
+        std::cout << "🔄 处理Wayland事件 #" << event_count << std::endl;
+    }
+    
     // 处理所有待处理的事件，但不阻塞
+    int pending_events = 0;
     while (wl_display_prepare_read(wl_display_) != 0) {
         wl_display_dispatch_pending(wl_display_);
+        pending_events++;
+    }
+    
+    if (pending_events > 0 && event_count <= 10) {
+        std::cout << "📨 处理了 " << pending_events << " 个待处理事件" << std::endl;
     }
     
     // 检查是否有数据可读
-    wl_display_flush(wl_display_);
+    if (wl_display_flush(wl_display_) < 0) {
+        if (event_count <= 10) {
+            std::cerr << "⚠️  Wayland display flush失败" << std::endl;
+        }
+    }
     
     // 读取并分发事件（非阻塞）
     if (wl_display_read_events(wl_display_) >= 0) {
-        wl_display_dispatch_pending(wl_display_);
+        int dispatched = wl_display_dispatch_pending(wl_display_);
+        if (dispatched > 0 && event_count <= 10) {
+            std::cout << "✅ 分发了 " << dispatched << " 个新事件" << std::endl;
+        }
     } else {
         wl_display_cancel_read(wl_display_);
+        if (event_count <= 10) {
+            std::cout << "❌ Wayland事件读取取消" << std::endl;
+        }
     }
 }
 
@@ -776,24 +959,37 @@ EGLConfig LVGLWaylandInterface::Impl::chooseEGLConfig() {
 }
 
 void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t* color_p) {
+    static int flush_count = 0;
+    flush_count++;
+    
     if (!egl_initialized_) {
+        std::cerr << "⚠️  flushDisplay调用但EGL未初始化 (调用#" << flush_count << ")" << std::endl;
         return;
     }
     
     std::lock_guard<std::mutex> lock(render_mutex_);
     
+    // 🔍 详细的调试信息
+    if (flush_count <= 5 || flush_count % 60 == 0) { // 只打印前5次和每60次
+        std::cout << "🎨 flushDisplay #" << flush_count << " - 区域("
+                  << area->x1 << "," << area->y1 << ") -> ("
+                  << area->x2 << "," << area->y2 << ")" << std::endl;
+    }
+    
     // 初始化OpenGL资源（第一次调用时）
     if (!gl_resources_initialized_) {
+        std::cout << "🔧 初始化OpenGL资源..." << std::endl;
         if (!initializeGLResources()) {
-            std::cerr << "OpenGL资源初始化失败" << std::endl;
+            std::cerr << "❌ OpenGL资源初始化失败" << std::endl;
             return;
         }
         gl_resources_initialized_ = true;
+        std::cout << "✅ OpenGL资源初始化完成" << std::endl;
     }
     
     // 设置视口
     glViewport(0, 0, config_.screen_width, config_.screen_height);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.1f, 0.2f, 0.3f, 1.0f); // 🔍 使用蓝色背景以便调试
     glClear(GL_COLOR_BUFFER_BIT);
     
     // 计算渲染区域
@@ -840,6 +1036,9 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
     if (x1 == 0 && y1 == 0 && w == config_.screen_width && h == config_.screen_height) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config_.screen_width, config_.screen_height,
                      0, GL_RGBA, GL_UNSIGNED_BYTE, rgba_data.data());
+        if (flush_count <= 5) {
+            std::cout << "📏 全屏纹理更新: " << config_.screen_width << "x" << config_.screen_height << std::endl;
+        }
     } else {
         // 部分更新：Y坐标需要翻转（OpenGL坐标系）
         int32_t gl_y = config_.screen_height - y1 - h;
@@ -872,13 +1071,28 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
     glDisableVertexAttribArray(tex_attr);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
+    // 🔍 强制刷新所有OpenGL命令
+    glFlush();
+    glFinish();
+    
     // 交换缓冲区（这会自动处理DRM framebuffer更新）
-    eglSwapBuffers(egl_display_, egl_surface_);
+    if (!eglSwapBuffers(egl_display_, egl_surface_)) {
+        std::cerr << "❌ eglSwapBuffers失败: " << eglGetError() << std::endl;
+    }
+    
+    // 🔍 强制Wayland事件处理
+    if (wl_display_) {
+        wl_display_flush(wl_display_);
+    }
     
     // 检查OpenGL错误
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
-        std::cerr << "OpenGL渲染错误: 0x" << std::hex << error << std::endl;
+        std::cerr << "❌ OpenGL渲染错误: 0x" << std::hex << error << std::endl;
+    }
+    
+    if (flush_count <= 5) {
+        std::cout << "✅ flushDisplay完成 #" << flush_count << std::endl;
     }
 }
 
