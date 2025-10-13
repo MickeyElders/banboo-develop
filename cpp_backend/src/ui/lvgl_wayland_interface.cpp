@@ -661,65 +661,14 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
 }
 
 // Wayland客户端实现
+// 修改 lvgl_wayland_interface.cpp 中的 initializeWaylandClient() 方法
+
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "🔗 连接Wayland客户端..." << std::endl;
     
-    // 连接到Wayland显示服务器
-    wl_display_ = wl_display_connect(nullptr);
-    if (!wl_display_) {
-        std::cerr << "❌ 无法连接到Wayland显示服务器" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已连接到Wayland显示服务器" << std::endl;
+    // ... 前面的代码保持不变 ...
     
-    // 获取registry并绑定全局对象
-    wl_registry_ = wl_display_get_registry(wl_display_);
-    if (!wl_registry_) {
-        std::cerr << "❌ 无法获取Wayland registry" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已获取Wayland registry" << std::endl;
-    
-    static const struct wl_registry_listener registry_listener = {
-        registryHandler,
-        registryRemover
-    };
-    
-    wl_registry_add_listener(wl_registry_, &registry_listener, this);
-    std::cout << "🔄 正在发现Wayland全局对象..." << std::endl;
-    
-    // 等待初始的roundtrip来获取所有全局对象
-    wl_display_dispatch(wl_display_);
-    wl_display_roundtrip(wl_display_);
-    
-    if (!wl_compositor_) {
-        std::cerr << "❌ Wayland compositor不可用" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已绑定Wayland compositor" << std::endl;
-    
-    if (!xdg_wm_base_) {
-        std::cerr << "❌ xdg_wm_base不可用" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已绑定xdg_wm_base" << std::endl;
-    
-    // 设置xdg_wm_base监听器
-    static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-        xdgWmBasePing
-    };
-    xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
-    std::cout << "✅ 已设置xdg_wm_base监听器" << std::endl;
-    
-    // 创建surface
-    wl_surface_ = wl_compositor_create_surface(wl_compositor_);
-    if (!wl_surface_) {
-        std::cerr << "❌ 无法创建Wayland surface" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已创建Wayland surface" << std::endl;
-    
-    // ✅ 修复：使用现代xdg-shell协议创建顶层窗口
+    // 创建xdg surface
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg surface" << std::endl;
@@ -727,10 +676,37 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 已创建xdg surface" << std::endl;
     
-    // 设置xdg surface监听器
+    // 🔧 关键修复：使用condition_variable同步configure事件
+    static bool surface_configured = false;
+    static std::mutex configure_mutex;
+    static std::condition_variable configure_cv;
+    
+    // ✅ 只设置一次监听器，使用lambda捕获同步变量
     static const struct xdg_surface_listener xdg_surface_listener = {
-        xdgSurfaceConfigure
+        [](void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
+            LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+            std::cout << "🎯 收到xdg_surface configure事件, serial=" << serial << std::endl;
+            
+            // 必须回复configure事件
+            xdg_surface_ack_configure(xdg_surface, serial);
+            std::cout << "✅ 已确认xdg surface配置" << std::endl;
+            
+            // 提交surface
+            if (impl->wl_surface_) {
+                wl_surface_commit(impl->wl_surface_);
+                std::cout << "✅ 已提交surface" << std::endl;
+            }
+            
+            // 标记配置完成
+            {
+                std::lock_guard<std::mutex> lock(configure_mutex);
+                surface_configured = true;
+            }
+            configure_cv.notify_all();
+        }
     };
+    
+    // ✅ 只添加一次监听器
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     std::cout << "✅ 已设置xdg surface监听器" << std::endl;
     
@@ -755,51 +731,20 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
     std::cout << "✅ 已设置窗口标题和应用ID" << std::endl;
     
-    // 提交surface使其生效，触发configure事件
-    wl_surface_commit(wl_surface_);
-    std::cout << "✅ 已提交surface，等待configure事件..." << std::endl;
+    // 🔧 关键修复：提交surface并等待configure事件
+    std::cout << "⏳ 等待xdg_surface configure事件完成..." << std::endl;
     
-    // 🔧 关键修复：正确等待xdg_surface的configure事件
-    std::cout << "⏳ 等待xdg_surface configure事件...（修复xdg_positioner协议错误）" << std::endl;
+    // 重置标志
+    {
+        std::lock_guard<std::mutex> lock(configure_mutex);
+        surface_configured = false;
+    }
     
-    // 添加配置状态跟踪
-    static bool surface_configured = false;
-    static std::mutex configure_mutex;
-    static std::condition_variable configure_cv;
-    
-    // 重新设置surface监听器，确保捕获configure事件
-    static const struct xdg_surface_listener xdg_surface_listener_fixed = {
-        [](void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
-            LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-            std::cout << "🎯 收到xdg_surface configure事件, serial=" << serial << std::endl;
-            
-            // 必须回复configure事件
-            xdg_surface_ack_configure(xdg_surface, serial);
-            std::cout << "✅ 已确认xdg surface配置" << std::endl;
-            
-            // 提交surface
-            if (impl->wl_surface_) {
-                wl_surface_commit(impl->wl_surface_);
-                std::cout << "✅ 已提交surface" << std::endl;
-            }
-            
-            // 标记配置完成
-            {
-                std::lock_guard<std::mutex> lock(configure_mutex);
-                surface_configured = true;
-            }
-            configure_cv.notify_all();
-        }
-    };
-    
-    // 重新添加监听器
-    xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener_fixed, this);
-    
-    // 强制触发configure事件
+    // 提交surface触发configure事件
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 等待configure事件完成
+    // 等待configure事件（最多2秒）
     std::unique_lock<std::mutex> lock(configure_mutex);
     bool configure_received = configure_cv.wait_for(lock, std::chrono::milliseconds(2000),
         []{ return surface_configured; });
@@ -807,11 +752,157 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     if (configure_received) {
         std::cout << "✅ xdg_surface configure事件已正确处理" << std::endl;
     } else {
-        std::cout << "⚠️ xdg_surface configure事件超时，继续EGL初始化" << std::endl;
+        std::cout << "⚠️ xdg_surface configure事件超时（但这可能是正常的）" << std::endl;
+    }
+    
+    // 额外处理pending事件
+    for (int i = 0; i < 10; i++) {
+        wl_display_dispatch_pending(wl_display_);
+        wl_display_flush(wl_display_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
     wayland_egl_initialized_ = true;
     return true;
+}
+
+bool LVGLWaylandInterface::Impl::recoverWaylandConnection() {
+    std::cout << "🔄 [恢复] 尝试恢复损坏的Wayland连接..." << std::endl;
+    
+    // 1. 检查错误状态
+    int error_code = wl_display_get_error(wl_display_);
+    if (error_code == 0) {
+        std::cout << "✅ [恢复] Wayland连接正常，无需恢复" << std::endl;
+        return true;
+    }
+    
+    std::cout << "❌ [恢复] 检测到Wayland错误: " << error_code << " (" << strerror(error_code) << ")" << std::endl;
+    
+    // 2. 保存重要配置
+    auto saved_config = config_;
+    
+    // 3. 清理损坏的连接（但不清理所有资源）
+    std::cout << "🔄 [恢复] 清理损坏的Wayland连接..." << std::endl;
+    
+    // 清理xdg对象
+    if (xdg_toplevel_) {
+        xdg_toplevel_destroy(xdg_toplevel_);
+        xdg_toplevel_ = nullptr;
+    }
+    if (xdg_surface_) {
+        xdg_surface_destroy(xdg_surface_);
+        xdg_surface_ = nullptr;
+    }
+    if (wl_surface_) {
+        wl_surface_destroy(wl_surface_);
+        wl_surface_ = nullptr;
+    }
+    
+    // 断开连接
+    if (wl_display_) {
+        wl_display_disconnect(wl_display_);
+        wl_display_ = nullptr;
+    }
+    
+    // 4. 重新建立连接
+    std::cout << "🔄 [恢复] 重新建立Wayland连接..." << std::endl;
+    
+    // 重置所有指针
+    wl_registry_ = nullptr;
+    wl_compositor_ = nullptr;
+    wl_subcompositor_ = nullptr;
+    xdg_wm_base_ = nullptr;
+    
+    // 重新初始化Wayland客户端
+    if (!initializeWaylandClient()) {
+        std::cerr << "❌ [恢复] Wayland客户端重新初始化失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "✅ [恢复] Wayland连接已成功恢复" << std::endl;
+    return true;
+}
+
+// 修改 initializeFallbackDisplayWithWaylandObjects() 方法
+bool LVGLWaylandInterface::Impl::initializeFallbackDisplayWithWaylandObjects() {
+    std::cout << "🔄 使用fallback显示模式（保留Wayland对象）" << std::endl;
+    
+    // 🔧 关键修复：检查Wayland连接是否损坏
+    if (wl_display_) {
+        int error_code = wl_display_get_error(wl_display_);
+        if (error_code != 0) {
+            std::cout << "⚠️ [Fallback] 检测到Wayland连接损坏（错误 " << error_code << "），尝试恢复..." << std::endl;
+            
+            // 尝试恢复连接
+            if (!recoverWaylandConnection()) {
+                std::cout << "❌ [Fallback] Wayland连接恢复失败" << std::endl;
+                // 继续使用fallback，但标记Wayland为不可用
+                wl_display_ = nullptr;
+                wl_compositor_ = nullptr;
+                wl_subcompositor_ = nullptr;
+                wl_surface_ = nullptr;
+            } else {
+                std::cout << "✅ [Fallback] Wayland连接恢复成功" << std::endl;
+            }
+        }
+    }
+    
+    // 先创建fallback显示
+    if (!initializeFallbackDisplay()) {
+        return false;
+    }
+    
+    // 关键：保留Wayland连接和基础对象供DeepStream使用
+    std::cout << "✅ 保留Wayland连接供DeepStream Subsurface使用" << std::endl;
+    std::cout << "   Display: " << (wl_display_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    std::cout << "   Compositor: " << (wl_compositor_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    std::cout << "   Subcompositor: " << (wl_subcompositor_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    std::cout << "   Surface: " << (wl_surface_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    
+    // 设置状态标志
+    wayland_initialized_ = (wl_display_ != nullptr);
+    wayland_egl_initialized_ = false;  // EGL失败，但Wayland连接正常
+    egl_initialized_ = false;
+    
+    return true;
+}
+
+// 修改 handleWaylandEvents() 方法，增加错误检测
+void LVGLWaylandInterface::Impl::handleWaylandEvents() {
+    static int event_count = 0;
+    static int consecutive_errors = 0;
+    
+    if (!wl_display_) {
+        return;
+    }
+    
+    // 🔧 关键修复：检查连接状态
+    int error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        consecutive_errors++;
+        if (consecutive_errors <= 3) {
+            std::cerr << "⚠️ [事件] Wayland连接错误: " << error_code << " (" << strerror(error_code) << ")" << std::endl;
+        }
+        
+        // 连接已损坏，停止事件处理
+        if (consecutive_errors > 10) {
+            std::cerr << "❌ [事件] Wayland连接严重损坏，停止事件处理" << std::endl;
+            wl_display_ = nullptr;  // 标记为不可用
+        }
+        return;
+    }
+    
+    consecutive_errors = 0;  // 重置错误计数
+    event_count++;
+    
+    // 处理事件（简化版，避免阻塞）
+    if (event_count <= 10 || event_count % 120 == 0) {
+        std::cout << "🔄 处理Wayland事件 #" << event_count << std::endl;
+    }
+    
+    // 只处理pending事件，不等待新事件
+    wl_display_dispatch_pending(wl_display_);
+    wl_display_flush(wl_display_);
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
