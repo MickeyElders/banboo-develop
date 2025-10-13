@@ -482,8 +482,21 @@ build-debug:
 	@cd $(BUILD_DIR)_debug && make -j$(shell nproc)
 	@echo "$(GREEN)[SUCCESS]$(NC) 调试版本构建完成"
 
+# 🔧 新增：编译自定义YOLO解析库
+compile-yolo-lib:
+	@echo "$(BLUE)[INFO]$(NC) 🔧 编译自定义YOLO解析库..."
+	@sudo mkdir -p $(INSTALL_DIR)/lib
+	@g++ -shared -fPIC \
+		-I/opt/nvidia/deepstream/deepstream/sources/includes \
+		-I/usr/local/cuda/include \
+		cpp_backend/src/deepstream/nvdsinfer_yolo_bamboo.cpp \
+		-o libnvdsinfer_yolo_bamboo.so
+	@sudo cp libnvdsinfer_yolo_bamboo.so $(INSTALL_DIR)/lib/
+	@sudo chmod 755 $(INSTALL_DIR)/lib/libnvdsinfer_yolo_bamboo.so
+	@echo "$(GREEN)[SUCCESS]$(NC) ✅ YOLO解析库编译部署完成"
+
 # === 系统安装 ===
-install-system:
+install-system: compile-yolo-lib
 	@echo "$(BLUE)[INFO]$(NC) 安装C++ LVGL系统到$(INSTALL_DIR)..."
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
 		echo "$(RED)[ERROR]$(NC) 构建目录不存在，请先运行 make build-system"; \
