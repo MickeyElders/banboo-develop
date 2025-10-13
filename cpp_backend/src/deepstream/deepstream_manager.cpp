@@ -816,11 +816,14 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
              << ",framerate=" << config.camera_fps << "/1"
              << ",format=NV12 ";
     
-    // 添加nvstreammux为nvinfer创建batch元数据（修复NvDsBatchMeta错误）
+    // 恢复nvstreammux为nvinfer创建batch元数据
     pipeline << "! m.sink_0 ";
     pipeline << "nvstreammux name=m batch-size=1 "
              << "width=" << config.camera_width << " "
              << "height=" << config.camera_height << " ";
+    
+    // 🔧 恢复nvinfer，使用正确的YOLO输出格式 (1x25200x85)
+    std::cout << "[DeepStreamManager] 恢复nvinfer推理，使用标准YOLO格式(1x25200x85)" << std::endl;
     
     // 🔧 修复：检查并使用正确的nvinfer配置文件路径
     std::string nvinfer_config_path = config.nvinfer_config;

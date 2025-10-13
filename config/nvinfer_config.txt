@@ -21,7 +21,7 @@
 ################################################################################
 
 # nvinfer配置文件 - 竹子识别AI推理
-# 使用DeepStream内置解析器，支持ONNX模型
+# 使用DeepStream内置YOLO解析器，支持标准YOLO格式(1x25200x85)
 
 [property]
 gpu-id=0
@@ -40,13 +40,17 @@ process-mode=1
 network-type=0
 cluster-mode=2
 maintain-aspect-ratio=1
-parse-bbox-func-name=NvDsInferParseYolo
-#custom-lib-path=/opt/nvidia/deepstream/deepstream/lib/libnvdsinfer_custom_impl_Custom.so
-#engine-create-func-name=NvDsInferYoloCudaEngineGet
 
-## Let DeepStream auto-detect output layers
-#output-blob-names=output0
-#coverage-blob-name=output0
+## 🔧 关键修复：使用正确的输出层名称和YOLO解析器
+parse-bbox-func-name=NvDsInferParseYolo
+output-blob-names=output
+input-object-min-width=16
+input-object-min-height=16
+
+## YOLO anchors and detection parameters for standard YOLO format
+## 输出格式: 1x25200x85 (25200个anchor boxes，每个85维：4坐标+1置信度+80类别)
+## 注意：我们的模型只有5个类别，但YOLO格式固定使用85维
+num-detected-classes=5
 
 [class-attrs-all]
 nms-iou-threshold=0.4
