@@ -79,6 +79,12 @@ public:
     lv_color_t* back_buffer_ = nullptr;
     uint32_t buffer_size_ = 0;
     
+    // OpenGL渲染资源
+    GLuint shader_program_ = 0;
+    GLuint texture_id_ = 0;
+    GLuint vbo_ = 0;
+    bool gl_resources_initialized_ = false;
+    
     // 线程同步
     std::mutex ui_mutex_;
     std::mutex canvas_mutex_;
@@ -115,6 +121,11 @@ public:
     bool findDRMResources();
     bool setupDRMMode();
     EGLConfig chooseEGLConfig();
+    
+    // OpenGL渲染资源管理
+    bool initializeGLResources();
+    void cleanupGLResources();
+    bool createShaderProgram();
 };
 
 LVGLWaylandInterface::LVGLWaylandInterface() 
@@ -780,8 +791,19 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
     
     std::lock_guard<std::mutex> lock(render_mutex_);
     
+    // 初始化OpenGL资源（第一次调用时）
+    if (!gl_resources_initialized_) {
+        if (!initializeGLResources()) {
+            std::cerr << "OpenGL资源初始化失败" << std::endl;
+            return;
+        }
+        gl_resources_initialized_ = true;
+    }
+    
     // 设置视口
     glViewport(0, 0, config_.screen_width, config_.screen_height);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
     
     // 计算渲染区域
     int32_t x1 = area->x1;
@@ -789,107 +811,49 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
     int32_t w = area->x2 - area->x1 + 1;
     int32_t h = area->y2 - area->y1 + 1;
     
-    // 创建纹理（如果需要）
-    static GLuint texture_id = 0;
-    if (texture_id == 0) {
-        glGenTextures(1, &texture_id);
-        glBindTexture(GL_TEXTURE_2D, texture_id);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-    
     // 绑定纹理
-    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glBindTexture(GL_TEXTURE_2D, texture_id_);
     
-    // 转换LVGL颜色格式到OpenGL格式
-    std::vector<uint8_t> gl_data(w * h * 4); // RGBA
+    // 正确的LVGL颜色格式转换
+    std::vector<uint8_t> rgba_data(w * h * 4);
     
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             lv_color_t pixel = color_p[y * w + x];
             
-            // LVGL颜色转换为RGBA
+            // 正确的颜色分量提取（根据LVGL v9.x格式）
             int idx = (y * w + x) * 4;
-            gl_data[idx + 0] = pixel.red << 3;      // R (5bit -> 8bit)
-            gl_data[idx + 1] = pixel.green << 2;    // G (6bit -> 8bit)
-            gl_data[idx + 2] = pixel.blue << 3;     // B (5bit -> 8bit)
-            gl_data[idx + 3] = 255;                 // A (完全不透明)
+            rgba_data[idx + 0] = LV_COLOR_GET_R(pixel) << 3;  // R: 5bit -> 8bit
+            rgba_data[idx + 1] = LV_COLOR_GET_G(pixel) << 2;  // G: 6bit -> 8bit
+            rgba_data[idx + 2] = LV_COLOR_GET_B(pixel) << 3;  // B: 5bit -> 8bit
+            rgba_data[idx + 3] = 255;                         // A: 完全不透明
         }
     }
     
-    // 上传纹理数据到GPU
-    glTexSubImage2D(GL_TEXTURE_2D, 0, x1, config_.screen_height - y1 - h,
-                    w, h, GL_RGBA, GL_UNSIGNED_BYTE, gl_data.data());
-    
-    // 如果是第一次，需要分配完整纹理
+    // 只在第一次或全屏更新时创建完整纹理
     if (x1 == 0 && y1 == 0 && w == config_.screen_width && h == config_.screen_height) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config_.screen_width, config_.screen_height,
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, gl_data.data());
-    }
-    
-    // 创建简单的vertex shader和fragment shader
-    static GLuint shader_program = 0;
-    if (shader_program == 0) {
-        const char* vertex_shader_source = R"(
-            attribute vec2 a_position;
-            attribute vec2 a_texcoord;
-            varying vec2 v_texcoord;
-            void main() {
-                gl_Position = vec4(a_position, 0.0, 1.0);
-                v_texcoord = a_texcoord;
-            }
-        )";
-        
-        const char* fragment_shader_source = R"(
-            precision mediump float;
-            varying vec2 v_texcoord;
-            uniform sampler2D u_texture;
-            void main() {
-                gl_FragColor = texture2D(u_texture, v_texcoord);
-            }
-        )";
-        
-        // 编译shader
-        GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
-        glCompileShader(vertex_shader);
-        
-        GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
-        glCompileShader(fragment_shader);
-        
-        // 创建程序
-        shader_program = glCreateProgram();
-        glAttachShader(shader_program, vertex_shader);
-        glAttachShader(shader_program, fragment_shader);
-        glLinkProgram(shader_program);
-        
-        glDeleteShader(vertex_shader);
-        glDeleteShader(fragment_shader);
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, rgba_data.data());
+    } else {
+        // 部分更新：Y坐标需要翻转（OpenGL坐标系）
+        int32_t gl_y = config_.screen_height - y1 - h;
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x1, gl_y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba_data.data());
     }
     
     // 使用shader程序
-    glUseProgram(shader_program);
+    glUseProgram(shader_program_);
     
-    // 设置顶点数据（全屏四边形）
-    static GLfloat vertices[] = {
-        // 位置      纹理坐标
-        -1.0f, -1.0f,  0.0f, 1.0f,  // 左下
-         1.0f, -1.0f,  1.0f, 1.0f,  // 右下
-        -1.0f,  1.0f,  0.0f, 0.0f,  // 左上
-         1.0f,  1.0f,  1.0f, 0.0f   // 右上
-    };
+    // 绑定VBO和设置属性
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
     
-    GLint pos_attr = glGetAttribLocation(shader_program, "a_position");
-    GLint tex_attr = glGetAttribLocation(shader_program, "a_texcoord");
-    GLint tex_uniform = glGetUniformLocation(shader_program, "u_texture");
+    GLint pos_attr = glGetAttribLocation(shader_program_, "a_position");
+    GLint tex_attr = glGetAttribLocation(shader_program_, "a_texcoord");
+    GLint tex_uniform = glGetUniformLocation(shader_program_, "u_texture");
     
-    glVertexAttribPointer(pos_attr, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), vertices);
+    glVertexAttribPointer(pos_attr, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(pos_attr);
     
-    glVertexAttribPointer(tex_attr, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), vertices + 2);
+    glVertexAttribPointer(tex_attr, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
     glEnableVertexAttribArray(tex_attr);
     
     glUniform1i(tex_uniform, 0);
@@ -897,21 +861,27 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
     // 渲染四边形
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     
-    // 禁用属性
+    // 清理
     glDisableVertexAttribArray(pos_attr);
     glDisableVertexAttribArray(tex_attr);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
-    // 交换缓冲区，显示到屏幕
+    // 交换缓冲区（这会自动处理DRM framebuffer更新）
     eglSwapBuffers(egl_display_, egl_surface_);
     
     // 检查OpenGL错误
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
-        std::cerr << "OpenGL错误: " << error << std::endl;
+        std::cerr << "OpenGL渲染错误: 0x" << std::hex << error << std::endl;
     }
 }
 
 void LVGLWaylandInterface::Impl::cleanup() {
+    // 首先清理OpenGL资源（必须在EGL上下文有效时执行）
+    if (gl_resources_initialized_ && egl_initialized_) {
+        cleanupGLResources();
+    }
+    
     // 清理EGL资源
     if (egl_initialized_) {
         if (egl_display_ != EGL_NO_DISPLAY) {
@@ -982,6 +952,134 @@ void LVGLWaylandInterface::Impl::cleanup() {
         free(back_buffer_);
         back_buffer_ = nullptr;
     }
+}
+
+// OpenGL资源管理实现
+bool LVGLWaylandInterface::Impl::initializeGLResources() {
+    // 创建shader程序
+    if (!createShaderProgram()) {
+        return false;
+    }
+    
+    // 创建纹理
+    glGenTextures(1, &texture_id_);
+    glBindTexture(GL_TEXTURE_2D, texture_id_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
+    // 创建VBO（顶点缓冲对象）
+    glGenBuffers(1, &vbo_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    
+    // 全屏四边形顶点数据（位置 + 纹理坐标）
+    GLfloat vertices[] = {
+        // 位置      纹理坐标
+        -1.0f, -1.0f,  0.0f, 1.0f,  // 左下
+         1.0f, -1.0f,  1.0f, 1.0f,  // 右下
+        -1.0f,  1.0f,  0.0f, 0.0f,  // 左上
+         1.0f,  1.0f,  1.0f, 0.0f   // 右上
+    };
+    
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    return true;
+}
+
+void LVGLWaylandInterface::Impl::cleanupGLResources() {
+    if (vbo_ != 0) {
+        glDeleteBuffers(1, &vbo_);
+        vbo_ = 0;
+    }
+    
+    if (texture_id_ != 0) {
+        glDeleteTextures(1, &texture_id_);
+        texture_id_ = 0;
+    }
+    
+    if (shader_program_ != 0) {
+        glDeleteProgram(shader_program_);
+        shader_program_ = 0;
+    }
+    
+    gl_resources_initialized_ = false;
+}
+
+bool LVGLWaylandInterface::Impl::createShaderProgram() {
+    const char* vertex_shader_source = R"(
+        attribute vec2 a_position;
+        attribute vec2 a_texcoord;
+        varying vec2 v_texcoord;
+        void main() {
+            gl_Position = vec4(a_position, 0.0, 1.0);
+            v_texcoord = a_texcoord;
+        }
+    )";
+    
+    const char* fragment_shader_source = R"(
+        precision mediump float;
+        varying vec2 v_texcoord;
+        uniform sampler2D u_texture;
+        void main() {
+            gl_FragColor = texture2D(u_texture, v_texcoord);
+        }
+    )";
+    
+    // 编译vertex shader
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
+    glCompileShader(vertex_shader);
+    
+    GLint success;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char info_log[512];
+        glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
+        std::cerr << "Vertex shader编译失败: " << info_log << std::endl;
+        glDeleteShader(vertex_shader);
+        return false;
+    }
+    
+    // 编译fragment shader
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
+    glCompileShader(fragment_shader);
+    
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char info_log[512];
+        glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
+        std::cerr << "Fragment shader编译失败: " << info_log << std::endl;
+        glDeleteShader(vertex_shader);
+        glDeleteShader(fragment_shader);
+        return false;
+    }
+    
+    // 创建shader程序
+    shader_program_ = glCreateProgram();
+    glAttachShader(shader_program_, vertex_shader);
+    glAttachShader(shader_program_, fragment_shader);
+    glLinkProgram(shader_program_);
+    
+    glGetProgramiv(shader_program_, GL_LINK_STATUS, &success);
+    if (!success) {
+        char info_log[512];
+        glGetProgramInfoLog(shader_program_, 512, NULL, info_log);
+        std::cerr << "Shader程序链接失败: " << info_log << std::endl;
+        glDeleteShader(vertex_shader);
+        glDeleteShader(fragment_shader);
+        glDeleteProgram(shader_program_);
+        shader_program_ = 0;
+        return false;
+    }
+    
+    // 清理shader对象
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+    
+    return true;
 }
 
 // 析构函数实现
