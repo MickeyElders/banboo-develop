@@ -56,13 +56,14 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
-    // Wayland EGL后端 - 完整的shell协议实现
+    // Wayland EGL后端 - 现代xdg-shell协议实现
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
     struct wl_compositor* wl_compositor_ = nullptr;
-    struct wl_shell* wl_shell_ = nullptr;
+    struct xdg_wm_base* xdg_wm_base_ = nullptr;
     struct wl_surface* wl_surface_ = nullptr;
-    struct wl_shell_surface* wl_shell_surface_ = nullptr;
+    struct xdg_surface* xdg_surface_ = nullptr;
+    struct xdg_toplevel* xdg_toplevel_ = nullptr;
     struct wl_egl_window* wl_egl_window_ = nullptr;
     struct wl_callback* frame_callback_ = nullptr;
     
@@ -114,12 +115,13 @@ public:
     void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
     void cleanup();
     
-    // Wayland辅助函数 - 完整的协议实现
+    // Wayland辅助函数 - 现代xdg-shell协议实现
     static void registryHandler(void* data, struct wl_registry* registry, uint32_t id, const char* interface, uint32_t version);
     static void registryRemover(void* data, struct wl_registry* registry, uint32_t id);
-    static void shellSurfacePing(void* data, struct wl_shell_surface* shell_surface, uint32_t serial);
-    static void shellSurfaceConfigure(void* data, struct wl_shell_surface* shell_surface, uint32_t edges, int32_t width, int32_t height);
-    static void shellSurfacePopupDone(void* data, struct wl_shell_surface* shell_surface);
+    static void xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial);
+    static void xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial);
+    static void xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel, int32_t width, int32_t height, struct wl_array* states);
+    static void xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel);
     static void frameCallback(void* data, struct wl_callback* callback, uint32_t time);
     EGLConfig chooseEGLConfig();
     void handleWaylandEvents();
@@ -678,6 +680,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 已绑定xdg_wm_base" << std::endl;
     
+    // 设置xdg_wm_base监听器
+    static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+        xdgWmBasePing
+    };
+    xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
+    std::cout << "✅ 已设置xdg_wm_base监听器" << std::endl;
+    
     // 创建surface
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
@@ -686,33 +695,41 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 已创建Wayland surface" << std::endl;
     
-    // ✅ 修复：使用wl_shell协议创建顶层窗口
-    if (wl_shell_) {
-        wl_shell_surface_ = wl_shell_get_shell_surface(wl_shell_, wl_surface_);
-        if (wl_shell_surface_) {
-            std::cout << "✅ 已创建shell surface" << std::endl;
-            
-            // 设置shell surface监听器
-            static const struct wl_shell_surface_listener shell_surface_listener = {
-                shellSurfacePing,
-                shellSurfaceConfigure,
-                shellSurfacePopupDone
-            };
-            wl_shell_surface_add_listener(wl_shell_surface_, &shell_surface_listener, this);
-            
-            // 🔧 关键：设置为顶层窗口角色
-            wl_shell_surface_set_toplevel(wl_shell_surface_);
-            std::cout << "✅ 已设置surface为顶层窗口" << std::endl;
-            
-            // 设置窗口标题
-            wl_shell_surface_set_title(wl_shell_surface_, "Bamboo Recognition System");
-            std::cout << "✅ 已设置窗口标题" << std::endl;
-        } else {
-            std::cerr << "❌ 无法创建shell surface" << std::endl;
-        }
-    } else {
-        std::cerr << "❌ wl_shell不可用" << std::endl;
+    // ✅ 修复：使用现代xdg-shell协议创建顶层窗口
+    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+    if (!xdg_surface_) {
+        std::cerr << "❌ 无法创建xdg surface" << std::endl;
+        return false;
     }
+    std::cout << "✅ 已创建xdg surface" << std::endl;
+    
+    // 设置xdg surface监听器
+    static const struct xdg_surface_listener xdg_surface_listener = {
+        xdgSurfaceConfigure
+    };
+    xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
+    std::cout << "✅ 已设置xdg surface监听器" << std::endl;
+    
+    // 创建toplevel角色
+    xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
+    if (!xdg_toplevel_) {
+        std::cerr << "❌ 无法创建xdg toplevel" << std::endl;
+        return false;
+    }
+    std::cout << "✅ 已创建xdg toplevel" << std::endl;
+    
+    // 设置xdg toplevel监听器
+    static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+        xdgToplevelConfigure,
+        xdgToplevelClose
+    };
+    xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
+    std::cout << "✅ 已设置xdg toplevel监听器" << std::endl;
+    
+    // 设置窗口属性
+    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
+    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
+    std::cout << "✅ 已设置窗口标题和应用ID" << std::endl;
     
     // 提交surface使其生效
     wl_surface_commit(wl_surface_);
@@ -813,10 +830,10 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, 1));
         std::cout << "✅ 绑定wl_compositor成功" << std::endl;
-    } else if (strcmp(interface, "wl_shell") == 0) {
-        impl->wl_shell_ = static_cast<struct wl_shell*>(
-            wl_registry_bind(registry, id, &wl_shell_interface, 1));
-        std::cout << "✅ 绑定wl_shell成功" << std::endl;
+    } else if (strcmp(interface, "xdg_wm_base") == 0) {
+        impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
+            wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
+        std::cout << "✅ 绑定xdg_wm_base成功" << std::endl;
     }
 }
 
