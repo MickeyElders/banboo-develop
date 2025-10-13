@@ -24,6 +24,7 @@
 #include <GLES2/gl2ext.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include <xdg-shell-client-protocol.h>
 #include <vector>
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
@@ -57,9 +58,10 @@ public:
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
     struct wl_compositor* wl_compositor_ = nullptr;
-    struct wl_shell* wl_shell_ = nullptr;
+    struct xdg_wm_base* xdg_wm_base_ = nullptr;
     struct wl_surface* wl_surface_ = nullptr;
-    struct wl_shell_surface* wl_shell_surface_ = nullptr;
+    struct xdg_surface* xdg_surface_ = nullptr;
+    struct xdg_toplevel* xdg_toplevel_ = nullptr;
     struct wl_egl_window* wl_egl_window_ = nullptr;
     
     EGLDisplay egl_display_ = EGL_NO_DISPLAY;
@@ -113,7 +115,12 @@ public:
     // Wayland辅助函数
     static void registryHandler(void* data, struct wl_registry* registry, uint32_t id, const char* interface, uint32_t version);
     static void registryRemover(void* data, struct wl_registry* registry, uint32_t id);
+    static void xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial);
+    static void xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial);
+    static void xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel, int32_t width, int32_t height, struct wl_array* states);
+    static void xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel);
     EGLConfig chooseEGLConfig();
+    void handleWaylandEvents();
     
     // OpenGL渲染资源管理
     bool initializeGLResources();
@@ -257,6 +264,9 @@ void LVGLWaylandInterface::uiThreadLoop() {
     
     while (!pImpl_->should_stop_.load()) {
         auto now = std::chrono::steady_clock::now();
+        
+        // ✅ 关键修复：处理Wayland事件循环
+        pImpl_->handleWaylandEvents();
         
         // 处理LVGL任务
         {
@@ -642,11 +652,27 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     
-    // 如果有shell，创建shell surface
-    if (wl_shell_) {
-        wl_shell_surface_ = wl_shell_get_shell_surface(wl_shell_, wl_surface_);
-        if (wl_shell_surface_) {
-            wl_shell_surface_set_toplevel(wl_shell_surface_);
+    // ✅ 修复：使用现代xdg-shell协议
+    if (xdg_wm_base_) {
+        xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+        if (xdg_surface_) {
+            static const struct xdg_surface_listener xdg_surface_listener = {
+                xdgSurfaceConfigure
+            };
+            xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
+            
+            xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
+            if (xdg_toplevel_) {
+                static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+                    xdgToplevelConfigure,
+                    xdgToplevelClose
+                };
+                xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
+                xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
+                
+                // 提交surface
+                wl_surface_commit(wl_surface_);
+            }
         }
     }
     
@@ -721,14 +747,69 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
     if (strcmp(interface, "wl_compositor") == 0) {
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, 1));
-    } else if (strcmp(interface, "wl_shell") == 0) {
-        impl->wl_shell_ = static_cast<struct wl_shell*>(
-            wl_registry_bind(registry, id, &wl_shell_interface, 1));
+    } else if (strcmp(interface, "xdg_wm_base") == 0) {
+        impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
+            wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
+        
+        // 添加xdg_wm_base监听器
+        static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+            xdgWmBasePing
+        };
+        xdg_wm_base_add_listener(impl->xdg_wm_base_, &xdg_wm_base_listener, impl);
     }
 }
 
 void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry* registry, uint32_t id) {
     // 处理全局对象移除（可选实现）
+}
+
+// ✅ 新增：xdg-shell协议回调函数实现
+void LVGLWaylandInterface::Impl::xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial) {
+    xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
+    xdg_surface_ack_configure(xdg_surface, serial);
+}
+
+void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel,
+                                                      int32_t width, int32_t height, struct wl_array* states) {
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    
+    // 如果合成器建议新尺寸，可以在这里处理窗口大小调整
+    if (width > 0 && height > 0) {
+        // 可选：更新窗口尺寸
+        if (impl->wl_egl_window_) {
+            wl_egl_window_resize(impl->wl_egl_window_, width, height, 0, 0);
+        }
+    }
+}
+
+void LVGLWaylandInterface::Impl::xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel) {
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    impl->should_stop_.store(true);
+}
+
+// ✅ 新增：Wayland事件处理函数
+void LVGLWaylandInterface::Impl::handleWaylandEvents() {
+    if (!wl_display_) {
+        return;
+    }
+    
+    // 处理所有待处理的事件，但不阻塞
+    while (wl_display_prepare_read(wl_display_) != 0) {
+        wl_display_dispatch_pending(wl_display_);
+    }
+    
+    // 检查是否有数据可读
+    wl_display_flush(wl_display_);
+    
+    // 读取并分发事件（非阻塞）
+    if (wl_display_read_events(wl_display_) >= 0) {
+        wl_display_dispatch_pending(wl_display_);
+    } else {
+        wl_display_cancel_read(wl_display_);
+    }
 }
 
 EGLConfig LVGLWaylandInterface::Impl::chooseEGLConfig() {
@@ -894,9 +975,14 @@ void LVGLWaylandInterface::Impl::cleanup() {
     }
     
     // 清理Wayland资源
-    if (wl_shell_surface_) {
-        wl_shell_surface_destroy(wl_shell_surface_);
-        wl_shell_surface_ = nullptr;
+    if (xdg_toplevel_) {
+        xdg_toplevel_destroy(xdg_toplevel_);
+        xdg_toplevel_ = nullptr;
+    }
+    
+    if (xdg_surface_) {
+        xdg_surface_destroy(xdg_surface_);
+        xdg_surface_ = nullptr;
     }
     
     if (wl_surface_) {
@@ -904,9 +990,9 @@ void LVGLWaylandInterface::Impl::cleanup() {
         wl_surface_ = nullptr;
     }
     
-    if (wl_shell_) {
-        wl_shell_destroy(wl_shell_);
-        wl_shell_ = nullptr;
+    if (xdg_wm_base_) {
+        xdg_wm_base_destroy(xdg_wm_base_);
+        xdg_wm_base_ = nullptr;
     }
     
     if (wl_compositor_) {
