@@ -96,9 +96,7 @@ public:
     bool egl_initialized_ = false;
     
     Impl() = default;
-    ~Impl() {
-        cleanup();
-    }
+    ~Impl();
     
     bool checkWaylandEnvironment();
     bool initializeDRMBackend();
