@@ -806,50 +806,79 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     
-    // 立即创建toplevel角色
+    // 🔧 关键修复：完全避免xdg_positioner问题的策略
+    std::cout << "🔧 使用保守的窗口创建策略（完全避免xdg_positioner）..." << std::endl;
+    
+    // 策略1：延迟创建toplevel角色，先确认surface健康状态
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // 再次检查surface状态
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cerr << "❌ Surface创建后检测到协议错误: " << error_code << std::endl;
+        std::cerr << "🔄 尝试重置Wayland连接..." << std::endl;
+        
+        // 清理当前surface并重新创建
+        if (xdg_surface_) { xdg_surface_destroy(xdg_surface_); xdg_surface_ = nullptr; }
+        if (wl_surface_) { wl_surface_destroy(wl_surface_); wl_surface_ = nullptr; }
+        
+        // 重新创建surface
+        wl_surface_ = wl_compositor_create_surface(wl_compositor_);
+        if (!wl_surface_) {
+            std::cerr << "❌ 重新创建surface失败" << std::endl;
+            return false;
+        }
+        
+        xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
+        if (!xdg_surface_) {
+            std::cerr << "❌ 重新创建xdg_surface失败" << std::endl;
+            return false;
+        }
+        
+        xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
+        std::cout << "✅ 已重新创建干净的surface" << std::endl;
+    }
+    
+    // 策略2：谨慎创建toplevel，使用最小化属性
+    std::cout << "🎯 创建xdg toplevel（最小化策略）..." << std::endl;
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
         std::cerr << "❌ 无法创建xdg toplevel" << std::endl;
         return false;
     }
-    std::cout << "✅ 已创建xdg toplevel" << std::endl;
     
-    // 🔧 关键：检查是否有xdg_positioner错误
+    // 立即检查创建toplevel后的状态
     error_code = wl_display_get_error(wl_display_);
     if (error_code != 0) {
-        std::cerr << "❌ 创建toplevel后发生xdg_positioner错误: " << error_code << std::endl;
-        std::cerr << "   这通常是由于Weston内部窗口或其他客户端冲突导致" << std::endl;
-        return false;
+        std::cerr << "❌ 创建toplevel后发生协议错误: " << error_code << std::endl;
+        return false;  // 立即失败，不要继续设置属性
     }
     
-    // 设置toplevel监听器
+    std::cout << "✅ 已创建xdg toplevel（无协议错误）" << std::endl;
+    
+    // 策略3：设置监听器但不设置任何属性，完全依赖默认值
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     
-    // 🔧 关键修复：避免xdg_positioner错误 - 不要设置可能导致协议错误的属性
-    std::cout << "🔧 设置基础窗口属性（避免xdg_positioner错误）..." << std::endl;
+    // 🔧 关键修复：完全跳过属性设置，避免任何可能触发xdg_positioner的操作
+    std::cout << "🚫 跳过窗口属性设置，使用默认配置（避免xdg_positioner触发）" << std::endl;
     
-    // 只设置最基本的窗口属性，避免触发xdg_positioner
-    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo");  // 使用简短标题
-    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo");  // 使用简短ID
+    // 不设置title、app_id或任何其他属性，让合成器使用默认值
     
-    std::cout << "✅ 已设置基础窗口属性" << std::endl;
+    // 进行一次轻量级的同步检查
+    wl_display_flush(wl_display_);
     
-    // 🔧 关键：不要立即设置窗口大小，让合成器决定
-    // 避免调用任何可能触发xdg_positioner的操作
-    
-    // 进行一次同步以确保属性已设置
-    wl_display_roundtrip(wl_display_);
-    
-    // 检查设置属性后的错误状态
+    // 最终检查：确认没有协议错误
     error_code = wl_display_get_error(wl_display_);
     if (error_code != 0) {
-        std::cerr << "❌ 设置窗口属性后发生xdg_positioner错误: " << error_code << std::endl;
+        std::cerr << "❌ 窗口创建过程中发生协议错误: " << error_code << std::endl;
         return false;
     }
+    
+    std::cout << "✅ 窗口创建成功（保守策略）" << std::endl;
     
     // 🔧 关键修复：在提交surface前再次检查错误状态
     error_code = wl_display_get_error(wl_display_);
