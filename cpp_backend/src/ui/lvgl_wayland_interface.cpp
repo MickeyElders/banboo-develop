@@ -860,29 +860,43 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     std::cout << "✅ 已创建xdg toplevel（无协议错误）" << std::endl;
     
-    // 策略3：设置监听器但不设置任何属性，完全依赖默认值
+    // 策略3：设置监听器并正确设置必需的窗口属性
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     
-    // 🔧 关键修复：完全跳过属性设置，避免任何可能触发xdg_positioner的操作
-    std::cout << "🚫 跳过窗口属性设置，使用默认配置（避免xdg_positioner触发）" << std::endl;
+    // 🔧 关键修复：正确设置xdg-shell协议要求的窗口属性
+    std::cout << "🔧 设置xdg-shell协议要求的窗口属性..." << std::endl;
     
-    // 不设置title、app_id或任何其他属性，让合成器使用默认值
+    // 必需：设置窗口标题（协议要求）
+    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
+    std::cout << "✅ 已设置窗口标题" << std::endl;
     
-    // 进行一次轻量级的同步检查
-    wl_display_flush(wl_display_);
+    // 必需：设置应用程序ID（协议要求）
+    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
+    std::cout << "✅ 已设置应用程序ID" << std::endl;
     
-    // 最终检查：确认没有协议错误
+    // 关键：设置最小窗口尺寸，避免xdg_positioner错误
+    xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
+    std::cout << "✅ 已设置最小窗口尺寸 (800x600)" << std::endl;
+    
+    // 可选：设置最大窗口尺寸
+    xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
+    std::cout << "✅ 已设置最大窗口尺寸 (" << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
+    
+    // 🔧 关键步骤4：检查设置窗口属性后的状态
     error_code = wl_display_get_error(wl_display_);
     if (error_code != 0) {
-        std::cerr << "❌ 窗口创建过程中发生协议错误: " << error_code << std::endl;
+        std::cerr << "❌ 设置窗口属性后发生协议错误: " << error_code << std::endl;
         return false;
     }
     
-    std::cout << "✅ 窗口创建成功（保守策略）" << std::endl;
+    // 进行同步以确保所有属性设置完成
+    wl_display_flush(wl_display_);
+    
+    std::cout << "✅ 窗口属性设置成功，符合xdg-shell协议要求" << std::endl;
     
     // 🔧 关键修复：在提交surface前再次检查错误状态
     error_code = wl_display_get_error(wl_display_);
