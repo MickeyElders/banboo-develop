@@ -26,8 +26,8 @@
 #include <wayland-egl.h>
 #include <vector>
 
-// 暂时移除xdg-shell，使用简化的Wayland实现
-// #include <xdg-shell-client-protocol.h>
+// 使用现代xdg-shell协议替代废弃的wl_shell
+#include "wayland-protocols/xdg-shell-client-protocol.h"
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
@@ -672,6 +672,12 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 已绑定Wayland compositor" << std::endl;
     
+    if (!xdg_wm_base_) {
+        std::cerr << "❌ xdg_wm_base不可用" << std::endl;
+        return false;
+    }
+    std::cout << "✅ 已绑定xdg_wm_base" << std::endl;
+    
     // 创建surface
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
@@ -818,27 +824,62 @@ void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry*
     // 处理全局对象移除（可选实现）
 }
 
-// ✅ 新增：wl_shell协议回调函数实现
-void LVGLWaylandInterface::Impl::shellSurfacePing(void* data, struct wl_shell_surface* shell_surface, uint32_t serial) {
-    std::cout << "🏓 收到shell surface ping, serial=" << serial << std::endl;
-    wl_shell_surface_pong(shell_surface, serial);
-    std::cout << "✅ 已回复shell surface pong" << std::endl;
+// ✅ 新增：xdg-shell协议回调函数实现
+void LVGLWaylandInterface::Impl::xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial) {
+    std::cout << "🏓 收到xdg_wm_base ping, serial=" << serial << std::endl;
+    xdg_wm_base_pong(xdg_wm_base, serial);
+    std::cout << "✅ 已回复xdg_wm_base pong" << std::endl;
 }
 
-void LVGLWaylandInterface::Impl::shellSurfaceConfigure(void* data, struct wl_shell_surface* shell_surface,
-                                                       uint32_t edges, int32_t width, int32_t height) {
+void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    std::cout << "📐 Shell surface配置更改: " << width << "x" << height << " edges=" << edges << std::endl;
+    std::cout << "📐 XDG surface配置更改, serial=" << serial << std::endl;
+    
+    // 🔧 关键：必须回复configure事件
+    xdg_surface_ack_configure(xdg_surface, serial);
+    std::cout << "✅ 已确认xdg surface配置" << std::endl;
+    
+    // 提交surface
+    if (impl->wl_surface_) {
+        wl_surface_commit(impl->wl_surface_);
+        std::cout << "✅ 已提交surface" << std::endl;
+    }
+}
+
+void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel,
+                                                      int32_t width, int32_t height, struct wl_array* states) {
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    std::cout << "📐 XDG toplevel配置更改: " << width << "x" << height << std::endl;
     
     // 如果合成器建议新尺寸，调整EGL窗口
     if (width > 0 && height > 0 && impl->wl_egl_window_) {
         wl_egl_window_resize(impl->wl_egl_window_, width, height, 0, 0);
         std::cout << "✅ EGL窗口已调整大小: " << width << "x" << height << std::endl;
     }
+    
+    // 打印窗口状态
+    uint32_t* state;
+    wl_array_for_each(state, states) {
+        switch (*state) {
+            case XDG_TOPLEVEL_STATE_MAXIMIZED:
+                std::cout << "🔲 窗口状态: 最大化" << std::endl;
+                break;
+            case XDG_TOPLEVEL_STATE_FULLSCREEN:
+                std::cout << "🔳 窗口状态: 全屏" << std::endl;
+                break;
+            case XDG_TOPLEVEL_STATE_ACTIVATED:
+                std::cout << "✨ 窗口状态: 激活" << std::endl;
+                break;
+            default:
+                std::cout << "❓ 窗口状态: " << *state << std::endl;
+                break;
+        }
+    }
 }
 
-void LVGLWaylandInterface::Impl::shellSurfacePopupDone(void* data, struct wl_shell_surface* shell_surface) {
-    std::cout << "📱 Shell surface popup完成" << std::endl;
+void LVGLWaylandInterface::Impl::xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel) {
+    std::cout << "❌ XDG toplevel关闭请求" << std::endl;
+    // 这里可以处理关闭窗口的逻辑
 }
 
 // ✅ 新增：frame回调函数 - 同步渲染
@@ -1075,9 +1116,32 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
     glFlush();
     glFinish();
     
+    // 🔧 关键：通知Wayland合成器有变化
+    if (wl_surface_) {
+        // 标记整个surface需要重绘
+        wl_surface_damage(wl_surface_, 0, 0, config_.screen_width, config_.screen_height);
+        
+        // 提交surface更改
+        wl_surface_commit(wl_surface_);
+        
+        if (flush_count <= 5) {
+            std::cout << "🎯 已标记surface damage并提交" << std::endl;
+        }
+    }
+    
     // 交换缓冲区（这会自动处理DRM framebuffer更新）
     if (!eglSwapBuffers(egl_display_, egl_surface_)) {
-        std::cerr << "❌ eglSwapBuffers失败: " << eglGetError() << std::endl;
+        EGLint error = eglGetError();
+        std::cerr << "❌ eglSwapBuffers失败: 0x" << std::hex << error << " (" << error << ")" << std::endl;
+        
+        // 如果是EGL_BAD_SURFACE，说明surface配置有问题
+        if (error == 0x300D) { // EGL_BAD_SURFACE
+            std::cerr << "🚨 EGL_BAD_SURFACE错误：surface未正确配置为可渲染状态！" << std::endl;
+        }
+    } else {
+        if (flush_count <= 5) {
+            std::cout << "✅ eglSwapBuffers成功" << std::endl;
+        }
     }
     
     // 🔍 强制Wayland事件处理
@@ -1129,10 +1193,30 @@ void LVGLWaylandInterface::Impl::cleanup() {
         wl_egl_window_ = nullptr;
     }
     
-    // 清理Wayland资源 - 简化实现
+    // 清理Wayland资源 - xdg-shell实现
+    if (frame_callback_) {
+        wl_callback_destroy(frame_callback_);
+        frame_callback_ = nullptr;
+    }
+    
+    if (xdg_toplevel_) {
+        xdg_toplevel_destroy(xdg_toplevel_);
+        xdg_toplevel_ = nullptr;
+    }
+    
+    if (xdg_surface_) {
+        xdg_surface_destroy(xdg_surface_);
+        xdg_surface_ = nullptr;
+    }
+    
     if (wl_surface_) {
         wl_surface_destroy(wl_surface_);
         wl_surface_ = nullptr;
+    }
+    
+    if (xdg_wm_base_) {
+        xdg_wm_base_destroy(xdg_wm_base_);
+        xdg_wm_base_ = nullptr;
     }
     
     if (wl_compositor_) {
