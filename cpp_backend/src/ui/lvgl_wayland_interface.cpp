@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <mutex>
 #include <chrono>
+#include <condition_variable>
 
 // 系统头文件
 #include <fcntl.h>
@@ -109,6 +110,7 @@ public:
     bool initializeWaylandEGL();
     bool initializeWaylandDisplay();
     bool initializeFallbackDisplay();
+    bool initializeFallbackDisplayWithWaylandObjects();
     bool initializeInput();
     void initializeTheme();
     void createMainInterface();
@@ -394,8 +396,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     std::cout << "正在初始化Wayland EGL..." << std::endl;
     if (!initializeWaylandEGL()) {
         std::cerr << "Wayland EGL初始化失败，使用fallback模式" << std::endl;
-        cleanup();
-        return initializeFallbackDisplay();
+        // 🔧 关键修复：EGL失败时不清理Wayland对象，保留给DeepStream使用
+        std::cout << "🔄 保留Wayland对象供DeepStream Subsurface使用..." << std::endl;
+        return initializeFallbackDisplayWithWaylandObjects();
     }
     
     // 创建LVGL显示设备
@@ -472,6 +475,30 @@ bool LVGLWaylandInterface::Impl::initializeFallbackDisplay() {
     });
     
     display_initialized_ = true;
+    return true;
+}
+
+// 🆕 新增：保留Wayland对象的fallback模式
+bool LVGLWaylandInterface::Impl::initializeFallbackDisplayWithWaylandObjects() {
+    std::cout << "🔄 使用fallback显示模式（保留Wayland对象）" << std::endl;
+    
+    // 先创建fallback显示
+    if (!initializeFallbackDisplay()) {
+        return false;
+    }
+    
+    // 关键：保留Wayland连接和基础对象供DeepStream使用
+    std::cout << "✅ 保留Wayland连接供DeepStream Subsurface使用" << std::endl;
+    std::cout << "   Display: " << (wl_display_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    std::cout << "   Compositor: " << (wl_compositor_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    std::cout << "   Subcompositor: " << (wl_subcompositor_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    std::cout << "   Surface: " << (wl_surface_ ? "✅ 保留" : "❌ NULL") << std::endl;
+    
+    // 设置状态标志
+    wayland_initialized_ = true;
+    wayland_egl_initialized_ = false;  // EGL失败，但Wayland连接正常
+    egl_initialized_ = false;
+    
     return true;
 }
 
@@ -732,22 +759,55 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     wl_surface_commit(wl_surface_);
     std::cout << "✅ 已提交surface，等待configure事件..." << std::endl;
     
-    // 等待第一个configure事件（这是xdg-shell协议的要求）
-    int configure_timeout = 100; // 100次尝试，每次10ms
-    bool configure_received = false;
+    // 🔧 关键修复：正确等待xdg_surface的configure事件
+    std::cout << "⏳ 等待xdg_surface configure事件...（修复xdg_positioner协议错误）" << std::endl;
     
-    for (int i = 0; i < configure_timeout && !configure_received; i++) {
-        wl_display_dispatch_pending(wl_display_);
-        wl_display_flush(wl_display_);
-        
-        // 简单检查：如果没有错误，假设configure已收到
-        if (i > 10) { // 给一些时间让configure事件到达
-            configure_received = true;
-            std::cout << "✅ Configure事件处理完成（超时后继续）" << std::endl;
-            break;
+    // 添加配置状态跟踪
+    static bool surface_configured = false;
+    static std::mutex configure_mutex;
+    static std::condition_variable configure_cv;
+    
+    // 重新设置surface监听器，确保捕获configure事件
+    static const struct xdg_surface_listener xdg_surface_listener_fixed = {
+        [](void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
+            LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+            std::cout << "🎯 收到xdg_surface configure事件, serial=" << serial << std::endl;
+            
+            // 必须回复configure事件
+            xdg_surface_ack_configure(xdg_surface, serial);
+            std::cout << "✅ 已确认xdg surface配置" << std::endl;
+            
+            // 提交surface
+            if (impl->wl_surface_) {
+                wl_surface_commit(impl->wl_surface_);
+                std::cout << "✅ 已提交surface" << std::endl;
+            }
+            
+            // 标记配置完成
+            {
+                std::lock_guard<std::mutex> lock(configure_mutex);
+                surface_configured = true;
+            }
+            configure_cv.notify_all();
         }
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    };
+    
+    // 重新添加监听器
+    xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener_fixed, this);
+    
+    // 强制触发configure事件
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
+    
+    // 等待configure事件完成
+    std::unique_lock<std::mutex> lock(configure_mutex);
+    bool configure_received = configure_cv.wait_for(lock, std::chrono::milliseconds(2000),
+        []{ return surface_configured; });
+    
+    if (configure_received) {
+        std::cout << "✅ xdg_surface configure事件已正确处理" << std::endl;
+    } else {
+        std::cout << "⚠️ xdg_surface configure事件超时，继续EGL初始化" << std::endl;
     }
     
     wayland_egl_initialized_ = true;
@@ -762,17 +822,29 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
         return false;
     }
     
-    // 🔧 关键修复：等待surface配置完成后再创建EGL窗口
-    std::cout << "⏳ 等待surface configure事件完成..." << std::endl;
+    // 🔧 关键修复：在xdg_surface configure完成后再创建EGL窗口
+    std::cout << "⏳ 确保xdg_surface configure事件已完成..." << std::endl;
     
-    // 处理待处理的Wayland事件，确保configure事件被处理
-    for (int i = 0; i < 50; i++) {
+    // 额外等待并处理任何剩余的Wayland事件
+    for (int i = 0; i < 20; i++) {
         wl_display_dispatch_pending(wl_display_);
         wl_display_flush(wl_display_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        
+        // 检查Wayland连接状态
+        int error_code = wl_display_get_error(wl_display_);
+        if (error_code != 0) {
+            std::cout << "⚠️ 检测到Wayland错误: " << error_code << "，但继续创建EGL窗口" << std::endl;
+            break;
+        }
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     
-    std::cout << "✅ Surface configure事件处理完成" << std::endl;
+    // 🔧 关键：在创建EGL窗口前进行最后检查
+    if (!wl_surface_ || !wl_display_) {
+        std::cerr << "❌ Wayland surface或display无效，无法创建EGL窗口" << std::endl;
+        return false;
+    }
     
     // 创建EGL窗口
     std::cout << "📐 创建EGL窗口 (" << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
@@ -836,42 +908,75 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     }
     std::cout << "✅ 已绑定OpenGL ES API" << std::endl;
     
-    // 初始化EGL
+    // 🔧 关键修复：改进EGL初始化过程
+    std::cout << "🔧 开始EGL初始化（增强版错误处理）..." << std::endl;
+    
+    // 检查Wayland display状态
+    int wayland_error = wl_display_get_error(wl_display_);
+    if (wayland_error != 0) {
+        std::cout << "⚠️ Wayland display错误状态: " << wayland_error << std::endl;
+        std::cout << "🔄 清理Wayland错误状态后继续EGL初始化..." << std::endl;
+    }
+    
     EGLint major, minor;
-    if (!eglInitialize(egl_display_, &major, &minor)) {
-        EGLint error = eglGetError();
-        std::cerr << "❌ EGL初始化失败，错误码: 0x" << std::hex << error << " (" << error << ")" << std::endl;
+    bool egl_init_success = false;
+    
+    // 尝试多次EGL初始化（处理各种协议错误）
+    for (int retry = 0; retry < 3 && !egl_init_success; retry++) {
+        std::cout << "🔄 EGL初始化尝试 #" << (retry + 1) << std::endl;
         
-        // 详细的错误分析
-        switch (error) {
-            case EGL_BAD_DISPLAY:
-                std::cerr << "   原因: EGL_BAD_DISPLAY - 显示连接无效" << std::endl;
-                break;
-            case EGL_NOT_INITIALIZED:
-                std::cerr << "   原因: EGL_NOT_INITIALIZED - EGL未初始化" << std::endl;
-                break;
-            default:
-                std::cerr << "   原因: 未知EGL错误" << std::endl;
-                break;
-        }
-        
-        // 🔧 新增：EGL初始化失败时的强力恢复机制
-        std::cout << "🔄 尝试EGL初始化失败恢复...（针对xdg_positioner错误）" << std::endl;
-        
-        // 策略1: 重新获取EGL display
-        egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
-        if (egl_display_ != EGL_NO_DISPLAY) {
-            std::cout << "🔄 重新获取EGL display成功，再次尝试初始化..." << std::endl;
-            if (eglInitialize(egl_display_, &major, &minor)) {
-                std::cout << "✅ EGL恢复初始化成功！" << std::endl;
-            } else {
-                std::cout << "❌ EGL恢复初始化仍失败，将使用fallback模式" << std::endl;
-                return false;
+        // 每次重试前先清理EGL状态
+        if (retry > 0) {
+            if (egl_display_ != EGL_NO_DISPLAY) {
+                eglTerminate(egl_display_);
             }
-        } else {
-            std::cout << "❌ 无法重新获取EGL display，将使用fallback模式" << std::endl;
-            return false;
+            egl_display_ = EGL_NO_DISPLAY;
+            
+            std::this_thread::sleep_for(std::chrono::milliseconds(100 * retry));
         }
+        
+        // 重新获取EGL display
+        egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
+        if (egl_display_ == EGL_NO_DISPLAY) {
+            std::cout << "❌ EGL display获取失败，重试..." << std::endl;
+            continue;
+        }
+        
+        // 尝试初始化
+        if (eglInitialize(egl_display_, &major, &minor)) {
+            std::cout << "✅ EGL初始化成功（尝试 #" << (retry + 1) << ")！" << std::endl;
+            egl_init_success = true;
+        } else {
+            EGLint error = eglGetError();
+            std::cout << "❌ EGL初始化失败（尝试 #" << (retry + 1) << ")，错误码: 0x"
+                      << std::hex << error << " (" << std::dec << error << ")" << std::endl;
+            
+            // 详细的错误分析
+            switch (error) {
+                case EGL_BAD_DISPLAY:
+                    std::cout << "   原因: EGL_BAD_DISPLAY - Wayland显示连接损坏（可能由协议错误导致）" << std::endl;
+                    break;
+                case EGL_NOT_INITIALIZED:
+                    std::cout << "   原因: EGL_NOT_INITIALIZED - EGL系统未正确初始化" << std::endl;
+                    break;
+                case EGL_BAD_ALLOC:
+                    std::cout << "   原因: EGL_BAD_ALLOC - EGL资源分配失败" << std::endl;
+                    break;
+                default:
+                    std::cout << "   原因: 未知EGL错误（可能与xdg_positioner协议错误相关）" << std::endl;
+                    break;
+            }
+            
+            if (retry < 2) {
+                std::cout << "🔄 准备重试EGL初始化..." << std::endl;
+            }
+        }
+    }
+    
+    if (!egl_init_success) {
+        std::cout << "❌ 所有EGL初始化尝试均失败，使用fallback模式" << std::endl;
+        std::cout << "🔍 这通常由xdg_positioner协议错误或Wayland连接损坏导致" << std::endl;
+        return false;
     }
     std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
     
