@@ -849,7 +849,7 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     pipeline << "sync=false ";           // 低延迟模式
     pipeline << "async=true ";           // 异步模式
     pipeline << "enable-last-sample=false "; // 减少内存使用
-    pipeline << "force-aspect-ratio=false "; // 允许任意缩放
+    pipeline << "fullscreen=false ";     // 非全屏模式
     
     // 指定Wayland显示
     if (wayland_display) {
