@@ -421,10 +421,10 @@ private:
     std::thread canvas_update_thread_;          // Canvas更新线程
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
     
-    // 🆕 Wayland Subsurface成员变量
-    struct wl_surface* video_surface_ = nullptr;      // 视频子表面
-    struct wl_subsurface* video_subsurface_ = nullptr; // Subsurface对象
-    SubsurfaceConfig subsurface_config_;               // Subsurface配置
+    // 🆕 Wayland Subsurface成员变量（使用void*避免类型冲突）
+    void* video_surface_ = nullptr;      // 视频子表面（wl_surface*）
+    void* video_subsurface_ = nullptr;   // Subsurface对象（wl_subsurface*）
+    SubsurfaceConfig subsurface_config_; // Subsurface配置
     
     // 🔧 线程安全保护
     mutable std::mutex drm_mutex_;      // DRM资源访问互斥锁

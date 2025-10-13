@@ -96,7 +96,8 @@ bool DeepStreamManager::initializeWithSubsurface(
     subsurface_config_ = config;
     
     // 🔧 关键步骤1：创建视频表面
-    video_surface_ = wl_compositor_create_surface(wl_compositor);
+    auto* wl_surface = wl_compositor_create_surface(wl_compositor);
+    video_surface_ = static_cast<void*>(wl_surface);
     if (!video_surface_) {
         std::cerr << "❌ [DeepStream] 创建视频surface失败" << std::endl;
         return false;
@@ -104,33 +105,34 @@ bool DeepStreamManager::initializeWithSubsurface(
     std::cout << "✅ [DeepStream] 创建视频surface" << std::endl;
     
     // 🔧 关键步骤2：创建subsurface并附加到父表面
-    video_subsurface_ = wl_subcompositor_get_subsurface(
-        wl_subcompositor, video_surface_, wl_parent_surface);
+    auto* wl_subsurface = wl_subcompositor_get_subsurface(
+        wl_subcompositor, wl_surface, wl_parent_surface);
+    video_subsurface_ = static_cast<void*>(wl_subsurface);
     
     if (!video_subsurface_) {
         std::cerr << "❌ [DeepStream] 创建subsurface失败" << std::endl;
-        wl_surface_destroy(video_surface_);
+        wl_surface_destroy(wl_surface);
         video_surface_ = nullptr;
         return false;
     }
     std::cout << "✅ [DeepStream] 创建subsurface并附加到父窗口" << std::endl;
     
     // 🔧 关键步骤3：设置subsurface位置
-    wl_subsurface_set_position(video_subsurface_, config.offset_x, config.offset_y);
+    wl_subsurface_set_position(wl_subsurface, config.offset_x, config.offset_y);
     std::cout << "📐 [DeepStream] Subsurface位置: ("
               << config.offset_x << ", " << config.offset_y << ")" << std::endl;
     
     // 🔧 关键步骤4：设置同步模式
     if (config.use_sync_mode) {
-        wl_subsurface_set_sync(video_subsurface_);
+        wl_subsurface_set_sync(wl_subsurface);
         std::cout << "🔄 [DeepStream] 使用同步模式（与父窗口同步刷新）" << std::endl;
     } else {
-        wl_subsurface_set_desync(video_subsurface_);
+        wl_subsurface_set_desync(wl_subsurface);
         std::cout << "⚡ [DeepStream] 使用异步模式（独立刷新）" << std::endl;
     }
     
     // 提交subsurface设置
-    wl_surface_commit(video_surface_);
+    wl_surface_commit(wl_surface);
     wl_display_flush(wl_display);
     
     std::cout << "✅ [DeepStream] Wayland Subsurface初始化完成" << std::endl;
@@ -344,7 +346,8 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 GstElement* waylandsink = gst_bin_get_by_name(GST_BIN(pipeline_), "video_sink");
                 if (waylandsink) {
                     // 将waylandsink的输出绑定到我们的subsurface
-                    g_object_set(waylandsink, "wayland-surface", video_surface_, NULL);
+                    auto* wl_surface = static_cast<struct wl_surface*>(video_surface_);
+                    g_object_set(waylandsink, "wayland-surface", wl_surface, NULL);
                     std::cout << "✅ [DeepStream] waylandsink已绑定到subsurface" << std::endl;
                     gst_object_unref(waylandsink);
                 } else {
@@ -1069,13 +1072,15 @@ void DeepStreamManager::cleanup() {
     
     // 🔧 新增：清理Wayland Subsurface资源
     if (video_subsurface_) {
-        wl_subsurface_destroy(video_subsurface_);
+        auto* wl_subsurface = static_cast<struct wl_subsurface*>(video_subsurface_);
+        wl_subsurface_destroy(wl_subsurface);
         video_subsurface_ = nullptr;
         std::cout << "✅ [DeepStream] 已清理video_subsurface_" << std::endl;
     }
     
     if (video_surface_) {
-        wl_surface_destroy(video_surface_);
+        auto* wl_surface = static_cast<struct wl_surface*>(video_surface_);
+        wl_surface_destroy(wl_surface);
         video_surface_ = nullptr;
         std::cout << "✅ [DeepStream] 已清理video_surface_" << std::endl;
     }
@@ -1253,119 +1258,7 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     return pipeline.str();
 }
 
-// ❌ AppSink回调已移除 - 使用Wayland Subsurface硬件合成
-// GstFlowReturn DeepStreamManager::newSampleCallback(GstAppSink* appsink, gpointer user_data) {
-//     // 此函数已被Subsurface架构替代，不再需要CPU拷贝和手动合成
-//     return GST_FLOW_OK;
-// }
 
-// ❌ 软件合成已移除 - 使用GPU硬件合成
-// void DeepStreamManager::compositeFrameToLVGL(GstMapInfo* map_info, int width, int height) {
-//     // 此函数已被Weston GPU合成器替代，实现零拷贝硬件加速
-// }
-
-// ❌ AppSink回调机制已移除 - 使用Wayland Subsurface硬件合成
-// void DeepStreamManager::setupAppSinkCallbacks() {
-    if (!pipeline_) {
-        std::cout << "错误：管道未创建，无法设置appsink回调" << std::endl;
-        return;
-    }
-    
-    std::cout << "🔧 开始修复AppSink回调机制..." << std::endl;
-    
-    // 查找appsink元素
-    appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "video_appsink");
-    if (!appsink_) {
-        std::cout << "错误：未找到appsink元素，尝试列出所有元素..." << std::endl;
-        
-        // 列出管道中的所有元素用于调试
-        GstIterator* it = gst_bin_iterate_elements(GST_BIN(pipeline_));
-        GValue item = G_VALUE_INIT;
-        gboolean done = FALSE;
-        
-        std::cout << "管道中的元素列表：" << std::endl;
-        while (!done) {
-            switch (gst_iterator_next(it, &item)) {
-                case GST_ITERATOR_OK: {
-                    GstElement* element = GST_ELEMENT(g_value_get_object(&item));
-                    gchar* name = gst_element_get_name(element);
-                    std::cout << "  - " << name << std::endl;
-                    g_free(name);
-                    g_value_reset(&item);
-                    break;
-                }
-                case GST_ITERATOR_RESYNC:
-                    gst_iterator_resync(it);
-                    break;
-                case GST_ITERATOR_ERROR:
-                case GST_ITERATOR_DONE:
-                    done = TRUE;
-                    break;
-            }
-        }
-        g_value_unset(&item);
-        gst_iterator_free(it);
-        return;
-    }
-    
-    std::cout << "✅ 成功找到appsink元素" << std::endl;
-    
-    // 🔧 修复：强制设置appsink属性，确保信号发射正常
-    g_object_set(G_OBJECT(appsink_),
-                 "emit-signals", TRUE,        // 启用信号
-                 "sync", FALSE,               // 异步模式
-                 "max-buffers", 2,            // 最大缓冲区数量
-                 "drop", TRUE,                // 丢弃旧帧
-                 "wait-on-eos", FALSE,        // 不等待EOS
-                 NULL);
-    
-    // 🔧 修复：验证属性设置
-    gboolean emit_signals = FALSE;
-    gboolean sync = TRUE;
-    guint max_buffers = 0;
-    gboolean drop = FALSE;
-    
-    g_object_get(G_OBJECT(appsink_),
-                 "emit-signals", &emit_signals,
-                 "sync", &sync,
-                 "max-buffers", &max_buffers,
-                 "drop", &drop,
-                 NULL);
-    
-    std::cout << "AppSink属性验证：" << std::endl;
-    std::cout << "  - emit-signals: " << (emit_signals ? "TRUE" : "FALSE") << std::endl;
-    std::cout << "  - sync: " << (sync ? "TRUE" : "FALSE") << std::endl;
-    std::cout << "  - max-buffers: " << max_buffers << std::endl;
-    std::cout << "  - drop: " << (drop ? "TRUE" : "FALSE") << std::endl;
-    
-    // 🔧 修复：连接信号并验证连接
-    gulong handler_id = g_signal_connect(appsink_, "new-sample", G_CALLBACK(newSampleCallback), this);
-    
-    if (handler_id > 0) {
-        std::cout << "✅ AppSink信号连接成功，handler_id: " << handler_id << std::endl;
-    } else {
-        std::cout << "❌ AppSink信号连接失败" << std::endl;
-        return;
-    }
-    
-    // 🔧 新增：强制触发一次sample拉取测试
-    std::cout << "🔧 执行AppSink连接测试..." << std::endl;
-    
-    // 使用GMainLoop确保信号处理正常工作
-    GMainContext* context = g_main_context_default();
-    if (context) {
-        std::cout << "✅ GMainContext可用，信号处理应该正常" << std::endl;
-        
-        // 检查是否有待处理的消息
-        while (g_main_context_pending(context)) {
-            g_main_context_iteration(context, FALSE);
-        }
-    } else {
-        std::cout << "⚠️ 警告：GMainContext不可用，信号可能无法正常处理" << std::endl;
-    }
-    
-    std::cout << "🎯 AppSink回调机制修复完成" << std::endl;
-}
 
 // 获取最新合成帧（供外部访问）
 bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
