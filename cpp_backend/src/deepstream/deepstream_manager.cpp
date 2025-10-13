@@ -873,9 +873,7 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     // 🔧 关键修复：使用独立的display标识避免客户端冲突
     pipeline << "display=" << deepstream_display_name << " ";
     
-    // 🎯 重要：添加window-set-render-rectangle属性，避免xdg_positioner冲突
-    pipeline << "window-set-render-rectangle=false ";
-    
+    // 🎯 移除不支持的属性，使用基本waylandsink配置
     std::cout << "[DeepStreamManager] waylandsink使用独立display: " << deepstream_display_name << std::endl;
     
     std::cout << "[DeepStreamManager] Wayland管道构建完成" << std::endl;

@@ -786,12 +786,34 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     }
     std::cout << "✅ EGL窗口创建成功" << std::endl;
     
-    // 🔧 关键修复：清理Wayland错误状态
-    std::cout << "🧹 清理Wayland错误状态..." << std::endl;
-    wl_display_get_error(wl_display_); // 获取并清理错误状态
-    wl_display_dispatch_pending(wl_display_);
-    wl_display_flush(wl_display_);
-    std::cout << "✅ Wayland状态清理完成" << std::endl;
+    // 🔧 关键修复：彻底清理Wayland错误状态和协议冲突
+    std::cout << "🧹 彻底清理Wayland错误状态..." << std::endl;
+    
+    // 1. 获取并清理现有的错误状态
+    int error_code = wl_display_get_error(wl_display_);
+    if (error_code != 0) {
+        std::cout << "⚠️ 检测到Wayland错误状态: " << error_code << "，正在清理..." << std::endl;
+    }
+    
+    // 2. 强制刷新所有待处理的协议消息
+    int rounds = 0;
+    while (wl_display_dispatch_pending(wl_display_) > 0 && rounds < 10) {
+        rounds++;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    // 3. 确保所有协议消息都已发送
+    if (wl_display_flush(wl_display_) < 0) {
+        std::cout << "⚠️ Wayland flush失败，但继续..." << std::endl;
+    }
+    
+    // 4. 最终的错误检查和清理
+    error_code = wl_display_get_error(wl_display_);
+    if (error_code == 0) {
+        std::cout << "✅ Wayland错误状态清理成功" << std::endl;
+    } else {
+        std::cout << "⚠️ Wayland仍有错误状态: " << error_code << "，但继续EGL初始化" << std::endl;
+    }
     
     // 获取EGL显示
     egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
