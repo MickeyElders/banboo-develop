@@ -736,8 +736,10 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     // ✅ 修复：使用现代xdg-shell协议创建顶层窗口
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
+        std::cerr << "❌ 无法创建xdg surface" << std::endl;
         return false;
     }
+    std::cout << "✅ 已创建xdg surface" << std::endl;
     
     // 设置xdg_surface监听器
     static const struct xdg_surface_listener xdg_surface_listener = {
@@ -745,11 +747,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     
-    // 🔧 关键修复：立即创建toplevel角色
+    // 立即创建toplevel角色
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
+        std::cerr << "❌ 无法创建xdg toplevel" << std::endl;
         return false;
     }
+    std::cout << "✅ 已创建xdg toplevel" << std::endl;
     
     // 设置toplevel监听器
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
@@ -762,21 +766,36 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo.recognition.system");
     
-    // 提交surface（现在合成器知道这是toplevel窗口了）
+    // 🔧 关键修复：提交前先处理一次事件，确保监听器注册完成
+    wl_display_roundtrip(wl_display_);
+    
+    // 提交surface
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 现在才等待configure事件
-    std::unique_lock<std::mutex> lock(configure_mutex_);
-    bool received = configure_cv_.wait_for(lock, std::chrono::seconds(3), 
-        [this]{ return configure_received_.load(); });
+    std::cout << "⏳ 等待xdg_surface configure事件..." << std::endl;
     
-    if (!received) {
+    // 🔧 改进：主动处理事件直到收到configure
+    for (int i = 0; i < 30; i++) {  // 最多等待3秒
+        wl_display_dispatch_pending(wl_display_);
+        wl_display_flush(wl_display_);
+        
+        if (configure_received_.load()) {
+            std::cout << "✅ Configure事件已在第" << i << "次尝试中接收" << std::endl;
+            break;
+        }
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    
+    if (!configure_received_.load()) {
         std::cerr << "❌ 等待configure超时" << std::endl;
         return false;
     }
     
     std::cout << "✅ Configure事件已正确接收" << std::endl;
+    
+    wayland_egl_initialized_ = true;
     return true;
 }
 
@@ -1020,11 +1039,15 @@ void LVGLWaylandInterface::Impl::xdgWmBasePing(void* data, struct xdg_wm_base* x
 
 void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    std::cout << "📐 XDG surface配置更改, serial=" << serial << std::endl;
+    std::cout << "📐 收到XDG surface配置, serial=" << serial << std::endl;
     
     // 🔧 关键：必须回复configure事件
     xdg_surface_ack_configure(xdg_surface, serial);
     std::cout << "✅ 已确认xdg surface配置" << std::endl;
+    
+    // 🔧 关键修复：设置标志并通知等待线程
+    impl->configure_received_.store(true);
+    impl->configure_cv_.notify_one();
     
     // 提交surface
     if (impl->wl_surface_) {
@@ -1038,10 +1061,10 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_top
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     std::cout << "📐 XDG toplevel配置更改: " << width << "x" << height << std::endl;
     
-    // 如果合成器建议新尺寸，调整EGL窗口
-    if (width > 0 && height > 0 && impl->wl_egl_window_) {
-        wl_egl_window_resize(impl->wl_egl_window_, width, height, 0, 0);
-        std::cout << "✅ EGL窗口已调整大小: " << width << "x" << height << std::endl;
+    // 如果合成器建议新尺寸，记录下来
+    if (width > 0 && height > 0) {
+        impl->config_.screen_width = width;
+        impl->config_.screen_height = height;
     }
     
     // 打印窗口状态
@@ -1060,9 +1083,6 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_top
                     break;
                 case XDG_TOPLEVEL_STATE_ACTIVATED:
                     std::cout << "✨ 窗口状态: 激活" << std::endl;
-                    break;
-                default:
-                    std::cout << "❓ 窗口状态: " << state_value << std::endl;
                     break;
             }
         }
