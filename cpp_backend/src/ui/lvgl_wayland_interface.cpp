@@ -13,15 +13,29 @@
 #include <mutex>
 #include <chrono>
 
-// 暂时使用fallback实现，等待lv_drivers集成
-#define HAS_WAYLAND_DRIVER 0
-#warning "Using fallback LVGL implementation without lv_drivers"
+// 系统头文件
+#include <fcntl.h>
+#include <errno.h>
+
+// EGL和DRM头文件
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#include <drm/drm.h>
+#include <drm/drm_fourcc.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#include <gbm.h>
+
+// 使用DRM EGL共享架构实现真正的屏幕渲染
+#define HAS_DRM_EGL_BACKEND 1
 
 namespace bamboo_cut {
 namespace ui {
 
 /**
- * @brief LVGL Wayland接口内部实现类
+ * @brief LVGL Wayland接口内部实现类 - 使用DRM EGL共享架构
  */
 class LVGLWaylandInterface::Impl {
 public:
@@ -41,9 +55,33 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
+    // DRM EGL后端
+    int drm_fd_ = -1;
+    struct gbm_device* gbm_device_ = nullptr;
+    struct gbm_surface* gbm_surface_ = nullptr;
+    EGLDisplay egl_display_ = EGL_NO_DISPLAY;
+    EGLContext egl_context_ = EGL_NO_CONTEXT;
+    EGLSurface egl_surface_ = EGL_NO_SURFACE;
+    EGLConfig egl_config_;
+    
+    // DRM资源
+    drmModeRes* drm_resources_ = nullptr;
+    drmModeConnector* drm_connector_ = nullptr;
+    drmModeEncoder* drm_encoder_ = nullptr;
+    drmModeCrtc* drm_crtc_ = nullptr;
+    drmModeModeInfo drm_mode_;
+    uint32_t drm_crtc_id_ = 0;
+    uint32_t drm_connector_id_ = 0;
+    
+    // 显示缓冲区
+    lv_color_t* front_buffer_ = nullptr;
+    lv_color_t* back_buffer_ = nullptr;
+    uint32_t buffer_size_ = 0;
+    
     // 线程同步
     std::mutex ui_mutex_;
     std::mutex canvas_mutex_;
+    std::mutex render_mutex_;
     std::atomic<bool> should_stop_{false};
     
     // Canvas更新
@@ -54,16 +92,29 @@ public:
     bool wayland_initialized_ = false;
     bool display_initialized_ = false;
     bool input_initialized_ = false;
+    bool drm_initialized_ = false;
+    bool egl_initialized_ = false;
     
     Impl() = default;
-    ~Impl() = default;
+    ~Impl() {
+        cleanup();
+    }
     
     bool checkWaylandEnvironment();
+    bool initializeDRMBackend();
+    bool initializeEGL();
     bool initializeWaylandDisplay();
     bool initializeInput();
     void initializeTheme();
     void createMainInterface();
     void updateCanvasFromFrame();
+    void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
+    void cleanup();
+    
+    // DRM辅助函数
+    bool findDRMResources();
+    bool setupDRMMode();
+    EGLConfig chooseEGLConfig();
 };
 
 LVGLWaylandInterface::LVGLWaylandInterface() 

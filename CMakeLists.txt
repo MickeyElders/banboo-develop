@@ -667,6 +667,7 @@ target_compile_definitions(bamboo_integrated PRIVATE
     USE_WAYLAND=1
     LV_USE_WAYLAND=1
     ENABLE_WAYLAND=1
+    HAS_DRM_EGL_BACKEND=1
     $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
     $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>
     $<$<BOOL:${ENABLE_MODBUS}>:ENABLE_MODBUS>
@@ -677,6 +678,9 @@ target_compile_definitions(bamboo_integrated PRIVATE
     $<$<BOOL:${ENABLE_CPP_INFERENCE}>:ENABLE_CPP_INFERENCE>
     $<$<BOOL:${ENABLE_WAYLAND}>:ENABLE_WAYLAND>
     $<$<BOOL:${ENABLE_EGL}>:ENABLE_EGL>
+    $<$<BOOL:${ENABLE_GBM}>:ENABLE_GBM>
+    $<$<BOOL:${ENABLE_GLES2}>:ENABLE_GLES2>
+    $<$<BOOL:${ENABLE_DRM_LIB}>:ENABLE_DRM_LIB>
     $<$<BOOL:${ENABLE_XKBCOMMON}>:ENABLE_XKBCOMMON>
     $<$<STREQUAL:${TARGET_ARCH},aarch64>:JETSON_ORIN_NX>
 )
@@ -834,13 +838,17 @@ if(WAYLAND_PROTOCOLS_FOUND)
 message(STATUS "    - wayland-protocols: ${WAYLAND_PROTOCOLS_VERSION}")
 endif()
 message(STATUS "  EGL: ${ENABLE_EGL}")
+message(STATUS "  GBM: ${ENABLE_GBM}")
+message(STATUS "  OpenGL ES: ${ENABLE_GLES2}")
+message(STATUS "  DRM库: ${ENABLE_DRM_LIB}")
 message(STATUS "  xkbcommon: ${ENABLE_XKBCOMMON}")
 message(STATUS "  LVGL: ${ENABLE_LVGL}")
 message(STATUS "  cpp_inference: ${ENABLE_CPP_INFERENCE}")
 message(STATUS "")
 message(STATUS "架构迁移:")
-message(STATUS "  DRM直接访问: 已移除")
-message(STATUS "  GBM显示后端: 已移除")
+message(STATUS "  DRM直接访问: 已替换为DRM EGL共享架构")
+message(STATUS "  GBM显示后端: 已启用 (DRM EGL)")
+message(STATUS "  OpenGL ES渲染: 已启用")
 message(STATUS "  Wayland合成器: 已启用")
 message(STATUS "  lv_drivers/wayland: 已集成")
 message(STATUS "")

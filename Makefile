@@ -321,6 +321,10 @@ install-system-deps:
 		libfontconfig1-dev \
 		libharfbuzz-dev \
 		libdrm-dev \
+		libgbm-dev \
+		libegl1-mesa-dev \
+		libgles2-mesa-dev \
+		mesa-common-dev \
 		weston \
 		libwayland-dev \
 		libwayland-egl1 \
