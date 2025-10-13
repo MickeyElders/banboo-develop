@@ -608,7 +608,7 @@ public:
         stop();
     }
     
-    bool InferenceWorkerThread::initialize() {
+    bool initialize() {
     std::cout << "🔧 [推理系统] 初始化Wayland Subsurface架构..." << std::endl;
     
     // 获取LVGL的Wayland对象
