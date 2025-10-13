@@ -70,10 +70,13 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     
     config_ = config;
     
-    // 强制使用waylandsink模式（简化架构）
-    if (config_.sink_mode != VideoSinkMode::WAYLANDSINK) {
-        std::cout << "[DeepStreamManager] 强制切换到waylandsink模式" << std::endl;
-        config_.sink_mode = VideoSinkMode::WAYLANDSINK;
+    // 🔧 架构重构：强制使用appsink模式避免双xdg-shell窗口冲突
+    std::cout << "[DeepStreamManager] 🎯 架构重构：使用appsink模式" << std::endl;
+    std::cout << "[DeepStreamManager] 📋 原因：避免与LVGL的xdg-shell协议冲突" << std::endl;
+    
+    if (config_.sink_mode != VideoSinkMode::APPSINK) {
+        std::cout << "[DeepStreamManager] 强制切换到appsink模式（架构重构）" << std::endl;
+        config_.sink_mode = VideoSinkMode::APPSINK;
     }
     
     // 初始化GStreamer
@@ -82,12 +85,12 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
         std::cout << "[DeepStreamManager] GStreamer初始化完成" << std::endl;
     }
     
-    // 检查关键插件可用性
-    const char* required_plugins[] = {"nvarguscamerasrc", "nvvidconv", "waylandsink"};
+    // 🔧 架构重构：检查appsink架构所需插件
+    const char* required_plugins[] = {"nvarguscamerasrc", "nvvidconv", "appsink"};
     const char* plugin_descriptions[] = {
         "nvarguscamerasrc (NVIDIA摄像头源)",
         "nvvidconv (NVIDIA视频转换)",
-        "waylandsink (Wayland显示)"
+        "appsink (应用程序数据接收)"
     };
     
     bool all_plugins_available = true;
@@ -359,7 +362,8 @@ bool DeepStreamManager::startSinglePipelineMode() {
         running_ = true;
         const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
         const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
-        std::cout << "DeepStream 管道启动成功 (" << mode_name << "，与LVGL协同工作)" << std::endl;
+        std::cout << "🎯 DeepStream 管道启动成功 (" << mode_name << " 架构重构模式)" << std::endl;
+        std::cout << "📺 数据流: nvarguscamerasrc → nvinfer → appsink → LVGL Canvas" << std::endl;
         
         // 如果使用appsink模式，设置回调函数
         if (config_.sink_mode == VideoSinkMode::APPSINK) {

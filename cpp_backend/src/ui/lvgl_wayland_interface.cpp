@@ -786,33 +786,42 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     }
     std::cout << "✅ EGL窗口创建成功" << std::endl;
     
-    // 🔧 关键修复：彻底清理Wayland错误状态和协议冲突
-    std::cout << "🧹 彻底清理Wayland错误状态..." << std::endl;
+    // 🔧 关键修复：重置Wayland连接来解决xdg_positioner协议错误
+    std::cout << "🔧 检测并修复xdg_positioner协议错误..." << std::endl;
     
-    // 1. 获取并清理现有的错误状态
+    // 1. 检查当前错误状态
     int error_code = wl_display_get_error(wl_display_);
     if (error_code != 0) {
-        std::cout << "⚠️ 检测到Wayland错误状态: " << error_code << "，正在清理..." << std::endl;
-    }
-    
-    // 2. 强制刷新所有待处理的协议消息
-    int rounds = 0;
-    while (wl_display_dispatch_pending(wl_display_) > 0 && rounds < 10) {
-        rounds++;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    
-    // 3. 确保所有协议消息都已发送
-    if (wl_display_flush(wl_display_) < 0) {
-        std::cout << "⚠️ Wayland flush失败，但继续..." << std::endl;
-    }
-    
-    // 4. 最终的错误检查和清理
-    error_code = wl_display_get_error(wl_display_);
-    if (error_code == 0) {
-        std::cout << "✅ Wayland错误状态清理成功" << std::endl;
+        std::cout << "❌ 检测到严重Wayland协议错误: " << error_code << std::endl;
+        std::cout << "🔄 执行Wayland连接重置修复..." << std::endl;
+        
+        // 重置策略：清理当前连接并重新建立
+        if (wl_egl_window_) {
+            wl_egl_window_destroy(wl_egl_window_);
+            wl_egl_window_ = nullptr;
+        }
+        
+        // 重新创建EGL窗口（这次确保没有协议错误）
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
+        if (!wl_egl_window_) {
+            std::cout << "❌ EGL窗口重建失败" << std::endl;
+            return false;
+        }
+        std::cout << "✅ EGL窗口已重建，协议错误已清理" << std::endl;
+        
+        // 强制同步，确保所有协议操作完成
+        wl_display_roundtrip(wl_display_);
+        
+        // 再次检查错误状态
+        error_code = wl_display_get_error(wl_display_);
+        if (error_code != 0) {
+            std::cout << "⚠️ 协议错误持续存在: " << error_code << "，但继续EGL初始化" << std::endl;
+        } else {
+            std::cout << "✅ Wayland协议错误已完全清理" << std::endl;
+        }
     } else {
-        std::cout << "⚠️ Wayland仍有错误状态: " << error_code << "，但继续EGL初始化" << std::endl;
+        std::cout << "✅ Wayland连接状态正常，无需修复" << std::endl;
     }
     
     // 获取EGL显示
@@ -848,7 +857,24 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
                 std::cerr << "   原因: 未知EGL错误" << std::endl;
                 break;
         }
-        return false;
+        
+        // 🔧 新增：EGL初始化失败时的强力恢复机制
+        std::cout << "🔄 尝试EGL初始化失败恢复...（针对xdg_positioner错误）" << std::endl;
+        
+        // 策略1: 重新获取EGL display
+        egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
+        if (egl_display_ != EGL_NO_DISPLAY) {
+            std::cout << "🔄 重新获取EGL display成功，再次尝试初始化..." << std::endl;
+            if (eglInitialize(egl_display_, &major, &minor)) {
+                std::cout << "✅ EGL恢复初始化成功！" << std::endl;
+            } else {
+                std::cout << "❌ EGL恢复初始化仍失败，将使用fallback模式" << std::endl;
+                return false;
+            }
+        } else {
+            std::cout << "❌ 无法重新获取EGL display，将使用fallback模式" << std::endl;
+            return false;
+        }
     }
     std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
     
