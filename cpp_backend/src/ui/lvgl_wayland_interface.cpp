@@ -431,8 +431,8 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     // 首先初始化Wayland客户端
     std::cout << "正在初始化Wayland客户端..." << std::endl;
     if (!initializeWaylandClient()) {
-        std::cerr << "Wayland客户端初始化失败，使用fallback模式" << std::endl;
-        return initializeFallbackDisplay();
+        std::cerr << "❌ Wayland客户端初始化失败" << std::endl;
+        return false;  // 不要调用 initializeFallbackDisplay()
     }
     
     // 然后初始化Wayland EGL
@@ -992,7 +992,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     
     // 额外等待并处理任何剩余的Wayland事件
     for (int i = 0; i < 10; i++) {  // 减少等待次数
-        wl_display_dispatch_pending(wl_display_);
+        wl_display_roundtrip(wl_display_);
         wl_display_flush(wl_display_);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         
