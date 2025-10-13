@@ -797,7 +797,21 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     // 初始化EGL
     EGLint major, minor;
     if (!eglInitialize(egl_display_, &major, &minor)) {
-        std::cerr << "❌ EGL初始化失败" << std::endl;
+        EGLint error = eglGetError();
+        std::cerr << "❌ EGL初始化失败，错误码: 0x" << std::hex << error << " (" << error << ")" << std::endl;
+        
+        // 详细的错误分析
+        switch (error) {
+            case EGL_BAD_DISPLAY:
+                std::cerr << "   原因: EGL_BAD_DISPLAY - 显示连接无效" << std::endl;
+                break;
+            case EGL_NOT_INITIALIZED:
+                std::cerr << "   原因: EGL_NOT_INITIALIZED - EGL未初始化" << std::endl;
+                break;
+            default:
+                std::cerr << "   原因: 未知EGL错误" << std::endl;
+                break;
+        }
         return false;
     }
     std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
