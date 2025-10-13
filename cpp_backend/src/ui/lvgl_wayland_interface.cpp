@@ -786,6 +786,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     }
     std::cout << "✅ EGL窗口创建成功" << std::endl;
     
+    // 🔧 关键修复：清理Wayland错误状态
+    std::cout << "🧹 清理Wayland错误状态..." << std::endl;
+    wl_display_get_error(wl_display_); // 获取并清理错误状态
+    wl_display_dispatch_pending(wl_display_);
+    wl_display_flush(wl_display_);
+    std::cout << "✅ Wayland状态清理完成" << std::endl;
+    
     // 获取EGL显示
     egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
     if (egl_display_ == EGL_NO_DISPLAY) {
@@ -793,6 +800,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
         return false;
     }
     std::cout << "✅ 已获取EGL显示" << std::endl;
+    
+    // 🔧 重要修复：设置正确的EGL API
+    if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+        std::cerr << "❌ EGL API绑定失败" << std::endl;
+        return false;
+    }
+    std::cout << "✅ 已绑定OpenGL ES API" << std::endl;
     
     // 初始化EGL
     EGLint major, minor;
