@@ -587,6 +587,11 @@ set(CPP_BACKEND_SOURCES
 )
 
 
+# 定义xdg-shell协议源文件
+set(XDG_SHELL_PROTOCOL_SOURCES
+    cpp_backend/src/wayland-protocols/xdg-shell-protocol.c
+)
+
 # 过滤存在的xdg-shell协议源文件
 set(VALID_XDG_SHELL_SOURCES)
 foreach(src ${XDG_SHELL_PROTOCOL_SOURCES})

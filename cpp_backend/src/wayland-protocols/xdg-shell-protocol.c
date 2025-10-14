@@ -81,7 +81,7 @@ static const struct wl_message xdg_wm_base_events[] = {
 };
 
 WL_EXPORT const struct wl_interface xdg_wm_base_interface = {
-	"xdg_wm_base", 2,
+	"xdg_wm_base", 5,
 	3, xdg_wm_base_requests,
 	1, xdg_wm_base_events,
 };
@@ -115,7 +115,7 @@ static const struct wl_message xdg_surface_events[] = {
 };
 
 WL_EXPORT const struct wl_interface xdg_surface_interface = {
-	"xdg_surface", 2,
+	"xdg_surface", 5,
 	5, xdg_surface_requests,
 	1, xdg_surface_events,
 };
@@ -143,7 +143,7 @@ static const struct wl_message xdg_toplevel_events[] = {
 };
 
 WL_EXPORT const struct wl_interface xdg_toplevel_interface = {
-	"xdg_toplevel", 2,
+	"xdg_toplevel", 5,
 	14, xdg_toplevel_requests,
 	2, xdg_toplevel_events,
 };
