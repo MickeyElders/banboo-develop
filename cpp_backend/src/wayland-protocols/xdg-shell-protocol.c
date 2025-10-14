@@ -94,11 +94,14 @@ static const struct wl_message xdg_positioner_requests[] = {
 	{ "set_gravity", "u", types + 0 },
 	{ "set_constraint_adjustment", "u", types + 0 },
 	{ "set_offset", "ii", types + 0 },
+	{ "set_reactive", "", types + 0 },
+	{ "set_parent_size", "ii", types + 0 },
+	{ "set_parent_configure", "u", types + 0 },
 };
 
 WL_EXPORT const struct wl_interface xdg_positioner_interface = {
-	"xdg_positioner", 1,
-	7, xdg_positioner_requests,
+	"xdg_positioner", 5,
+	10, xdg_positioner_requests,
 	0, NULL,
 };
 
