@@ -28,7 +28,7 @@
 #include <vector>
 
 #include <wayland-client-protocol.h>
-#include <xdg-shell-client-protocol.h>
+#include "wayland-protocols/xdg-shell-client-protocol.h"
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
