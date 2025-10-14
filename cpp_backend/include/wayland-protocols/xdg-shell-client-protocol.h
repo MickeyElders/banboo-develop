@@ -367,6 +367,20 @@ xdg_toplevel_unset_fullscreen(struct xdg_toplevel *xdg_toplevel)
 }
 
 static inline void
+xdg_toplevel_set_max_size(struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height)
+{
+	wl_proxy_marshal((struct wl_proxy *) xdg_toplevel,
+			 XDG_TOPLEVEL_SET_MAX_SIZE, width, height);
+}
+
+static inline void
+xdg_toplevel_set_min_size(struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height)
+{
+	wl_proxy_marshal((struct wl_proxy *) xdg_toplevel,
+			 XDG_TOPLEVEL_SET_MIN_SIZE, width, height);
+}
+
+static inline void
 xdg_toplevel_set_minimized(struct xdg_toplevel *xdg_toplevel)
 {
 	wl_proxy_marshal((struct wl_proxy *) xdg_toplevel,
