@@ -867,7 +867,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     
-    // 🔧 关键修复：正确设置xdg-shell协议要求的窗口属性
+    // 🔧 关键修复：正确设置xdg-shell协议要求的窗口属性（但不要过早flush）
     std::cout << "🔧 设置xdg-shell协议要求的窗口属性..." << std::endl;
     
     // 必需：设置窗口标题（协议要求）
@@ -886,70 +886,34 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
     std::cout << "✅ 已设置最大窗口尺寸 (" << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
     
-    // 🔧 关键步骤4：检查设置窗口属性后的状态
-    error_code = wl_display_get_error(wl_display_);
-    if (error_code != 0) {
-        std::cerr << "❌ 设置窗口属性后发生协议错误: " << error_code << std::endl;
-        return false;
-    }
+    std::cout << "✅ 窗口属性设置完成" << std::endl;
     
-    // 进行同步以确保所有属性设置完成
-    wl_display_flush(wl_display_);
-    
-    std::cout << "✅ 窗口属性设置成功，符合xdg-shell协议要求" << std::endl;
-    
-    // 🔧 关键修复：在提交surface前再次检查错误状态
-    error_code = wl_display_get_error(wl_display_);
-    if (error_code != 0) {
-        std::cerr << "❌ 提交surface前发现xdg_positioner错误: " << error_code << std::endl;
-        return false;
-    }
-    
-    // 提交surface
+    // 🔧 关键修复：立即提交surface（不要先flush）
+    std::cout << "📝 提交初始surface..." << std::endl;
     wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
+    wl_display_flush(wl_display_);  // 现在才flush，将commit和所有属性一起发送
     
-    // 🔧 立即检查提交后的错误状态
-    error_code = wl_display_get_error(wl_display_);
-    if (error_code != 0) {
-        std::cerr << "❌ 提交surface后发生xdg_positioner错误: " << error_code << std::endl;
-        std::cerr << "   这通常是因为Weston合成器状态冲突或其他客户端干扰" << std::endl;
-        return false;
-    }
+    // 🔧 关键修复：等待configure事件
+    std::cout << "⏳ 等待configure事件..." << std::endl;
+    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     
-    std::cout << "⏳ 等待xdg_surface configure事件..." << std::endl;
-    
-    // 减少等待时间和次数，避免长时间占用
-    for (int i = 0; i < 10; i++) {
-        // roundtrip会：
-        // 1. 发送所有待处理的请求到服务器
-        // 2. 等待服务器处理完成
-        // 3. 读取并分发所有事件
-        // 4. 返回时保证所有事件都已处理
-        if (wl_display_roundtrip(wl_display_) < 0) {
-            int error_code = wl_display_get_error(wl_display_);
-            std::cerr << "❌ Wayland roundtrip失败，错误码: " << error_code << std::endl;
+    while (!configure_received_.load()) {
+        if (std::chrono::steady_clock::now() > timeout) {
+            std::cerr << "❌ 等待configure超时" << std::endl;
             return false;
         }
         
-        // 检查configure事件是否已收到
-        if (configure_received_.load()) {
-            std::cout << "✅ Configure事件已在第" << (i + 1) << "次roundtrip中接收" << std::endl;
-            break;
-        }
-        
-        // 如果还没收到，短暂等待后重试
-        if (i < 9) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (wl_display_dispatch(wl_display_) < 0) {
+            std::cerr << "❌ dispatch失败" << std::endl;
+            return false;
         }
     }
     
-    if (!configure_received_.load()) {
-        std::cerr << "❌ 等待configure超时" << std::endl;
-        return false;
-    }
+    std::cout << "✅ Configure事件已接收并确认" << std::endl;
     
-    std::cout << "✅ Configure事件已正确接收" << std::endl;
+    // 最后一次commit激活窗口
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
     
     wayland_egl_initialized_ = true;
     return true;
@@ -1202,19 +1166,15 @@ void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surf
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     std::cout << "📐 收到XDG surface配置, serial=" << serial << std::endl;
     
-    // 🔧 关键：必须回复configure事件
+    // 步骤6: 确认configure（协议要求必须ack）
     xdg_surface_ack_configure(xdg_surface, serial);
     std::cout << "✅ 已确认xdg surface配置" << std::endl;
     
-    // 🔧 关键修复：设置标志并通知等待线程
+    // 设置标志，通知主线程configure已到达
     impl->configure_received_.store(true);
     impl->configure_cv_.notify_one();
     
-    // 提交surface
-    if (impl->wl_surface_) {
-        wl_surface_commit(impl->wl_surface_);
-        std::cout << "✅ 已提交surface" << std::endl;
-    }
+    // ⚠️ 注意：不要在这里commit，让主线程在ack后commit
 }
 
 void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel,
