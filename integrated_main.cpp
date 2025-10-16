@@ -988,6 +988,14 @@ public:
                 return false;
             }
             
+            std::cout << "⏳ 等待Weston合成器完全稳定（避免xdg_positioner冲突）..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(3));  // 从500ms增加到3秒
+            
+            // 检查是否有其他Wayland客户端
+            if (system("pgrep -x weston-terminal > /dev/null 2>&1") == 0) {
+                std::cout << "⚠️ 警告：检测到weston-terminal正在运行，可能影响窗口创建" << std::endl;
+                std::cout << "建议关闭其他Wayland客户端" << std::endl;
+            }
             // 创建Wayland优化的LVGL界面实例
             lvgl_wayland_interface_ = std::make_unique<bamboo_cut::ui::LVGLWaylandInterface>();
             
