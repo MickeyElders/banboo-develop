@@ -146,7 +146,7 @@ public:
 
 private:
     // 辅助函数声明
-    static int create_anonymous_file(size_t size);
+    static int createAnonymousFile(size_t size);
 };
 
 
