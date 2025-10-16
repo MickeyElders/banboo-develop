@@ -913,6 +913,118 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     return true;
 }
 
+bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
+    std::cout << "🎨 初始化Wayland EGL..." << std::endl;
+    
+    if (!wayland_egl_initialized_) {
+        std::cerr << "❌ Wayland客户端未初始化" << std::endl;
+        return false;
+    }
+    
+    // 🔧 健康检查
+    if (!wl_display_) {
+        std::cerr << "❌ Wayland display为空" << std::endl;
+        return false;
+    }
+    
+    int initial_error_code = wl_display_get_error(wl_display_);
+    if (initial_error_code != 0) {
+        std::cerr << "❌ Wayland display错误: " << initial_error_code << std::endl;
+        return false;
+    }
+    
+    // 检查必需对象
+    if (!wl_surface_ || !wl_display_) {
+        std::cerr << "❌ Wayland surface或display无效，无法创建EGL窗口" << std::endl;
+        return false;
+    }
+    
+    // 创建EGL窗口
+    std::cout << "📐 创建EGL窗口 (" << config_.screen_width << "x" 
+              << config_.screen_height << ")" << std::endl;
+    wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
+    if (!wl_egl_window_) {
+        std::cerr << "❌ 无法创建Wayland EGL窗口" << std::endl;
+        return false;
+    }
+    std::cout << "✅ EGL窗口创建成功" << std::endl;
+    
+    // 获取EGL显示
+    egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
+    if (egl_display_ == EGL_NO_DISPLAY) {
+        std::cerr << "❌ EGL显示获取失败" << std::endl;
+        return false;
+    }
+    std::cout << "✅ 已获取EGL显示" << std::endl;
+    
+    // 绑定OpenGL ES API
+    if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+        std::cerr << "❌ EGL API绑定失败" << std::endl;
+        return false;
+    }
+    std::cout << "✅ 已绑定OpenGL ES API" << std::endl;
+    
+    // 初始化EGL
+    EGLint major, minor;
+    if (!eglInitialize(egl_display_, &major, &minor)) {
+        EGLint egl_error = eglGetError();
+        std::cerr << "❌ EGL初始化失败，错误码: 0x" 
+                  << std::hex << egl_error << std::endl;
+        return false;
+    }
+    std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
+    
+    // 选择EGL配置
+    egl_config_ = chooseEGLConfig();
+    if (!egl_config_) {
+        std::cerr << "❌ EGL配置选择失败" << std::endl;
+        return false;
+    }
+    std::cout << "✅ EGL配置选择成功" << std::endl;
+    
+    // 创建EGL上下文
+    EGLint context_attribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+    
+    egl_context_ = eglCreateContext(egl_display_, egl_config_, EGL_NO_CONTEXT, context_attribs);
+    if (egl_context_ == EGL_NO_CONTEXT) {
+        EGLint egl_error = eglGetError();
+        std::cerr << "❌ EGL上下文创建失败，错误码: 0x" 
+                  << std::hex << egl_error << std::endl;
+        return false;
+    }
+    std::cout << "✅ EGL上下文创建成功" << std::endl;
+    
+    // 创建EGL surface
+    egl_surface_ = eglCreateWindowSurface(egl_display_, egl_config_, 
+                                         (EGLNativeWindowType)wl_egl_window_, NULL);
+    if (egl_surface_ == EGL_NO_SURFACE) {
+        EGLint egl_error = eglGetError();
+        std::cerr << "❌ EGL surface创建失败，错误码: 0x" 
+                  << std::hex << egl_error << std::endl;
+        return false;
+    }
+    std::cout << "✅ EGL surface创建成功" << std::endl;
+    
+    // 激活EGL上下文
+    if (!eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_)) {
+        EGLint egl_error = eglGetError();
+        std::cerr << "❌ EGL上下文激活失败，错误码: 0x" 
+                  << std::hex << egl_error << std::endl;
+        return false;
+    }
+    std::cout << "✅ EGL上下文已激活" << std::endl;
+    
+    // 设置交换间隔（vsync）
+    eglSwapInterval(egl_display_, 1);
+    
+    egl_initialized_ = true;
+    std::cout << "✅ Wayland EGL初始化完成" << std::endl;
+    return true;
+}
+
 
 
 // Wayland registry回调函数 - 支持subcompositor绑定
