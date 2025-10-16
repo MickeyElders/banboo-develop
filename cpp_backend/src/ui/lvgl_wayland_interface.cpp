@@ -906,29 +906,6 @@ static int createAnonymousFile(size_t size) {
     return fd;
 }
 
-// 🆕 辅助函数：创建匿名共享内存文件
-int create_anonymous_file(size_t size) {
-    static const char template_str[] = "/bamboo-cut-XXXXXX";
-    const char* path = getenv("XDG_RUNTIME_DIR");
-    if (!path) {
-        path = "/tmp";
-    }
-    
-    std::string name = std::string(path) + template_str;
-    int fd = mkstemp(&name[0]);
-    if (fd < 0) {
-        return -1;
-    }
-    
-    unlink(name.c_str());
-    
-    if (ftruncate(fd, size) < 0) {
-        close(fd);
-        return -1;
-    }
-    
-    return fd;
-}
 
 // 🔧 更新：xdg_surface configure回调
 void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
@@ -1154,38 +1131,6 @@ void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surf
     // ⚠️ 注意：不要在这里commit，让主线程在ack后commit
 }
 
-void LVGLWaylandInterface::Impl::xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel,
-                                                      int32_t width, int32_t height, struct wl_array* states) {
-    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    std::cout << "📐 XDG toplevel配置更改: " << width << "x" << height << std::endl;
-    
-    // 如果合成器建议新尺寸，记录下来
-    if (width > 0 && height > 0) {
-        impl->config_.screen_width = width;
-        impl->config_.screen_height = height;
-    }
-    
-    // 打印窗口状态
-    if (states && states->size > 0) {
-        uint32_t* state_data = static_cast<uint32_t*>(states->data);
-        size_t num_states = states->size / sizeof(uint32_t);
-        
-        for (size_t i = 0; i < num_states; i++) {
-            uint32_t state_value = state_data[i];
-            switch (state_value) {
-                case XDG_TOPLEVEL_STATE_MAXIMIZED:
-                    std::cout << "🔲 窗口状态: 最大化" << std::endl;
-                    break;
-                case XDG_TOPLEVEL_STATE_FULLSCREEN:
-                    std::cout << "🔳 窗口状态: 全屏" << std::endl;
-                    break;
-                case XDG_TOPLEVEL_STATE_ACTIVATED:
-                    std::cout << "✨ 窗口状态: 激活" << std::endl;
-                    break;
-            }
-        }
-    }
-}
 
 void LVGLWaylandInterface::Impl::xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel) {
     std::cout << "❌ XDG toplevel关闭请求" << std::endl;
