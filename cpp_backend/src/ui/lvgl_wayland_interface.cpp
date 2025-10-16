@@ -778,6 +778,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     static const struct xdg_surface_listener xdg_surface_listener = {
         xdgSurfaceConfigure
     };
+
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     std::cout << "✅ XDG Surface创建成功" << std::endl;
     
@@ -906,20 +907,6 @@ static int createAnonymousFile(size_t size) {
     return fd;
 }
 
-
-// 🔧 更新：xdg_surface configure回调
-void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
-    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    std::cout << "📐 收到XDG surface configure, serial=" << serial << std::endl;
-    
-    // 🔧 关键：立即ack configure（协议要求）
-    xdg_surface_ack_configure(xdg_surface, serial);
-    std::cout << "✅ 已确认xdg surface configure" << std::endl;
-    
-    // 设置标志，通知等待线程
-    impl->configure_received_.store(true);
-    impl->configure_cv_.notify_all();
-}
 
 // 🔧 更新：xdg_toplevel configure回调
 void LVGLWaylandInterface::Impl::xdgToplevelConfigure(
