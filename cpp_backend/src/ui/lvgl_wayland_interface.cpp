@@ -992,6 +992,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
+    // 清理临时buffer
+    wl_buffer_destroy(buffer);
+    
     wayland_egl_initialized_ = true;
     return true;
 }
@@ -1638,6 +1641,11 @@ void LVGLWaylandInterface::Impl::cleanup() {
     if (wl_subcompositor_) {
         wl_subcompositor_destroy(wl_subcompositor_);
         wl_subcompositor_ = nullptr;
+    }
+    
+    if (wl_shm_) {
+        wl_shm_destroy(wl_shm_);
+        wl_shm_ = nullptr;
     }
     
     if (wl_compositor_) {
