@@ -144,9 +144,6 @@ public:
     std::condition_variable configure_cv_;
     std::atomic<bool> configure_received_{false};
 
-private:
-    // 辅助函数声明
-    static int createAnonymousFile(size_t size);
 };
 
 
