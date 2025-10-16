@@ -713,137 +713,91 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
 
 
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
-    // ... 前面的代码保持不变，直到创建toplevel和设置监听器 ...
+    std::cout << "正在初始化Wayland客户端..." << std::endl;
     
-    // 设置监听器
+    // 步骤1: 连接Wayland display
+    wl_display_ = wl_display_connect(nullptr);
+    if (!wl_display_) {
+        std::cerr << "❌ 无法连接Wayland display" << std::endl;
+        return false;
+    }
+    std::cout << "✅ Wayland display连接成功" << std::endl;
+    
+    // 步骤2: 获取registry并设置监听器
+    wl_registry_ = wl_display_get_registry(wl_display_);
+    if (!wl_registry_) {
+        std::cerr << "❌ 无法获取registry" << std::endl;
+        return false;
+    }
+    
+    static const struct wl_registry_listener registry_listener = {
+        registryHandler,
+        registryRemover
+    };
+    wl_registry_add_listener(wl_registry_, &registry_listener, this);
+    
+    // 步骤3: 🔧 关键：同步等待registry绑定完成
+    wl_display_roundtrip(wl_display_);
+    std::cout << "✅ Registry同步完成" << std::endl;
+    
+    // 步骤4: 检查必需的接口是否已绑定
+    if (!wl_compositor_) {
+        std::cerr << "❌ wl_compositor未绑定" << std::endl;
+        return false;
+    }
+    if (!xdg_wm_base_) {
+        std::cerr << "❌ xdg_wm_base未绑定" << std::endl;
+        return false;
+    }
+    if (!wl_shm_) {
+        std::cerr << "❌ wl_shm未绑定" << std::endl;
+        return false;
+    }
+    std::cout << "✅ 所有必需的Wayland接口已绑定" << std::endl;
+    
+    // 步骤5: 设置xdg_wm_base监听器
+    static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+        xdgWmBasePing
+    };
+    xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
+    
+    // 步骤6: 创建surface
+    wl_surface_ = wl_compositor_create_surface(wl_compositor_);
+    if (!wl_surface_) {
+        std::cerr << "❌ 无法创建surface" << std::endl;
+        return false;
+    }
+    std::cout << "✅ Surface创建成功" << std::endl;
+    
+    // 步骤7: 创建xdg_surface
+    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+    if (!xdg_surface_) {
+        std::cerr << "❌ 无法创建xdg_surface" << std::endl;
+        return false;
+    }
+    
+    static const struct xdg_surface_listener xdg_surface_listener = {
+        xdgSurfaceConfigure
+    };
+    xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
+    std::cout << "✅ XDG Surface创建成功" << std::endl;
+    
+    // 步骤8: 创建xdg_toplevel
+    xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
+    if (!xdg_toplevel_) {
+        std::cerr << "❌ 无法创建xdg_toplevel" << std::endl;
+        return false;
+    }
+    
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
+    std::cout << "✅ XDG Toplevel创建成功" << std::endl;
     
-    // 🔧 关键修复：只设置最基本的窗口属性
-    std::cout << "🔧 设置基本窗口属性..." << std::endl;
+    // ... 继续后续代码（创建buffer、等待configure等）
     
-    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
-    std::cout << "✅ 已设置窗口标题" << std::endl;
-    
-    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
-    std::cout << "✅ 已设置应用程序ID" << std::endl;
-    
-    // ❌ 移除这两行 - 它们会触发positioner创建
-    // xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
-    // xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
-    
-    std::cout << "✅ 基本窗口属性设置完成" << std::endl;
-    
-    // 创建buffer（保持之前的代码）
-    std::cout << "🎨 创建初始buffer..." << std::endl;
-    
-    if (!wl_shm_) {
-        std::cerr << "❌ wl_shm不可用" << std::endl;
-        return false;
-    }
-    
-    int width = config_.screen_width;
-    int height = config_.screen_height;
-    int stride = width * 4;
-    int size = stride * height;
-    
-    int fd = -1;
-    char name[] = "/tmp/wayland-shm-XXXXXX";
-    fd = mkstemp(name);
-    if (fd < 0) {
-        std::cerr << "❌ 无法创建临时文件" << std::endl;
-        return false;
-    }
-    unlink(name);
-    
-    if (ftruncate(fd, size) < 0) {
-        std::cerr << "❌ 无法设置文件大小" << std::endl;
-        close(fd);
-        return false;
-    }
-    
-    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (data == MAP_FAILED) {
-        std::cerr << "❌ mmap失败" << std::endl;
-        close(fd);
-        return false;
-    }
-    
-    // 填充黑色
-    uint32_t* pixels = static_cast<uint32_t*>(data);
-    for (int i = 0; i < width * height; i++) {
-        pixels[i] = 0xFF000000;
-    }
-    
-    munmap(data, size);
-    
-    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
-    close(fd);
-    
-    if (!pool) {
-        std::cerr << "❌ 无法创建wl_shm_pool" << std::endl;
-        return false;
-    }
-    
-    struct wl_buffer* buffer = wl_shm_pool_create_buffer(
-        pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
-    wl_shm_pool_destroy(pool);
-    
-    if (!buffer) {
-        std::cerr << "❌ 无法创建wl_buffer" << std::endl;
-        return false;
-    }
-    
-    std::cout << "✅ 初始buffer已创建" << std::endl;
-    
-    // attach buffer
-    wl_surface_attach(wl_surface_, buffer, 0, 0);
-    wl_surface_damage(wl_surface_, 0, 0, width, height);
-    std::cout << "✅ Buffer已attach到surface" << std::endl;
-    
-    // 提交surface
-    std::cout << "📝 提交初始surface（含buffer）..." << std::endl;
-    wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
-    
-    // 等待configure
-    std::cout << "⏳ 等待configure事件..." << std::endl;
-    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    
-    while (!configure_received_.load()) {
-        if (std::chrono::steady_clock::now() > timeout) {
-            std::cerr << "❌ 等待configure超时" << std::endl;
-            return false;
-        }
-        
-        if (wl_display_dispatch(wl_display_) < 0) {
-            int err = wl_display_get_error(wl_display_);
-            std::cerr << "❌ dispatch失败，错误码: " << err << std::endl;
-            return false;
-        }
-    }
-    
-    std::cout << "✅ Configure事件已接收并确认" << std::endl;
-    
-    // 最后一次commit激活窗口
-    wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
-    
-    // 🔧 新增：现在可以安全地设置min/max size了（在configure后）
-    std::cout << "🔧 Configure后设置窗口尺寸约束..." << std::endl;
-    xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
-    xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
-    wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
-    std::cout << "✅ 窗口尺寸约束已设置" << std::endl;
-    
-    // 清理临时buffer
-    wl_buffer_destroy(buffer);
-    
-    wayland_egl_initialized_ = true;
     return true;
 }
 
