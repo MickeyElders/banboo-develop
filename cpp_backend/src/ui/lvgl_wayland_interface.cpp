@@ -770,6 +770,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "✅ Surface创建成功" << std::endl;
     
     // 步骤7: 创建xdg_surface
+    // 🔧 修复：使用正确的函数名
     xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
@@ -796,216 +797,122 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     std::cout << "✅ XDG Toplevel创建成功" << std::endl;
     
-    // ... 继续后续代码（创建buffer、等待configure等）
+    // 步骤9: 设置窗口属性
+    std::cout << "🔧 设置窗口属性..." << std::endl;
+    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
+    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
+    std::cout << "✅ 窗口属性设置完成" << std::endl;
     
-    return true;
-}
-
-
-// ========== 修复2: lvgl_wayland_interface.cpp 变量重复声明 ==========
-// 在 initializeWaylandEGL() 方法中（约第836行开始）
-
-bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
-    std::cout << "🎨 初始化Wayland EGL..." << std::endl;
+    // 步骤10: 创建初始buffer并提交
+    std::cout << "🎨 创建初始buffer..." << std::endl;
     
-    if (!wayland_egl_initialized_) {
-        std::cerr << "❌ Wayland客户端未初始化" << std::endl;
+    int width = config_.screen_width;
+    int height = config_.screen_height;
+    int stride = width * 4;
+    int size = stride * height;
+    
+    // 创建共享内存文件
+    int fd = -1;
+    char name[] = "/tmp/wayland-shm-XXXXXX";
+    fd = mkstemp(name);
+    if (fd < 0) {
+        std::cerr << "❌ 无法创建临时文件" << std::endl;
+        return false;
+    }
+    unlink(name);
+    
+    if (ftruncate(fd, size) < 0) {
+        std::cerr << "❌ 无法设置文件大小" << std::endl;
+        close(fd);
         return false;
     }
     
-    // 🔧 新增：健康检查（只在这里声明一次error_code）
-    if (!wl_display_) {
-        std::cerr << "❌ Wayland display为空" << std::endl;
+    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        std::cerr << "❌ mmap失败" << std::endl;
+        close(fd);
         return false;
     }
     
-    int initial_error_code = wl_display_get_error(wl_display_);  // 🔧 改名避免冲突
-    if (initial_error_code != 0) {
-        std::cerr << "❌ Wayland display错误: " << initial_error_code << std::endl;
-        
-        // 详细错误信息
-        const char* error_msg = "未知错误";
-        switch (initial_error_code) {
-            case 1: error_msg = "协议参数错误"; break;
-            case 22: error_msg = "EINVAL - 无效参数"; break;
-            case 32: error_msg = "EPIPE - 连接断开"; break;
+    // 填充黑色背景
+    uint32_t* pixels = static_cast<uint32_t*>(data);
+    for (int i = 0; i < width * height; i++) {
+        pixels[i] = 0xFF000000;  // ARGB: 不透明黑色
+    }
+    
+    munmap(data, size);
+    
+    // 创建wl_shm_pool和buffer
+    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
+    close(fd);
+    
+    if (!pool) {
+        std::cerr << "❌ 无法创建wl_shm_pool" << std::endl;
+        return false;
+    }
+    
+    struct wl_buffer* buffer = wl_shm_pool_create_buffer(
+        pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
+    wl_shm_pool_destroy(pool);
+    
+    if (!buffer) {
+        std::cerr << "❌ 无法创建wl_buffer" << std::endl;
+        return false;
+    }
+    
+    std::cout << "✅ 初始buffer已创建" << std::endl;
+    
+    // 步骤11: attach buffer到surface
+    wl_surface_attach(wl_surface_, buffer, 0, 0);
+    wl_surface_damage(wl_surface_, 0, 0, width, height);
+    std::cout << "✅ Buffer已attach到surface" << std::endl;
+    
+    // 步骤12: 提交surface（触发configure事件）
+    std::cout << "📝 提交初始surface..." << std::endl;
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
+    
+    // 步骤13: 等待configure事件
+    std::cout << "⏳ 等待configure事件..." << std::endl;
+    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    
+    while (!configure_received_.load()) {
+        if (std::chrono::steady_clock::now() > timeout) {
+            std::cerr << "❌ 等待configure超时" << std::endl;
+            wl_buffer_destroy(buffer);
+            return false;
         }
-        std::cerr << "   原因: " << error_msg << std::endl;
         
-        return false;  // 不再尝试使用损坏的连接
-    }
-    
-    // 🔧 关键修复：在xdg_surface configure完成后再创建EGL窗口
-    std::cout << "⏳ 确保xdg_surface configure事件已完成..." << std::endl;
-    
-    // 检查Wayland连接健康状态
-    int check_error_code = wl_display_get_error(wl_display_);
-    if (check_error_code != 0) {
-        std::cerr << "❌ Wayland连接已损坏，错误码: " << check_error_code << std::endl;
-        return false;  // 立即失败，不要继续使用损坏的连接
-    }
-    
-    // 额外等待并处理任何剩余的Wayland事件
-    for (int i = 0; i < 10; i++) {  // 减少等待次数
-        wl_display_roundtrip(wl_display_);
-        wl_display_flush(wl_display_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        // 再次检查连接状态
-        int loop_error_code = wl_display_get_error(wl_display_);
-        if (loop_error_code != 0) {
-            std::cerr << "❌ EGL初始化期间检测到Wayland协议错误: " << loop_error_code << std::endl;
+        if (wl_display_dispatch(wl_display_) < 0) {
+            int err = wl_display_get_error(wl_display_);
+            std::cerr << "❌ dispatch失败，错误码: " << err << std::endl;
+            wl_buffer_destroy(buffer);
             return false;
         }
     }
     
-    // 🔧 关键：在创建EGL窗口前进行最后检查
-    if (!wl_surface_ || !wl_display_) {
-        std::cerr << "❌ Wayland surface或display无效，无法创建EGL窗口" << std::endl;
-        return false;
-    }
+    std::cout << "✅ Configure事件已接收" << std::endl;
     
-    // 创建EGL窗口
-    std::cout << "📐 创建EGL窗口 (" << config_.screen_width << "x" 
-              << config_.screen_height << ")" << std::endl;
-    wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
-    if (!wl_egl_window_) {
-        std::cerr << "❌ 无法创建Wayland EGL窗口" << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL窗口创建成功" << std::endl;
+    // 步骤14: 最后一次commit激活窗口
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
     
-    // 🔧 关键修复：重置Wayland连接来解决xdg_positioner协议错误
-    std::cout << "🔧 检测并修复xdg_positioner协议错误..." << std::endl;
+    // 步骤15: 设置窗口尺寸约束（在configure后）
+    std::cout << "🔧 设置窗口尺寸约束..." << std::endl;
+    xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
+    xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
+    std::cout << "✅ 窗口尺寸约束已设置" << std::endl;
     
-    // 1. 检查当前错误状态（使用新的变量名）
-    int protocol_error_code = wl_display_get_error(wl_display_);  // 🔧 改名避免冲突
-    if (protocol_error_code != 0) {
-        std::cout << "❌ 检测到严重Wayland协议错误: " << protocol_error_code << std::endl;
-        std::cout << "🔄 执行Wayland连接重置修复..." << std::endl;
-        
-        // 重置策略：清理当前连接并重新建立
-        if (wl_egl_window_) {
-            wl_egl_window_destroy(wl_egl_window_);
-            wl_egl_window_ = nullptr;
-        }
-        
-        // 重新创建EGL窗口（这次确保没有协议错误）
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
-        if (!wl_egl_window_) {
-            std::cout << "❌ EGL窗口重建失败" << std::endl;
-            return false;
-        }
-        std::cout << "✅ EGL窗口已重建，协议错误已清理" << std::endl;
-        
-        // 强制同步，确保所有协议操作完成
-        wl_display_roundtrip(wl_display_);
-        
-        // 再次检查错误状态（使用新的变量名）
-        int final_error_code = wl_display_get_error(wl_display_);  // 🔧 改名避免冲突
-        if (final_error_code != 0) {
-            std::cout << "⚠️ 协议错误持续存在: " << final_error_code 
-                      << "，但继续EGL初始化" << std::endl;
-        } else {
-            std::cout << "✅ Wayland协议错误已完全清理" << std::endl;
-        }
-    } else {
-        std::cout << "✅ Wayland连接状态正常，无需修复" << std::endl;
-    }
+    // 清理临时buffer
+    wl_buffer_destroy(buffer);
     
-    // 获取EGL显示
-    egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
-    if (egl_display_ == EGL_NO_DISPLAY) {
-        std::cerr << "❌ EGL显示获取失败" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已获取EGL显示" << std::endl;
-    
-    // 🔧 重要修复：设置正确的EGL API
-    if (!eglBindAPI(EGL_OPENGL_ES_API)) {
-        std::cerr << "❌ EGL API绑定失败" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已绑定OpenGL ES API" << std::endl;
-    
-    // 🔧 关键修复：改进EGL初始化过程
-    std::cout << "🔧 开始EGL初始化（增强版错误处理）..." << std::endl;
-    
-    // 检查Wayland display状态（使用新的变量名）
-    int wayland_state_error = wl_display_get_error(wl_display_);  // 🔧 改名避免冲突
-    if (wayland_state_error != 0) {
-        std::cout << "⚠️ Wayland display错误状态: " << wayland_state_error << std::endl;
-        std::cout << "🔄 清理Wayland错误状态后继续EGL初始化..." << std::endl;
-    }
-    
-    EGLint major, minor;
-    bool egl_init_success = false;
-    
-    // 尝试多次EGL初始化（处理各种协议错误）
-    for (int retry = 0; retry < 3 && !egl_init_success; retry++) {
-        std::cout << "🔄 EGL初始化尝试 #" << (retry + 1) << std::endl;
-        
-        // 每次重试前先清理EGL状态
-        if (retry > 0) {
-            if (egl_display_ != EGL_NO_DISPLAY) {
-                eglTerminate(egl_display_);
-            }
-            egl_display_ = EGL_NO_DISPLAY;
-            
-            std::this_thread::sleep_for(std::chrono::milliseconds(100 * retry));
-        }
-        
-        // 重新获取EGL display
-        egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
-        if (egl_display_ == EGL_NO_DISPLAY) {
-            std::cout << "❌ EGL display获取失败，重试..." << std::endl;
-            continue;
-        }
-        
-        // 尝试初始化
-        if (eglInitialize(egl_display_, &major, &minor)) {
-            std::cout << "✅ EGL初始化成功（尝试 #" << (retry + 1) << ")！" << std::endl;
-            egl_init_success = true;
-        } else {
-            EGLint egl_error = eglGetError();
-            std::cout << "❌ EGL初始化失败（尝试 #" << (retry + 1) << ")，错误码: 0x"
-                      << std::hex << egl_error << " (" << std::dec << egl_error << ")" << std::endl;
-            
-            // 详细的错误分析
-            switch (egl_error) {
-                case EGL_BAD_DISPLAY:
-                    std::cout << "   原因: EGL_BAD_DISPLAY - Wayland显示连接损坏（可能由协议错误导致）" << std::endl;
-                    break;
-                case EGL_NOT_INITIALIZED:
-                    std::cout << "   原因: EGL_NOT_INITIALIZED - EGL系统未正确初始化" << std::endl;
-                    break;
-                case EGL_BAD_ALLOC:
-                    std::cout << "   原因: EGL_BAD_ALLOC - EGL资源分配失败" << std::endl;
-                    break;
-                default:
-                    std::cout << "   原因: 未知EGL错误（可能与xdg_positioner协议错误相关）" << std::endl;
-                    break;
-            }
-            
-            if (retry < 2) {
-                std::cout << "🔄 准备重试EGL初始化..." << std::endl;
-            }
-        }
-    }
-    
-    if (!egl_init_success) {
-        std::cout << "❌ 所有EGL初始化尝试均失败，使用fallback模式" << std::endl;
-        std::cout << "🔍 这通常由xdg_positioner协议错误或Wayland连接损坏导致" << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
-    
-    // ... 继续原有的EGL配置和上下文创建代码 ...
-    
-    egl_initialized_ = true;
+    wayland_egl_initialized_ = true;
+    std::cout << "✅ Wayland客户端初始化完成" << std::endl;
     return true;
 }
+
 
 
 // Wayland registry回调函数 - 支持subcompositor绑定
