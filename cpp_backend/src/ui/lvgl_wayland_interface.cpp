@@ -17,6 +17,8 @@
 // 系统头文件
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 // EGL和Wayland头文件
 #include <EGL/egl.h>
@@ -62,6 +64,7 @@ public:
     struct wl_registry* wl_registry_ = nullptr;
     struct wl_compositor* wl_compositor_ = nullptr;
     struct wl_subcompositor* wl_subcompositor_ = nullptr;  // 🆕 新增：subcompositor支持
+    struct wl_shm* wl_shm_ = nullptr;  // 🆕 新增：共享内存接口
     struct xdg_wm_base* xdg_wm_base_ = nullptr;
     struct wl_surface* wl_surface_ = nullptr;
     struct xdg_surface* xdg_surface_ = nullptr;
@@ -888,10 +891,84 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     std::cout << "✅ 窗口属性设置完成" << std::endl;
     
-    // 🔧 关键修复：立即提交surface（不要先flush）
-    std::cout << "📝 提交初始surface..." << std::endl;
+    // 🔧 关键修复：创建并attach初始buffer（必须在第一次commit前）
+    std::cout << "🎨 创建初始buffer..." << std::endl;
+    
+    // 检查wl_shm是否可用
+    if (!wl_shm_) {
+        std::cerr << "❌ wl_shm不可用" << std::endl;
+        return false;
+    }
+    
+    // 创建一个简单的黑色buffer（1280x800，ARGB8888格式）
+    int width = config_.screen_width;
+    int height = config_.screen_height;
+    int stride = width * 4;  // ARGB8888 = 4 bytes per pixel
+    int size = stride * height;
+    
+    // 创建共享内存文件
+    int fd = -1;
+    char name[] = "/tmp/wayland-shm-XXXXXX";
+    fd = mkstemp(name);
+    if (fd < 0) {
+        std::cerr << "❌ 无法创建临时文件" << std::endl;
+        return false;
+    }
+    unlink(name);  // 立即unlink，文件描述符仍然有效
+    
+    if (ftruncate(fd, size) < 0) {
+        std::cerr << "❌ 无法设置文件大小" << std::endl;
+        close(fd);
+        return false;
+    }
+    
+    // mmap共享内存
+    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        std::cerr << "❌ mmap失败" << std::endl;
+        close(fd);
+        return false;
+    }
+    
+    // 填充黑色（ARGB: 0xFF000000）
+    uint32_t* pixels = static_cast<uint32_t*>(data);
+    for (int i = 0; i < width * height; i++) {
+        pixels[i] = 0xFF000000;  // 不透明黑色
+    }
+    
+    munmap(data, size);
+    
+    // 创建wl_shm_pool
+    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
+    close(fd);  // pool创建后可以关闭fd
+    
+    if (!pool) {
+        std::cerr << "❌ 无法创建wl_shm_pool" << std::endl;
+        return false;
+    }
+    
+    // 创建buffer
+    struct wl_buffer* buffer = wl_shm_pool_create_buffer(
+        pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
+    wl_shm_pool_destroy(pool);
+    
+    if (!buffer) {
+        std::cerr << "❌ 无法创建wl_buffer" << std::endl;
+        return false;
+    }
+    
+    std::cout << "✅ 初始buffer已创建" << std::endl;
+    
+    // 🔧 关键：attach buffer到surface
+    wl_surface_attach(wl_surface_, buffer, 0, 0);
+    wl_surface_damage(wl_surface_, 0, 0, width, height);
+    
+    std::cout << "✅ Buffer已attach到surface" << std::endl;
+    
+    // 现在提交surface（带buffer）
+    std::cout << "📝 提交初始surface（含buffer）..." << std::endl;
     wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);  // 现在才flush，将commit和所有属性一起发送
+    wl_display_flush(wl_display_);
     
     // 🔧 关键修复：等待configure事件
     std::cout << "⏳ 等待configure事件..." << std::endl;
@@ -1143,6 +1220,12 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
         impl->wl_subcompositor_ = static_cast<struct wl_subcompositor*>(
             wl_registry_bind(registry, id, &wl_subcompositor_interface, 1));
         std::cout << "✅ 绑定wl_subcompositor成功（支持Subsurface架构）" << std::endl;
+    }
+    else if (strcmp(interface, "wl_shm") == 0) {
+        // 🆕 新增：绑定共享内存接口，用于创建buffer
+        impl->wl_shm_ = static_cast<struct wl_shm*>(
+            wl_registry_bind(registry, id, &wl_shm_interface, 1));
+        std::cout << "✅ 绑定wl_shm成功" << std::endl;
     }
     else if (strcmp(interface, "xdg_wm_base") == 0) {
         impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
