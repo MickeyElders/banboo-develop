@@ -36,6 +36,30 @@
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
 
+// 🆕 辅助函数：创建匿名共享内存文件（在Impl类外部定义）
+static int createAnonymousFile(size_t size) {
+    static const char template_str[] = "/bamboo-cut-XXXXXX";
+    const char* path = getenv("XDG_RUNTIME_DIR");
+    if (!path) {
+        path = "/tmp";
+    }
+    
+    std::string name = std::string(path) + template_str;
+    int fd = mkstemp(&name[0]);
+    if (fd < 0) {
+        return -1;
+    }
+    
+    unlink(name.c_str());
+    
+    if (ftruncate(fd, size) < 0) {
+        close(fd);
+        return -1;
+    }
+    
+    return fd;
+}
+
 namespace bamboo_cut {
 namespace ui {
 
@@ -143,6 +167,7 @@ public:
     std::mutex configure_mutex_;
     std::condition_variable configure_cv_;
     std::atomic<bool> configure_received_{false};
+
 
 };
 
@@ -880,29 +905,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     return true;
 }
 
-// 🆕 辅助函数：创建匿名共享内存文件（在Impl类外部定义）
-static int createAnonymousFile(size_t size) {
-    static const char template_str[] = "/bamboo-cut-XXXXXX";
-    const char* path = getenv("XDG_RUNTIME_DIR");
-    if (!path) {
-        path = "/tmp";
-    }
-    
-    std::string name = std::string(path) + template_str;
-    int fd = mkstemp(&name[0]);
-    if (fd < 0) {
-        return -1;
-    }
-    
-    unlink(name.c_str());
-    
-    if (ftruncate(fd, size) < 0) {
-        close(fd);
-        return -1;
-    }
-    
-    return fd;
-}
+
 
 
 // 🔧 更新：xdg_toplevel configure回调
