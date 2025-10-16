@@ -32,6 +32,11 @@
 #include <wayland-client-protocol.h>
 #include "wayland-protocols/xdg-shell-client-protocol.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <cstring>
+
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
 
@@ -142,7 +147,13 @@ public:
     std::mutex configure_mutex_;
     std::condition_variable configure_cv_;
     std::atomic<bool> configure_received_{false};
+
+private:
+    // 辅助函数声明
+    static int create_anonymous_file(size_t size);
 };
+
+
 
 LVGLWaylandInterface::LVGLWaylandInterface() 
     : pImpl_(std::make_unique<Impl>()) {
@@ -736,21 +747,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     wl_registry_add_listener(wl_registry_, &registry_listener, this);
     
-    // 步骤3: 🔧 关键：同步等待registry绑定完成
+    // 步骤3: 同步等待registry绑定完成
     wl_display_roundtrip(wl_display_);
     std::cout << "✅ Registry同步完成" << std::endl;
     
-    // 步骤4: 检查必需的接口是否已绑定
-    if (!wl_compositor_) {
-        std::cerr << "❌ wl_compositor未绑定" << std::endl;
-        return false;
-    }
-    if (!xdg_wm_base_) {
-        std::cerr << "❌ xdg_wm_base未绑定" << std::endl;
-        return false;
-    }
-    if (!wl_shm_) {
-        std::cerr << "❌ wl_shm未绑定" << std::endl;
+    // 步骤4: 检查必需的接口
+    if (!wl_compositor_ || !xdg_wm_base_ || !wl_shm_) {
+        std::cerr << "❌ 缺少必需的Wayland接口" << std::endl;
         return false;
     }
     std::cout << "✅ 所有必需的Wayland接口已绑定" << std::endl;
@@ -770,8 +773,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "✅ Surface创建成功" << std::endl;
     
     // 步骤7: 创建xdg_surface
-    // 🔧 修复：使用正确的函数名
-    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
+    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
         return false;
@@ -801,57 +803,168 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "🔧 设置窗口属性..." << std::endl;
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
-    std::cout << "✅ 窗口属性设置完成" << std::endl;
-    std::cout << "🔧 使用简化的窗口初始化流程（避免xdg_positioner冲突）" << std::endl;
     
-    // ✅ 新流程：直接提交空的surface，让EGL初始化来激活窗口
-    std::cout << "📝 提交空surface..." << std::endl;
+    // 🔧 关键修复：创建并attach一个dummy buffer
+    std::cout << "🔧 创建初始shm buffer..." << std::endl;
+    
+    // 创建共享内存池
+    int shm_size = config_.screen_width * config_.screen_height * 4;
+    int fd = create_anonymous_file(shm_size);
+    if (fd < 0) {
+        std::cerr << "❌ 无法创建共享内存文件" << std::endl;
+        return false;
+    }
+    
+    void* shm_data = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (shm_data == MAP_FAILED) {
+        std::cerr << "❌ mmap失败" << std::endl;
+        close(fd);
+        return false;
+    }
+    
+    // 填充初始颜色（黑色）
+    memset(shm_data, 0, shm_size);
+    munmap(shm_data, shm_size);
+    
+    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, shm_size);
+    struct wl_buffer* buffer = wl_shm_pool_create_buffer(
+        pool, 0,
+        config_.screen_width, config_.screen_height,
+        config_.screen_width * 4,
+        WL_SHM_FORMAT_ARGB8888
+    );
+    wl_shm_pool_destroy(pool);
+    close(fd);
+    
+    // 🔧 关键：attach buffer并commit
+    std::cout << "🔧 Attach buffer并提交初始surface..." << std::endl;
+    wl_surface_attach(wl_surface_, buffer, 0, 0);
     wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
     
-    // ✅ 处理所有pending事件，但不等待configure
-    std::cout << "🔄 处理pending Wayland事件..." << std::endl;
-    int max_attempts = 3;
-    for (int i = 0; i < max_attempts; i++) {
-        if (wl_display_roundtrip(wl_display_) < 0) {
-            int err = wl_display_get_error(wl_display_);
-            std::cerr << "⚠️ roundtrip失败（尝试" << (i+1) << "/" << max_attempts << "），错误码: " << err << std::endl;
-            
-            // 如果是xdg_positioner错误，重置连接并重试
-            if (err == 1 || err == 22) {
-                std::cout << "🔄 检测到positioner错误，清理并重试..." << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                continue;
-            }
-            
-            // 其他错误直接失败
+    // 步骤10: 等待configure事件（必须等待！）
+    std::cout << "⏳ 等待configure事件..." << std::endl;
+    configure_received_.store(false);
+    
+    int timeout_ms = 5000;  // 5秒超时
+    auto start_time = std::chrono::steady_clock::now();
+    
+    while (!configure_received_.load()) {
+        if (wl_display_dispatch(wl_display_) < 0) {
+            int error = wl_display_get_error(wl_display_);
+            std::cerr << "❌ Wayland dispatch失败，错误码: " << error << std::endl;
+            wl_buffer_destroy(buffer);
             return false;
         }
         
-        // roundtrip成功，检查是否收到configure
-        if (configure_received_.load()) {
-            std::cout << "✅ Configure事件已接收（非必需）" << std::endl;
-            break;
-        }
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start_time
+        ).count();
         
-        // 短暂等待
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (elapsed > timeout_ms) {
+            std::cerr << "❌ 等待configure事件超时" << std::endl;
+            wl_buffer_destroy(buffer);
+            return false;
+        }
     }
     
-    // ✅ 不管是否收到configure，都继续（EGL初始化会激活窗口）
-    std::cout << "✅ Wayland客户端基础初始化完成（配置事件: " 
-              << (configure_received_.load() ? "已收到" : "待EGL触发") << ")" << std::endl;
+    std::cout << "✅ Configure事件已接收" << std::endl;
     
-    // ✅ 设置窗口尺寸约束（可选，不影响核心功能）
+    // 清理临时buffer
+    wl_buffer_destroy(buffer);
+    
+    // 步骤11: 设置窗口尺寸约束
     std::cout << "🔧 设置窗口尺寸约束..." << std::endl;
     xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
     xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
+    
+    // 最后一次commit以应用所有设置
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
     wayland_egl_initialized_ = true;
-    std::cout << "✅ Wayland客户端初始化完成（简化流程）" << std::endl;
+    std::cout << "✅ Wayland客户端初始化完成" << std::endl;
     return true;
+}
+
+// 🆕 辅助函数：创建匿名共享内存文件
+int create_anonymous_file(size_t size) {
+    static const char template_str[] = "/bamboo-cut-XXXXXX";
+    const char* path = getenv("XDG_RUNTIME_DIR");
+    if (!path) {
+        path = "/tmp";
+    }
+    
+    std::string name = std::string(path) + template_str;
+    int fd = mkstemp(&name[0]);
+    if (fd < 0) {
+        return -1;
+    }
+    
+    unlink(name.c_str());
+    
+    if (ftruncate(fd, size) < 0) {
+        close(fd);
+        return -1;
+    }
+    
+    return fd;
+}
+
+// 🔧 更新：xdg_surface configure回调
+void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(
+    void* data, 
+    struct xdg_surface* xdg_surface, 
+    uint32_t serial) {
+    
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    std::cout << "📐 收到XDG surface configure, serial=" << serial << std::endl;
+    
+    // 🔧 关键：立即ack configure（协议要求）
+    xdg_surface_ack_configure(xdg_surface, serial);
+    std::cout << "✅ 已确认xdg surface configure" << std::endl;
+    
+    // 设置标志，通知等待线程
+    impl->configure_received_.store(true);
+    impl->configure_cv_.notify_all();
+}
+
+// 🔧 更新：xdg_toplevel configure回调
+void LVGLWaylandInterface::Impl::xdgToplevelConfigure(
+    void* data, 
+    struct xdg_toplevel* xdg_toplevel,
+    int32_t width, 
+    int32_t height, 
+    struct wl_array* states) {
+    
+    LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
+    std::cout << "📐 XDG toplevel configure: " << width << "x" << height << std::endl;
+    
+    // 如果合成器建议新尺寸，更新配置
+    if (width > 0 && height > 0) {
+        impl->config_.screen_width = width;
+        impl->config_.screen_height = height;
+        std::cout << "📏 更新窗口尺寸为: " << width << "x" << height << std::endl;
+    }
+    
+    // 打印窗口状态
+    if (states && states->size > 0) {
+        uint32_t* state_data = static_cast<uint32_t*>(states->data);
+        size_t num_states = states->size / sizeof(uint32_t);
+        
+        for (size_t i = 0; i < num_states; i++) {
+            switch (state_data[i]) {
+                case XDG_TOPLEVEL_STATE_MAXIMIZED:
+                    std::cout << "🔲 窗口状态: 最大化" << std::endl;
+                    break;
+                case XDG_TOPLEVEL_STATE_FULLSCREEN:
+                    std::cout << "🔳 窗口状态: 全屏" << std::endl;
+                    break;
+                case XDG_TOPLEVEL_STATE_ACTIVATED:
+                    std::cout << "✨ 窗口状态: 激活" << std::endl;
+                    break;
+            }
+        }
+    }
 }
 
 bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
