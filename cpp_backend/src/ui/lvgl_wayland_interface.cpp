@@ -8,17 +8,13 @@
 #include <lvgl.h>
 #include <iostream>
 #include <cstdlib>
-#include <cstring>
 #include <unistd.h>
 #include <mutex>
 #include <chrono>
 #include <condition_variable>
 
 // 系统头文件
-#include <fcntl.h>
 #include <errno.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 // EGL和Wayland头文件
 #include <EGL/egl.h>
@@ -33,9 +29,9 @@
 #include "wayland-protocols/xdg-shell-client-protocol.h"
 
 #include <sys/mman.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <cstring>
+#include <string>
 
 // 使用DRM EGL共享架构实现真正的屏幕渲染
 #define HAS_DRM_EGL_BACKEND 1
@@ -772,8 +768,8 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Surface创建成功" << std::endl;
     
-    // 步骤7: 创建xdg_surface
-    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+    // 步骤7: 创建xdg_surface (使用正确的函数名)
+    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
         return false;
@@ -809,7 +805,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     // 创建共享内存池
     int shm_size = config_.screen_width * config_.screen_height * 4;
-    int fd = create_anonymous_file(shm_size);
+    int fd = createAnonymousFile(shm_size);
     if (fd < 0) {
         std::cerr << "❌ 无法创建共享内存文件" << std::endl;
         return false;
@@ -886,6 +882,30 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     return true;
 }
 
+// 🆕 辅助函数：创建匿名共享内存文件（在Impl类外部定义）
+static int createAnonymousFile(size_t size) {
+    static const char template_str[] = "/bamboo-cut-XXXXXX";
+    const char* path = getenv("XDG_RUNTIME_DIR");
+    if (!path) {
+        path = "/tmp";
+    }
+    
+    std::string name = std::string(path) + template_str;
+    int fd = mkstemp(&name[0]);
+    if (fd < 0) {
+        return -1;
+    }
+    
+    unlink(name.c_str());
+    
+    if (ftruncate(fd, size) < 0) {
+        close(fd);
+        return -1;
+    }
+    
+    return fd;
+}
+
 // 🆕 辅助函数：创建匿名共享内存文件
 int create_anonymous_file(size_t size) {
     static const char template_str[] = "/bamboo-cut-XXXXXX";
@@ -911,11 +931,7 @@ int create_anonymous_file(size_t size) {
 }
 
 // 🔧 更新：xdg_surface configure回调
-void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(
-    void* data, 
-    struct xdg_surface* xdg_surface, 
-    uint32_t serial) {
-    
+void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     std::cout << "📐 收到XDG surface configure, serial=" << serial << std::endl;
     
