@@ -17,13 +17,13 @@
 // 系统头文件
 #include <errno.h>
 
-// EGL和Wayland头文件
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
+// 🔧 修复：注释EGL头文件，只保留Wayland SHM
+// #include <EGL/egl.h>
+// #include <EGL/eglext.h>
+// #include <GLES2/gl2.h>
+// #include <GLES2/gl2ext.h>
 #include <wayland-client.h>
-#include <wayland-egl.h>
+// #include <wayland-egl.h>
 #include <vector>
 
 #include <wayland-client-protocol.h>
@@ -34,8 +34,9 @@
 #include <cstring>
 #include <string>
 
-// 使用DRM EGL共享架构实现真正的屏幕渲染
-#define HAS_DRM_EGL_BACKEND 1
+// 🔧 修复：禁用EGL，完全使用SHM避免与DeepStream冲突
+// #define HAS_DRM_EGL_BACKEND 1
+#define HAS_DRM_EGL_BACKEND 0
 
 // 🆕 辅助函数：创建匿名共享内存文件（在Impl类外部定义）
 static int createAnonymousFile(size_t size) {
@@ -95,24 +96,25 @@ public:
     struct wl_surface* wl_surface_ = nullptr;
     struct xdg_surface* xdg_surface_ = nullptr;
     struct xdg_toplevel* xdg_toplevel_ = nullptr;
-    struct wl_egl_window* wl_egl_window_ = nullptr;
+    // 🔧 修复：注释EGL相关成员，避免与DeepStream冲突
+    // struct wl_egl_window* wl_egl_window_ = nullptr;
     struct wl_callback* frame_callback_ = nullptr;
 
-    EGLDisplay egl_display_ = EGL_NO_DISPLAY;
-    EGLContext egl_context_ = EGL_NO_CONTEXT;
-    EGLSurface egl_surface_ = EGL_NO_SURFACE;
-    EGLConfig egl_config_;
+    // EGLDisplay egl_display_ = EGL_NO_DISPLAY;
+    // EGLContext egl_context_ = EGL_NO_CONTEXT;
+    // EGLSurface egl_surface_ = EGL_NO_SURFACE;
+    // EGLConfig egl_config_;
     
     // 显示缓冲区
     lv_color_t* front_buffer_ = nullptr;
     lv_color_t* back_buffer_ = nullptr;
     uint32_t buffer_size_ = 0;
     
-    // OpenGL渲染资源
-    GLuint shader_program_ = 0;
-    GLuint texture_id_ = 0;
-    GLuint vbo_ = 0;
-    bool gl_resources_initialized_ = false;
+    // 🔧 修复：注释OpenGL资源，完全使用SHM
+    // GLuint shader_program_ = 0;
+    // GLuint texture_id_ = 0;
+    // GLuint vbo_ = 0;
+    // bool gl_resources_initialized_ = false;
     
     // 线程同步
     std::mutex ui_mutex_;
@@ -128,15 +130,17 @@ public:
     bool wayland_initialized_ = false;
     bool display_initialized_ = false;
     bool input_initialized_ = false;
-    bool wayland_egl_initialized_ = false;
-    bool egl_initialized_ = false;
+    // 🔧 修复：移除EGL状态标志
+    // bool wayland_egl_initialized_ = false;
+    // bool egl_initialized_ = false;
     
     Impl() = default;
     ~Impl();
     
     bool checkWaylandEnvironment();
     bool initializeWaylandClient();
-    bool initializeWaylandEGL();
+    // 🔧 修复：注释EGL方法，只保留SHM相关方法
+    // bool initializeWaylandEGL();
     bool initializeWaylandDisplay();
     bool initializeFallbackDisplay();
     bool initializeFallbackDisplayWithWaylandObjects();
@@ -144,7 +148,7 @@ public:
     void initializeTheme();
     void createMainInterface();
     void updateCanvasFromFrame();
-    void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
+    // void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
     void cleanup();
     void flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p);
     // Wayland辅助函数 - 现代xdg-shell协议实现
@@ -155,14 +159,15 @@ public:
     static void xdgToplevelConfigure(void* data, struct xdg_toplevel* xdg_toplevel, int32_t width, int32_t height, struct wl_array* states);
     static void xdgToplevelClose(void* data, struct xdg_toplevel* xdg_toplevel);
     static void frameCallback(void* data, struct wl_callback* callback, uint32_t time);
-    EGLConfig chooseEGLConfig();
+    // 🔧 修复：注释EGL和OpenGL方法
+    // EGLConfig chooseEGLConfig();
     void handleWaylandEvents();
     void requestFrame();
     
-    // OpenGL渲染资源管理
-    bool initializeGLResources();
-    void cleanupGLResources();
-    bool createShaderProgram();
+    // 🔧 修复：注释OpenGL资源管理方法
+    // bool initializeGLResources();
+    // void cleanupGLResources();
+    // bool createShaderProgram();
 
      // 🆕 新增：configure事件同步
     std::mutex configure_mutex_;
@@ -505,8 +510,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
         return false;
     }
     
-    // 🔧 关键：跳过 EGL 初始化，完全使用 SHM
-    std::cout << "📺 使用 SHM 软件渲染（避免与 DeepStream 的 EGL 冲突）..." << std::endl;
+    // 🔧 关键：完全使用 SHM 软件渲染，避免与 DeepStream 的 EGL 冲突
+    std::cout << "📺 LVGL 使用 SHM 软件渲染（避免与 DeepStream 的 EGL 冲突）..." << std::endl;
+    std::cout << "🎯 DeepStream 将独占 EGL/DRM 硬件加速" << std::endl;
     
     // 创建 LVGL 显示设备
     display_ = lv_display_create(config_.screen_width, config_.screen_height);
@@ -543,8 +549,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     lv_display_set_user_data(display_, this);
     
     display_initialized_ = true;
-    std::cout << "✅ Wayland SHM 显示初始化成功（LVGL 软件渲染）" << std::endl;
-    std::cout << "📺 DeepStream 可以独占 EGL/DRM 硬件加速" << std::endl;
+    std::cout << "✅ LVGL Wayland SHM 显示初始化成功（纯软件渲染）" << std::endl;
+    std::cout << "🚫 已跳过 EGL 初始化，避免与 DeepStream 冲突" << std::endl;
+    std::cout << "🎬 DeepStream 可以独占 EGL/DRM 硬件加速资源" << std::endl;
     return true;
 }
 
@@ -924,7 +931,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     
     std::cout << "✅ Wayland 客户端初始化完成" << std::endl;
-    wayland_egl_initialized_ = true;
+    // wayland_egl_initialized_ = true;  // 🔧 修复：注释EGL状态
     return true;
 }
 
@@ -968,119 +975,14 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(
     }
 }
 
+// 🔧 修复：注释整个EGL初始化方法，避免与DeepStream冲突
+/*
 bool LVGLWaylandInterface::Impl::initializeWaylandEGL() {
     std::cout << "🎨 初始化Wayland EGL..." << std::endl;
-    
-    if (!wayland_egl_initialized_) {
-        std::cerr << "❌ Wayland客户端未初始化" << std::endl;
-        return false;
-    }
-    
-    // 🔧 健康检查
-    if (!wl_display_) {
-        std::cerr << "❌ Wayland display为空" << std::endl;
-        return false;
-    }
-    
-    int initial_error_code = wl_display_get_error(wl_display_);
-    if (initial_error_code != 0) {
-        std::cerr << "❌ Wayland display错误: " << initial_error_code << std::endl;
-        return false;
-    }
-    
-    // 检查必需对象
-    if (!wl_surface_ || !wl_display_) {
-        std::cerr << "❌ Wayland surface或display无效，无法创建EGL窗口" << std::endl;
-        return false;
-    }
-    
-    // 创建EGL窗口
-    std::cout << "📐 创建EGL窗口 (" << config_.screen_width << "x" 
-              << config_.screen_height << ")" << std::endl;
-    wl_egl_window_ = wl_egl_window_create(wl_surface_, config_.screen_width, config_.screen_height);
-    if (!wl_egl_window_) {
-        std::cerr << "❌ 无法创建Wayland EGL窗口" << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL窗口创建成功" << std::endl;
-    
-    // 获取EGL显示
-    egl_display_ = eglGetDisplay((EGLNativeDisplayType)wl_display_);
-    if (egl_display_ == EGL_NO_DISPLAY) {
-        std::cerr << "❌ EGL显示获取失败" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已获取EGL显示" << std::endl;
-    
-    // 绑定OpenGL ES API
-    if (!eglBindAPI(EGL_OPENGL_ES_API)) {
-        std::cerr << "❌ EGL API绑定失败" << std::endl;
-        return false;
-    }
-    std::cout << "✅ 已绑定OpenGL ES API" << std::endl;
-    
-    // 初始化EGL
-    EGLint major, minor;
-    if (!eglInitialize(egl_display_, &major, &minor)) {
-        EGLint egl_error = eglGetError();
-        std::cerr << "❌ EGL初始化失败，错误码: 0x" 
-                  << std::hex << egl_error << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL初始化成功 (版本: " << major << "." << minor << ")" << std::endl;
-    
-    // 选择EGL配置
-    egl_config_ = chooseEGLConfig();
-    if (!egl_config_) {
-        std::cerr << "❌ EGL配置选择失败" << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL配置选择成功" << std::endl;
-    
-    // 创建EGL上下文
-    EGLint context_attribs[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
-        EGL_NONE
-    };
-    
-    egl_context_ = eglCreateContext(egl_display_, egl_config_, EGL_NO_CONTEXT, context_attribs);
-    if (egl_context_ == EGL_NO_CONTEXT) {
-        EGLint egl_error = eglGetError();
-        std::cerr << "❌ EGL上下文创建失败，错误码: 0x" 
-                  << std::hex << egl_error << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL上下文创建成功" << std::endl;
-    
-    // 创建EGL surface
-    egl_surface_ = eglCreateWindowSurface(egl_display_, egl_config_, 
-                                         (EGLNativeWindowType)wl_egl_window_, NULL);
-    if (egl_surface_ == EGL_NO_SURFACE) {
-        EGLint egl_error = eglGetError();
-        std::cerr << "❌ EGL surface创建失败，错误码: 0x" 
-                  << std::hex << egl_error << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL surface创建成功" << std::endl;
-    
-    // 激活EGL上下文
-    if (!eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_)) {
-        EGLint egl_error = eglGetError();
-        std::cerr << "❌ EGL上下文激活失败，错误码: 0x" 
-                  << std::hex << egl_error << std::endl;
-        return false;
-    }
-    std::cout << "✅ EGL上下文已激活" << std::endl;
-    
-    // 设置交换间隔（vsync）
-    eglSwapInterval(egl_display_, 1);
-    
-    egl_initialized_ = true;
-    std::cout << "✅ Wayland EGL初始化完成" << std::endl;
+    // ... EGL 初始化代码已注释，避免与 DeepStream 冲突 ...
     return true;
 }
-
-
+*/
 
 // Wayland registry回调函数 - 支持subcompositor绑定
 void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry* registry,
@@ -1240,188 +1142,20 @@ void LVGLWaylandInterface::Impl::handleWaylandEvents() {
     }
 }
 
+// 🔧 修复：注释EGL配置选择方法
+/*
 EGLConfig LVGLWaylandInterface::Impl::chooseEGLConfig() {
-    EGLint config_attribs[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_NONE
-    };
-    
-    EGLConfig config;
-    EGLint num_configs;
-    
-    if (!eglChooseConfig(egl_display_, config_attribs, &config, 1, &num_configs)) {
-        std::cerr << "EGL配置选择失败" << std::endl;
-        return nullptr;
-    }
-    
-    return config;
+    // ... EGL 配置选择代码已注释，避免与 DeepStream 冲突 ...
+    return nullptr;
 }
+*/
 
+// 🔧 修复：注释EGL flush方法，LVGL现在完全使用SHM
+/*
 void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t* color_p) {
-    static int flush_count = 0;
-    flush_count++;
-    
-    if (!egl_initialized_) {
-        std::cerr << "⚠️  flushDisplay调用但EGL未初始化 (调用#" << flush_count << ")" << std::endl;
-        return;
-    }
-    
-    std::lock_guard<std::mutex> lock(render_mutex_);
-    
-    // 🔍 详细的调试信息
-    if (flush_count <= 5 || flush_count % 60 == 0) { // 只打印前5次和每60次
-        std::cout << "🎨 flushDisplay #" << flush_count << " - 区域("
-                  << area->x1 << "," << area->y1 << ") -> ("
-                  << area->x2 << "," << area->y2 << ")" << std::endl;
-    }
-    
-    // 初始化OpenGL资源（第一次调用时）
-    if (!gl_resources_initialized_) {
-        std::cout << "🔧 初始化OpenGL资源..." << std::endl;
-        if (!initializeGLResources()) {
-            std::cerr << "❌ OpenGL资源初始化失败" << std::endl;
-            return;
-        }
-        gl_resources_initialized_ = true;
-        std::cout << "✅ OpenGL资源初始化完成" << std::endl;
-    }
-    
-    // 设置视口
-    glViewport(0, 0, config_.screen_width, config_.screen_height);
-    glClearColor(0.1f, 0.2f, 0.3f, 1.0f); // 🔍 使用蓝色背景以便调试
-    glClear(GL_COLOR_BUFFER_BIT);
-    
-    // 计算渲染区域
-    int32_t x1 = area->x1;
-    int32_t y1 = area->y1;
-    int32_t w = area->x2 - area->x1 + 1;
-    int32_t h = area->y2 - area->y1 + 1;
-    
-    // 绑定纹理
-    glBindTexture(GL_TEXTURE_2D, texture_id_);
-    
-    // 正确的LVGL颜色格式转换
-    std::vector<uint8_t> rgba_data(w * h * 4);
-    
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            lv_color_t pixel = color_p[y * w + x];
-            
-            // 根据LVGL v9.x的颜色结构直接访问
-            int idx = (y * w + x) * 4;
-            
-            #if LV_COLOR_DEPTH == 16
-                // RGB565格式
-                rgba_data[idx + 0] = (pixel.red & 0x1F) << 3;      // R: 5bit -> 8bit
-                rgba_data[idx + 1] = (pixel.green & 0x3F) << 2;    // G: 6bit -> 8bit
-                rgba_data[idx + 2] = (pixel.blue & 0x1F) << 3;     // B: 5bit -> 8bit
-            #elif LV_COLOR_DEPTH == 32
-                // ARGB8888格式
-                rgba_data[idx + 0] = pixel.red;
-                rgba_data[idx + 1] = pixel.green;
-                rgba_data[idx + 2] = pixel.blue;
-            #else
-                // 默认处理
-                rgba_data[idx + 0] = pixel.red << 3;
-                rgba_data[idx + 1] = pixel.green << 2;
-                rgba_data[idx + 2] = pixel.blue << 3;
-            #endif
-            
-            rgba_data[idx + 3] = 255;  // A: 完全不透明
-        }
-    }
-    
-    // 只在第一次或全屏更新时创建完整纹理
-    if (x1 == 0 && y1 == 0 && w == config_.screen_width && h == config_.screen_height) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, config_.screen_width, config_.screen_height,
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, rgba_data.data());
-        if (flush_count <= 5) {
-            std::cout << "📏 全屏纹理更新: " << config_.screen_width << "x" << config_.screen_height << std::endl;
-        }
-    } else {
-        // 部分更新：Y坐标需要翻转（OpenGL坐标系）
-        int32_t gl_y = config_.screen_height - y1 - h;
-        glTexSubImage2D(GL_TEXTURE_2D, 0, x1, gl_y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba_data.data());
-    }
-    
-    // 使用shader程序
-    glUseProgram(shader_program_);
-    
-    // 绑定VBO和设置属性
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    
-    GLint pos_attr = glGetAttribLocation(shader_program_, "a_position");
-    GLint tex_attr = glGetAttribLocation(shader_program_, "a_texcoord");
-    GLint tex_uniform = glGetUniformLocation(shader_program_, "u_texture");
-    
-    glVertexAttribPointer(pos_attr, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
-    glEnableVertexAttribArray(pos_attr);
-    
-    glVertexAttribPointer(tex_attr, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(tex_attr);
-    
-    glUniform1i(tex_uniform, 0);
-    
-    // 渲染四边形
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    
-    // 清理
-    glDisableVertexAttribArray(pos_attr);
-    glDisableVertexAttribArray(tex_attr);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    // 🔍 强制刷新所有OpenGL命令
-    glFlush();
-    glFinish();
-    
-    // 🔧 关键：通知Wayland合成器有变化
-    if (wl_surface_) {
-        // 标记整个surface需要重绘
-        wl_surface_damage(wl_surface_, 0, 0, config_.screen_width, config_.screen_height);
-        
-        // 提交surface更改
-        wl_surface_commit(wl_surface_);
-        
-        if (flush_count <= 5) {
-            std::cout << "🎯 已标记surface damage并提交" << std::endl;
-        }
-    }
-    
-    // 交换缓冲区（这会自动处理DRM framebuffer更新）
-    if (!eglSwapBuffers(egl_display_, egl_surface_)) {
-        EGLint error = eglGetError();
-        std::cerr << "❌ eglSwapBuffers失败: 0x" << std::hex << error << " (" << error << ")" << std::endl;
-        
-        // 如果是EGL_BAD_SURFACE，说明surface配置有问题
-        if (error == 0x300D) { // EGL_BAD_SURFACE
-            std::cerr << "🚨 EGL_BAD_SURFACE错误：surface未正确配置为可渲染状态！" << std::endl;
-        }
-    } else {
-        if (flush_count <= 5) {
-            std::cout << "✅ eglSwapBuffers成功" << std::endl;
-        }
-    }
-    
-    // 🔍 强制Wayland事件处理
-    if (wl_display_) {
-        wl_display_flush(wl_display_);
-    }
-    
-    // 检查OpenGL错误
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-        std::cerr << "❌ OpenGL渲染错误: 0x" << std::hex << error << std::endl;
-    }
-    
-    if (flush_count <= 5) {
-        std::cout << "✅ flushDisplay完成 #" << flush_count << std::endl;
-    }
+    // ... EGL 渲染代码已注释，LVGL 现在使用 SHM 软件渲染 ...
 }
+*/
 
 void LVGLWaylandInterface::Impl::cleanup() {
     // 首先清理OpenGL资源（必须在EGL上下文有效时执行）
