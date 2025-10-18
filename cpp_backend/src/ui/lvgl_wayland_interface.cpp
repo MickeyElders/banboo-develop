@@ -1009,9 +1009,11 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
         std::cout << "✅ 绑定wl_shm成功" << std::endl;
     }
     else if (strcmp(interface, "xdg_wm_base") == 0) {
-        impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
-            wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
-        std::cout << "✅ 绑定xdg_wm_base成功" << std::endl;
+    // 🔧 关键修复：使用 version 2 或更高，但不超过服务器支持的版本
+    uint32_t bind_version = std::min(version, 2u);  // 使用 v2，兼容性更好
+    impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
+        wl_registry_bind(registry, id, &xdg_wm_base_interface, bind_version));
+    std::cout << "✅ 绑定xdg_wm_base成功 (version " << bind_version << ")" << std::endl;
     }
 }
 
