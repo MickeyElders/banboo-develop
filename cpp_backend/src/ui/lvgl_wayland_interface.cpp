@@ -864,6 +864,29 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     
+    // ============= 新增代码开始 =============
+    // 🔧 Workaround: 跳过 ID 8，避开 Weston 13.0.0 xdg_positioner bug
+    std::cout << "🔧 [Workaround] 跳过 ID 8，避开 Weston bug..." << std::endl;
+
+    std::vector<struct wl_callback*> dummy_callbacks;
+
+    // 创建 6 个临时 callback，占用 ID 3-8
+    for (int i = 0; i < 6; i++) {
+        struct wl_callback* cb = wl_display_sync(wl_display_);
+        if (cb) {
+            dummy_callbacks.push_back(cb);
+        }
+    }
+
+    // 立即销毁，但 ID 已被标记为已使用
+    for (auto* cb : dummy_callbacks) {
+        wl_callback_destroy(cb);
+    }
+    wl_display_flush(wl_display_);
+
+    std::cout << "✅ [Workaround] ID 预分配完成，surface 将使用 ID 9+" << std::endl;
+    // ============= 新增代码结束 =============
+
     // 创建 surface
     std::cout << "📐 创建主 Surface..." << std::endl;
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
