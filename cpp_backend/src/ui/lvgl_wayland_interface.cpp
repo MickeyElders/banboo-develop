@@ -12,6 +12,7 @@
 #include <mutex>
 #include <chrono>
 #include <condition_variable>
+#include <poll.h>   
 
 // 系统头文件
 #include <errno.h>
@@ -96,8 +97,7 @@ public:
     struct xdg_toplevel* xdg_toplevel_ = nullptr;
     struct wl_egl_window* wl_egl_window_ = nullptr;
     struct wl_callback* frame_callback_ = nullptr;
-    struct pollfd pfd;
-    
+
     EGLDisplay egl_display_ = EGL_NO_DISPLAY;
     EGLContext egl_context_ = EGL_NO_CONTEXT;
     EGLSurface egl_surface_ = EGL_NO_SURFACE;
