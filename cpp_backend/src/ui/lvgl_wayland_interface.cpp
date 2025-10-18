@@ -829,7 +829,7 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "正在初始化Wayland客户端..." << std::endl;
     
-    // 步骤1: 连接 display
+    // 连接 display
     wl_display_ = wl_display_connect(nullptr);
     if (!wl_display_) {
         std::cerr << "❌ 无法连接Wayland display" << std::endl;
@@ -837,7 +837,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Wayland display连接成功" << std::endl;
     
-    // 步骤2: 获取 registry 并绑定接口
+    // 获取 registry 并绑定接口
     wl_registry_ = wl_display_get_registry(wl_display_);
     if (!wl_registry_) {
         std::cerr << "❌ 无法获取registry" << std::endl;
@@ -853,7 +853,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "✅ Registry同步完成" << std::endl;
     
     // 验证必需接口
-    if (!wl_compositor_ || !xdg_wm_base_ || !wl_shm_ || !wl_subcompositor_) {
+    if (!wl_compositor_ || !xdg_wm_base_ || !wl_shm_) {
         std::cerr << "❌ 缺少必需的Wayland接口" << std::endl;
         return false;
     }
@@ -864,7 +864,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     
-    // 步骤3: 创建 surface（让 Wayland 自然分配 ID）
+    // 创建 surface
     std::cout << "📐 创建主 Surface..." << std::endl;
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
@@ -873,7 +873,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 主 Surface 创建成功" << std::endl;
     
-    // 步骤4: 创建 xdg_surface
+    // 创建 xdg_surface
     std::cout << "🎯 创建 XDG Surface..." << std::endl;
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
@@ -887,7 +887,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     std::cout << "✅ XDG Surface 创建成功" << std::endl;
     
-    // 步骤5: 创建 toplevel
+    // 创建 toplevel
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
         std::cerr << "❌ 无法创建xdg_toplevel" << std::endl;
@@ -899,16 +899,15 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
-    
-    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
-    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
     std::cout << "✅ XDG Toplevel 创建成功" << std::endl;
     
-    // 步骤6: 提交空 surface 触发 configure
+    // ⚠️ 关键：不要在第一次 commit 前设置 title/app_id
+    // 只提交空 surface
+    std::cout << "📝 提交空 surface，触发 configure..." << std::endl;
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 步骤7: 等待 configure 事件
+    // 等待 configure 事件
     std::cout << "⏳ 等待 configure 事件..." << std::endl;
     configure_received_.store(false);
     
@@ -931,7 +930,6 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     
     std::cout << "✅ Wayland 客户端初始化完成" << std::endl;
-    // wayland_egl_initialized_ = true;  // 🔧 修复：注释EGL状态
     return true;
 }
 
