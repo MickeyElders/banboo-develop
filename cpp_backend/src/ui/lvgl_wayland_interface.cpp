@@ -146,7 +146,7 @@ public:
     void updateCanvasFromFrame();
     void flushDisplay(const lv_area_t* area, lv_color_t* color_p);
     void cleanup();
-    
+    void flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p);
     // Wayland辅助函数 - 现代xdg-shell协议实现
     static void registryHandler(void* data, struct wl_registry* registry, uint32_t id, const char* interface, uint32_t version);
     static void registryRemover(void* data, struct wl_registry* registry, uint32_t id);
@@ -429,91 +429,98 @@ bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
 bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     std::cout << "正在初始化Wayland客户端..." << std::endl;
     
-    // ✅ 修复：在任何Wayland错误发生时，立即停止并报告
+    // 初始化 Wayland 客户端（使用新的 ID 预留策略）
     if (!initializeWaylandClient()) {
         std::cerr << "❌ Wayland客户端初始化失败" << std::endl;
-        
-        // 🔧 关键修复：检查具体错误原因
-        if (wl_display_) {
-            int error_code = wl_display_get_error(wl_display_);
-            if (error_code == 1) {
-                std::cerr << "   错误原因: xdg_positioner协议错误" << std::endl;
-                std::cerr << "   可能原因: Weston内部状态冲突或其他客户端干扰" << std::endl;
-                std::cerr << "   建议: 重启Weston (sudo systemctl restart weston)" << std::endl;
-            } else if (error_code == 22) {
-                std::cerr << "   错误原因: EINVAL - 无效参数" << std::endl;
-                std::cerr << "   可能原因: Wayland对象使用顺序错误" << std::endl;
-            }
-        }
-        
-        // ❌ 不要降级到fallback！应该完全失败，让用户修复环境
-        return false;  // 让整个系统初始化失败
-    }
-    
-    // 继续EGL初始化...
-    if (!initializeWaylandEGL()) {
-        std::cerr << "❌ Wayland EGL初始化失败" << std::endl;
-        // 🔧 EGL失败可以降级，但Wayland窗口必须成功
-        return initializeFallbackDisplayWithWaylandObjects();
-    }
-    // 首先初始化Wayland客户端
-    std::cout << "正在初始化Wayland客户端..." << std::endl;
-    if (!initializeWaylandClient()) {
-        std::cerr << "❌ Wayland客户端初始化失败" << std::endl;
-        return false;  // 不要调用 initializeFallbackDisplay()
-    }
-    
-    // 然后初始化Wayland EGL
-    std::cout << "正在初始化Wayland EGL..." << std::endl;
-    if (!initializeWaylandEGL()) {
-        std::cerr << "Wayland EGL初始化失败，使用fallback模式" << std::endl;
-        // 🔧 关键修复：EGL失败时不清理Wayland对象，保留给DeepStream使用
-        std::cout << "🔄 保留Wayland对象供DeepStream Subsurface使用..." << std::endl;
-        return initializeFallbackDisplayWithWaylandObjects();
-    }
-    
-    // 创建LVGL显示设备
-    display_ = lv_display_create(config_.screen_width, config_.screen_height);
-    if (!display_) {
-        std::cerr << "LVGL显示创建失败" << std::endl;
-        cleanup();
         return false;
     }
     
-    // 分配显示缓冲区
+    // 🔧 关键：跳过 EGL 初始化，完全使用 SHM
+    std::cout << "📺 使用 SHM 软件渲染（避免与 DeepStream 的 EGL 冲突）..." << std::endl;
+    
+    // 创建 LVGL 显示设备
+    display_ = lv_display_create(config_.screen_width, config_.screen_height);
+    if (!display_) {
+        std::cerr << "LVGL显示创建失败" << std::endl;
+        return false;
+    }
+    
+    // 分配 SHM 缓冲区
     buffer_size_ = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
     front_buffer_ = (lv_color_t*)malloc(buffer_size_);
     back_buffer_ = (lv_color_t*)malloc(buffer_size_);
     
     if (!front_buffer_ || !back_buffer_) {
         std::cerr << "显示缓冲区分配失败" << std::endl;
-        cleanup();
         return false;
     }
     
-    // 设置LVGL缓冲区
     lv_display_set_buffers(display_, front_buffer_, back_buffer_,
                           buffer_size_, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
-    // ✅ 关键修复：设置真正的flush回调
+    // 设置 flush 回调（使用 SHM）
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
-        // 从用户数据获取Impl实例
         LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
             lv_display_get_user_data(disp));
         
         if (impl) {
-            impl->flushDisplay(area, (lv_color_t*)color_p);
+            impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
         }
         
         lv_display_flush_ready(disp);
     });
     
-    // 设置用户数据，以便在回调中访问
     lv_display_set_user_data(display_, this);
     
     display_initialized_ = true;
-    std::cout << "Wayland EGL显示初始化成功" << std::endl;
+    std::cout << "✅ Wayland SHM 显示初始化成功（LVGL 软件渲染）" << std::endl;
+    std::cout << "📺 DeepStream 可以独占 EGL/DRM 硬件加速" << std::endl;
     return true;
+}
+
+// 新增：通过 SHM 刷新显示的方法
+void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p) {
+    if (!wl_surface_ || !wl_shm_) return;
+    
+    // 创建 SHM buffer
+    int width = area->x2 - area->x1 + 1;
+    int height = area->y2 - area->y1 + 1;
+    int stride = width * 4;
+    int size = stride * height;
+    
+    int fd = createAnonymousFile(size);
+    if (fd < 0) return;
+    
+    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        close(fd);
+        return;
+    }
+    
+    // 复制 LVGL 像素数据到 SHM
+    uint32_t* pixels = (uint32_t*)data;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            lv_color_t c = color_p[y * width + x];
+            pixels[y * width + x] = (0xFF << 24) | (c.red << 16) | (c.green << 8) | c.blue;
+        }
+    }
+    
+    munmap(data, size);
+    
+    // 创建 Wayland buffer
+    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
+    struct wl_buffer* buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
+    wl_shm_pool_destroy(pool);
+    close(fd);
+    
+    // 提交到 Wayland
+    wl_surface_attach(wl_surface_, buffer, area->x1, area->y1);
+    wl_surface_damage(wl_surface_, area->x1, area->y1, width, height);
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
+    
+    wl_buffer_destroy(buffer);
 }
 
 bool LVGLWaylandInterface::Impl::initializeFallbackDisplay() {
