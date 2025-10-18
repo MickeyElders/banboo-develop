@@ -752,6 +752,10 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Wayland display连接成功" << std::endl;
     
+    // 🔧 关键修复：在连接后立即清理所有待处理事件
+    // 避免与其他 Wayland 客户端（如 weston-desktop-shell）的对象 ID 冲突
+    wl_display_roundtrip(wl_display_);
+    
     // 步骤2: 获取registry并设置监听器
     wl_registry_ = wl_display_get_registry(wl_display_);
     if (!wl_registry_) {
@@ -782,6 +786,10 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     
+    // 🔧 关键修复：再次清理事件队列，确保 shell 组件不干扰
+    wl_display_dispatch_pending(wl_display_);
+    wl_display_flush(wl_display_);
+    
     // 步骤6: 创建surface
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
@@ -789,6 +797,10 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     std::cout << "✅ Surface创建成功" << std::endl;
+    
+    // 🔧 关键修复：在创建 xdg_surface 之前再次同步
+    // 这可以避免与 Weston 内部创建的 positioner 对象冲突
+    wl_display_roundtrip(wl_display_);
     
     // 步骤7: 创建xdg_surface
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
@@ -822,16 +834,17 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
     
-    // 🔧 关键修复1: 不要设置 min/max size，让合成器自由决定
-    // 删除这些调用，避免尺寸冲突：
-    // xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
-    // xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
+    // 🔧 关键修复：在 commit 前多次 flush，确保命令顺序正确
+    wl_display_flush(wl_display_);
     
-    // 🔧 关键修复2: 第一次 commit 不 attach buffer，只是告诉合成器我们准备好了
+    // 步骤10: 第一次 commit（不 attach buffer）
     std::cout << "🔧 提交初始surface配置（无buffer）..." << std::endl;
     wl_surface_commit(wl_surface_);
     
-    // 步骤10: 等待configure事件（这是协议要求，必须等待）
+    // 🔧 立即 flush，避免命令堆积
+    wl_display_flush(wl_display_);
+    
+    // 步骤11: 等待configure事件
     std::cout << "⏳ 等待configure事件..." << std::endl;
     configure_received_.store(false);
     
@@ -839,10 +852,49 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     auto start_time = std::chrono::steady_clock::now();
     
     while (!configure_received_.load()) {
-        if (wl_display_dispatch(wl_display_) < 0) {
+        // 🔧 使用非阻塞 dispatch，避免死锁
+        int ret = wl_display_dispatch_pending(wl_display_);
+        if (ret < 0) {
             int error = wl_display_get_error(wl_display_);
             std::cerr << "❌ Wayland dispatch失败，错误码: " << error << std::endl;
+            
+            // 🔧 诊断：打印具体的 Wayland 协议错误
+            uint32_t object_id;
+            uint32_t error_code;
+            const struct wl_interface* interface;
+            uint32_t message_id;
+            
+            error_code = wl_display_get_protocol_error(wl_display_, &interface, &message_id);
+            if (interface) {
+                std::cerr << "   协议错误: 接口=" << interface->name 
+                          << ", 消息ID=" << message_id
+                          << ", 错误码=" << error_code << std::endl;
+            }
+            
             return false;
+        }
+        
+        // 如果没有待处理事件，等待新事件
+        if (ret == 0) {
+            // 🔧 使用 wl_display_prepare_read + wl_display_read_events
+            // 这是正确的非阻塞事件等待方式
+            while (wl_display_prepare_read(wl_display_) != 0) {
+                wl_display_dispatch_pending(wl_display_);
+            }
+            
+            // 使用 poll 等待事件（带超时）
+            struct pollfd pfd;
+            pfd.fd = wl_display_get_fd(wl_display_);
+            pfd.events = POLLIN;
+            
+            int poll_ret = poll(&pfd, 1, 100);  // 100ms 超时
+            
+            if (poll_ret > 0) {
+                wl_display_read_events(wl_display_);
+                wl_display_dispatch_pending(wl_display_);
+            } else {
+                wl_display_cancel_read(wl_display_);
+            }
         }
         
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -857,7 +909,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     std::cout << "✅ Configure事件已接收" << std::endl;
     
-    // 🔧 关键修复3: 在收到 configure 后再创建并 attach buffer
+    // 步骤12: 创建并 attach buffer（在收到 configure 后）
     std::cout << "🔧 创建初始buffer并attach..." << std::endl;
     
     int shm_size = config_.screen_width * config_.screen_height * 4;
@@ -874,7 +926,6 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     
-    // 填充初始颜色（黑色）
     memset(shm_data, 0, shm_size);
     munmap(shm_data, shm_size);
     
@@ -888,23 +939,17 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 现在可以安全地 attach buffer 了
     wl_surface_attach(wl_surface_, buffer, 0, 0);
     wl_surface_damage(wl_surface_, 0, 0, config_.screen_width, config_.screen_height);
     wl_surface_commit(wl_surface_);
-    
-    // 清理临时buffer
-    wl_buffer_destroy(buffer);
-    
-    // 最后一次 flush
     wl_display_flush(wl_display_);
+    
+    wl_buffer_destroy(buffer);
     
     wayland_egl_initialized_ = true;
     std::cout << "✅ Wayland客户端初始化完成" << std::endl;
     return true;
 }
-
-
 
 
 // 🔧 更新：xdg_toplevel configure回调
