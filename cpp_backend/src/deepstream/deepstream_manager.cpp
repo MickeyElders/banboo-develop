@@ -73,6 +73,35 @@ DeepStreamManager::~DeepStreamManager() {
 }
 
 bool DeepStreamManager::initializeWithSubsurface(
+    void* wl_display,
+    void* wl_surface,
+    int width,
+    int height) {
+    
+    std::cout << "🎬 [DeepStream] 初始化Wayland Subsurface模式..." << std::endl;
+    
+    // 保存 subsurface 指针
+    video_surface_ = wl_surface;
+    
+    // 配置基础参数
+    config_.sink_mode = VideoSinkMode::WAYLANDSINK;
+    config_.screen_width = width;
+    config_.screen_height = height;
+    
+    // 初始化GStreamer
+    if (!gst_is_initialized()) {
+        gst_init(nullptr, nullptr);
+    }
+    
+    // 计算布局
+    video_layout_ = calculateWaylandVideoLayout(config_);
+    
+    initialized_ = true;
+    std::cout << "✅ [DeepStream] Subsurface初始化完成" << std::endl;
+    return true;
+}
+
+bool DeepStreamManager::initializeWithSubsurface(
     void* parent_display,
     void* parent_compositor,
     void* parent_subcompositor,
@@ -321,7 +350,19 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 std::cerr << "❌ 管道字符串为空，配置错误" << std::endl;
                 return false;
             }
-            
+             // 🔧 关键：在启动管道前，将 waylandsink 绑定到 subsurface
+            if (video_surface_) {
+                GstElement* waylandsink = gst_bin_get_by_name(GST_BIN(pipeline_), "video_sink");
+                if (waylandsink) {
+                    // 将 waylandsink 的输出绑定到我们的 subsurface
+                    auto* wl_surface = static_cast<struct wl_surface*>(video_surface_);
+                    g_object_set(waylandsink, "wayland-surface", wl_surface, NULL);
+                    std::cout << "✅ [DeepStream] waylandsink已绑定到subsurface" << std::endl;
+                    gst_object_unref(waylandsink);
+                } else {
+                    std::cerr << "⚠️ [DeepStream] 未找到waylandsink元素" << std::endl;
+                }
+            }
             // 创建管道
             GError *error = nullptr;
             pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
@@ -919,24 +960,12 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     
     std::ostringstream pipeline;
     
-    std::cout << "🔧 [DeepStream] 构建Subsurface Waylandsink管道..." << std::endl;
-    
     // 摄像头源
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
              << "! video/x-raw(memory:NVMM)"
              << ",width=" << config.camera_width
              << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1"
-             << ",format=NV12 ";
-    
-    // 可选：AI推理
-    if (!config.nvinfer_config.empty() && access(config.nvinfer_config.c_str(), F_OK) == 0) {
-        pipeline << "! m.sink_0 "
-                 << "nvstreammux name=m batch-size=1 "
-                 << "width=" << config.camera_width << " "
-                 << "height=" << config.camera_height << " "
-                 << "! nvinfer config-file-path=" << config.nvinfer_config << " ";
-    }
+             << ",framerate=" << config.camera_fps << "/1 ";
     
     // 格式转换和缩放
     pipeline << "! nvvidconv "
@@ -944,14 +973,11 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
              << ",width=" << width
              << ",height=" << height << " ";
     
-    // 🔧 关键：waylandsink渲染到subsurface
+    // 🔧 关键：waylandsink 不设置 display 参数
+    // waylandsink 会在启动时通过 g_object_set 绑定到我们的 subsurface
     pipeline << "! waylandsink name=video_sink "
              << "sync=false "
              << "async=true ";
-    
-    // 注意：不设置display参数，waylandsink会自动使用WAYLAND_DISPLAY
-    
-    std::cout << "🔧 [DeepStream] Subsurface管道: " << pipeline.str() << std::endl;
     
     return pipeline.str();
 }

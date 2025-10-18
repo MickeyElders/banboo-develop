@@ -608,7 +608,7 @@ public:
         stop();
     }
     
-    bool initialize() {
+    bool InferenceWorkerThread::initialize() {
     std::cout << "🔧 [推理系统] 初始化Wayland Subsurface架构..." << std::endl;
     
     // 获取LVGL的Wayland对象
@@ -619,9 +619,9 @@ public:
     
     auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
     
-    // 等待LVGL的Wayland对象完全初始化
+    // 🔧 关键：等待LVGL的Wayland对象完全初始化
     int retry_count = 0;
-    const int MAX_RETRIES = 10;
+    const int MAX_RETRIES = 20;
     
     void* parent_display = nullptr;
     void* parent_compositor = nullptr;
@@ -646,35 +646,45 @@ public:
     
     if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
         std::cerr << "❌ 无法获取LVGL Wayland对象（已重试" << MAX_RETRIES << "次）" << std::endl;
-        std::cerr << "   Display: " << (parent_display ? "OK" : "NULL") << std::endl;
-        std::cerr << "   Compositor: " << (parent_compositor ? "OK" : "NULL") << std::endl;
-        std::cerr << "   Subcompositor: " << (parent_subcompositor ? "OK" : "NULL") << std::endl;
-        std::cerr << "   Surface: " << (parent_surface ? "OK" : "NULL") << std::endl;
+        std::cerr << "🔄 DeepStream将使用AppSink软件合成模式" << std::endl;
         
-        std::cout << "🔄 DeepStream将使用AppSink软件合成模式" << std::endl;
-        return initializeDeepStreamManager();
+        // 降级到AppSink模式
+        deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+        config_.sink_mode = deepstream::VideoSinkMode::APPSINK;
+        return deepstream_manager_->initialize(config_);
     }
     
     std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
     
+    // 🆕 通过LVGL接口创建Subsurface
+    std::cout << "🎬 为 DeepStream 创建 Subsurface..." << std::endl;
+    
+    int video_x = 10;
+    int video_y = 80;   // 头部面板高度 60px + 边距 20px
+    int video_width = 960;
+    int video_height = 640;
+    
+    auto subsurface_handle = lvgl_if->createSubsurface(video_x, video_y, video_width, video_height);
+    
+    if (!subsurface_handle.surface) {
+        std::cerr << "❌ 创建 Subsurface 失败，降级到 AppSink 模式" << std::endl;
+        
+        deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+        config_.sink_mode = deepstream::VideoSinkMode::APPSINK;
+        return deepstream_manager_->initialize(config_);
+    }
+    
+    std::cout << "✅ Subsurface 创建成功" << std::endl;
+    
     // 创建DeepStream管理器（使用Subsurface）
     deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
     
-    // 配置Subsurface
-    deepstream::SubsurfaceConfig subsurface_config;
-    subsurface_config.offset_x = 0;
-    subsurface_config.offset_y = 80;
-    subsurface_config.width = 960;
-    subsurface_config.height = 640;
-    subsurface_config.use_sync_mode = true;
-    
-    // 使用Subsurface模式初始化
+    // 使用简化的Subsurface初始化方法
     if (!deepstream_manager_->initializeWithSubsurface(
             parent_display,
-            parent_compositor,
-            parent_subcompositor,
-            parent_surface,
-            subsurface_config)) {
+            subsurface_handle.surface,  // 传递 subsurface 的 wl_surface
+            video_width,
+            video_height)) {
         std::cerr << "❌ DeepStream Subsurface初始化失败" << std::endl;
         return false;
     }

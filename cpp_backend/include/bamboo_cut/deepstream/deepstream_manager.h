@@ -269,6 +269,16 @@ public:
     bool checkWaylandEnvironment();
     
     /**
+     * @brief 简化创建
+     * @return 创建是否成功
+     */
+    bool initializeWithSubsurface(
+    void* wl_display,
+    void* wl_surface,      // 直接使用 LVGL 创建的 subsurface
+    int width,
+    int height);
+
+    /**
      * @brief 计算Wayland视频布局
      * @param config DeepStream配置
      * @return 计算出的视频布局

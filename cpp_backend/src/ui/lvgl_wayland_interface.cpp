@@ -169,10 +169,80 @@ public:
     std::condition_variable configure_cv_;
     std::atomic<bool> configure_received_{false};
 
-
+    // 🆕 为 DeepStream 创建 Subsurface
+    struct SubsurfaceHandle {
+        void* surface;      // wl_surface*
+        void* subsurface;   // wl_subsurface*
+    };
+    
+    SubsurfaceHandle createSubsurface(int x, int y, int width, int height);
+    void destroySubsurface(SubsurfaceHandle handle);
+    
+    // 获取 Wayland 对象（供 DeepStream 使用）
+    void* getWaylandDisplay();
+    void* getWaylandCompositor();
+    void* getWaylandSubcompositor();
+    void* getWaylandSurface();
 };
 
+LVGLWaylandInterface::SubsurfaceHandle 
+LVGLWaylandInterface::createSubsurface(int x, int y, int width, int height) {
+    SubsurfaceHandle handle = {nullptr, nullptr};
+    
+    if (!pImpl_->wl_compositor_ || !pImpl_->wl_subcompositor_ || !pImpl_->wl_surface_) {
+        std::cerr << "❌ Wayland 对象未初始化" << std::endl;
+        return handle;
+    }
+    
+    std::cout << "🎬 为 DeepStream 创建 Subsurface..." << std::endl;
+    
+    // 创建 DeepStream 的独立 surface
+    auto* wl_surface = wl_compositor_create_surface(pImpl_->wl_compositor_);
+    if (!wl_surface) {
+        std::cerr << "❌ 无法创建 DeepStream surface" << std::endl;
+        return handle;
+    }
+    handle.surface = wl_surface;
+    
+    // 将其设置为 LVGL 主 surface 的 subsurface
+    auto* wl_subsurface = wl_subcompositor_get_subsurface(
+        pImpl_->wl_subcompositor_,
+        wl_surface,
+        pImpl_->wl_surface_  // 父 surface
+    );
+    
+    if (!wl_subsurface) {
+        std::cerr << "❌ 无法创建 subsurface" << std::endl;
+        wl_surface_destroy(wl_surface);
+        handle.surface = nullptr;
+        return handle;
+    }
+    handle.subsurface = wl_subsurface;
+    
+    // 设置 subsurface 位置
+    wl_subsurface_set_position(wl_subsurface, x, y);
+    
+    // 设置为同步模式
+    wl_subsurface_set_sync(wl_subsurface);
+    
+    // 提交更改
+    wl_surface_commit(wl_surface);
+    wl_display_flush(pImpl_->wl_display_);
+    
+    std::cout << "✅ DeepStream Subsurface 创建成功，位置: (" 
+              << x << ", " << y << ")" << std::endl;
+    
+    return handle;
+}
 
+void LVGLWaylandInterface::destroySubsurface(SubsurfaceHandle handle) {
+    if (handle.subsurface) {
+        wl_subsurface_destroy(static_cast<struct wl_subsurface*>(handle.subsurface));
+    }
+    if (handle.surface) {
+        wl_surface_destroy(static_cast<struct wl_surface*>(handle.surface));
+    }
+}
 
 LVGLWaylandInterface::LVGLWaylandInterface() 
     : pImpl_(std::make_unique<Impl>()) {
@@ -752,7 +822,7 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "正在初始化Wayland客户端..." << std::endl;
     
-    // 步骤1: 连接Wayland display
+    // 步骤1: 连接 display
     wl_display_ = wl_display_connect(nullptr);
     if (!wl_display_) {
         std::cerr << "❌ 无法连接Wayland display" << std::endl;
@@ -760,14 +830,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Wayland display连接成功" << std::endl;
     
-    // 🔧 激进修复1：大量预同步，让 Weston 完成所有初始化
-    std::cout << "🔄 执行激进预同步（清空 Weston 所有待处理对象）..." << std::endl;
-    for (int i = 0; i < 10; i++) {
-        wl_display_roundtrip(wl_display_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-    
-    // 步骤2: 获取registry
+    // 步骤2: 获取 registry 并绑定接口
     wl_registry_ = wl_display_get_registry(wl_display_);
     if (!wl_registry_) {
         std::cerr << "❌ 无法获取registry" << std::endl;
@@ -782,55 +845,30 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     wl_display_roundtrip(wl_display_);
     std::cout << "✅ Registry同步完成" << std::endl;
     
-    if (!wl_compositor_ || !xdg_wm_base_ || !wl_shm_) {
+    // 验证必需接口
+    if (!wl_compositor_ || !xdg_wm_base_ || !wl_shm_ || !wl_subcompositor_) {
         std::cerr << "❌ 缺少必需的Wayland接口" << std::endl;
         return false;
     }
     
+    // 设置 xdg_wm_base 监听器
     static const struct xdg_wm_base_listener xdg_wm_base_listener = {
         xdgWmBasePing
     };
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     
-    // 🔧 激进修复2：创建大量临时对象，跳到 ID 50+ 范围
-    std::cout << "🚀 激进策略：占用 ID 1-50 范围，跳到安全区域..." << std::endl;
-    std::vector<struct wl_callback*> dummy_callbacks;
-    
-    // 创建 40 个临时 callback，占用 ID 空间
-    for (int i = 0; i < 40; i++) {
-        struct wl_callback* cb = wl_display_sync(wl_display_);
-        dummy_callbacks.push_back(cb);
-    }
-    
-    // 同步并销毁
-    wl_display_roundtrip(wl_display_);
-    for (auto cb : dummy_callbacks) {
-        wl_callback_destroy(cb);
-    }
-    dummy_callbacks.clear();
-    wl_display_roundtrip(wl_display_);
-    
-    std::cout << "✅ 已跳过危险 ID 范围（1-50），现在使用 ID 50+..." << std::endl;
-    
-    // 步骤6: 创建surface（现在应该是 ID 50+）
+    // 步骤3: 创建 surface（让 Wayland 自然分配 ID）
+    std::cout << "📐 创建主 Surface..." << std::endl;
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
     if (!wl_surface_) {
         std::cerr << "❌ 无法创建surface" << std::endl;
         return false;
     }
-    std::cout << "✅ Surface创建成功" << std::endl;
+    std::cout << "✅ 主 Surface 创建成功" << std::endl;
     
-    // 大量同步
-    for (int i = 0; i < 5; i++) {
-        wl_display_roundtrip(wl_display_);
-        wl_display_dispatch_pending(wl_display_);
-        wl_display_flush(wl_display_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    
-    // 创建 xdg_surface（应该在安全的 ID 范围）
-    std::cout << "🎯 创建 XDG Surface（安全 ID 范围）..." << std::endl;
-    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
+    // 步骤4: 创建 xdg_surface
+    std::cout << "🎯 创建 XDG Surface..." << std::endl;
+    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
         return false;
@@ -840,8 +878,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         xdgSurfaceConfigure
     };
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
-    std::cout << "✅ XDG Surface创建成功" << std::endl;
+    std::cout << "✅ XDG Surface 创建成功" << std::endl;
     
+    // 步骤5: 创建 toplevel
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
         std::cerr << "❌ 无法创建xdg_toplevel" << std::endl;
@@ -853,47 +892,42 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
-    std::cout << "✅ XDG Toplevel创建成功" << std::endl;
     
-    // 设置属性
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
+    std::cout << "✅ XDG Toplevel 创建成功" << std::endl;
     
-    // 🔧 修复：不要在这里 sync，直接 flush
-    wl_display_flush(wl_display_);
-    
-    // 第一次 commit（无 buffer）
-    std::cout << "🔧 提交初始surface配置..." << std::endl;
+    // 步骤6: 提交空 surface 触发 configure
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 等待 configure
-    std::cout << "⏳ 等待configure事件..." << std::endl;
+    // 步骤7: 等待 configure 事件
+    std::cout << "⏳ 等待 configure 事件..." << std::endl;
     configure_received_.store(false);
     
-    int max_attempts = 100;
+    int max_attempts = 50;
     int attempts = 0;
     
     while (!configure_received_.load() && attempts < max_attempts) {
-        int ret = wl_display_dispatch(wl_display_);
-        if (ret < 0) {
+        if (wl_display_dispatch(wl_display_) < 0) {
             int error = wl_display_get_error(wl_display_);
-            std::cerr << "❌ Wayland dispatch失败，错误码: " << error << std::endl;
+            std::cerr << "❌ Wayland dispatch 失败，错误码: " << error << std::endl;
             return false;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
         attempts++;
     }
     
     if (!configure_received_.load()) {
-        std::cerr << "❌ 等待configure事件超时" << std::endl;
+        std::cerr << "❌ 等待 configure 超时" << std::endl;
         return false;
     }
     
-    std::cout << "✅ Configure事件已接收，Wayland客户端初始化完成" << std::endl;
+    std::cout << "✅ Wayland 客户端初始化完成" << std::endl;
     wayland_egl_initialized_ = true;
     return true;
 }
+
 
 // 🔧 更新：xdg_toplevel configure回调
 void LVGLWaylandInterface::Impl::xdgToplevelConfigure(
