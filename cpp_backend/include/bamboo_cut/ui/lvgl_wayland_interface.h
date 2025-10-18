@@ -134,6 +134,28 @@ public:
      * @return Wayland Surface指针，用作subsurface的父表面
      */
     void* getWaylandSurface();
+    
+    // 🆕 Subsurface句柄结构
+    struct SubsurfaceHandle {
+        void* surface;      // wl_surface*
+        void* subsurface;   // wl_subsurface*
+    };
+    
+    /**
+     * @brief 为DeepStream创建Subsurface
+     * @param x 相对父窗口的X偏移
+     * @param y 相对父窗口的Y偏移
+     * @param width 子表面宽度
+     * @param height 子表面高度
+     * @return Subsurface句柄
+     */
+    SubsurfaceHandle createSubsurface(int x, int y, int width, int height);
+    
+    /**
+     * @brief 销毁Subsurface
+     * @param handle Subsurface句柄
+     */
+    void destroySubsurface(SubsurfaceHandle handle);
 
 private:
     // 内部实现指针

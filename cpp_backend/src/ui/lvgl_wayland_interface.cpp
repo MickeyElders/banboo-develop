@@ -875,7 +875,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     // 步骤4: 创建 xdg_surface
     std::cout << "🎯 创建 XDG Surface..." << std::endl;
-    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
         return false;
@@ -1158,37 +1158,7 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
 */
 
 void LVGLWaylandInterface::Impl::cleanup() {
-    // 首先清理OpenGL资源（必须在EGL上下文有效时执行）
-    if (gl_resources_initialized_ && egl_initialized_) {
-        cleanupGLResources();
-    }
-    
-    // 清理EGL资源
-    if (egl_initialized_) {
-        if (egl_display_ != EGL_NO_DISPLAY) {
-            eglMakeCurrent(egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-            
-            if (egl_surface_ != EGL_NO_SURFACE) {
-                eglDestroySurface(egl_display_, egl_surface_);
-                egl_surface_ = EGL_NO_SURFACE;
-            }
-            
-            if (egl_context_ != EGL_NO_CONTEXT) {
-                eglDestroyContext(egl_display_, egl_context_);
-                egl_context_ = EGL_NO_CONTEXT;
-            }
-            
-            eglTerminate(egl_display_);
-            egl_display_ = EGL_NO_DISPLAY;
-        }
-        egl_initialized_ = false;
-    }
-    
-    // 清理Wayland EGL资源
-    if (wl_egl_window_) {
-        wl_egl_window_destroy(wl_egl_window_);
-        wl_egl_window_ = nullptr;
-    }
+    // 🔧 修复：完全使用SHM，只清理Wayland资源
     
     // 清理Wayland资源 - xdg-shell实现
     if (frame_callback_) {
@@ -1241,8 +1211,6 @@ void LVGLWaylandInterface::Impl::cleanup() {
         wl_display_ = nullptr;
     }
     
-    wayland_egl_initialized_ = false;
-    
     // 清理显示缓冲区
     if (front_buffer_) {
         free(front_buffer_);
@@ -1255,133 +1223,7 @@ void LVGLWaylandInterface::Impl::cleanup() {
     }
 }
 
-// OpenGL资源管理实现
-bool LVGLWaylandInterface::Impl::initializeGLResources() {
-    // 创建shader程序
-    if (!createShaderProgram()) {
-        return false;
-    }
-    
-    // 创建纹理
-    glGenTextures(1, &texture_id_);
-    glBindTexture(GL_TEXTURE_2D, texture_id_);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    // 创建VBO（顶点缓冲对象）
-    glGenBuffers(1, &vbo_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    
-    // 全屏四边形顶点数据（位置 + 纹理坐标）
-    GLfloat vertices[] = {
-        // 位置      纹理坐标
-        -1.0f, -1.0f,  0.0f, 1.0f,  // 左下
-         1.0f, -1.0f,  1.0f, 1.0f,  // 右下
-        -1.0f,  1.0f,  0.0f, 0.0f,  // 左上
-         1.0f,  1.0f,  1.0f, 0.0f   // 右上
-    };
-    
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    return true;
-}
-
-void LVGLWaylandInterface::Impl::cleanupGLResources() {
-    if (vbo_ != 0) {
-        glDeleteBuffers(1, &vbo_);
-        vbo_ = 0;
-    }
-    
-    if (texture_id_ != 0) {
-        glDeleteTextures(1, &texture_id_);
-        texture_id_ = 0;
-    }
-    
-    if (shader_program_ != 0) {
-        glDeleteProgram(shader_program_);
-        shader_program_ = 0;
-    }
-    
-    gl_resources_initialized_ = false;
-}
-
-bool LVGLWaylandInterface::Impl::createShaderProgram() {
-    const char* vertex_shader_source = R"(
-        attribute vec2 a_position;
-        attribute vec2 a_texcoord;
-        varying vec2 v_texcoord;
-        void main() {
-            gl_Position = vec4(a_position, 0.0, 1.0);
-            v_texcoord = a_texcoord;
-        }
-    )";
-    
-    const char* fragment_shader_source = R"(
-        precision mediump float;
-        varying vec2 v_texcoord;
-        uniform sampler2D u_texture;
-        void main() {
-            gl_FragColor = texture2D(u_texture, v_texcoord);
-        }
-    )";
-    
-    // 编译vertex shader
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
-    glCompileShader(vertex_shader);
-    
-    GLint success;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char info_log[512];
-        glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
-        std::cerr << "Vertex shader编译失败: " << info_log << std::endl;
-        glDeleteShader(vertex_shader);
-        return false;
-    }
-    
-    // 编译fragment shader
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
-    glCompileShader(fragment_shader);
-    
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char info_log[512];
-        glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
-        std::cerr << "Fragment shader编译失败: " << info_log << std::endl;
-        glDeleteShader(vertex_shader);
-        glDeleteShader(fragment_shader);
-        return false;
-    }
-    
-    // 创建shader程序
-    shader_program_ = glCreateProgram();
-    glAttachShader(shader_program_, vertex_shader);
-    glAttachShader(shader_program_, fragment_shader);
-    glLinkProgram(shader_program_);
-    
-    glGetProgramiv(shader_program_, GL_LINK_STATUS, &success);
-    if (!success) {
-        char info_log[512];
-        glGetProgramInfoLog(shader_program_, 512, NULL, info_log);
-        std::cerr << "Shader程序链接失败: " << info_log << std::endl;
-        glDeleteShader(vertex_shader);
-        glDeleteShader(fragment_shader);
-        glDeleteProgram(shader_program_);
-        shader_program_ = 0;
-        return false;
-    }
-    
-    // 清理shader对象
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
-    
-    return true;
-}
+// 🔧 修复：删除所有OpenGL和EGL方法实现，完全使用SHM
 
 // 析构函数实现
 LVGLWaylandInterface::Impl::~Impl() {
