@@ -753,9 +753,12 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Wayland display连接成功" << std::endl;
     
-    // 🔧 关键修复：在连接后立即清理所有待处理事件
-    // 避免与其他 Wayland 客户端（如 weston-desktop-shell）的对象 ID 冲突
-    wl_display_roundtrip(wl_display_);
+    // 🔧 关键修复1：强制多次同步，让 Weston 完成所有内部对象分配
+    std::cout << "🔄 执行预同步（清空 Weston 内部队列）..." << std::endl;
+    for (int i = 0; i < 3; i++) {
+        wl_display_roundtrip(wl_display_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
     
     // 步骤2: 获取registry并设置监听器
     wl_registry_ = wl_display_get_registry(wl_display_);
@@ -787,9 +790,27 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     
-    // 🔧 关键修复：再次清理事件队列，确保 shell 组件不干扰
-    wl_display_dispatch_pending(wl_display_);
-    wl_display_flush(wl_display_);
+    // 🔧 关键修复2：创建临时 callback 对象占用 ID 空间
+    // 这会让我们的实际对象跳过 Weston 可能使用的 ID 范围
+    std::cout << "🔧 预留对象 ID 空间（避免与 Weston 内部对象冲突）..." << std::endl;
+    std::vector<struct wl_callback*> dummy_callbacks;
+    for (int i = 0; i < 5; i++) {
+        struct wl_callback* cb = wl_display_sync(wl_display_);
+        dummy_callbacks.push_back(cb);
+    }
+    
+    // 执行同步，让这些 callback 完成
+    wl_display_roundtrip(wl_display_);
+    
+    // 销毁临时对象（释放 ID，但已经跳过了冲突区）
+    for (auto cb : dummy_callbacks) {
+        wl_callback_destroy(cb);
+    }
+    dummy_callbacks.clear();
+    
+    // 再次同步，确保清理完成
+    wl_display_roundtrip(wl_display_);
+    std::cout << "✅ 对象 ID 空间已预留" << std::endl;
     
     // 步骤6: 创建surface
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
@@ -799,11 +820,17 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Surface创建成功" << std::endl;
     
-    // 🔧 关键修复：在创建 xdg_surface 之前再次同步
-    // 这可以避免与 Weston 内部创建的 positioner 对象冲突
-    wl_display_roundtrip(wl_display_);
+    // 🔧 关键修复3：在创建 xdg_surface 前大量同步
+    std::cout << "🔄 执行深度同步（确保 Weston 完全就绪）..." << std::endl;
+    for (int i = 0; i < 3; i++) {
+        wl_display_roundtrip(wl_display_);
+        wl_display_dispatch_pending(wl_display_);
+        wl_display_flush(wl_display_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
     
     // 步骤7: 创建xdg_surface
+    std::cout << "🎯 创建 XDG Surface..." << std::endl;
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
@@ -835,32 +862,29 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
     
-    // 🔧 关键修复：在 commit 前多次 flush，确保命令顺序正确
+    // 🔧 关键修复4：在 commit 前强制同步所有命令
     wl_display_flush(wl_display_);
+    wl_display_roundtrip(wl_display_);
     
     // 步骤10: 第一次 commit（不 attach buffer）
     std::cout << "🔧 提交初始surface配置（无buffer）..." << std::endl;
     wl_surface_commit(wl_surface_);
-    
-    // 🔧 立即 flush，避免命令堆积
     wl_display_flush(wl_display_);
     
-    // 步骤11: 等待configure事件
+    // 步骤11: 等待configure事件（使用简单的 dispatch）
     std::cout << "⏳ 等待configure事件..." << std::endl;
     configure_received_.store(false);
     
-    int timeout_ms = 5000;
-    auto start_time = std::chrono::steady_clock::now();
+    int max_attempts = 100;
+    int attempts = 0;
     
-    while (!configure_received_.load()) {
-        // 🔧 使用非阻塞 dispatch，避免死锁
-        int ret = wl_display_dispatch_pending(wl_display_);
+    while (!configure_received_.load() && attempts < max_attempts) {
+        int ret = wl_display_dispatch(wl_display_);
         if (ret < 0) {
             int error = wl_display_get_error(wl_display_);
             std::cerr << "❌ Wayland dispatch失败，错误码: " << error << std::endl;
             
-            // 🔧 诊断：打印具体的 Wayland 协议错误
-            uint32_t object_id;
+            // 诊断协议错误
             uint32_t error_code;
             const struct wl_interface* interface;
             uint32_t message_id;
@@ -868,49 +892,24 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
             error_code = wl_display_get_protocol_error(wl_display_, &interface, &message_id);
             if (interface) {
                 std::cerr << "   协议错误: 接口=" << interface->name 
-                          << ", 消息ID=" << message_id
-                          << ", 错误码=" << error_code << std::endl;
+                          << ", 消息ID=" << message_id << std::endl;
             }
             
             return false;
         }
         
-        // 如果没有待处理事件，等待新事件
-        if (ret == 0) {
-            // 🔧 使用 wl_display_prepare_read + wl_display_read_events
-            // 这是正确的非阻塞事件等待方式
-            while (wl_display_prepare_read(wl_display_) != 0) {
-                wl_display_dispatch_pending(wl_display_);
-            }
-            
-            // 使用 poll 等待事件（带超时）
-            struct pollfd pfd;
-            pfd.fd = wl_display_get_fd(wl_display_);
-            pfd.events = POLLIN;
-            
-            int poll_ret = poll(&pfd, 1, 100);  // 100ms 超时
-            
-            if (poll_ret > 0) {
-                wl_display_read_events(wl_display_);
-                wl_display_dispatch_pending(wl_display_);
-            } else {
-                wl_display_cancel_read(wl_display_);
-            }
-        }
-        
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start_time
-        ).count();
-        
-        if (elapsed > timeout_ms) {
-            std::cerr << "❌ 等待configure事件超时" << std::endl;
-            return false;
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        attempts++;
+    }
+    
+    if (!configure_received_.load()) {
+        std::cerr << "❌ 等待configure事件超时" << std::endl;
+        return false;
     }
     
     std::cout << "✅ Configure事件已接收" << std::endl;
     
-    // 步骤12: 创建并 attach buffer（在收到 configure 后）
+    // 步骤12: 创建并 attach buffer
     std::cout << "🔧 创建初始buffer并attach..." << std::endl;
     
     int shm_size = config_.screen_width * config_.screen_height * 4;
