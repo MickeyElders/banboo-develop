@@ -790,7 +790,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ Surface创建成功" << std::endl;
     
-    // 步骤7: 创建xdg_surface (使用正确的函数名)
+    // 步骤7: 创建xdg_surface
     xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
@@ -800,7 +800,6 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     static const struct xdg_surface_listener xdg_surface_listener = {
         xdgSurfaceConfigure
     };
-
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     std::cout << "✅ XDG Surface创建成功" << std::endl;
     
@@ -823,10 +822,44 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut.wayland");
     
-    // 🔧 关键修复：创建并attach一个dummy buffer
-    std::cout << "🔧 创建初始shm buffer..." << std::endl;
+    // 🔧 关键修复1: 不要设置 min/max size，让合成器自由决定
+    // 删除这些调用，避免尺寸冲突：
+    // xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
+    // xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
     
-    // 创建共享内存池
+    // 🔧 关键修复2: 第一次 commit 不 attach buffer，只是告诉合成器我们准备好了
+    std::cout << "🔧 提交初始surface配置（无buffer）..." << std::endl;
+    wl_surface_commit(wl_surface_);
+    
+    // 步骤10: 等待configure事件（这是协议要求，必须等待）
+    std::cout << "⏳ 等待configure事件..." << std::endl;
+    configure_received_.store(false);
+    
+    int timeout_ms = 5000;
+    auto start_time = std::chrono::steady_clock::now();
+    
+    while (!configure_received_.load()) {
+        if (wl_display_dispatch(wl_display_) < 0) {
+            int error = wl_display_get_error(wl_display_);
+            std::cerr << "❌ Wayland dispatch失败，错误码: " << error << std::endl;
+            return false;
+        }
+        
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start_time
+        ).count();
+        
+        if (elapsed > timeout_ms) {
+            std::cerr << "❌ 等待configure事件超时" << std::endl;
+            return false;
+        }
+    }
+    
+    std::cout << "✅ Configure事件已接收" << std::endl;
+    
+    // 🔧 关键修复3: 在收到 configure 后再创建并 attach buffer
+    std::cout << "🔧 创建初始buffer并attach..." << std::endl;
+    
     int shm_size = config_.screen_width * config_.screen_height * 4;
     int fd = createAnonymousFile(shm_size);
     if (fd < 0) {
@@ -855,49 +888,15 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 🔧 关键：attach buffer并commit
-    std::cout << "🔧 Attach buffer并提交初始surface..." << std::endl;
+    // 现在可以安全地 attach buffer 了
     wl_surface_attach(wl_surface_, buffer, 0, 0);
+    wl_surface_damage(wl_surface_, 0, 0, config_.screen_width, config_.screen_height);
     wl_surface_commit(wl_surface_);
-    
-    // 步骤10: 等待configure事件（必须等待！）
-    std::cout << "⏳ 等待configure事件..." << std::endl;
-    configure_received_.store(false);
-    
-    int timeout_ms = 5000;  // 5秒超时
-    auto start_time = std::chrono::steady_clock::now();
-    
-    while (!configure_received_.load()) {
-        if (wl_display_dispatch(wl_display_) < 0) {
-            int error = wl_display_get_error(wl_display_);
-            std::cerr << "❌ Wayland dispatch失败，错误码: " << error << std::endl;
-            wl_buffer_destroy(buffer);
-            return false;
-        }
-        
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start_time
-        ).count();
-        
-        if (elapsed > timeout_ms) {
-            std::cerr << "❌ 等待configure事件超时" << std::endl;
-            wl_buffer_destroy(buffer);
-            return false;
-        }
-    }
-    
-    std::cout << "✅ Configure事件已接收" << std::endl;
     
     // 清理临时buffer
     wl_buffer_destroy(buffer);
     
-    // 步骤11: 设置窗口尺寸约束
-    std::cout << "🔧 设置窗口尺寸约束..." << std::endl;
-    xdg_toplevel_set_min_size(xdg_toplevel_, 800, 600);
-    xdg_toplevel_set_max_size(xdg_toplevel_, config_.screen_width, config_.screen_height);
-    
-    // 最后一次commit以应用所有设置
-    wl_surface_commit(wl_surface_);
+    // 最后一次 flush
     wl_display_flush(wl_display_);
     
     wayland_egl_initialized_ = true;
