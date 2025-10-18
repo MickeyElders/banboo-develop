@@ -924,6 +924,51 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     std::cout << "✅ XDG Toplevel 创建成功" << std::endl;
     
+    std::cout << "🎨 创建初始 SHM buffer..." << std::endl;
+    
+    // 创建一个 1x1 的最小 buffer（避免错误）
+    int stride = 4;
+    int size = stride * 1;
+    
+    int fd = createAnonymousFile(size);
+    if (fd < 0) {
+        std::cerr << "❌ 无法创建共享内存文件" << std::endl;
+        return false;
+    }
+    
+    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        close(fd);
+        std::cerr << "❌ mmap 失败" << std::endl;
+        return false;
+    }
+    
+    // 填充黑色
+    memset(data, 0, size);
+    
+    // 创建 wl_shm_pool
+    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
+    
+    // 创建 buffer (1x1 像素)
+    struct wl_buffer* buffer = wl_shm_pool_create_buffer(
+        pool, 0, 1, 1, stride, WL_SHM_FORMAT_ARGB8888);
+    
+    wl_shm_pool_destroy(pool);
+    munmap(data, size);
+    close(fd);
+    
+    // ✅ 关键：在 commit 前附加 buffer
+    wl_surface_attach(wl_surface_, buffer, 0, 0);
+    wl_surface_damage(wl_surface_, 0, 0, 1, 1);
+    
+    std::cout << "✅ 初始 buffer 已附加" << std::endl;
+    // ✅✅✅ 修复结束 ✅✅✅
+    
+    // 现在 commit
+    std::cout << "📝 提交 surface 并触发 configure..." << std::endl;
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
+    
     // ⚠️ 关键：不要在第一次 commit 前设置 title/app_id
     // 只提交空 surface
     std::cout << "📝 提交空 surface，触发 configure..." << std::endl;
