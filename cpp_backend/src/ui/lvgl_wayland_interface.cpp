@@ -896,11 +896,41 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 主 Surface 创建成功" << std::endl;
     
+    // 🆕 关键修复：在创建 xdg_surface 前正确配置 xdg_positioner
+    std::cout << "🎯 配置 XDG Positioner..." << std::endl;
+    
+    // 创建 positioner 并设置必需属性
+    struct xdg_positioner *positioner = xdg_wm_base_create_positioner(xdg_wm_base_);
+    if (!positioner) {
+        std::cerr << "❌ 无法创建xdg_positioner" << std::endl;
+        return false;
+    }
+    
+    // ⚠️ 必需设置：有效的非零尺寸
+    xdg_positioner_set_size(positioner, config_.screen_width, config_.screen_height);
+    std::cout << "✅ 设置 positioner 尺寸: " << config_.screen_width << "x" << config_.screen_height << std::endl;
+    
+    // ⚠️ 必需设置：有效的锚定矩形（非零尺寸）
+    xdg_positioner_set_anchor_rect(positioner, 0, 0, 100, 100);
+    std::cout << "✅ 设置 positioner 锚定矩形" << std::endl;
+    
+    // 可选但建议设置：锚点和重力
+    xdg_positioner_set_anchor(positioner, XDG_POSITIONER_ANCHOR_TOP_LEFT);
+    xdg_positioner_set_gravity(positioner, XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT);
+    
+    // 可选：约束调整
+    xdg_positioner_set_constraint_adjustment(positioner, 
+        XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_X |
+        XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_Y);
+    
+    std::cout << "✅ XDG Positioner 配置完成" << std::endl;
+    
     // 创建 xdg_surface
     std::cout << "🎯 创建 XDG Surface..." << std::endl;
-    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
+    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
+        xdg_positioner_destroy(positioner);  // 清理 positioner
         return false;
     }
     
@@ -914,21 +944,36 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
         std::cerr << "❌ 无法创建xdg_toplevel" << std::endl;
+        xdg_positioner_destroy(positioner);  // 清理 positioner
         return false;
     }
+    
+    // 🆕 设置全屏显示
+    std::cout << "🖥️  设置全屏显示..." << std::endl;
+    xdg_toplevel_set_fullscreen(xdg_toplevel_, nullptr);
+    
+    // 设置窗口标题和应用ID
+    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
+    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut-lvgl");
     
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
-    std::cout << "✅ XDG Toplevel 创建成功" << std::endl;
+    std::cout << "✅ XDG Toplevel 创建成功，已设置全屏" << std::endl;
+    
+    // 🆕 现在可以销毁 positioner，因为配置已完成
+    xdg_positioner_destroy(positioner);
+    std::cout << "✅ XDG Positioner 已销毁" << std::endl;
+    
+    // ... 后面的代码保持不变 ...
     
     std::cout << "🎨 创建初始 SHM buffer..." << std::endl;
     
-    // 创建一个 1x1 的最小 buffer（避免错误）
-    int stride = 4;
-    int size = stride * 1;
+    // 创建一个全屏尺寸的 buffer（而不是1x1）
+    int stride = config_.screen_width * 4;
+    int size = stride * config_.screen_height;
     
     int fd = createAnonymousFile(size);
     if (fd < 0) {
@@ -949,26 +994,25 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     // 创建 wl_shm_pool
     struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
     
-    // 创建 buffer (1x1 像素)
+    // 创建全屏 buffer
     struct wl_buffer* buffer = wl_shm_pool_create_buffer(
-        pool, 0, 1, 1, stride, WL_SHM_FORMAT_ARGB8888);
+        pool, 0, config_.screen_width, config_.screen_height, stride, WL_SHM_FORMAT_ARGB8888);
     
     wl_shm_pool_destroy(pool);
     munmap(data, size);
     close(fd);
     
-    // ✅ 关键：在 commit 前附加 buffer
+    // ✅ 关键：在 commit 前附加全屏 buffer
     wl_surface_attach(wl_surface_, buffer, 0, 0);
-    wl_surface_damage(wl_surface_, 0, 0, 1, 1);
+    wl_surface_damage(wl_surface_, 0, 0, config_.screen_width, config_.screen_height);
     
-    std::cout << "✅ 初始 buffer 已附加" << std::endl;
-    // ✅✅✅ 修复结束 ✅✅✅
+    std::cout << "✅ 全屏 buffer 已附加: " << config_.screen_width << "x" << config_.screen_height << std::endl;
     
     // 现在 commit
     std::cout << "📝 提交 surface 并触发 configure..." << std::endl;
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
-    
+
     // ⚠️ 关键：不要在第一次 commit 前设置 title/app_id
     // 只提交空 surface
     std::cout << "📝 提交空 surface，触发 configure..." << std::endl;
