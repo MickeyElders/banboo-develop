@@ -1098,7 +1098,6 @@ private:
         }
         
         // 🔧 修复：优先使用XDG_RUNTIME_DIR环境变量
-        const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
         if (!runtime_dir) {
             runtime_dir = "/run/user/0";  // 默认使用root的runtime目录
             setenv("XDG_RUNTIME_DIR", runtime_dir, 1);
