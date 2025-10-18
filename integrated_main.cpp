@@ -1081,6 +1081,15 @@ private:
 private:
     // 检查Wayland合成器状态
     bool checkWaylandCompositor() {
+        // 启用 Wayland 调试
+        setenv("WAYLAND_DEBUG", "1", 1);
+
+        // 确保正确的 runtime 目录
+        const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
+        if (!runtime_dir || access(runtime_dir, W_OK) != 0) {
+            std::cout << "⚠️ XDG_RUNTIME_DIR 不可写，尝试修复..." << std::endl;
+            setenv("XDG_RUNTIME_DIR", "/run/user/0", 1);
+        }
         // 检查WAYLAND_DISPLAY环境变量
         const char* wayland_display = getenv("WAYLAND_DISPLAY");
         if (!wayland_display) {
