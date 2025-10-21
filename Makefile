@@ -245,19 +245,23 @@ setup-mutter:
 	@echo "Type=simple" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "User=root" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "ExecStartPre=/bin/sh -c 'mkdir -p /run/user/0 && chmod 700 /run/user/0'" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "ExecStartPre=/bin/sh -c 'pkill -9 dbus-daemon || true; dbus-daemon --session --address=unix:path=/run/user/0/bus --nofork --nopidfile --syslog &'" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "ExecStartPre=/bin/sleep 2" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "ExecStart=/usr/bin/mutter --wayland --no-x11 --display-server" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "Environment=WAYLAND_DISPLAY=wayland-0" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "Environment=EGL_PLATFORM=wayland" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "Environment=__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=XDG_SESSION_TYPE=wayland" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=GDK_BACKEND=wayland" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "Restart=always" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "[Install]" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@sudo systemctl daemon-reload
-	@echo "$(GREEN)[SUCCESS]$(NC) Mutter服务配置完成"
+	@echo "$(GREEN)[SUCCESS]$(NC) Mutter服务配置完成（已包含D-Bus启动）"
 
 # 启动 Mutter
 start-mutter: check-mutter setup-mutter
