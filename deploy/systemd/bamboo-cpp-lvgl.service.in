@@ -19,14 +19,15 @@ Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/lib/aarch
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="HOME=/root"
 
-# Wayland 显示设置（Mutter 合成器）
-Environment="WAYLAND_DISPLAY=wayland-0"
+# Wayland 显示设置（支持 Sway/Mutter/Weston）
+Environment="WAYLAND_DISPLAY=wayland-1"
 Environment="WAYLAND_DEBUG=0"
 Environment="EGL_PLATFORM=wayland"
 Environment="QT_QPA_PLATFORM=wayland"
 Environment="GDK_BACKEND=wayland"
 Environment="SDL_VIDEODRIVER=wayland"
-Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus"
+Environment="XDG_SESSION_TYPE=wayland"
+Environment="LIBINPUT_DEFAULT_TOUCH_ENABLED=1"
 
 # 设备权限组
 SupplementaryGroups=input video render tty dialout
@@ -43,10 +44,10 @@ ExecStartPre=/bin/bash -c 'pkill -9 bamboo_cu || true'
 ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video0 2>/dev/null); do kill -9 $p; done || true'
 ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video1 2>/dev/null); do kill -9 $p; done || true'
 ExecStartPre=/bin/bash -c 'systemctl restart nvargus-daemon'
-# 检查并启动 Mutter Wayland 合成器（如果可用）
-ExecStartPre=/bin/bash -c 'if systemctl list-unit-files | grep -q mutter-wayland.service; then systemctl is-active --quiet mutter-wayland.service || systemctl start mutter-wayland.service; fi'
-ExecStartPre=/bin/bash -c 'if [ -f /usr/bin/mutter ] && [ ! -S /run/user/0/wayland-0 ]; then echo "启动 Mutter 合成器..."; systemctl start mutter-wayland.service 2>/dev/null || true; sleep 3; fi'
-ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/user/0/wayland-0 ] && [ -f /usr/bin/mutter ]; do sleep 1; done" || echo "Wayland socket 不可用，继续使用 fallback 模式"'
+# 检查并启动 Wayland 合成器（优先级: Sway > Mutter > Weston）
+ExecStartPre=/bin/bash -c 'if systemctl list-unit-files | grep -q sway-wayland.service; then systemctl is-active --quiet sway-wayland.service || systemctl start sway-wayland.service; elif systemctl list-unit-files | grep -q mutter-wayland.service; then systemctl is-active --quiet mutter-wayland.service || systemctl start mutter-wayland.service; elif systemctl list-unit-files | grep -q weston.service; then systemctl is-active --quiet weston.service || systemctl start weston.service; fi'
+ExecStartPre=/bin/bash -c 'if [ ! -S /run/user/0/wayland-0 ] && [ ! -S /run/user/0/wayland-1 ]; then echo "启动 Wayland 合成器..."; if [ -f /usr/bin/sway ]; then systemctl start sway-wayland.service 2>/dev/null || true; elif [ -f /usr/bin/mutter ]; then systemctl start mutter-wayland.service 2>/dev/null || true; elif [ -f /usr/bin/weston ]; then systemctl start weston.service 2>/dev/null || true; fi; sleep 3; fi'
+ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/user/0/wayland-0 ] && [ ! -S /run/user/0/wayland-1 ]; do sleep 1; done" || echo "Wayland socket 不可用，继续使用 fallback 模式"'
 ExecStartPre=/bin/sleep 3
 
 # 改进停止命令
