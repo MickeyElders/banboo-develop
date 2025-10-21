@@ -875,7 +875,7 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     // 创建 xdg_surface（toplevel 窗口不需要 positioner）
     std::cout << "🎯 创建 XDG Surface..." << std::endl;
-    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
+    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
         return false;
