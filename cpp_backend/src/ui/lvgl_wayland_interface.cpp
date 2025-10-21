@@ -895,19 +895,18 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     
-    // 设置窗口标题和应用ID
-    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
-    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut-lvgl");
-    
-    // 🆕 设置全屏显示
-    std::cout << "🖥️  设置全屏显示..." << std::endl;
-    xdg_toplevel_set_fullscreen(xdg_toplevel_, nullptr);
-    
+    // ⚠️ 关键：必须先添加监听器，再设置属性
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
         xdgToplevelClose
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
+    std::cout << "✅ XDG Toplevel 监听器已添加" << std::endl;
+    
+    // 现在可以安全地设置窗口属性
+    xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
+    xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut-lvgl");
+    xdg_toplevel_set_fullscreen(xdg_toplevel_, nullptr);
     std::cout << "✅ XDG Toplevel 创建成功，已设置全屏" << std::endl;
     
     // ⚠️ 关键：第一次 commit 必须是空 commit（不附加 buffer）
