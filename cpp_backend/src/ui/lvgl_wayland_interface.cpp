@@ -910,11 +910,39 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     std::cout << "✅ XDG Toplevel 创建成功，已设置全屏" << std::endl;
     
-    // ... 后面的代码保持不变 ...
+    // ⚠️ 关键：第一次 commit 必须是空 commit（不附加 buffer）
+    // 这是 xdg-shell 协议的要求，用于触发 configure 事件
+    std::cout << "📝 执行空 commit，触发 configure 事件..." << std::endl;
+    wl_surface_commit(wl_surface_);
+    wl_display_flush(wl_display_);
     
+    // 等待 configure 事件
+    std::cout << "⏳ 等待 configure 事件..." << std::endl;
+    configure_received_.store(false);
+    
+    int max_attempts = 50;
+    int attempts = 0;
+    
+    while (!configure_received_.load() && attempts < max_attempts) {
+        if (wl_display_dispatch(wl_display_) < 0) {
+            int error = wl_display_get_error(wl_display_);
+            std::cerr << "❌ Wayland dispatch 失败，错误码: " << error << std::endl;
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        attempts++;
+    }
+    
+    if (!configure_received_.load()) {
+        std::cerr << "❌ 等待 configure 超时" << std::endl;
+        return false;
+    }
+    
+    std::cout << "✅ 收到 configure 事件" << std::endl;
+    
+    // ✅ 现在可以创建并附加 buffer（在 configure 之后）
     std::cout << "🎨 创建初始 SHM buffer..." << std::endl;
     
-    // 创建一个全屏尺寸的 buffer（而不是1x1）
     int stride = config_.screen_width * 4;
     int size = stride * config_.screen_height;
     
@@ -945,39 +973,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     munmap(data, size);
     close(fd);
     
-    // ✅ 关键：在 commit 前附加全屏 buffer
+    // 附加 buffer 并提交（第二次 commit）
     wl_surface_attach(wl_surface_, buffer, 0, 0);
     wl_surface_damage(wl_surface_, 0, 0, config_.screen_width, config_.screen_height);
-    
-    std::cout << "✅ 全屏 buffer 已附加: " << config_.screen_width << "x" << config_.screen_height << std::endl;
-    
-    // 提交 surface 并触发 configure 事件
-    std::cout << "📝 提交 surface，触发 configure..." << std::endl;
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 等待 configure 事件
-    std::cout << "⏳ 等待 configure 事件..." << std::endl;
-    configure_received_.store(false);
-    
-    int max_attempts = 50;
-    int attempts = 0;
-    
-    while (!configure_received_.load() && attempts < max_attempts) {
-        if (wl_display_dispatch(wl_display_) < 0) {
-            int error = wl_display_get_error(wl_display_);
-            std::cerr << "❌ Wayland dispatch 失败，错误码: " << error << std::endl;
-            return false;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        attempts++;
-    }
-    
-    if (!configure_received_.load()) {
-        std::cerr << "❌ 等待 configure 超时" << std::endl;
-        return false;
-    }
-    
+    std::cout << "✅ Buffer 已附加并提交: " << config_.screen_width << "x" << config_.screen_height << std::endl;
     std::cout << "✅ Wayland 客户端初始化完成" << std::endl;
     return true;
 }
