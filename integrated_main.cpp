@@ -687,7 +687,7 @@ public:
         }
         
         std::cout << "✅ [推理系统] Wayland Subsurface架构初始化完成" << std::endl;
-        std::cout << "📺 视频将由Weston自动合成到LVGL窗口" << std::endl;
+        std::cout << "📺 视频将由 Wayland 合成器自动合成到 LVGL 窗口" << std::endl;
         
         return true;
     }
@@ -989,20 +989,16 @@ public:
         
         #ifdef ENABLE_LVGL
         try {
-            // 检查Weston是否运行
+            // 检查 Wayland 合成器是否运行
             if (!checkWaylandCompositor()) {
-                std::cout << "错误: Weston合成器未运行，请先启动Weston" << std::endl;
+                std::cout << "错误: Wayland 合成器未运行，请先启动合成器" << std::endl;
                 return false;
             }
             
-            std::cout << "⏳ 等待Weston合成器完全稳定（避免xdg_positioner冲突）..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(3));  // 从500ms增加到3秒
+            std::cout << "⏳ 等待 Wayland 合成器完全稳定..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(3));  // 等待合成器稳定
             
-            // 检查是否有其他Wayland客户端
-            if (system("pgrep -x weston-terminal > /dev/null 2>&1") == 0) {
-                std::cout << "⚠️ 警告：检测到weston-terminal正在运行，可能影响窗口创建" << std::endl;
-                std::cout << "建议关闭其他Wayland客户端" << std::endl;
-            }
+            // 注意：如果需要，可以检查是否有其他 Wayland 客户端影响窗口创建
             // 创建Wayland优化的LVGL界面实例
             lvgl_wayland_interface_ = std::make_unique<bamboo_cut::ui::LVGLWaylandInterface>();
             
@@ -1146,14 +1142,14 @@ public:
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // === 步骤1: 检查Weston合成器状态 ===
-        std::cout << "\n🔍 [Wayland] 步骤1: 检查Weston合成器..." << std::endl;
+        // === 步骤1: 检查 Wayland 合成器状态 ===
+        std::cout << "\n🔍 [Wayland] 步骤1: 检查 Wayland 合成器..." << std::endl;
         if (!checkWaylandCompositor()) {
-            std::cout << "❌ [Wayland] Weston合成器未运行，请先启动Weston" << std::endl;
-            std::cout << "请运行: sudo systemctl start weston 或使用安装脚本" << std::endl;
+            std::cout << "❌ [Wayland] Wayland 合成器未运行，请先启动合成器" << std::endl;
+            std::cout << "请运行: sudo systemctl start mutter-wayland 或 sudo make start-mutter" << std::endl;
             return false;
         }
-        std::cout << "✅ [Wayland] Weston合成器运行正常" << std::endl;
+        std::cout << "✅ [Wayland] Wayland 合成器运行正常" << std::endl;
         
         // === 步骤2: LVGL Wayland界面初始化 ===
         std::cout << "\n🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面..." << std::endl;
