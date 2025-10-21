@@ -297,11 +297,139 @@ mutter-logs:
 	@echo "$(CYAN)=== Mutter日志 ===$(NC)"
 	@sudo journalctl -u mutter-wayland -f --no-hostname
 
-setup-wayland: start-mutter
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境配置完成（Mutter）"
+# ============================================================================
+# Sway Wayland 合成器（推荐用于嵌入式，支持触摸控制）
+# ============================================================================
+
+# 检查 Sway 是否已安装
+check-sway:
+	@echo "$(BLUE)[INFO]$(NC) 检查Sway合成器..."
+	@if ! command -v sway >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Sway未安装，正在安装..."; \
+		sudo apt-get update && sudo apt-get install -y sway swaylock swayidle xwayland libinput-tools; \
+	else \
+		echo "$(GREEN)[SUCCESS]$(NC) Sway已安装: $$(sway --version 2>&1 | head -n1)"; \
+	fi
+
+# 创建 Sway 配置文件（支持触摸控制）
+setup-sway-config:
+	@echo "$(BLUE)[INFO]$(NC) 创建Sway配置文件（支持触摸控制）..."
+	@sudo mkdir -p /root/.config/sway
+	@echo "# Sway配置 - Bamboo识别系统（触摸控制优化）" | sudo tee /root/.config/sway/config > /dev/null
+	@echo "# 自动生成，请勿手动编辑" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 基础设置" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "set \$$mod Mod4" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 输出配置（根据实际屏幕调整）" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "output * bg #000000 solid_color" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "output * mode 1920x1080@60Hz" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 触摸屏/触摸板支持配置" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "input type:touchscreen {" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    tap enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    drag enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    events enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "}" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "input type:touchpad {" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    tap enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    natural_scroll enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    dwt enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "    drag enabled" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "}" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 禁用屏幕锁定和电源管理（工业应用）" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "exec swayidle -w timeout 0 'echo disabled' before-sleep 'echo disabled'" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 禁用窗口装饰（全屏模式）" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "default_border none" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "default_floating_border none" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "titlebar_border_thickness 0" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "titlebar_padding 0" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 焦点配置" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "focus_follows_mouse no" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "mouse_warping none" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "# 自动全屏应用" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "for_window [title=\".*\"] fullscreen enable" | sudo tee -a /root/.config/sway/config > /dev/null
+	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
+	@sudo chmod 644 /root/.config/sway/config
+	@echo "$(GREEN)[SUCCESS]$(NC) Sway配置文件创建完成"
+
+# 配置 Sway 服务
+setup-sway:
+	@echo "$(BLUE)[INFO]$(NC) 配置Sway Wayland服务..."
+	@sudo mkdir -p /etc/systemd/system
+	@echo "[Unit]" | sudo tee /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Description=Sway Wayland Compositor (Touch-Enabled)" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "After=multi-user.target" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "[Service]" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Type=simple" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "User=root" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "ExecStartPre=/bin/sh -c 'mkdir -p /run/user/0 && chmod 700 /run/user/0'" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "ExecStart=/usr/bin/sway --unsupported-gpu" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=WAYLAND_DISPLAY=wayland-1" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=XDG_SESSION_TYPE=wayland" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=EGL_PLATFORM=wayland" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=WLR_NO_HARDWARE_CURSORS=1" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=WLR_RENDERER=gles2" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Environment=LIBINPUT_DEFAULT_TOUCH_ENABLED=1" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "Restart=always" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "[Install]" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
+	@sudo systemctl daemon-reload
+	@echo "$(GREEN)[SUCCESS]$(NC) Sway服务配置完成（已启用触摸支持）"
+
+# 启动 Sway
+start-sway: check-sway setup-sway-config setup-sway
+	@echo "$(BLUE)[INFO]$(NC) 启动Sway Wayland合成器..."
+	@sudo systemctl enable sway-wayland
+	@sudo systemctl start sway-wayland
+	@sleep 3
+	@if sudo systemctl is-active --quiet sway-wayland; then \
+		echo "$(GREEN)[SUCCESS]$(NC) Sway启动成功"; \
+		echo "WAYLAND_DISPLAY=$$(ls /run/user/0/wayland-* 2>/dev/null | head -n1 | xargs basename)"; \
+		echo "触摸控制: 已启用"; \
+	else \
+		echo "$(RED)[ERROR]$(NC) Sway启动失败"; \
+		sudo journalctl -u sway-wayland -n 30 --no-pager; \
+		exit 1; \
+	fi
+
+# 停止 Sway
+stop-sway:
+	@echo "$(BLUE)[INFO]$(NC) 停止Sway..."
+	@sudo systemctl stop sway-wayland || true
+	@echo "$(GREEN)[SUCCESS]$(NC) Sway已停止"
+
+# 检查 Sway 状态
+sway-status:
+	@echo "$(CYAN)=== Sway状态 ===$(NC)"
+	@sudo systemctl status sway-wayland --no-pager -l || true
+	@echo ""
+	@echo "$(CYAN)=== Wayland Socket ===$(NC)"
+	@ls -lah /run/user/0/wayland-* 2>/dev/null || echo "无Wayland socket"
+	@echo ""
+	@echo "$(CYAN)=== 触摸设备 ===$(NC)"
+	@libinput list-devices 2>/dev/null | grep -A 5 "Capabilities.*touch" || echo "未检测到触摸设备"
+
+# Sway 日志
+sway-logs:
+	@echo "$(CYAN)=== Sway日志 ===$(NC)"
+	@sudo journalctl -u sway-wayland -f --no-hostname
+
+setup-wayland: start-sway
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境配置完成（Sway + 触摸控制）"
 
 # 兼容性别名
-start-weston: start-mutter
+start-weston: start-sway
 stop-weston: stop-mutter
 weston-status: mutter-status
 
