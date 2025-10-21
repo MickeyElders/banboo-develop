@@ -864,29 +864,6 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_wm_base_add_listener(xdg_wm_base_, &xdg_wm_base_listener, this);
     
-    // ============= 新增代码开始 =============
-    // 🔧 Workaround: 跳过 ID 8，避开 Weston 13.0.0 xdg_positioner bug
-    std::cout << "🔧 [Workaround] 跳过 ID 8，避开 Weston bug..." << std::endl;
-
-    std::vector<struct wl_callback*> dummy_callbacks;
-
-    // 创建 6 个临时 callback，占用 ID 3-8
-    for (int i = 0; i < 6; i++) {
-        struct wl_callback* cb = wl_display_sync(wl_display_);
-        if (cb) {
-            dummy_callbacks.push_back(cb);
-        }
-    }
-
-    // 立即销毁，但 ID 已被标记为已使用
-    for (auto* cb : dummy_callbacks) {
-        wl_callback_destroy(cb);
-    }
-    wl_display_flush(wl_display_);
-
-    std::cout << "✅ [Workaround] ID 预分配完成，surface 将使用 ID 9+" << std::endl;
-    // ============= 新增代码结束 =============
-
     // 创建 surface
     std::cout << "📐 创建主 Surface..." << std::endl;
     wl_surface_ = wl_compositor_create_surface(wl_compositor_);
@@ -896,41 +873,11 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     }
     std::cout << "✅ 主 Surface 创建成功" << std::endl;
     
-    // 🆕 关键修复：在创建 xdg_surface 前正确配置 xdg_positioner
-    std::cout << "🎯 配置 XDG Positioner..." << std::endl;
-    
-    // 创建 positioner 并设置必需属性
-    struct xdg_positioner *positioner = xdg_wm_base_create_positioner(xdg_wm_base_);
-    if (!positioner) {
-        std::cerr << "❌ 无法创建xdg_positioner" << std::endl;
-        return false;
-    }
-    
-    // ⚠️ 必需设置：有效的非零尺寸
-    xdg_positioner_set_size(positioner, config_.screen_width, config_.screen_height);
-    std::cout << "✅ 设置 positioner 尺寸: " << config_.screen_width << "x" << config_.screen_height << std::endl;
-    
-    // ⚠️ 必需设置：有效的锚定矩形（非零尺寸）
-    xdg_positioner_set_anchor_rect(positioner, 0, 0, 100, 100);
-    std::cout << "✅ 设置 positioner 锚定矩形" << std::endl;
-    
-    // 可选但建议设置：锚点和重力
-    xdg_positioner_set_anchor(positioner, XDG_POSITIONER_ANCHOR_TOP_LEFT);
-    xdg_positioner_set_gravity(positioner, XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT);
-    
-    // 可选：约束调整
-    xdg_positioner_set_constraint_adjustment(positioner, 
-        XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_X |
-        XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_Y);
-    
-    std::cout << "✅ XDG Positioner 配置完成" << std::endl;
-    
-    // 创建 xdg_surface
+    // 创建 xdg_surface（toplevel 窗口不需要 positioner）
     std::cout << "🎯 创建 XDG Surface..." << std::endl;
     xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
-        xdg_positioner_destroy(positioner);  // 清理 positioner
         return false;
     }
     
@@ -940,21 +887,21 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     xdg_surface_add_listener(xdg_surface_, &xdg_surface_listener, this);
     std::cout << "✅ XDG Surface 创建成功" << std::endl;
     
-    // 创建 toplevel
+    // 创建 toplevel（顶层窗口，不使用 positioner）
+    std::cout << "🎯 创建 XDG Toplevel..." << std::endl;
     xdg_toplevel_ = xdg_surface_get_toplevel(xdg_surface_);
     if (!xdg_toplevel_) {
         std::cerr << "❌ 无法创建xdg_toplevel" << std::endl;
-        xdg_positioner_destroy(positioner);  // 清理 positioner
         return false;
     }
-    
-    // 🆕 设置全屏显示
-    std::cout << "🖥️  设置全屏显示..." << std::endl;
-    xdg_toplevel_set_fullscreen(xdg_toplevel_, nullptr);
     
     // 设置窗口标题和应用ID
     xdg_toplevel_set_title(xdg_toplevel_, "Bamboo Recognition System");
     xdg_toplevel_set_app_id(xdg_toplevel_, "bamboo-cut-lvgl");
+    
+    // 🆕 设置全屏显示
+    std::cout << "🖥️  设置全屏显示..." << std::endl;
+    xdg_toplevel_set_fullscreen(xdg_toplevel_, nullptr);
     
     static const struct xdg_toplevel_listener xdg_toplevel_listener = {
         xdgToplevelConfigure,
@@ -962,10 +909,6 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     };
     xdg_toplevel_add_listener(xdg_toplevel_, &xdg_toplevel_listener, this);
     std::cout << "✅ XDG Toplevel 创建成功，已设置全屏" << std::endl;
-    
-    // 🆕 现在可以销毁 positioner，因为配置已完成
-    xdg_positioner_destroy(positioner);
-    std::cout << "✅ XDG Positioner 已销毁" << std::endl;
     
     // ... 后面的代码保持不变 ...
     
@@ -1008,14 +951,8 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     std::cout << "✅ 全屏 buffer 已附加: " << config_.screen_width << "x" << config_.screen_height << std::endl;
     
-    // 现在 commit
-    std::cout << "📝 提交 surface 并触发 configure..." << std::endl;
-    wl_surface_commit(wl_surface_);
-    wl_display_flush(wl_display_);
-
-    // ⚠️ 关键：不要在第一次 commit 前设置 title/app_id
-    // 只提交空 surface
-    std::cout << "📝 提交空 surface，触发 configure..." << std::endl;
+    // 提交 surface 并触发 configure 事件
+    std::cout << "📝 提交 surface，触发 configure..." << std::endl;
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
