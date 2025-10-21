@@ -6,6 +6,7 @@
         install-deps install-system-deps install-wayland-deps install-lvgl build-lvgl-from-source \
         install-service enable-service disable-service \
         check-system check-wayland build-system install-system setup-config setup-wayland \
+        start-mutter stop-mutter mutter-status mutter-logs check-mutter setup-mutter \
         start-weston stop-weston weston-status auto-setup-environment \
         build-debug test-system backup
 
@@ -54,7 +55,7 @@ install: all install-system install-service
 
 deploy: auto-setup-environment install enable-service start
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统部署完成！"
-	@echo "Wayland环境已自动配置并启动"
+	@echo "Wayland环境（Mutter）已自动配置并启动"
 
 help:
 	@echo "$(CYAN)===============================================$(NC)"
@@ -99,7 +100,7 @@ help:
 	@echo "  install          - 完整安装系统"
 	@echo "  install-deps     - 安装所有依赖(系统+Wayland+LVGL)"
 	@echo "  install-system-deps - 仅安装系统依赖"
-	@echo "  install-wayland-deps - 安装Wayland环境和Weston"
+	@echo "  install-wayland-deps - 安装Wayland环境和Mutter"
 	@echo "  install-lvgl     - 检查并安装LVGL"
 	@echo "  install-system   - 安装编译好的系统"
 	@echo "  install-service  - 安装systemd服务"
@@ -113,11 +114,12 @@ help:
 	@echo "  enable-service   - 启用开机自启"
 	@echo "  disable-service  - 禁用开机自启"
 	@echo ""
-	@echo "$(GREEN)Wayland环境管理:$(NC)"
-	@echo "  setup-wayland    - 配置Wayland环境和Weston服务"
-	@echo "  start-weston     - 启动Weston合成器"
-	@echo "  stop-weston      - 停止Weston合成器"
-	@echo "  weston-status    - 查看Weston状态"
+	@echo "$(GREEN)Wayland环境管理（Mutter）:$(NC)"
+	@echo "  setup-wayland    - 配置Wayland环境和Mutter服务"
+	@echo "  start-mutter     - 启动Mutter合成器"
+	@echo "  stop-mutter      - 停止Mutter合成器"
+	@echo "  mutter-status    - 查看Mutter状态"
+	@echo "  mutter-logs      - 查看Mutter日志"
 	@echo "  check-wayland    - 检查Wayland环境完整性"
 	@echo ""
 	@echo "$(GREEN)维护命令:$(NC)"
@@ -170,35 +172,35 @@ install-deps: install-system-deps install-wayland-deps install-lvgl9-auto
 
 # === 自动环境配置 ===
 auto-setup-environment:
-	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境..."
-	@# 1. 检查Wayland依赖是否安装
-	@if ! command -v weston >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston未安装，正在自动安装..."; \
+	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（Mutter）..."
+	@# 1. 检查Mutter是否安装
+	@if ! command -v mutter >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Mutter未安装，正在自动安装..."; \
 		$(MAKE) install-wayland-deps; \
 	fi
-	@# 2. 检查Weston服务是否配置
-	@if [ ! -f "/etc/systemd/system/weston.service" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston服务未配置，正在自动配置..."; \
-		$(MAKE) setup-wayland; \
+	@# 2. 检查Mutter服务是否配置
+	@if [ ! -f "/etc/systemd/system/mutter-wayland.service" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Mutter服务未配置，正在自动配置..."; \
+		$(MAKE) setup-mutter; \
 	fi
-	@# 3. 智能检查Weston运行状态
-	@WESTON_RUNNING=false; \
-	if pgrep -x weston >/dev/null 2>&1; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到Weston进程正在运行"; \
-		WESTON_RUNNING=true; \
-	elif systemctl is-active --quiet weston.service 2>/dev/null; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到Weston服务正在运行"; \
-		WESTON_RUNNING=true; \
+	@# 3. 智能检查Mutter运行状态
+	@MUTTER_RUNNING=false; \
+	if pgrep -x mutter >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到Mutter进程正在运行"; \
+		MUTTER_RUNNING=true; \
+	elif systemctl is-active --quiet mutter-wayland.service 2>/dev/null; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到Mutter服务正在运行"; \
+		MUTTER_RUNNING=true; \
 	fi; \
-	if [ "$$WESTON_RUNNING" = "false" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston未运行，正在启动..."; \
-		$(MAKE) start-weston; \
+	if [ "$$MUTTER_RUNNING" = "false" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Mutter未运行，正在启动..."; \
+		$(MAKE) start-mutter; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Weston已在运行，跳过启动"; \
+		echo "$(GREEN)[SUCCESS]$(NC) Mutter已在运行，跳过启动"; \
 	fi
 	@# 4. 验证Wayland环境
 	@if [ ! -S "/run/user/0/wayland-0" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Wayland socket不存在，等待Weston完全启动..."; \
+		echo "$(YELLOW)[WARNING]$(NC) Wayland socket不存在，等待Mutter完全启动..."; \
 		sleep 5; \
 		if [ ! -S "/run/user/0/wayland-0" ]; then \
 			echo "$(RED)[ERROR]$(NC) Wayland环境配置失败"; \
@@ -207,90 +209,102 @@ auto-setup-environment:
 	fi
 	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境检查完成"
 
-# === Wayland环境配置 ===
+# === Wayland环境配置（使用Mutter） ===
 install-wayland-deps:
-	@echo "$(BLUE)[INFO]$(NC) 配置Wayland环境..."
+	@echo "$(BLUE)[INFO]$(NC) 配置Wayland环境（使用Mutter合成器）..."
+	@sudo apt-get update
 	@sudo apt-get install -y \
-		weston \
+		mutter \
+		gnome-session \
 		libwayland-dev \
 		libwayland-egl1 \
 		wayland-protocols \
-		libxkbcommon-dev
-	@echo "$(BLUE)[INFO]$(NC) 配置Weston服务..."
-	@sudo mkdir -p /etc/weston
-	@echo "[core]" | sudo tee /etc/weston/weston.ini > /dev/null
-	@echo "backend=drm-backend.so" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "idle-time=0" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "use-pixman=false" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "[output]" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "name=HDMI-A-1" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "mode=1920x1200@60" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "[renderer]" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "egl-config-attribs=EGL_ALPHA_SIZE:8,EGL_RED_SIZE:8,EGL_GREEN_SIZE:8,EGL_BLUE_SIZE:8" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "dmabuf-import=true" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "[input-method]" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@echo "path=/usr/lib/weston/weston-keyboard" | sudo tee -a /etc/weston/weston.ini > /dev/null
-	@if [ ! -f "/etc/systemd/system/weston.service" ]; then \
-		echo "$(BLUE)[INFO]$(NC) 创建Weston systemd服务..."; \
-		echo "[Unit]" | sudo tee /etc/systemd/system/weston.service > /dev/null; \
-		echo "Description=Weston Wayland Compositor" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "After=multi-user.target" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "[Service]" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Type=simple" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "User=root" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Group=root" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "ExecStart=/usr/bin/weston --config=/etc/weston/weston.ini --log=/var/log/weston.log" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Environment=WAYLAND_DISPLAY=wayland-0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Environment=EGL_PLATFORM=drm" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Environment=__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Environment=EGL_EXTENSIONS=EGL_EXT_image_dma_buf_import,EGL_EXT_image_dma_buf_import_modifiers" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "Restart=always" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "RestartSec=5" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "[Install]" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/weston.service > /dev/null; \
-		sudo systemctl daemon-reload; \
-	fi
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境配置完成"
+		libxkbcommon-dev \
+		dbus-x11
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland依赖安装完成"
 
-setup-wayland: install-wayland-deps
-	@echo "$(BLUE)[INFO]$(NC) 启用Weston服务..."
-	@sudo systemctl enable weston.service
-	@echo "$(GREEN)[SUCCESS]$(NC) Weston服务已启用"
-
-start-weston:
-	@echo "$(BLUE)[INFO]$(NC) 启动Weston合成器..."
-	@sudo systemctl start weston.service
-	@sleep 3
-	@if sudo systemctl is-active --quiet weston.service; then \
-		echo "$(GREEN)[SUCCESS]$(NC) Weston启动成功"; \
+# 检查 Mutter 是否已安装
+check-mutter:
+	@echo "$(BLUE)[INFO]$(NC) 检查Mutter合成器..."
+	@if ! command -v mutter >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Mutter未安装，正在安装..."; \
+		sudo apt-get update && sudo apt-get install -y mutter gnome-session dbus-x11; \
 	else \
-		echo "$(RED)[ERROR]$(NC) Weston启动失败"; \
-		sudo journalctl -u weston.service --no-pager -n 20; \
+		echo "$(GREEN)[SUCCESS]$(NC) Mutter已安装: $$(mutter --version 2>&1 | head -n1)"; \
+	fi
+
+# 配置 Mutter 服务
+setup-mutter:
+	@echo "$(BLUE)[INFO]$(NC) 配置Mutter Wayland服务..."
+	@sudo mkdir -p /etc/systemd/system
+	@echo "[Unit]" | sudo tee /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Description=Mutter Wayland Compositor" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "After=multi-user.target" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "[Service]" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Type=simple" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "User=root" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "ExecStartPre=/bin/sh -c 'mkdir -p /run/user/0 && chmod 700 /run/user/0'" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "ExecStart=/usr/bin/mutter --wayland --no-x11 --display-server" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=WAYLAND_DISPLAY=wayland-0" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=EGL_PLATFORM=wayland" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "Restart=always" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "[Install]" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
+	@sudo systemctl daemon-reload
+	@echo "$(GREEN)[SUCCESS]$(NC) Mutter服务配置完成"
+
+# 启动 Mutter
+start-mutter: check-mutter setup-mutter
+	@echo "$(BLUE)[INFO]$(NC) 启动Mutter Wayland合成器..."
+	@sudo systemctl enable mutter-wayland
+	@sudo systemctl start mutter-wayland
+	@sleep 2
+	@if sudo systemctl is-active --quiet mutter-wayland; then \
+		echo "$(GREEN)[SUCCESS]$(NC) Mutter启动成功"; \
+		echo "WAYLAND_DISPLAY=$$(ls /run/user/0/wayland-* 2>/dev/null | head -n1 | xargs basename)"; \
+	else \
+		echo "$(RED)[ERROR]$(NC) Mutter启动失败"; \
+		sudo journalctl -u mutter-wayland -n 20 --no-pager; \
 		exit 1; \
 	fi
 
-stop-weston:
-	@echo "$(BLUE)[INFO]$(NC) 停止Weston合成器..."
-	@sudo systemctl stop weston.service
-	@echo "$(GREEN)[SUCCESS]$(NC) Weston已停止"
+# 停止 Mutter
+stop-mutter:
+	@echo "$(BLUE)[INFO]$(NC) 停止Mutter..."
+	@sudo systemctl stop mutter-wayland || true
+	@echo "$(GREEN)[SUCCESS]$(NC) Mutter已停止"
 
-weston-status:
-	@echo "$(CYAN)=== Weston状态 ===$(NC)"
-	@sudo systemctl status weston.service --no-pager -l
+# 检查 Mutter 状态
+mutter-status:
+	@echo "$(CYAN)=== Mutter状态 ===$(NC)"
+	@sudo systemctl status mutter-wayland --no-pager -l || true
 	@echo ""
 	@echo "$(CYAN)=== Wayland Socket ===$(NC)"
-	@ls -la /run/user/0/wayland-* 2>/dev/null || echo "Wayland socket不存在"
+	@ls -lah /run/user/0/wayland-* 2>/dev/null || echo "无Wayland socket"
+
+# Mutter 日志
+mutter-logs:
+	@echo "$(CYAN)=== Mutter日志 ===$(NC)"
+	@sudo journalctl -u mutter-wayland -f --no-hostname
+
+setup-wayland: start-mutter
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境配置完成（Mutter）"
+
+# 兼容性别名
+start-weston: start-mutter
+stop-weston: stop-mutter
+weston-status: mutter-status
 
 check-wayland:
-	@echo "$(BLUE)[INFO]$(NC) 检查Wayland环境..."
-	@echo -n "Weston服务状态: "
-	@sudo systemctl is-active weston.service 2>/dev/null || echo "未运行"
+	@echo "$(BLUE)[INFO]$(NC) 检查Wayland环境（Mutter）..."
+	@echo -n "Mutter服务状态: "
+	@sudo systemctl is-active mutter-wayland.service 2>/dev/null || echo "未运行"
 	@echo -n "Wayland socket: "
 	@ls /run/user/0/wayland-0 2>/dev/null && echo "存在" || echo "不存在"
 	@echo -n "Wayland库: "
@@ -325,11 +339,13 @@ install-system-deps:
 		libegl1-mesa-dev \
 		libgles2-mesa-dev \
 		mesa-common-dev \
-		weston \
+		mutter \
+		gnome-session \
 		libwayland-dev \
 		libwayland-egl1 \
 		wayland-protocols \
-		libxkbcommon-dev
+		libxkbcommon-dev \
+		dbus-x11
 	@if lspci | grep -i nvidia >/dev/null 2>&1; then \
 		echo "$(BLUE)[INFO]$(NC) 检测到NVIDIA GPU，检查CUDA环境..."; \
 		if [ -d "/usr/local/cuda" ]; then \

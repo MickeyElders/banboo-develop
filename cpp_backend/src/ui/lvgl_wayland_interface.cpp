@@ -1,6 +1,6 @@
 /**
  * @file lvgl_wayland_interface.cpp
- * @brief LVGL Wayland接口实现 - Weston合成器架构支持
+ * @brief LVGL Wayland接口实现 - 标准 Wayland 协议
  */
 
 #include "bamboo_cut/ui/lvgl_wayland_interface.h"
@@ -269,8 +269,8 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
         return false;
     }
     
-    // 🆕 Jetson Orin NX特定：等待Weston完全就绪
-    std::cout << "🔧 [Jetson] 等待Weston合成器完全初始化..." << std::endl;
+    // 🆕 Jetson Orin NX特定：等待 Wayland 合成器完全就绪
+    std::cout << "🔧 [Jetson] 等待 Wayland 合成器完全初始化..." << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     
     // 初始化LVGL
@@ -1057,11 +1057,10 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
         std::cout << "✅ 绑定wl_shm成功" << std::endl;
     }
     else if (strcmp(interface, "xdg_wm_base") == 0) {
-    // 🔧 关键修复：使用 version 2 或更高，但不超过服务器支持的版本
-    uint32_t bind_version = std::min(version, 2u);  // 使用 v2，兼容性更好
+    // 🔧 使用 version 1（最基础、最稳定的版本，避免协议 bug）
     impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
-        wl_registry_bind(registry, id, &xdg_wm_base_interface, bind_version));
-    std::cout << "✅ 绑定xdg_wm_base成功 (version " << bind_version << ")" << std::endl;
+        wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
+    std::cout << "✅ 绑定xdg_wm_base成功 (version 1)" << std::endl;
     }
 }
 
