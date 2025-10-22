@@ -1146,7 +1146,7 @@ public:
         std::cout << "\n🔍 [Wayland] 步骤1: 检查 Wayland 合成器..." << std::endl;
         if (!checkWaylandCompositor()) {
             std::cout << "❌ [Wayland] Wayland 合成器未运行，请先启动合成器" << std::endl;
-            std::cout << "请运行: sudo systemctl start mutter-wayland 或 sudo make start-mutter" << std::endl;
+            std::cout << "请运行: sudo make start-sway 或 sudo systemctl start sway-wayland" << std::endl;
             return false;
         }
         std::cout << "✅ [Wayland] Wayland 合成器运行正常" << std::endl;

@@ -8,6 +8,11 @@
         check-system check-wayland build-system install-system setup-config setup-wayland \
         start-mutter stop-mutter mutter-status mutter-logs check-mutter setup-mutter \
         start-weston stop-weston weston-status auto-setup-environment \
+        check-weston-version backup-current-weston uninstall-current-weston \
+        install-weston12-build-deps download-weston12 compile-weston12 \
+        install-weston12 configure-weston12 setup-weston12-service \
+        start-weston12 stop-weston12 weston12-status weston12-logs \
+        downgrade-to-weston12 test-weston12 \
         build-debug test-system backup
 
 # === 系统配置 ===
@@ -100,7 +105,7 @@ help:
 	@echo "  install          - 完整安装系统"
 	@echo "  install-deps     - 安装所有依赖(系统+Wayland+LVGL)"
 	@echo "  install-system-deps - 仅安装系统依赖"
-	@echo "  install-wayland-deps - 安装Wayland环境和Mutter"
+	@echo "  install-wayland-deps - 安装Wayland环境和Sway"
 	@echo "  install-lvgl     - 检查并安装LVGL"
 	@echo "  install-system   - 安装编译好的系统"
 	@echo "  install-service  - 安装systemd服务"
@@ -114,13 +119,22 @@ help:
 	@echo "  enable-service   - 启用开机自启"
 	@echo "  disable-service  - 禁用开机自启"
 	@echo ""
-	@echo "$(GREEN)Wayland环境管理（Mutter）:$(NC)"
-	@echo "  setup-wayland    - 配置Wayland环境和Mutter服务"
-	@echo "  start-mutter     - 启动Mutter合成器"
-	@echo "  stop-mutter      - 停止Mutter合成器"
-	@echo "  mutter-status    - 查看Mutter状态"
-	@echo "  mutter-logs      - 查看Mutter日志"
+	@echo "$(GREEN)Wayland环境管理（Sway）:$(NC)"
+	@echo "  setup-wayland    - 配置Wayland环境和Sway服务"
+	@echo "  start-sway       - 启动Sway合成器（自动安装+配置+启动）"
+	@echo "  stop-sway        - 停止Sway合成器"
+	@echo "  sway-status      - 查看Sway状态和触摸设备"
+	@echo "  sway-logs        - 查看Sway日志"
 	@echo "  check-wayland    - 检查Wayland环境完整性"
+	@echo ""
+	@echo "$(GREEN)Weston 12 降级支持（解决 Weston 13 bug）:$(NC)"
+	@echo "  downgrade-to-weston12    - 🚀 一键降级到 Weston 12（推荐）"
+	@echo "  check-weston-version     - 检查当前 Weston 版本"
+	@echo "  start-weston12           - 启动 Weston 12 服务"
+	@echo "  stop-weston12            - 停止 Weston 12 服务"
+	@echo "  weston12-status          - 查看 Weston 12 状态"
+	@echo "  weston12-logs            - 查看 Weston 12 日志"
+	@echo "  test-weston12            - 测试 Weston 12 环境"
 	@echo ""
 	@echo "$(GREEN)维护命令:$(NC)"
 	@echo "  check-system     - 检查系统环境"
@@ -172,56 +186,59 @@ install-deps: install-system-deps install-wayland-deps install-lvgl9-auto
 
 # === 自动环境配置 ===
 auto-setup-environment:
-	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（Mutter）..."
-	@# 1. 检查Mutter是否安装
-	@if ! command -v mutter >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Mutter未安装，正在自动安装..."; \
+	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（Sway）..."
+	@# 1. 检查Sway是否安装
+	@if ! command -v sway >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Sway未安装，正在自动安装..."; \
 		$(MAKE) install-wayland-deps; \
 	fi
-	@# 2. 检查Mutter服务是否配置
-	@if [ ! -f "/etc/systemd/system/mutter-wayland.service" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Mutter服务未配置，正在自动配置..."; \
-		$(MAKE) setup-mutter; \
+	@# 2. 检查Sway服务是否配置
+	@if [ ! -f "/etc/systemd/system/sway-wayland.service" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Sway服务未配置，正在自动配置..."; \
+		$(MAKE) setup-sway-config; \
+		$(MAKE) setup-sway; \
 	fi
-	@# 3. 智能检查Mutter运行状态
-	@MUTTER_RUNNING=false; \
-	if pgrep -x mutter >/dev/null 2>&1; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到Mutter进程正在运行"; \
-		MUTTER_RUNNING=true; \
-	elif systemctl is-active --quiet mutter-wayland.service 2>/dev/null; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到Mutter服务正在运行"; \
-		MUTTER_RUNNING=true; \
+	@# 3. 智能检查Sway运行状态
+	@SWAY_RUNNING=false; \
+	if pgrep -x sway >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到Sway进程正在运行"; \
+		SWAY_RUNNING=true; \
+	elif systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到Sway服务正在运行"; \
+		SWAY_RUNNING=true; \
 	fi; \
-	if [ "$$MUTTER_RUNNING" = "false" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Mutter未运行，正在启动..."; \
-		$(MAKE) start-mutter; \
+	if [ "$$SWAY_RUNNING" = "false" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Sway未运行，正在启动..."; \
+		$(MAKE) start-sway; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Mutter已在运行，跳过启动"; \
+		echo "$(GREEN)[SUCCESS]$(NC) Sway已在运行，跳过启动"; \
 	fi
 	@# 4. 验证Wayland环境
-	@if [ ! -S "/run/user/0/wayland-0" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Wayland socket不存在，等待Mutter完全启动..."; \
+	@if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Wayland socket不存在，等待Sway完全启动..."; \
 		sleep 5; \
-		if [ ! -S "/run/user/0/wayland-0" ]; then \
+		if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
 			echo "$(RED)[ERROR]$(NC) Wayland环境配置失败"; \
 			exit 1; \
 		fi; \
 	fi
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境检查完成"
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境检查完成（Sway）"
 
-# === Wayland环境配置（使用Mutter） ===
+# === Wayland环境配置（使用Sway） ===
 install-wayland-deps:
-	@echo "$(BLUE)[INFO]$(NC) 配置Wayland环境（使用Mutter合成器）..."
+	@echo "$(BLUE)[INFO]$(NC) 配置Wayland环境（使用Sway合成器）..."
 	@sudo apt-get update
 	@sudo apt-get install -y \
-		mutter \
-		gnome-session \
+		sway \
+		swaylock \
+		swayidle \
+		xwayland \
+		libinput-tools \
 		libwayland-dev \
 		libwayland-egl1 \
 		wayland-protocols \
-		libxkbcommon-dev \
-		dbus-x11
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland依赖安装完成"
+		libxkbcommon-dev
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland依赖安装完成（Sway）"
 
 # 检查 Mutter 是否已安装
 check-mutter:
@@ -428,17 +445,378 @@ sway-logs:
 setup-wayland: start-sway
 	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境配置完成（Sway + 触摸控制）"
 
-# 兼容性别名
-start-weston: start-sway
-stop-weston: stop-mutter
-weston-status: mutter-status
+# ============================================================================
+# Weston 12 降级支持（解决 Weston 13 的 xdg_positioner bug）
+# ============================================================================
+
+.PHONY: check-weston-version backup-current-weston uninstall-current-weston \
+        install-weston12-build-deps download-weston12 compile-weston12 \
+        install-weston12 configure-weston12 setup-weston12-service \
+        start-weston12 stop-weston12 weston12-status weston12-logs \
+        downgrade-to-weston12 test-weston12
+
+# 检查当前 Weston 版本
+check-weston-version:
+	@echo "$(BLUE)[INFO]$(NC) 检查 Weston 版本..."
+	@if command -v weston >/dev/null 2>&1; then \
+		WESTON_VERSION=$$(weston --version 2>&1 | grep -oP 'weston \K\d+\.\d+' | head -1 || echo "未知"); \
+		echo "$(CYAN)当前 Weston 版本: $$WESTON_VERSION$(NC)"; \
+		WESTON_MAJOR=$$(echo $$WESTON_VERSION | cut -d. -f1); \
+		if [ "$$WESTON_MAJOR" = "12" ]; then \
+			echo "$(GREEN)[SUCCESS]$(NC) ✓ Weston 12 已安装"; \
+		elif [ "$$WESTON_MAJOR" = "13" ]; then \
+			echo "$(YELLOW)[WARNING]$(NC) ⚠ Weston 13 存在已知 xdg_positioner bug，建议降级"; \
+		elif [ "$$WESTON_MAJOR" = "9" ] || [ "$$WESTON_MAJOR" = "10" ]; then \
+			echo "$(YELLOW)[WARNING]$(NC) ⚠ Weston 版本较旧 ($$WESTON_VERSION)，建议升级到 12"; \
+		else \
+			echo "$(YELLOW)[WARNING]$(NC) ⚠ 未知 Weston 版本: $$WESTON_VERSION"; \
+		fi; \
+		which weston; \
+		ls -lh $$(which weston); \
+	else \
+		echo "$(RED)[ERROR]$(NC) ✗ Weston 未安装"; \
+	fi
+	@echo ""
+	@echo "$(CYAN)DRM 设备状态:$(NC)"
+	@ls -la /dev/dri/ 2>/dev/null || echo "$(YELLOW)DRM 设备不存在$(NC)"
+
+# 备份当前 Weston 配置
+backup-current-weston:
+	@echo "$(BLUE)[INFO]$(NC) 备份当前 Weston 配置..."
+	@BACKUP_DATE=$$(date +%Y%m%d_%H%M%S); \
+	sudo mkdir -p /opt/backup/weston; \
+	if [ -d "/etc/xdg/weston" ]; then \
+		sudo cp -r /etc/xdg/weston /opt/backup/weston/weston-etc-$$BACKUP_DATE; \
+		echo "$(GREEN)[SUCCESS]$(NC) 配置已备份: /opt/backup/weston/weston-etc-$$BACKUP_DATE"; \
+	fi; \
+	if [ -f "/root/.config/weston.ini" ]; then \
+		sudo cp /root/.config/weston.ini /opt/backup/weston/weston.ini.$$BACKUP_DATE; \
+		echo "$(GREEN)[SUCCESS]$(NC) 用户配置已备份"; \
+	fi; \
+	if [ -f "/etc/systemd/system/weston.service" ]; then \
+		sudo cp /etc/systemd/system/weston.service /opt/backup/weston/weston.service.$$BACKUP_DATE; \
+		echo "$(GREEN)[SUCCESS]$(NC) 服务文件已备份"; \
+	fi
+	@echo "$(GREEN)[SUCCESS]$(NC) 备份完成"
+
+# 卸载当前 Weston
+uninstall-current-weston:
+	@echo "$(BLUE)[INFO]$(NC) 停止并卸载当前 Weston..."
+	@# 停止所有服务
+	@sudo systemctl stop bamboo-cpp-lvgl 2>/dev/null || true
+	@sudo systemctl stop weston.service 2>/dev/null || true
+	@sudo systemctl stop weston 2>/dev/null || true
+	@sudo pkill -9 weston 2>/dev/null || true
+	@sleep 2
+	@# 卸载 Weston（如果是 APT 安装）
+	@if dpkg -l | grep -q "^ii.*weston"; then \
+		echo "$(BLUE)[INFO]$(NC) 卸载 APT 安装的 Weston..."; \
+		sudo apt-get remove --purge -y weston libweston-* 2>/dev/null || true; \
+		sudo apt-get autoremove -y; \
+	fi
+	@# 删除手动编译的 Weston 文件
+	@echo "$(BLUE)[INFO]$(NC) 删除手动编译的 Weston 文件..."
+	@sudo rm -f /usr/bin/weston* 2>/dev/null || true
+	@sudo rm -f /usr/local/bin/weston* 2>/dev/null || true
+	@sudo rm -rf /usr/lib/weston 2>/dev/null || true
+	@sudo rm -rf /usr/local/lib/weston 2>/dev/null || true
+	@sudo rm -rf /usr/lib/aarch64-linux-gnu/weston 2>/dev/null || true
+	@sudo rm -rf /usr/share/weston 2>/dev/null || true
+	@sudo rm -rf /usr/local/share/weston 2>/dev/null || true
+	@sudo rm -f /usr/lib/aarch64-linux-gnu/libweston-*.so* 2>/dev/null || true
+	@sudo rm -f /usr/local/lib/libweston-*.so* 2>/dev/null || true
+	@sudo ldconfig
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 已卸载"
+
+# 安装 Weston 12 编译依赖
+install-weston12-build-deps:
+	@echo "$(BLUE)[INFO]$(NC) 安装 Weston 12 编译依赖..."
+	@sudo apt-get update
+	@sudo apt-get install -y \
+		build-essential \
+		meson \
+		ninja-build \
+		pkg-config \
+		libwayland-dev \
+		wayland-protocols \
+		libxkbcommon-dev \
+		libpixman-1-dev \
+		libdrm-dev \
+		libgbm-dev \
+		libinput-dev \
+		libudev-dev \
+		libjpeg-dev \
+		libpng-dev \
+		libwebp-dev \
+		libegl1-mesa-dev \
+		libgles2-mesa-dev \
+		libxcb1-dev \
+		libxcb-composite0-dev \
+		libxcb-xfixes0-dev \
+		libdbus-1-dev \
+		libsystemd-dev \
+		libpam0g-dev \
+		liblcms2-dev \
+		libcolord-dev \
+		libxml2-dev \
+		libcairo2-dev \
+		libpango1.0-dev
+	@echo "$(GREEN)[SUCCESS]$(NC) 依赖安装完成"
+
+# 下载 Weston 12.0.0 源码
+download-weston12:
+	@echo "$(BLUE)[INFO]$(NC) 下载 Weston 12.0.0 源码..."
+	@sudo mkdir -p /tmp/weston12-build
+	@cd /tmp/weston12-build && \
+		if [ ! -f "weston-12.0.0.tar.xz" ]; then \
+			wget -q --show-progress https://wayland.freedesktop.org/releases/weston-12.0.0.tar.xz || \
+			wget -q --show-progress https://gitlab.freedesktop.org/wayland/weston/-/archive/12.0.0/weston-12.0.0.tar.gz -O weston-12.0.0.tar.xz; \
+		fi
+	@echo "$(BLUE)[INFO]$(NC) 解压源码..."
+	@cd /tmp/weston12-build && \
+		rm -rf weston-12.0.0 && \
+		tar -xf weston-12.0.0.tar.xz
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12.0.0 源码已准备"
+
+# 编译 Weston 12
+compile-weston12: install-weston12-build-deps download-weston12
+	@echo "$(CYAN)[COMPILE]$(NC) 开始编译 Weston 12.0.0 (预计 15-30 分钟)..."
+	@cd /tmp/weston12-build/weston-12.0.0 && \
+		echo "$(BLUE)[INFO]$(NC) 配置 Meson..." && \
+		meson setup build \
+			--prefix=/usr \
+			--libexecdir=/usr/lib/weston \
+			--buildtype=release \
+			-Dbackend-drm=true \
+			-Dbackend-wayland=false \
+			-Dbackend-x11=false \
+			-Dbackend-rdp=false \
+			-Drenderer-gl=true \
+			-Dxwayland=false \
+			-Dshell-desktop=true \
+			-Dshell-fullscreen=true \
+			-Dshell-ivi=false \
+			-Dshell-kiosk=true \
+			-Dcolor-management-lcms=true \
+			-Dsystemd=true \
+			-Dremoting=false \
+			-Dpipewire=false \
+			-Ddemo-clients=false \
+			-Dsimple-clients=[] \
+			-Dresize-pool=true && \
+		echo "$(BLUE)[INFO]$(NC) 开始编译 (使用 $(shell nproc) 个核心)..." && \
+		meson compile -C build -j$(shell nproc)
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12.0.0 编译完成"
+
+# 安装 Weston 12
+install-weston12: compile-weston12
+	@echo "$(BLUE)[INFO]$(NC) 安装 Weston 12..."
+	@cd /tmp/weston12-build/weston-12.0.0/build && \
+		sudo meson install
+	@sudo ldconfig
+	@echo "$(BLUE)[INFO]$(NC) 验证安装..."
+	@weston --version
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 安装完成"
+
+# 配置 Weston 12
+configure-weston12:
+	@echo "$(BLUE)[INFO]$(NC) 配置 Weston 12..."
+	@sudo mkdir -p /etc/xdg/weston
+	@echo "[core]" | sudo tee /etc/xdg/weston/weston.ini > /dev/null
+	@echo "backend=drm-backend.so" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "idle-time=0" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "require-input=false" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "use-pixman=true" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "[shell]" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "locking=false" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "panel-position=none" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "background-color=0xff000000" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "[output]" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "name=all" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "mode=preferred" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "transform=normal" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "[libinput]" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "enable-tap=true" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "touchscreen_calibrator=true" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 配置文件已创建: /etc/xdg/weston/weston.ini"
+
+# 创建 Weston 12 systemd 服务
+setup-weston12-service:
+	@echo "$(BLUE)[INFO]$(NC) 创建 Weston 12 systemd 服务..."
+	@echo "[Unit]" | sudo tee /etc/systemd/system/weston12.service > /dev/null
+	@echo "Description=Weston 12 Wayland Compositor (Jetson Optimized)" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Documentation=man:weston(1) man:weston.ini(5)" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "After=systemd-user-sessions.service multi-user.target" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "[Service]" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Type=simple" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "User=root" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Environment=\"XDG_RUNTIME_DIR=/run/user/0\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Environment=\"WAYLAND_DISPLAY=wayland-0\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Environment=\"XDG_SESSION_TYPE=wayland\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Environment=\"EGL_PLATFORM=wayland\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Environment=\"__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "ExecStartPre=/bin/mkdir -p /run/user/0" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "ExecStartPre=/bin/chmod 0700 /run/user/0" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "ExecStartPre=/bin/sh -c 'rm -f /run/user/0/wayland-*'" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "ExecStart=/usr/bin/weston \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "    --backend=drm-backend.so \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "    --tty=1 \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "    --idle-time=0 \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "    --use-pixman \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "    --log=/var/log/weston12.log" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "Restart=always" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "TimeoutStartSec=60" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "StandardOutput=journal" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "StandardError=journal" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "SyslogIdentifier=weston12" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "[Install]" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable weston12.service
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 服务已配置并启用"
+
+# 启动 Weston 12
+start-weston12:
+	@echo "$(BLUE)[INFO]$(NC) 启动 Weston 12..."
+	@sudo systemctl start weston12.service
+	@sleep 3
+	@if sudo systemctl is-active --quiet weston12.service; then \
+		echo "$(GREEN)[SUCCESS]$(NC) ✓ Weston 12 启动成功"; \
+		echo "$(CYAN)Wayland Socket:$(NC)"; \
+		ls -la /run/user/0/wayland-* 2>/dev/null || echo "$(YELLOW)等待 socket 创建...$(NC)"; \
+		sleep 2; \
+		ls -la /run/user/0/wayland-* 2>/dev/null || echo "$(RED)Socket 未创建，查看日志$(NC)"; \
+	else \
+		echo "$(RED)[ERROR]$(NC) ✗ Weston 12 启动失败"; \
+		echo "$(CYAN)查看最近 30 行日志:$(NC)"; \
+		sudo journalctl -u weston12.service -n 30 --no-pager; \
+		exit 1; \
+	fi
+
+# 停止 Weston 12
+stop-weston12:
+	@echo "$(BLUE)[INFO]$(NC) 停止 Weston 12..."
+	@sudo systemctl stop weston12.service
+	@sudo pkill -9 weston 2>/dev/null || true
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 已停止"
+
+# 查看 Weston 12 状态
+weston12-status:
+	@echo "$(CYAN)=== Weston 12 服务状态 ===$(NC)"
+	@sudo systemctl status weston12.service --no-pager -l || true
+	@echo ""
+	@echo "$(CYAN)=== Weston 进程 ===$(NC)"
+	@ps aux | grep weston | grep -v grep || echo "无 Weston 进程"
+	@echo ""
+	@echo "$(CYAN)=== Wayland Socket ===$(NC)"
+	@ls -lah /run/user/0/wayland-* 2>/dev/null || echo "无 Wayland socket"
+	@echo ""
+	@echo "$(CYAN)=== DRM 设备 ===$(NC)"
+	@ls -la /dev/dri/ 2>/dev/null || echo "DRM 设备不存在"
+
+# 查看 Weston 12 日志
+weston12-logs:
+	@echo "$(CYAN)=== Weston 12 systemd 日志 (最近 100 行) ===$(NC)"
+	@sudo journalctl -u weston12.service -n 100 --no-pager
+	@echo ""
+	@echo "$(CYAN)=== Weston 12 运行日志 ===$(NC)"
+	@if [ -f /var/log/weston12.log ]; then \
+		sudo tail -100 /var/log/weston12.log; \
+	else \
+		echo "日志文件 /var/log/weston12.log 不存在"; \
+	fi
+
+# 测试 Weston 12
+test-weston12:
+	@echo "$(BLUE)[INFO]$(NC) 测试 Weston 12..."
+	@echo "$(CYAN)1. 检查版本:$(NC)"
+	@weston --version
+	@echo ""
+	@echo "$(CYAN)2. 检查服务状态:$(NC)"
+	@sudo systemctl is-active weston12.service && echo "$(GREEN)✓ 服务运行中$(NC)" || echo "$(RED)✗ 服务未运行$(NC)"
+	@echo ""
+	@echo "$(CYAN)3. 检查 Wayland socket:$(NC)"
+	@ls -la /run/user/0/wayland-* 2>/dev/null && echo "$(GREEN)✓ Socket 存在$(NC)" || echo "$(RED)✗ Socket 不存在$(NC)"
+	@echo ""
+	@echo "$(CYAN)4. 检查配置文件:$(NC)"
+	@if [ -f /etc/xdg/weston/weston.ini ]; then \
+		echo "$(GREEN)✓ 配置文件存在$(NC)"; \
+		echo "内容预览:"; \
+		head -20 /etc/xdg/weston/weston.ini; \
+	else \
+		echo "$(RED)✗ 配置文件不存在$(NC)"; \
+	fi
+
+# 🚀 一键降级到 Weston 12（推荐使用）
+downgrade-to-weston12:
+	@echo "$(CYAN)======================================$(NC)"
+	@echo "$(CYAN)  Weston 12 完整降级流程$(NC)"
+	@echo "$(CYAN)======================================$(NC)"
+	@echo ""
+	@echo "$(BLUE)[步骤 1/9]$(NC) 检查当前版本..."
+	@$(MAKE) check-weston-version
+	@echo ""
+	@echo "$(BLUE)[步骤 2/9]$(NC) 备份当前配置..."
+	@$(MAKE) backup-current-weston
+	@echo ""
+	@echo "$(BLUE)[步骤 3/9]$(NC) 卸载当前 Weston..."
+	@$(MAKE) uninstall-current-weston
+	@echo ""
+	@echo "$(BLUE)[步骤 4/9]$(NC) 编译 Weston 12 (需要 15-30 分钟)..."
+	@$(MAKE) install-weston12
+	@echo ""
+	@echo "$(BLUE)[步骤 5/9]$(NC) 配置 Weston 12..."
+	@$(MAKE) configure-weston12
+	@echo ""
+	@echo "$(BLUE)[步骤 6/9]$(NC) 创建 systemd 服务..."
+	@$(MAKE) setup-weston12-service
+	@echo ""
+	@echo "$(BLUE)[步骤 7/9]$(NC) 启动 Weston 12..."
+	@$(MAKE) start-weston12
+	@echo ""
+	@echo "$(BLUE)[步骤 8/9]$(NC) 测试 Weston 12..."
+	@$(MAKE) test-weston12
+	@echo ""
+	@echo "$(BLUE)[步骤 9/9]$(NC) 清理临时文件..."
+	@sudo rm -rf /tmp/weston12-build
+	@echo ""
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)  ✓✓✓ Weston 12 降级完成！$(NC)"
+	@echo "$(GREEN)======================================$(NC)"
+	@echo ""
+	@echo "$(CYAN)下一步操作:$(NC)"
+	@echo "  1. 查看 Weston 12 状态: $(YELLOW)make weston12-status$(NC)"
+	@echo "  2. 查看 Weston 12 日志: $(YELLOW)make weston12-logs$(NC)"
+	@echo "  3. 重新部署应用: $(YELLOW)make redeploy$(NC)"
+	@echo "  4. 查看应用日志: $(YELLOW)sudo journalctl -u bamboo-cpp-lvgl -f$(NC)"
+	@echo ""
+	@echo "$(CYAN)如果遇到问题:$(NC)"
+	@echo "  - 查看服务状态: $(YELLOW)make weston12-status$(NC)"
+	@echo "  - 重启 Weston 12: $(YELLOW)sudo systemctl restart weston12$(NC)"
+	@echo "  - 恢复备份: 查看 /opt/backup/weston/"
+	@echo ""
+
+# 兼容性别名（更新为使用 Weston 12）
+start-weston: start-weston12
+stop-weston: stop-weston12
+weston-status: weston12-status
 
 check-wayland:
-	@echo "$(BLUE)[INFO]$(NC) 检查Wayland环境（Mutter）..."
-	@echo -n "Mutter服务状态: "
-	@sudo systemctl is-active mutter-wayland.service 2>/dev/null || echo "未运行"
+	@echo "$(BLUE)[INFO]$(NC) 检查Wayland环境（Sway）..."
+	@echo -n "Sway服务状态: "
+	@sudo systemctl is-active sway-wayland.service 2>/dev/null || echo "未运行"
 	@echo -n "Wayland socket: "
-	@ls /run/user/0/wayland-0 2>/dev/null && echo "存在" || echo "不存在"
+	@ls /run/user/0/wayland-* 2>/dev/null && echo "存在" || echo "不存在"
 	@echo -n "Wayland库: "
 	@pkg-config --exists wayland-client && echo "已安装" || echo "未安装"
 	@echo -n "EGL库: "
