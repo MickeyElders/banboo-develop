@@ -1057,10 +1057,12 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
         std::cout << "✅ 绑定wl_shm成功" << std::endl;
     }
     else if (strcmp(interface, "xdg_wm_base") == 0) {
-    // 🔧 使用 version 1（最基础、最稳定的版本，避免协议 bug）
+    // 🔧 修复：使用服务器支持的版本号（最高 version 3）
+    // 版本 1 会导致 Weston 无法正确解析协议消息，出现 xdg_positioner 错误
+    uint32_t use_version = (version < 3) ? version : 3;
     impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
-        wl_registry_bind(registry, id, &xdg_wm_base_interface, 1));
-    std::cout << "✅ 绑定xdg_wm_base成功 (version 1)" << std::endl;
+        wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version));
+    std::cout << "✅ 绑定xdg_wm_base成功 (version " << use_version << ")" << std::endl;
     }
 }
 
