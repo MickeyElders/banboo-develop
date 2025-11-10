@@ -684,7 +684,6 @@ setup-weston12-service:
 	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
 	@echo "ExecStart=/usr/bin/weston \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
 	@echo "    --backend=drm-backend.so \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "    --tty=1 \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
 	@echo "    --idle-time=0 \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
 	@echo "    --use-pixman \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
 	@echo "    --log=/var/log/weston12.log" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
