@@ -114,6 +114,11 @@ public:
     lv_color_t* back_buffer_ = nullptr;
     uint32_t buffer_size_ = 0;
     
+    // 🆕 持久化 SHM buffer（避免每次flush都重新创建）
+    void* shm_data_ = nullptr;          // mmap 的共享内存指针
+    size_t shm_size_ = 0;               // 共享内存大小
+    struct wl_buffer* wl_buffer_ = nullptr;  // Wayland buffer对象
+    
     // 🔧 修复：注释OpenGL资源，完全使用SHM
     // GLuint shader_program_ = 0;
     // GLuint texture_id_ = 0;
@@ -557,91 +562,96 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
 void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p) {
     if (!wl_surface_ || !wl_shm_) return;
     
-    // 🔧 修复：只渲染更新的区域，提高性能
-    int area_width = area->x2 - area->x1 + 1;
-    int area_height = area->y2 - area->y1 + 1;
-    
-    // 但为了简化 buffer 管理，还是使用全屏 buffer
-    // 只是只更新指定区域的像素
     int width = config_.screen_width;
     int height = config_.screen_height;
     int stride = width * 4;
-    int size = stride * height;
+    size_t size = stride * height;
     
-    int fd = createAnonymousFile(size);
-    if (fd < 0) {
-        std::cerr << "❌ 创建SHM文件失败" << std::endl;
-        return;
-    }
-    
-    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (data == MAP_FAILED) {
+    // 🔧 修复：初始化或重用持久化 SHM buffer
+    if (!shm_data_ || shm_size_ != size) {
+        // 清理旧 buffer
+        if (shm_data_) {
+            munmap(shm_data_, shm_size_);
+            shm_data_ = nullptr;
+        }
+        if (wl_buffer_) {
+            wl_buffer_destroy(wl_buffer_);
+            wl_buffer_ = nullptr;
+        }
+        
+        // 创建新的持久化 SHM buffer
+        int fd = createAnonymousFile(size);
+        if (fd < 0) {
+            std::cerr << "❌ 创建SHM文件失败" << std::endl;
+            return;
+        }
+        
+        shm_data_ = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        if (shm_data_ == MAP_FAILED) {
+            close(fd);
+            std::cerr << "❌ mmap失败" << std::endl;
+            shm_data_ = nullptr;
+            return;
+        }
+        
+        shm_size_ = size;
+        
+        // 创建 Wayland buffer（持久化）
+        struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
+        wl_buffer_ = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
+        wl_shm_pool_destroy(pool);
         close(fd);
-        std::cerr << "❌ mmap失败" << std::endl;
-        return;
+        
+        // 初始化为黑色背景
+        memset(shm_data_, 0, size);
+        
+        std::cout << "✅ 创建持久化 SHM buffer: " << width << "x" << height << std::endl;
     }
     
-    // 🔧 修复：从 color_p 读取 LVGL 渲染的实际数据
-    uint32_t* pixels = (uint32_t*)data;
-    
-    // 先填充黑色背景（或者从 front_buffer_ 复制旧数据）
-    memset(data, 0, size);
+    // 🔧 修复：直接在持久化 buffer 上更新指定区域
+    uint32_t* pixels = (uint32_t*)shm_data_;
+    int area_width = area->x2 - area->x1 + 1;
+    int area_height = area->y2 - area->y1 + 1;
     
     // 🔧 修复：复制 LVGL 传入的渲染数据到正确位置
     #if LV_COLOR_DEPTH == 32
         // 32位颜色：直接内存拷贝（最高效）
-        // LVGL 的 lv_color_t 在 32 位模式下就是 ARGB8888
         int color_idx = 0;
         for (int y = area->y1; y <= area->y2; y++) {
-            // 计算目标行的起始位置
             uint32_t* row_start = pixels + y * width + area->x1;
-            // 拷贝整行数据
             memcpy(row_start, &color_p[color_idx], area_width * sizeof(lv_color_t));
             color_idx += area_width;
         }
-    #else
-        // 16位或其他颜色深度：逐像素转换
+    #elif LV_COLOR_DEPTH == 16
+        // 16位颜色：RGB565 -> ARGB8888
         int color_idx = 0;
         for (int y = area->y1; y <= area->y2; y++) {
             for (int x = area->x1; x <= area->x2; x++) {
                 lv_color_t c = color_p[color_idx++];
-                
-                #if LV_COLOR_DEPTH == 16
-                    // 16位颜色：RGB565 -> ARGB8888
-                    uint16_t c16 = *((uint16_t*)&c);
-                    uint8_t r = ((c16 >> 11) & 0x1F) << 3;
-                    uint8_t g = ((c16 >> 5) & 0x3F) << 2;
-                    uint8_t b = (c16 & 0x1F) << 3;
-                    pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
-                #else
-                    // 8位或其他：简单转换
-                    uint8_t* cb = (uint8_t*)&c;
-                    pixels[y * width + x] = (0xFF << 24) | (cb[0] << 16) | (cb[1] << 8) | cb[2];
-                #endif
+                uint16_t c16 = *((uint16_t*)&c);
+                uint8_t r = ((c16 >> 11) & 0x1F) << 3;
+                uint8_t g = ((c16 >> 5) & 0x3F) << 2;
+                uint8_t b = (c16 & 0x1F) << 3;
+                pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+            }
+        }
+    #else
+        // 其他深度：简单转换
+        int color_idx = 0;
+        for (int y = area->y1; y <= area->y2; y++) {
+            for (int x = area->x1; x <= area->x2; x++) {
+                lv_color_t c = color_p[color_idx++];
+                uint8_t* cb = (uint8_t*)&c;
+                pixels[y * width + x] = (0xFF << 24) | (cb[0] << 16) | (cb[1] << 8) | cb[2];
             }
         }
     #endif
     
-    munmap(data, size);
-    
-    // 创建 Wayland buffer
-    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
-    struct wl_buffer* buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
-    wl_shm_pool_destroy(pool);
-    close(fd);
-    
-    // 🔧 修复：正确的 attach 参数（x=0, y=0 是 surface 偏移）
-    wl_surface_attach(wl_surface_, buffer, 0, 0);
-    
-    // 🔧 修复：只标记实际更新的区域为 damaged
+    // 提交到 Wayland
+    wl_surface_attach(wl_surface_, wl_buffer_, 0, 0);
     wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
-    
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
-    
-    // 🔧 修复：不要立即销毁 buffer！
-    // Weston 需要先读取 buffer，应该在 buffer.release 事件时销毁
-    // wl_buffer_destroy(buffer);  // 暂时注释掉
     
     // 调试：前3次 flush 打印信息
     static int flush_count = 0;
@@ -1263,6 +1273,18 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
 
 void LVGLWaylandInterface::Impl::cleanup() {
     // 🔧 修复：完全使用SHM，只清理Wayland资源
+    
+    // 清理持久化 SHM buffer
+    if (wl_buffer_) {
+        wl_buffer_destroy(wl_buffer_);
+        wl_buffer_ = nullptr;
+    }
+    
+    if (shm_data_) {
+        munmap(shm_data_, shm_size_);
+        shm_data_ = nullptr;
+        shm_size_ = 0;
+    }
     
     // 清理Wayland资源 - xdg-shell实现
     if (frame_callback_) {
