@@ -60,7 +60,7 @@ install: all install-system install-service
 
 deploy: auto-setup-environment install enable-service start
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统部署完成！"
-	@echo "Wayland环境（Mutter）已自动配置并启动"
+	@echo "Wayland环境（Weston 12）已自动配置并启动"
 
 help:
 	@echo "$(CYAN)===============================================$(NC)"
@@ -185,44 +185,59 @@ install-deps: install-system-deps install-wayland-deps install-lvgl9-auto
 	@echo "$(GREEN)[SUCCESS]$(NC) 所有依赖安装完成"
 
 # === 自动环境配置 ===
+# 使用 Weston 12（推荐用于 Jetson + Nvidia）
 auto-setup-environment:
-	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（Sway）..."
-	@# 1. 检查Sway是否安装
-	@if ! command -v sway >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Sway未安装，正在自动安装..."; \
-		$(MAKE) install-wayland-deps; \
-	fi
-	@# 2. 检查Sway服务是否配置
-	@if [ ! -f "/etc/systemd/system/sway-wayland.service" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Sway服务未配置，正在自动配置..."; \
-		$(MAKE) setup-sway-config; \
-		$(MAKE) setup-sway; \
-	fi
-	@# 3. 智能检查Sway运行状态
-	@SWAY_RUNNING=false; \
-	if pgrep -x sway >/dev/null 2>&1; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到Sway进程正在运行"; \
-		SWAY_RUNNING=true; \
-	elif systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到Sway服务正在运行"; \
-		SWAY_RUNNING=true; \
-	fi; \
-	if [ "$$SWAY_RUNNING" = "false" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Sway未运行，正在启动..."; \
-		$(MAKE) start-sway; \
+	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（Weston 12）..."
+	@# 1. 检查 Weston 版本
+	@if ! command -v weston >/dev/null 2>&1; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston 未安装，正在降级到 Weston 12..."; \
+		$(MAKE) downgrade-to-weston12; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Sway已在运行，跳过启动"; \
+		WESTON_VERSION=$$(weston --version 2>&1 | grep -oP 'weston \K\d+\.\d+' | head -1 || echo "0"); \
+		WESTON_MAJOR=$$(echo $$WESTON_VERSION | cut -d. -f1); \
+		if [ "$$WESTON_MAJOR" != "12" ]; then \
+			echo "$(YELLOW)[WARNING]$(NC) Weston 版本不是 12（当前: $$WESTON_VERSION），正在降级..."; \
+			$(MAKE) downgrade-to-weston12; \
+		else \
+			echo "$(GREEN)[SUCCESS]$(NC) Weston 12 已安装"; \
+		fi; \
 	fi
-	@# 4. 验证Wayland环境
+	@# 2. 检查 Weston 12 服务是否配置
+	@if [ ! -f "/etc/systemd/system/weston12.service" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston 12 服务未配置，正在配置..."; \
+		$(MAKE) setup-weston12-service; \
+	fi
+	@# 3. 停止 Sway（如果在运行）
+	@if systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
+		echo "$(BLUE)[INFO]$(NC) 停止 Sway 服务..."; \
+		sudo systemctl stop sway-wayland.service; \
+		sudo systemctl disable sway-wayland.service; \
+	fi
+	@# 4. 智能检查 Weston 12 运行状态
+	@WESTON_RUNNING=false; \
+	if pgrep -x weston >/dev/null 2>&1; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到 Weston 进程正在运行"; \
+		WESTON_RUNNING=true; \
+	elif systemctl is-active --quiet weston12.service 2>/dev/null; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到 Weston 12 服务正在运行"; \
+		WESTON_RUNNING=true; \
+	fi; \
+	if [ "$$WESTON_RUNNING" = "false" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston 12 未运行，正在启动..."; \
+		$(MAKE) start-weston12; \
+	else \
+		echo "$(GREEN)[SUCCESS]$(NC) Weston 12 已在运行，跳过启动"; \
+	fi
+	@# 5. 验证 Wayland 环境
 	@if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Wayland socket不存在，等待Sway完全启动..."; \
+		echo "$(YELLOW)[WARNING]$(NC) Wayland socket 不存在，等待 Weston 12 完全启动..."; \
 		sleep 5; \
 		if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
-			echo "$(RED)[ERROR]$(NC) Wayland环境配置失败"; \
+			echo "$(RED)[ERROR]$(NC) Wayland 环境配置失败"; \
 			exit 1; \
 		fi; \
 	fi
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland环境检查完成（Sway）"
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland 环境检查完成（Weston 12）"
 
 # === Wayland环境配置（使用Sway） ===
 install-wayland-deps:
