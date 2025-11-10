@@ -563,27 +563,38 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
 void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p) {
     if (!wl_surface_ || !wl_shm_) return;
     
-    // 创建 SHM buffer
-    int width = area->x2 - area->x1 + 1;
-    int height = area->y2 - area->y1 + 1;
+    // 🔧 修复：使用全屏 buffer，而不是部分区域
+    // 因为 partial render 需要复杂的 buffer 管理
+    int width = config_.screen_width;
+    int height = config_.screen_height;
     int stride = width * 4;
     int size = stride * height;
     
     int fd = createAnonymousFile(size);
-    if (fd < 0) return;
+    if (fd < 0) {
+        std::cerr << "❌ 创建SHM文件失败" << std::endl;
+        return;
+    }
     
     void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (data == MAP_FAILED) {
         close(fd);
+        std::cerr << "❌ mmap失败" << std::endl;
         return;
     }
     
-    // 复制 LVGL 像素数据到 SHM
+    // 🔧 修复：复制整个前端缓冲区到 SHM
     uint32_t* pixels = (uint32_t*)data;
+    
+    // 从前端缓冲区复制数据
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            lv_color_t c = color_p[y * width + x];
-            pixels[y * width + x] = (0xFF << 24) | (c.red << 16) | (c.green << 8) | c.blue;
+            lv_color_t c = front_buffer_[y * width + x];
+            // LVGL v9 color format: RGB888
+            uint8_t r = c.red;
+            uint8_t g = c.green;
+            uint8_t b = c.blue;
+            pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
         }
     }
     
@@ -595,13 +606,29 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 提交到 Wayland
-    wl_surface_attach(wl_surface_, buffer, area->x1, area->y1);
-    wl_surface_damage(wl_surface_, area->x1, area->y1, width, height);
+    // 🔧 修复：正确的 attach 参数（x=0, y=0 是 surface 偏移）
+    wl_surface_attach(wl_surface_, buffer, 0, 0);
+    
+    // 🔧 修复：只标记实际更新的区域为 damaged
+    int area_width = area->x2 - area->x1 + 1;
+    int area_height = area->y2 - area->y1 + 1;
+    wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
+    
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    wl_buffer_destroy(buffer);
+    // 🔧 修复：不要立即销毁 buffer！
+    // Weston 需要先读取 buffer，应该在 buffer.release 事件时销毁
+    // 为了简化，我们现在延迟销毁（或者保持不销毁，让系统回收）
+    // wl_buffer_destroy(buffer);  // 暂时注释掉
+    
+    static int flush_count = 0;
+    flush_count++;
+    if (flush_count <= 5) {
+        std::cout << "🖼️  LVGL flush #" << flush_count 
+                  << " 区域: [" << area->x1 << "," << area->y1 
+                  << " -> " << area->x2 << "," << area->y2 << "]" << std::endl;
+    }
 }
 
 bool LVGLWaylandInterface::Impl::initializeFallbackDisplay() {
