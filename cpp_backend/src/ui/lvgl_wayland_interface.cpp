@@ -871,10 +871,14 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     // 加载主屏幕
     lv_screen_load(main_screen_);
     
-    // 🔧 修复：标记整个屏幕为脏，让 UI 线程自然刷新
+    // 🔧 修复：递归标记所有子对象为脏，确保完整刷新
     lv_obj_invalidate(main_screen_);
+    lv_obj_invalidate(header_panel_);
+    lv_obj_invalidate(camera_panel_);
+    lv_obj_invalidate(control_panel_);
+    lv_obj_invalidate(footer_panel_);
     
-    std::cout << "✅ UI 创建完成，已标记屏幕需要刷新" << std::endl;
+    std::cout << "✅ UI 创建完成，已标记所有面板需要刷新" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
@@ -1022,8 +1026,13 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
         return false;
     }
     
-    // 填充黑色
-    memset(data, 0, size);
+    // 🔧 修复：填充深灰色背景（与 LVGL 主题一致），而不是黑色
+    // 这样即使 LVGL 刷新不完整，屏幕也能显示合理的背景色
+    uint32_t* pixels = (uint32_t*)data;
+    uint32_t bg_color = 0xFF1E1E1E;  // ARGB: #1E1E1E（深灰色）
+    for (int i = 0; i < (size / 4); i++) {
+        pixels[i] = bg_color;
+    }
     
     // 创建 wl_shm_pool
     struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
