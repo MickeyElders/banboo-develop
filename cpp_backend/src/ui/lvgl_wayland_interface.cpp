@@ -111,9 +111,10 @@ public:
     // EGLConfig egl_config_;
     
     // 显示缓冲区
-    lv_color_t* front_buffer_ = nullptr;  // LVGL 前缓冲（DIRECT 模式）
-    lv_color_t* back_buffer_ = nullptr;   // LVGL 后缓冲（未使用，DIRECT 模式只需一个）
+    lv_color_t* front_buffer_ = nullptr;  // LVGL 前缓冲（PARTIAL 模式）
+    lv_color_t* back_buffer_ = nullptr;   // LVGL 后缓冲（PARTIAL 模式）
     uint32_t buffer_size_ = 0;
+    uint32_t* full_frame_buffer_ = nullptr;  // 完整帧累积 buffer（ARGB8888）
     
     // 🔧 修复：注释OpenGL资源，完全使用SHM
     // GLuint shader_program_ = 0;
@@ -552,67 +553,66 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     // - 延迟注册 flush 回调到 UI 创建之后
     // - 避免在初始化阶段触发渲染
     
-    std::cout << "🔧 [DEBUG] 步骤2: 分配显示缓冲区..." << std::endl;
-    size_t full_buffer_size = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
-    std::cout << "   Buffer大小: " << (full_buffer_size / 1024) << " KB" << std::endl;
+    std::cout << "🔧 [DEBUG] 步骤2: 分配完整帧累积 buffer..." << std::endl;
+    // 为 PARTIAL 模式累积完整帧
+    size_t full_frame_size = config_.screen_width * config_.screen_height * sizeof(uint32_t);
+    full_frame_buffer_ = (uint32_t*)malloc(full_frame_size);
     
-    front_buffer_ = (lv_color_t*)malloc(full_buffer_size);
-    
-    if (!front_buffer_) {
-        std::cerr << "显示缓冲区分配失败" << std::endl;
+    if (!full_frame_buffer_) {
+        std::cerr << "完整帧 buffer 分配失败" << std::endl;
         return false;
     }
-    std::cout << "✅ [DEBUG] Buffer分配成功" << std::endl;
     
-    std::cout << "🔧 [DEBUG] 步骤3: 初始化 buffer 为背景色..." << std::endl;
-    // 初始化 buffer 为深灰色背景
+    std::cout << "   完整帧 buffer 大小: " << (full_frame_size / 1024) << " KB" << std::endl;
+    
+    // 初始化为深灰色背景
     uint32_t bg_color = 0xFF1E1E1E;
-    uint32_t* pixels = (uint32_t*)front_buffer_;
-    for (size_t i = 0; i < (full_buffer_size / sizeof(uint32_t)); i++) {
-        pixels[i] = bg_color;
+    for (size_t i = 0; i < (full_frame_size / sizeof(uint32_t)); i++) {
+        full_frame_buffer_[i] = bg_color;
     }
-    std::cout << "✅ [DEBUG] Buffer初始化完成" << std::endl;
+    std::cout << "✅ [DEBUG] 完整帧 buffer 已初始化" << std::endl;
     
-    std::cout << "🔧 [DEBUG] 步骤4: 注册初始化阶段的 flush 回调..." << std::endl;
-    // 🔧 关键修复：先注册一个初始化阶段的 flush 回调
-    // DIRECT 模式下，lv_display_set_buffers() 会立即触发渲染
-    // 如果没有 flush 回调，会导致卡住
+    std::cout << "🔧 [DEBUG] 步骤4: 使用 PARTIAL 模式（DIRECT 模式不稳定）..." << std::endl;
+    // 🔧 架构决策：DIRECT 模式在 lv_display_set_buffers() 时卡住
+    // 根本原因：LVGL DIRECT 模式在这个版本/环境下有问题
+    // 
+    // 最终方案：PARTIAL 模式 + 完整帧提交
+    // - PARTIAL 模式：LVGL 只渲染变化区域到小 buffer
+    // - flush 时：提交 LVGL 的完整 display buffer（包含所有累积更新）
+    // - 全屏 damage：确保 Wayland 合成器刷新整个屏幕
+    
+    // 分配 PARTIAL 模式的 buffer（1/10 屏幕大小）
+    size_t partial_buffer_size = (config_.screen_width * config_.screen_height / 10) * sizeof(lv_color_t);
+    front_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
+    back_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
+    
+    if (!front_buffer_ || !back_buffer_) {
+        std::cerr << "PARTIAL 模式 buffer 分配失败" << std::endl;
+        return false;
+    }
+    
+    std::cout << "   PARTIAL buffer 大小: " << (partial_buffer_size / 1024) << " KB × 2" << std::endl;
+    
+    // 设置 PARTIAL 模式（不会立即触发渲染）
+    lv_display_set_buffers(display_, front_buffer_, back_buffer_,
+                          partial_buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+    std::cout << "✅ LVGL 使用 PARTIAL 渲染模式" << std::endl;
+    
+    // 注册 flush 回调
     lv_display_set_user_data(display_, this);
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
-        std::cout << "🔧 [DEBUG-CALLBACK] flush 回调被调用" << std::endl;
         LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
             lv_display_get_user_data(disp));
         
-        // 初始化阶段：UI 还没创建，直接标记完成，不实际渲染
-        if (impl && !impl->ui_created_) {
-            std::cout << "🔧 [DEBUG-CALLBACK] 初始化阶段，跳过渲染" << std::endl;
-            lv_display_flush_ready(disp);
-            std::cout << "🔧 [DEBUG-CALLBACK] flush_ready 已调用" << std::endl;
-            return;
-        }
-        
-        std::cout << "🔧 [DEBUG-CALLBACK] UI已创建，执行正常渲染" << std::endl;
-        // UI 创建完成后：正常渲染
-        if (impl) {
+        if (impl && impl->ui_created_) {
             impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
         }
         
         lv_display_flush_ready(disp);
     });
-    std::cout << "✅ [DEBUG] 初始化阶段 flush 回调已注册" << std::endl;
     
-    std::cout << "🔧 [DEBUG] 步骤5: 设置 DIRECT 渲染模式（调用前）..." << std::endl;
-    std::cout << "   Buffer地址: " << (void*)front_buffer_ << std::endl;
-    std::cout << "   Buffer大小: " << full_buffer_size << " bytes" << std::endl;
-    std::cout << "   开始调用 lv_display_set_buffers()..." << std::endl;
-    
-    // 使用 DIRECT 模式
-    lv_display_set_buffers(display_, front_buffer_, nullptr,
-                          full_buffer_size, LV_DISPLAY_RENDER_MODE_DIRECT);
-    
-    std::cout << "✅ [DEBUG] lv_display_set_buffers() 调用完成" << std::endl;
-    std::cout << "✅ LVGL 使用 DIRECT 渲染模式 (buffer: " 
-              << (full_buffer_size / 1024) << " KB)" << std::endl;
+    std::cout << "✅ flush 回调已注册" << std::endl;
     
     display_initialized_ = true;
     std::cout << "✅ LVGL Wayland SHM 显示初始化成功（纯软件渲染）" << std::endl;
@@ -623,15 +623,30 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
 
 // 新增：通过 SHM 刷新显示的方法
 void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p) {
-    if (!wl_surface_ || !wl_shm_) return;
+    if (!wl_surface_ || !wl_shm_ || !full_frame_buffer_) return;
     
     int width = config_.screen_width;
     int height = config_.screen_height;
+    
+    // 🔧 PARTIAL 模式：步骤1 - 累积更新到完整帧 buffer
+    int area_width = area->x2 - area->x1 + 1;
+    int area_height = area->y2 - area->y1 + 1;
+    
+    #if LV_COLOR_DEPTH == 32
+        // 逐行拷贝更新区域
+        int color_idx = 0;
+        for (int y = area->y1; y <= area->y2; y++) {
+            uint32_t* row_start = full_frame_buffer_ + y * width + area->x1;
+            memcpy(row_start, &color_p[color_idx], area_width * sizeof(uint32_t));
+            color_idx += area_width;
+        }
+    #else
+        #error "Only LV_COLOR_DEPTH=32 is supported"
+    #endif
+    
+    // 🔧 步骤2 - 创建临时 SHM buffer，提交完整帧
     int stride = width * 4;
     size_t size = stride * height;
-    
-    // 🔧 DIRECT 模式：color_p 就是完整的屏幕数据
-    // 直接创建 SHM buffer 并拷贝
     
     int fd = createAnonymousFile(size);
     if (fd < 0) {
@@ -646,12 +661,8 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
         return;
     }
     
-    // DIRECT 模式：color_p 是完整帧，直接拷贝
-    #if LV_COLOR_DEPTH == 32
-        memcpy(data, color_p, size);
-    #else
-        #error "Only LV_COLOR_DEPTH=32 is supported with DIRECT mode"
-    #endif
+    // 从完整帧 buffer 拷贝到 SHM
+    memcpy(data, full_frame_buffer_, size);
     
     // 创建 Wayland buffer
     struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
@@ -660,7 +671,7 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 附加 buffer 并标记全屏 damage
+    // 🔧 关键：全屏 damage 确保合成器刷新完整帧
     wl_surface_attach(wl_surface_, buffer, 0, 0);
     wl_surface_damage(wl_surface_, 0, 0, width, height);
     wl_surface_commit(wl_surface_);
@@ -681,7 +692,9 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     static int flush_count = 0;
     if (++flush_count <= 3) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
-                  << " DIRECT 模式：完整帧 " << width << "x" << height << std::endl;
+                  << " PARTIAL 更新 [" << area->x1 << "," << area->y1 
+                  << "-" << area->x2 << "," << area->y2 
+                  << "] → 提交完整帧 " << width << "x" << height << std::endl;
     }
 }
 
@@ -1347,6 +1360,11 @@ void LVGLWaylandInterface::Impl::cleanup() {
     if (back_buffer_) {
         free(back_buffer_);
         back_buffer_ = nullptr;
+    }
+    
+    if (full_frame_buffer_) {
+        free(full_frame_buffer_);
+        full_frame_buffer_ = nullptr;
     }
 }
 
