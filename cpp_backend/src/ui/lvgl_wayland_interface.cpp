@@ -534,23 +534,25 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
         return false;
     }
     
-    // 分配 SHM 缓冲区（使用较小的部分缓冲区以提高性能）
-    // 🔧 修复：使用 1/10 屏幕大小的 buffer 用于 PARTIAL 模式
-    size_t partial_buffer_size = (config_.screen_width * config_.screen_height / 10) * sizeof(lv_color_t);
-    front_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
-    back_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
+    // 🔧 架构改进：使用 DIRECT 模式 + 单个完整屏幕 buffer
+    // 这避免了 PARTIAL 模式 + 持久化 buffer 的不一致问题
+    size_t full_buffer_size = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
     
-    if (!front_buffer_ || !back_buffer_) {
+    // 只分配一个前缓冲区（DIRECT 模式只需要一个）
+    front_buffer_ = (lv_color_t*)malloc(full_buffer_size);
+    
+    if (!front_buffer_) {
         std::cerr << "显示缓冲区分配失败" << std::endl;
         return false;
     }
     
-    // 🔧 修复：回退到 PARTIAL 模式（性能更好，更稳定）
-    lv_display_set_buffers(display_, front_buffer_, back_buffer_,
-                          partial_buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    // 使用 DIRECT 模式：每次渲染完整屏幕
+    // 虽然看起来慢，但实际上避免了持久化 buffer 的状态管理问题
+    lv_display_set_buffers(display_, front_buffer_, nullptr,
+                          full_buffer_size, LV_DISPLAY_RENDER_MODE_DIRECT);
     
-    std::cout << "✅ LVGL 使用 PARTIAL 渲染模式 (buffer: " 
-              << (partial_buffer_size / 1024) << " KB)" << std::endl;
+    std::cout << "✅ LVGL 使用 DIRECT 渲染模式 (buffer: " 
+              << (full_buffer_size / 1024) << " KB)" << std::endl;
     
     // 设置 flush 回调（使用 SHM）
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
@@ -582,113 +584,66 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     int stride = width * 4;
     size_t size = stride * height;
     
-    // 🔧 修复：初始化或重用持久化 SHM buffer
-    if (!shm_data_ || shm_size_ != size) {
-        // 清理旧 buffer
-        if (shm_data_) {
-            munmap(shm_data_, shm_size_);
-            shm_data_ = nullptr;
-        }
-        if (wl_buffer_) {
-            wl_buffer_destroy(wl_buffer_);
-            wl_buffer_ = nullptr;
-        }
-        
-        // 创建新的持久化 SHM buffer
-        int fd = createAnonymousFile(size);
-        if (fd < 0) {
-            std::cerr << "❌ 创建SHM文件失败" << std::endl;
-            return;
-        }
-        
-        shm_data_ = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        if (shm_data_ == MAP_FAILED) {
-            close(fd);
-            std::cerr << "❌ mmap失败" << std::endl;
-            shm_data_ = nullptr;
-            return;
-        }
-        
-        shm_size_ = size;
-        
-        // 创建 Wayland buffer（持久化）
-        struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
-        wl_buffer_ = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
-        wl_shm_pool_destroy(pool);
-        close(fd);
-        
-        // 🔧 修复：初始化为深灰色背景（LVGL主题色 #1E1E1E），而不是黑色
-        // 这样即使某些区域没有被LVGL渲染，也会显示合理的背景
-        uint32_t* pixels = (uint32_t*)shm_data_;
-        uint32_t bg_color = 0xFF1E1E1E;  // ARGB: alpha=FF, RGB=1E1E1E
-        for (size_t i = 0; i < (size / 4); i++) {
-            pixels[i] = bg_color;
-        }
-        
-        std::cout << "✅ 创建持久化 SHM buffer: " << width << "x" << height 
-                  << " (背景色: #1E1E1E)" << std::endl;
+    // 🔧 DIRECT 模式架构：每次 flush 创建新的 SHM buffer
+    // 优势：
+    // 1. 避免持久化 buffer 的状态管理
+    // 2. Wayland 合成器接收完整、一致的 buffer
+    // 3. 无需复杂的 damage 管理
+    // 4. color_p 就是完整的帧数据，直接拷贝即可
+    
+    int fd = createAnonymousFile(size);
+    if (fd < 0) {
+        std::cerr << "❌ 创建SHM文件失败" << std::endl;
+        return;
     }
     
-    // 🔧 修复：直接在持久化 buffer 上更新指定区域
-    uint32_t* pixels = (uint32_t*)shm_data_;
-    int area_width = area->x2 - area->x1 + 1;
-    int area_height = area->y2 - area->y1 + 1;
+    void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        close(fd);
+        std::cerr << "❌ mmap失败" << std::endl;
+        return;
+    }
     
-    // 🔧 修复：正确转换 LVGL 颜色到 ARGB8888 格式
+    // DIRECT 模式下，color_p 就是完整的屏幕数据（1920x1200）
+    // 直接拷贝到 SHM buffer
     #if LV_COLOR_DEPTH == 32
-        // 32位颜色：逐像素转换，确保正确的字节序
-        int color_idx = 0;
-        for (int y = area->y1; y <= area->y2; y++) {
-            for (int x = area->x1; x <= area->x2; x++) {
-                lv_color_t c = color_p[color_idx++];
-                // LVGL 32位格式可能是 XRGB8888，转换为 ARGB8888
-                uint8_t r = c.red;
-                uint8_t g = c.green;
-                uint8_t b = c.blue;
-                pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
-            }
-        }
-    #elif LV_COLOR_DEPTH == 16
-        // 16位颜色：RGB565 -> ARGB8888
-        int color_idx = 0;
-        for (int y = area->y1; y <= area->y2; y++) {
-            for (int x = area->x1; x <= area->x2; x++) {
-                lv_color_t c = color_p[color_idx++];
-                uint16_t c16 = *((uint16_t*)&c);
-                uint8_t r = ((c16 >> 11) & 0x1F) << 3;
-                uint8_t g = ((c16 >> 5) & 0x3F) << 2;
-                uint8_t b = (c16 & 0x1F) << 3;
-                pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
-            }
-        }
+        // 32位模式：LVGL 已经是 ARGB8888，直接内存拷贝
+        memcpy(data, color_p, size);
     #else
-        // 其他深度：简单转换
-        int color_idx = 0;
-        for (int y = area->y1; y <= area->y2; y++) {
-            for (int x = area->x1; x <= area->x2; x++) {
-                lv_color_t c = color_p[color_idx++];
-                uint8_t* cb = (uint8_t*)&c;
-                pixels[y * width + x] = (0xFF << 24) | (cb[0] << 16) | (cb[1] << 8) | cb[2];
-            }
-        }
+        // 其他颜色深度需要转换（暂不支持）
+        #error "Only LV_COLOR_DEPTH=32 is supported with DIRECT mode"
     #endif
     
-    // 提交到 Wayland
-    wl_surface_attach(wl_surface_, wl_buffer_, 0, 0);
+    // 创建 Wayland buffer（临时，每次 flush 创建）
+    struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
+    struct wl_buffer* buffer = wl_shm_pool_create_buffer(
+        pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
+    wl_shm_pool_destroy(pool);
+    close(fd);  // fd 可以关闭，mmap 的数据仍然有效
     
-    // 🔧 修复：只 damage 实际更新的区域（LVGL 会自动处理所有需要的刷新）
-    wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
-    
+    // 附加 buffer 并标记整个屏幕为 damage
+    wl_surface_attach(wl_surface_, buffer, 0, 0);
+    wl_surface_damage(wl_surface_, 0, 0, width, height);
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 调试：前5次 flush 打印信息
+    // 设置 buffer 释放回调
+    static const struct wl_buffer_listener buffer_listener = {
+        [](void* data, struct wl_buffer* buffer) {
+            // Buffer 已被合成器使用完毕，可以释放
+            wl_buffer_destroy(buffer);
+        }
+    };
+    wl_buffer_add_listener(buffer, &buffer_listener, nullptr);
+    
+    // 释放 mmap（buffer 仍然有效直到合成器使用完毕）
+    munmap(data, size);
+    
+    // 调试：前3次 flush 打印信息
     static int flush_count = 0;
-    if (++flush_count <= 5) {
+    if (++flush_count <= 3) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
-                  << " 区域: [" << area->x1 << "," << area->y1 
-                  << " -> " << area->x2 << "," << area->y2 
-                  << "] 尺寸: " << area_width << "x" << area_height << std::endl;
+                  << " DIRECT 模式：完整屏幕 " << width << "x" << height << std::endl;
     }
 }
 
@@ -821,6 +776,10 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明背景
     lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 🔧 修复：让摄像头面板不接收点击事件，点击穿透
+    lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
+    lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
     
     // 🔧 修复：不创建Canvas，让视频直接显示
     // DeepStream Subsurface会自动显示在这个位置
