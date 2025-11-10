@@ -557,8 +557,12 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
 void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p) {
     if (!wl_surface_ || !wl_shm_) return;
     
-    // 🔧 修复：使用全屏 buffer，而不是部分区域
-    // 因为 partial render 需要复杂的 buffer 管理
+    // 🔧 修复：只渲染更新的区域，提高性能
+    int area_width = area->x2 - area->x1 + 1;
+    int area_height = area->y2 - area->y1 + 1;
+    
+    // 但为了简化 buffer 管理，还是使用全屏 buffer
+    // 只是只更新指定区域的像素
     int width = config_.screen_width;
     int height = config_.screen_height;
     int stride = width * 4;
@@ -577,20 +581,46 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
         return;
     }
     
-    // 🔧 修复：复制整个前端缓冲区到 SHM
+    // 🔧 修复：从 color_p 读取 LVGL 渲染的实际数据
     uint32_t* pixels = (uint32_t*)data;
     
-    // 从前端缓冲区复制数据
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            lv_color_t c = front_buffer_[y * width + x];
-            // LVGL v9 color format: RGB888
-            uint8_t r = c.red;
-            uint8_t g = c.green;
-            uint8_t b = c.blue;
-            pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+    // 先填充黑色背景（或者从 front_buffer_ 复制旧数据）
+    memset(data, 0, size);
+    
+    // 🔧 修复：复制 LVGL 传入的渲染数据到正确位置
+    #if LV_COLOR_DEPTH == 32
+        // 32位颜色：直接内存拷贝（最高效）
+        // LVGL 的 lv_color_t 在 32 位模式下就是 ARGB8888
+        int color_idx = 0;
+        for (int y = area->y1; y <= area->y2; y++) {
+            // 计算目标行的起始位置
+            uint32_t* row_start = pixels + y * width + area->x1;
+            // 拷贝整行数据
+            memcpy(row_start, &color_p[color_idx], area_width * sizeof(lv_color_t));
+            color_idx += area_width;
         }
-    }
+    #else
+        // 16位或其他颜色深度：逐像素转换
+        int color_idx = 0;
+        for (int y = area->y1; y <= area->y2; y++) {
+            for (int x = area->x1; x <= area->x2; x++) {
+                lv_color_t c = color_p[color_idx++];
+                
+                #if LV_COLOR_DEPTH == 16
+                    // 16位颜色：RGB565 -> ARGB8888
+                    uint16_t c16 = *((uint16_t*)&c);
+                    uint8_t r = ((c16 >> 11) & 0x1F) << 3;
+                    uint8_t g = ((c16 >> 5) & 0x3F) << 2;
+                    uint8_t b = (c16 & 0x1F) << 3;
+                    pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+                #else
+                    // 8位或其他：简单转换
+                    uint8_t* cb = (uint8_t*)&c;
+                    pixels[y * width + x] = (0xFF << 24) | (cb[0] << 16) | (cb[1] << 8) | cb[2];
+                #endif
+            }
+        }
+    #endif
     
     munmap(data, size);
     
@@ -604,8 +634,6 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     wl_surface_attach(wl_surface_, buffer, 0, 0);
     
     // 🔧 修复：只标记实际更新的区域为 damaged
-    int area_width = area->x2 - area->x1 + 1;
-    int area_height = area->y2 - area->y1 + 1;
     wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
     
     wl_surface_commit(wl_surface_);
@@ -613,19 +641,16 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     
     // 🔧 修复：不要立即销毁 buffer！
     // Weston 需要先读取 buffer，应该在 buffer.release 事件时销毁
-    // 为了简化，我们现在延迟销毁（或者保持不销毁，让系统回收）
     // wl_buffer_destroy(buffer);  // 暂时注释掉
     
-    // 🔧 修复：禁用 flush 日志，避免日志泛滥
-    // 如需调试可取消下面的注释
-    /*
+    // 调试：前3次 flush 打印信息
     static int flush_count = 0;
     if (++flush_count <= 3) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
                   << " 区域: [" << area->x1 << "," << area->y1 
-                  << " -> " << area->x2 << "," << area->y2 << "]" << std::endl;
+                  << " -> " << area->x2 << "," << area->y2 
+                  << "] 尺寸: " << area_width << "x" << area_height << std::endl;
     }
-    */
 }
 
 bool LVGLWaylandInterface::Impl::initializeFallbackDisplay() {
