@@ -111,12 +111,9 @@ public:
     // EGLConfig egl_config_;
     
     // 显示缓冲区
-    lv_color_t* front_buffer_ = nullptr;  // LVGL 前缓冲（PARTIAL 模式）
-    lv_color_t* back_buffer_ = nullptr;   // LVGL 后缓冲（PARTIAL 模式）
+    lv_color_t* front_buffer_ = nullptr;  // LVGL 前缓冲（DIRECT 模式）
+    lv_color_t* back_buffer_ = nullptr;   // LVGL 后缓冲（未使用，DIRECT 模式只需一个）
     uint32_t buffer_size_ = 0;
-    
-    // 🔧 完整帧累积 buffer（用于 PARTIAL 模式累积更新）
-    uint32_t* full_frame_buffer_ = nullptr;  // 完整屏幕帧（ARGB8888）
     
     // 🔧 修复：注释OpenGL资源，完全使用SHM
     // GLuint shader_program_ = 0;
@@ -314,6 +311,21 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     
     // 创建主界面
     pImpl_->createMainInterface();
+    
+    // 🔧 关键：UI 创建完成后再注册 flush 回调
+    // 这避免了初始化阶段 DIRECT 模式触发全屏渲染导致卡住
+    std::cout << "✅ UI 创建完成，现在注册 flush 回调..." << std::endl;
+    lv_display_set_flush_cb(pImpl_->display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
+        LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
+            lv_display_get_user_data(disp));
+        
+        if (impl) {
+            impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
+        }
+        
+        lv_display_flush_ready(disp);
+    });
+    std::cout << "✅ flush 回调已注册，DIRECT 模式渲染就绪" << std::endl;
     
     fully_initialized_.store(true);
     return true;
@@ -532,64 +544,43 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
         return false;
     }
     
-    // 🔧 最终架构：PARTIAL 模式 + 非持久化 SHM buffer
+    // 🔧 核心架构：DIRECT 模式解决渲染伪影
     // 
-    // 为什么不用 DIRECT 模式？
-    // - DIRECT 模式会在初始化时立即触发全屏渲染，导致卡住
-    // - 每次渲染 9MB 数据效率低
+    // 核心目标：同时正确显示 UI 和视频
+    // 
+    // 为什么必须用 DIRECT 模式？
+    // - PARTIAL + 持久化/累积 buffer 会导致状态不一致
+    // - Wayland 合成器缓存部分 damage，导致渲染伪影（黑白条纹）
+    // - 只有 DIRECT 模式才能确保合成器看到完整、一致的帧
     //
-    // 为什么不用持久化 buffer？
-    // - 持久化 buffer + 部分 damage 会导致状态不一致
-    // - Wayland 合成器缓存导致渲染伪影
-    //
-    // 新方案：PARTIAL 模式 + 每次创建新 SHM buffer + 全屏 damage
-    // - PARTIAL 模式：小 buffer（1/10 屏幕），渲染快
-    // - 非持久化：每次 flush 创建新 SHM buffer
-    // - 全屏 damage：标记整个屏幕，避免缓存问题
-    // - 累积更新：在内部完整帧 buffer 上累积所有部分更新
+    // DIRECT 模式初始化卡住的解决方案：
+    // - 延迟注册 flush 回调到 UI 创建之后
+    // - 避免在初始化阶段触发渲染
     
-    size_t partial_buffer_size = (config_.screen_width * config_.screen_height / 10) * sizeof(lv_color_t);
-    front_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
-    back_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
+    size_t full_buffer_size = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
+    front_buffer_ = (lv_color_t*)malloc(full_buffer_size);
     
-    if (!front_buffer_ || !back_buffer_) {
+    if (!front_buffer_) {
         std::cerr << "显示缓冲区分配失败" << std::endl;
         return false;
     }
     
-    // 分配完整帧 buffer 用于累积更新
-    size_t full_frame_size = config_.screen_width * config_.screen_height * sizeof(uint32_t);
-    full_frame_buffer_ = (uint32_t*)malloc(full_frame_size);
-    if (!full_frame_buffer_) {
-        std::cerr << "完整帧缓冲区分配失败" << std::endl;
-        return false;
-    }
-    
-    // 初始化为深灰色背景
+    // 初始化 buffer 为深灰色背景
     uint32_t bg_color = 0xFF1E1E1E;
-    for (size_t i = 0; i < (full_frame_size / sizeof(uint32_t)); i++) {
-        full_frame_buffer_[i] = bg_color;
+    uint32_t* pixels = (uint32_t*)front_buffer_;
+    for (size_t i = 0; i < (full_buffer_size / sizeof(uint32_t)); i++) {
+        pixels[i] = bg_color;
     }
     
-    lv_display_set_buffers(display_, front_buffer_, back_buffer_,
-                          partial_buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    // 使用 DIRECT 模式
+    lv_display_set_buffers(display_, front_buffer_, nullptr,
+                          full_buffer_size, LV_DISPLAY_RENDER_MODE_DIRECT);
     
-    std::cout << "✅ LVGL 使用 PARTIAL 渲染模式 (buffer: " 
-              << (partial_buffer_size / 1024) << " KB, 全帧累积: " 
-              << (full_frame_size / 1024) << " KB)" << std::endl;
+    std::cout << "✅ LVGL 使用 DIRECT 渲染模式 (buffer: " 
+              << (full_buffer_size / 1024) << " KB)" << std::endl;
     
-    // 设置 flush 回调（使用 SHM）
-    lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
-        LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
-            lv_display_get_user_data(disp));
-        
-        if (impl) {
-            impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
-        }
-        
-        lv_display_flush_ready(disp);
-    });
-    
+    // 🔧 关键：先不设置 flush 回调，延迟到 UI 创建之后
+    // 这避免了初始化阶段的渲染触发
     lv_display_set_user_data(display_, this);
     
     display_initialized_ = true;
@@ -601,32 +592,15 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
 
 // 新增：通过 SHM 刷新显示的方法
 void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_color_t* color_p) {
-    if (!wl_surface_ || !wl_shm_ || !full_frame_buffer_) return;
+    if (!wl_surface_ || !wl_shm_) return;
     
     int width = config_.screen_width;
     int height = config_.screen_height;
-    
-    // 🔧 步骤1：将此次的部分更新累积到完整帧 buffer
-    // PARTIAL 模式下，color_p 只包含更新区域的数据
-    int area_width = area->x2 - area->x1 + 1;
-    int area_height = area->y2 - area->y1 + 1;
-    
-    #if LV_COLOR_DEPTH == 32
-        // 逐行拷贝更新区域到完整帧 buffer
-        int color_idx = 0;
-        for (int y = area->y1; y <= area->y2; y++) {
-            uint32_t* row_start = full_frame_buffer_ + y * width + area->x1;
-            memcpy(row_start, &color_p[color_idx], area_width * sizeof(uint32_t));
-            color_idx += area_width;
-        }
-    #else
-        #error "Only LV_COLOR_DEPTH=32 is supported"
-    #endif
-    
-    // 🔧 步骤2：创建新的 SHM buffer，拷贝完整帧
-    // 这样 Wayland 合成器总是看到完整、一致的帧
     int stride = width * 4;
     size_t size = stride * height;
+    
+    // 🔧 DIRECT 模式：color_p 就是完整的屏幕数据
+    // 直接创建 SHM buffer 并拷贝
     
     int fd = createAnonymousFile(size);
     if (fd < 0) {
@@ -641,18 +615,21 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
         return;
     }
     
-    // 从完整帧 buffer 拷贝到 SHM
-    memcpy(data, full_frame_buffer_, size);
+    // DIRECT 模式：color_p 是完整帧，直接拷贝
+    #if LV_COLOR_DEPTH == 32
+        memcpy(data, color_p, size);
+    #else
+        #error "Only LV_COLOR_DEPTH=32 is supported with DIRECT mode"
+    #endif
     
-    // 🔧 步骤3：创建 Wayland buffer 并提交
+    // 创建 Wayland buffer
     struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
     struct wl_buffer* buffer = wl_shm_pool_create_buffer(
         pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 附加 buffer 并标记整个屏幕为 damage
-    // 虽然只更新了部分区域，但我们标记全屏，确保合成器看到完整帧
+    // 附加 buffer 并标记全屏 damage
     wl_surface_attach(wl_surface_, buffer, 0, 0);
     wl_surface_damage(wl_surface_, 0, 0, width, height);
     wl_surface_commit(wl_surface_);
@@ -669,14 +646,11 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     // 释放 mmap
     munmap(data, size);
     
-    // 调试：前5次 flush 打印信息
+    // 调试：前3次 flush 打印信息
     static int flush_count = 0;
-    if (++flush_count <= 5) {
+    if (++flush_count <= 3) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
-                  << " 更新区域: [" << area->x1 << "," << area->y1 
-                  << " -> " << area->x2 << "," << area->y2 
-                  << "] " << area_width << "x" << area_height 
-                  << " → 提交完整帧 " << width << "x" << height << std::endl;
+                  << " DIRECT 模式：完整帧 " << width << "x" << height << std::endl;
     }
 }
 
@@ -1342,11 +1316,6 @@ void LVGLWaylandInterface::Impl::cleanup() {
     if (back_buffer_) {
         free(back_buffer_);
         back_buffer_ = nullptr;
-    }
-    
-    if (full_frame_buffer_) {
-        free(full_frame_buffer_);
-        full_frame_buffer_ = nullptr;
     }
 }
 
