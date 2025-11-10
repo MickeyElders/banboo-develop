@@ -126,6 +126,7 @@ public:
     std::mutex canvas_mutex_;
     std::mutex render_mutex_;
     std::atomic<bool> should_stop_{false};
+    std::atomic<bool> ui_created_{false};  // 🔧 UI 是否已创建完成
     
     // Canvas更新
     cv::Mat latest_frame_;
@@ -312,20 +313,10 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     // 创建主界面
     pImpl_->createMainInterface();
     
-    // 🔧 关键：UI 创建完成后再注册 flush 回调
-    // 这避免了初始化阶段 DIRECT 模式触发全屏渲染导致卡住
-    std::cout << "✅ UI 创建完成，现在注册 flush 回调..." << std::endl;
-    lv_display_set_flush_cb(pImpl_->display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
-        LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
-            lv_display_get_user_data(disp));
-        
-        if (impl) {
-            impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
-        }
-        
-        lv_display_flush_ready(disp);
-    });
-    std::cout << "✅ flush 回调已注册，DIRECT 模式渲染就绪" << std::endl;
+    // 🔧 关键：UI 创建完成后设置标志，启用正常渲染
+    std::cout << "✅ UI 创建完成，启用正常渲染..." << std::endl;
+    pImpl_->ui_created_.store(true);
+    std::cout << "✅ DIRECT 模式渲染就绪" << std::endl;
     
     fully_initialized_.store(true);
     return true;
@@ -582,17 +573,37 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     }
     std::cout << "✅ [DEBUG] Buffer初始化完成" << std::endl;
     
-    std::cout << "🔧 [DEBUG] 步骤4: 设置 DIRECT 渲染模式..." << std::endl;
+    std::cout << "🔧 [DEBUG] 步骤4: 注册初始化阶段的 flush 回调..." << std::endl;
+    // 🔧 关键修复：先注册一个初始化阶段的 flush 回调
+    // DIRECT 模式下，lv_display_set_buffers() 会立即触发渲染
+    // 如果没有 flush 回调，会导致卡住
+    lv_display_set_user_data(display_, this);
+    lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
+        LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
+            lv_display_get_user_data(disp));
+        
+        // 初始化阶段：UI 还没创建，直接标记完成，不实际渲染
+        if (impl && !impl->ui_created_) {
+            lv_display_flush_ready(disp);
+            return;
+        }
+        
+        // UI 创建完成后：正常渲染
+        if (impl) {
+            impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
+        }
+        
+        lv_display_flush_ready(disp);
+    });
+    std::cout << "✅ [DEBUG] 初始化阶段 flush 回调已注册" << std::endl;
+    
+    std::cout << "🔧 [DEBUG] 步骤5: 设置 DIRECT 渲染模式..." << std::endl;
     // 使用 DIRECT 模式
     lv_display_set_buffers(display_, front_buffer_, nullptr,
                           full_buffer_size, LV_DISPLAY_RENDER_MODE_DIRECT);
     
     std::cout << "✅ LVGL 使用 DIRECT 渲染模式 (buffer: " 
               << (full_buffer_size / 1024) << " KB)" << std::endl;
-    
-    // 🔧 关键：先不设置 flush 回调，延迟到 UI 创建之后
-    // 这避免了初始化阶段的渲染触发
-    lv_display_set_user_data(display_, this);
     
     display_initialized_ = true;
     std::cout << "✅ LVGL Wayland SHM 显示初始化成功（纯软件渲染）" << std::endl;
