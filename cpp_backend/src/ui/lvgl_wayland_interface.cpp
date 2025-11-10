@@ -317,7 +317,16 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     // 🔧 关键：UI 创建完成后设置标志，启用正常渲染
     std::cout << "✅ UI 创建完成，启用正常渲染..." << std::endl;
     pImpl_->ui_created_.store(true);
-    std::cout << "✅ DIRECT 模式渲染就绪" << std::endl;
+    
+    // 🔧 强制触发完整刷新，确保UI立即显示
+    std::cout << "🔄 强制刷新整个屏幕..." << std::endl;
+    if (pImpl_->display_) {
+        lv_obj_invalidate(lv_screen_active());  // 标记当前屏幕为脏
+        lv_refr_now(pImpl_->display_);          // 立即刷新
+        std::cout << "✅ 初始刷新完成" << std::endl;
+    }
+    
+    std::cout << "✅ PARTIAL 模式渲染就绪" << std::endl;
     
     fully_initialized_.store(true);
     return true;
@@ -671,11 +680,21 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 🔧 关键：全屏 damage 确保合成器刷新完整帧
+    // 🔧 关键修复：使用 buffer damage 而不是 surface damage
+    // buffer damage 更精确，避免合成器缓存问题
     wl_surface_attach(wl_surface_, buffer, 0, 0);
+    
+    // 使用 wl_surface_damage_buffer 标记 buffer 坐标系的损坏区域
+    wl_surface_damage_buffer(wl_surface_, 0, 0, width, height);
+    
+    // 🔧 额外：同时使用传统 damage 以兼容旧版合成器
     wl_surface_damage(wl_surface_, 0, 0, width, height);
+    
     wl_surface_commit(wl_surface_);
+    
+    // 🔧 关键：提交后立即处理 Wayland 事件，确保合成器响应
     wl_display_flush(wl_display_);
+    wl_display_roundtrip(wl_display_);
     
     // 设置 buffer 释放回调
     static const struct wl_buffer_listener buffer_listener = {
@@ -688,9 +707,9 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     // 释放 mmap
     munmap(data, size);
     
-    // 调试：前3次 flush 打印信息
+    // 调试：前5次 flush 打印信息
     static int flush_count = 0;
-    if (++flush_count <= 3) {
+    if (++flush_count <= 5) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
                   << " PARTIAL 更新 [" << area->x1 << "," << area->y1 
                   << "-" << area->x2 << "," << area->y2 
