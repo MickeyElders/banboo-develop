@@ -587,10 +587,56 @@ set(CPP_BACKEND_SOURCES
 )
 
 
-# 🔧 修复：使用系统 wayland-protocols，移除自定义协议文件
-# 自定义生成的协议文件可能版本不匹配，导致 Weston 协议解析错误
-# xdg-shell 协议已静态链接在系统的 libwayland-client 中
-message(STATUS "Using system wayland-protocols (xdg-shell from libwayland-client)")
+# 🔧 修复：在构建时从系统 wayland-protocols 生成 xdg-shell 协议文件
+# 确保与系统 Weston 版本完全兼容
+
+# 查找 wayland-scanner
+find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+
+# 查找系统的 xdg-shell.xml
+execute_process(
+    COMMAND pkg-config --variable=pkgdatadir wayland-protocols
+    OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+set(XDG_SHELL_XML "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
+
+if(NOT EXISTS "${XDG_SHELL_XML}")
+    message(FATAL_ERROR "找不到 xdg-shell.xml: ${XDG_SHELL_XML}")
+endif()
+
+message(STATUS "Found xdg-shell.xml: ${XDG_SHELL_XML}")
+
+# 生成协议文件的输出目录
+set(WAYLAND_PROTOCOLS_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/wayland-protocols")
+file(MAKE_DIRECTORY ${WAYLAND_PROTOCOLS_GEN_DIR})
+
+# 生成 xdg-shell 客户端头文件
+set(XDG_SHELL_CLIENT_HEADER "${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h")
+add_custom_command(
+    OUTPUT ${XDG_SHELL_CLIENT_HEADER}
+    COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} ${XDG_SHELL_CLIENT_HEADER}
+    DEPENDS ${XDG_SHELL_XML}
+    COMMENT "Generating xdg-shell client header"
+)
+
+# 生成 xdg-shell 协议实现代码
+set(XDG_SHELL_PROTOCOL_CODE "${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c")
+add_custom_command(
+    OUTPUT ${XDG_SHELL_PROTOCOL_CODE}
+    COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} ${XDG_SHELL_PROTOCOL_CODE}
+    DEPENDS ${XDG_SHELL_XML}
+    COMMENT "Generating xdg-shell protocol code"
+)
+
+# 将生成的文件添加到源文件列表
+list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE})
+
+# 添加生成文件的包含目录
+include_directories(${WAYLAND_PROTOCOLS_GEN_DIR})
+
+message(STATUS "Wayland protocols will be generated at build time")
 
 # 添加lv_drivers Wayland源文件 (如果存在)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers")
