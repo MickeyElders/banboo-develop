@@ -529,19 +529,23 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
         return false;
     }
     
-    // 分配 SHM 缓冲区
-    buffer_size_ = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
-    front_buffer_ = (lv_color_t*)malloc(buffer_size_);
-    back_buffer_ = (lv_color_t*)malloc(buffer_size_);
+    // 分配 SHM 缓冲区（使用较小的部分缓冲区以提高性能）
+    // 🔧 修复：使用 1/10 屏幕大小的 buffer 用于 PARTIAL 模式
+    size_t partial_buffer_size = (config_.screen_width * config_.screen_height / 10) * sizeof(lv_color_t);
+    front_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
+    back_buffer_ = (lv_color_t*)malloc(partial_buffer_size);
     
     if (!front_buffer_ || !back_buffer_) {
         std::cerr << "显示缓冲区分配失败" << std::endl;
         return false;
     }
     
-    // 🔧 修复：使用DIRECT模式减少渲染问题，确保完整刷新
+    // 🔧 修复：回退到 PARTIAL 模式（性能更好，更稳定）
     lv_display_set_buffers(display_, front_buffer_, back_buffer_,
-                          buffer_size_, LV_DISPLAY_RENDER_MODE_DIRECT);
+                          partial_buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+    std::cout << "✅ LVGL 使用 PARTIAL 渲染模式 (buffer: " 
+              << (partial_buffer_size / 1024) << " KB)" << std::endl;
     
     // 设置 flush 回调（使用 SHM）
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
