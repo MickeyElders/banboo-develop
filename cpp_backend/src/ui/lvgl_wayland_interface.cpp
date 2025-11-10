@@ -579,15 +579,19 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     // 如果没有 flush 回调，会导致卡住
     lv_display_set_user_data(display_, this);
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
+        std::cout << "🔧 [DEBUG-CALLBACK] flush 回调被调用" << std::endl;
         LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(
             lv_display_get_user_data(disp));
         
         // 初始化阶段：UI 还没创建，直接标记完成，不实际渲染
         if (impl && !impl->ui_created_) {
+            std::cout << "🔧 [DEBUG-CALLBACK] 初始化阶段，跳过渲染" << std::endl;
             lv_display_flush_ready(disp);
+            std::cout << "🔧 [DEBUG-CALLBACK] flush_ready 已调用" << std::endl;
             return;
         }
         
+        std::cout << "🔧 [DEBUG-CALLBACK] UI已创建，执行正常渲染" << std::endl;
         // UI 创建完成后：正常渲染
         if (impl) {
             impl->flushDisplayViaSHM(area, (lv_color_t*)color_p);
@@ -597,11 +601,16 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     });
     std::cout << "✅ [DEBUG] 初始化阶段 flush 回调已注册" << std::endl;
     
-    std::cout << "🔧 [DEBUG] 步骤5: 设置 DIRECT 渲染模式..." << std::endl;
+    std::cout << "🔧 [DEBUG] 步骤5: 设置 DIRECT 渲染模式（调用前）..." << std::endl;
+    std::cout << "   Buffer地址: " << (void*)front_buffer_ << std::endl;
+    std::cout << "   Buffer大小: " << full_buffer_size << " bytes" << std::endl;
+    std::cout << "   开始调用 lv_display_set_buffers()..." << std::endl;
+    
     // 使用 DIRECT 模式
     lv_display_set_buffers(display_, front_buffer_, nullptr,
                           full_buffer_size, LV_DISPLAY_RENDER_MODE_DIRECT);
     
+    std::cout << "✅ [DEBUG] lv_display_set_buffers() 调用完成" << std::endl;
     std::cout << "✅ LVGL 使用 DIRECT 渲染模式 (buffer: " 
               << (full_buffer_size / 1024) << " KB)" << std::endl;
     
