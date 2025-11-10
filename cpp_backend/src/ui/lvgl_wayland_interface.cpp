@@ -537,12 +537,16 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     std::cout << "📺 LVGL 使用 SHM 软件渲染（避免与 DeepStream 的 EGL 冲突）..." << std::endl;
     std::cout << "🎯 DeepStream 将独占 EGL/DRM 硬件加速" << std::endl;
     
+    std::cout << "🔧 [DEBUG] 步骤1: 创建 LVGL 显示设备..." << std::endl;
+    std::cout << "   屏幕尺寸: " << config_.screen_width << "x" << config_.screen_height << std::endl;
+    
     // 创建 LVGL 显示设备
     display_ = lv_display_create(config_.screen_width, config_.screen_height);
     if (!display_) {
         std::cerr << "LVGL显示创建失败" << std::endl;
         return false;
     }
+    std::cout << "✅ [DEBUG] LVGL显示创建成功" << std::endl;
     
     // 🔧 核心架构：DIRECT 模式解决渲染伪影
     // 
@@ -557,21 +561,28 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
     // - 延迟注册 flush 回调到 UI 创建之后
     // - 避免在初始化阶段触发渲染
     
+    std::cout << "🔧 [DEBUG] 步骤2: 分配显示缓冲区..." << std::endl;
     size_t full_buffer_size = config_.screen_width * config_.screen_height * sizeof(lv_color_t);
+    std::cout << "   Buffer大小: " << (full_buffer_size / 1024) << " KB" << std::endl;
+    
     front_buffer_ = (lv_color_t*)malloc(full_buffer_size);
     
     if (!front_buffer_) {
         std::cerr << "显示缓冲区分配失败" << std::endl;
         return false;
     }
+    std::cout << "✅ [DEBUG] Buffer分配成功" << std::endl;
     
+    std::cout << "🔧 [DEBUG] 步骤3: 初始化 buffer 为背景色..." << std::endl;
     // 初始化 buffer 为深灰色背景
     uint32_t bg_color = 0xFF1E1E1E;
     uint32_t* pixels = (uint32_t*)front_buffer_;
     for (size_t i = 0; i < (full_buffer_size / sizeof(uint32_t)); i++) {
         pixels[i] = bg_color;
     }
+    std::cout << "✅ [DEBUG] Buffer初始化完成" << std::endl;
     
+    std::cout << "🔧 [DEBUG] 步骤4: 设置 DIRECT 渲染模式..." << std::endl;
     // 使用 DIRECT 模式
     lv_display_set_buffers(display_, front_buffer_, nullptr,
                           full_buffer_size, LV_DISPLAY_RENDER_MODE_DIRECT);
