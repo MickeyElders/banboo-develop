@@ -612,10 +612,16 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
         wl_shm_pool_destroy(pool);
         close(fd);
         
-        // 初始化为黑色背景
-        memset(shm_data_, 0, size);
+        // 🔧 修复：初始化为深灰色背景（LVGL主题色 #1E1E1E），而不是黑色
+        // 这样即使某些区域没有被LVGL渲染，也会显示合理的背景
+        uint32_t* pixels = (uint32_t*)shm_data_;
+        uint32_t bg_color = 0xFF1E1E1E;  // ARGB: alpha=FF, RGB=1E1E1E
+        for (size_t i = 0; i < (size / 4); i++) {
+            pixels[i] = bg_color;
+        }
         
-        std::cout << "✅ 创建持久化 SHM buffer: " << width << "x" << height << std::endl;
+        std::cout << "✅ 创建持久化 SHM buffer: " << width << "x" << height 
+                  << " (背景色: #1E1E1E)" << std::endl;
     }
     
     // 🔧 修复：直接在持久化 buffer 上更新指定区域
@@ -659,13 +665,23 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     
     // 提交到 Wayland
     wl_surface_attach(wl_surface_, wl_buffer_, 0, 0);
-    wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
+    
+    // 🔧 修复：第一次刷新时标记整个屏幕为脏区域，确保完整渲染
+    static bool first_flush = true;
+    if (first_flush) {
+        wl_surface_damage(wl_surface_, 0, 0, width, height);
+        first_flush = false;
+        std::cout << "🖼️  首次 flush：标记整个屏幕 (" << width << "x" << height << ")" << std::endl;
+    } else {
+        wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
+    }
+    
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
     
-    // 调试：前3次 flush 打印信息
+    // 调试：前5次 flush 打印信息
     static int flush_count = 0;
-    if (++flush_count <= 3) {
+    if (++flush_count <= 5) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
                   << " 区域: [" << area->x1 << "," << area->y1 
                   << " -> " << area->x2 << "," << area->y2 
@@ -860,6 +876,12 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     
     // 加载主屏幕
     lv_screen_load(main_screen_);
+    
+    // 🔧 修复：强制刷新整个屏幕，确保所有组件立即渲染
+    lv_obj_invalidate(main_screen_);
+    lv_refr_now(display_);  // 立即刷新，不等待下一个tick
+    
+    std::cout << "✅ UI 创建完成，已强制刷新整个屏幕" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
