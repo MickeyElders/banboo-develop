@@ -631,7 +631,8 @@ add_custom_command(
 )
 
 # 将生成的文件添加到源文件列表
-list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE})
+# 注意：同时添加 .c 和 .h，确保 CMake 正确处理依赖关系
+list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE} ${XDG_SHELL_CLIENT_HEADER})
 
 # 添加生成文件的包含目录
 include_directories(${WAYLAND_PROTOCOLS_GEN_DIR})
