@@ -27,7 +27,9 @@
 #include <vector>
 
 #include <wayland-client-protocol.h>
-#include "wayland-protocols/xdg-shell-client-protocol.h"
+// 🔧 修复：使用系统提供的 xdg-shell 协议头文件，而非自定义生成的
+// 系统协议库与 Weston 版本完全匹配，避免协议解析错误
+#include <xdg-shell-client-protocol.h>
 
 #include <sys/mman.h>
 #include <fcntl.h>

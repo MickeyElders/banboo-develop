@@ -587,25 +587,10 @@ set(CPP_BACKEND_SOURCES
 )
 
 
-# 定义xdg-shell协议源文件
-set(XDG_SHELL_PROTOCOL_SOURCES
-    cpp_backend/src/wayland-protocols/xdg-shell-protocol.c
-)
-
-# 过滤存在的xdg-shell协议源文件
-set(VALID_XDG_SHELL_SOURCES)
-foreach(src ${XDG_SHELL_PROTOCOL_SOURCES})
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
-        list(APPEND VALID_XDG_SHELL_SOURCES ${src})
-        message(STATUS "Found xdg-shell protocol source: ${src}")
-    endif()
-endforeach()
-
-if(VALID_XDG_SHELL_SOURCES)
-    list(APPEND CPP_BACKEND_SOURCES ${VALID_XDG_SHELL_SOURCES})
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp_backend/include/wayland-protocols)
-    message(STATUS "Added xdg-shell protocol sources: ${VALID_XDG_SHELL_SOURCES}")
-endif()
+# 🔧 修复：使用系统 wayland-protocols，移除自定义协议文件
+# 自定义生成的协议文件可能版本不匹配，导致 Weston 协议解析错误
+# xdg-shell 协议已静态链接在系统的 libwayland-client 中
+message(STATUS "Using system wayland-protocols (xdg-shell from libwayland-client)")
 
 # 添加lv_drivers Wayland源文件 (如果存在)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers")
