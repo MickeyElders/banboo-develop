@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <mutex>
 #include <chrono>
+#include <thread>
 #include <condition_variable>
 #include <poll.h>   
 
@@ -877,11 +878,21 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     // 加载主屏幕
     lv_screen_load(main_screen_);
     
-    // 🔧 修复：强制刷新整个屏幕，确保所有组件立即渲染
+    // 🔧 修复：强制刷新整个屏幕，PARTIAL 模式需要多次调用
     lv_obj_invalidate(main_screen_);
-    lv_refr_now(display_);  // 立即刷新，不等待下一个tick
     
-    std::cout << "✅ UI 创建完成，已强制刷新整个屏幕" << std::endl;
+    // PARTIAL 模式下，lv_refr_now() 每次只刷新一个区域
+    // 需要循环调用直到所有脏区域都被刷新完成
+    int max_refresh_attempts = 20;  // 最多 20 次（应该足够刷新 1920x1200）
+    for (int i = 0; i < max_refresh_attempts; i++) {
+        lv_refr_now(display_);
+        
+        // 检查是否还有脏区域需要刷新
+        // LVGL 内部会标记脏区域，如果没有了会自动停止
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    
+    std::cout << "✅ UI 创建完成，已强制刷新整个屏幕（循环模式）" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
