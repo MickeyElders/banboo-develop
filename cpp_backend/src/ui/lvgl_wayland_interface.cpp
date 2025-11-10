@@ -1280,18 +1280,7 @@ void LVGLWaylandInterface::Impl::flushDisplay(const lv_area_t* area, lv_color_t*
 
 void LVGLWaylandInterface::Impl::cleanup() {
     // 🔧 修复：完全使用SHM，只清理Wayland资源
-    
-    // 清理持久化 SHM buffer
-    if (wl_buffer_) {
-        wl_buffer_destroy(wl_buffer_);
-        wl_buffer_ = nullptr;
-    }
-    
-    if (shm_data_) {
-        munmap(shm_data_, shm_size_);
-        shm_data_ = nullptr;
-        shm_size_ = 0;
-    }
+    // 注意：新架构中不再有持久化 SHM buffer（每次 flush 创建新 buffer）
     
     // 清理Wayland资源 - xdg-shell实现
     if (frame_callback_) {
