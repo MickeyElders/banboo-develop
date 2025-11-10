@@ -187,57 +187,69 @@ install-deps: install-system-deps install-wayland-deps install-lvgl9-auto
 # === 自动环境配置 ===
 # 使用 Weston 12（推荐用于 Jetson + Nvidia）
 auto-setup-environment:
-	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（Weston 12）..."
-	@# 1. 检查 Weston 版本
+	@echo "$(BLUE)[INFO]$(NC) 自动检查和配置Wayland环境（使用系统 Weston）..."
+	@# 1. 检查 Weston 是否已安装
 	@if ! command -v weston >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston 未安装，正在降级到 Weston 12..."; \
-		$(MAKE) downgrade-to-weston12; \
-	else \
-		WESTON_VERSION=$$(weston --version 2>&1 | grep -oP 'weston \K\d+\.\d+' | head -1 || echo "0"); \
-		WESTON_MAJOR=$$(echo $$WESTON_VERSION | cut -d. -f1); \
-		if [ "$$WESTON_MAJOR" != "12" ]; then \
-			echo "$(YELLOW)[WARNING]$(NC) Weston 版本不是 12（当前: $$WESTON_VERSION），正在降级..."; \
-			$(MAKE) downgrade-to-weston12; \
-		else \
-			echo "$(GREEN)[SUCCESS]$(NC) Weston 12 已安装"; \
-		fi; \
+		echo "$(RED)[ERROR]$(NC) Weston 未安装，请先安装: sudo apt-get install weston"; \
+		exit 1; \
 	fi
-	@# 2. 检查 Weston 12 服务是否配置
-	@if [ ! -f "/etc/systemd/system/weston12.service" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston 12 服务未配置，正在配置..."; \
-		$(MAKE) setup-weston12-service; \
+	@WESTON_VERSION=$$(weston --version 2>&1 | grep -oP 'weston \K[\d.]+' | head -1 || echo "unknown"); \
+	echo "$(GREEN)[SUCCESS]$(NC) 检测到系统 Weston $$WESTON_VERSION"
+	@# 2. 配置 Nvidia DRM 模块（Jetson 必需）
+	@echo "$(BLUE)[INFO]$(NC) 配置 Nvidia DRM 模块..."
+	@sudo modprobe nvidia-drm modeset=1 2>/dev/null || true
+	@if ! grep -q "options nvidia-drm modeset=1" /etc/modprobe.d/nvidia-drm.conf 2>/dev/null; then \
+		echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia-drm.conf >/dev/null; \
+		echo "$(GREEN)[SUCCESS]$(NC) Nvidia DRM 模块配置已保存"; \
 	fi
-	@# 3. 停止 Sway（如果在运行）
+	@# 3. 配置用户权限
+	@echo "$(BLUE)[INFO]$(NC) 配置 DRM 设备权限..."
+	@sudo usermod -a -G video,render,input root 2>/dev/null || true
+	@# 4. 配置 Weston 服务
+	@if [ ! -f "/etc/systemd/system/weston.service" ]; then \
+		echo "$(YELLOW)[WARNING]$(NC) Weston 服务未配置，正在配置..."; \
+		$(MAKE) setup-weston-service; \
+	fi
+	@# 5. 停止其他 Wayland 合成器
 	@if systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
 		echo "$(BLUE)[INFO]$(NC) 停止 Sway 服务..."; \
 		sudo systemctl stop sway-wayland.service; \
 		sudo systemctl disable sway-wayland.service; \
 	fi
-	@# 4. 智能检查 Weston 12 运行状态
+	@if systemctl is-active --quiet weston12.service 2>/dev/null; then \
+		echo "$(BLUE)[INFO]$(NC) 停止 Weston 12 服务..."; \
+		sudo systemctl stop weston12.service; \
+		sudo systemctl disable weston12.service; \
+	fi
+	@# 6. 启动 Weston
 	@WESTON_RUNNING=false; \
 	if pgrep -x weston >/dev/null 2>&1; then \
 		echo "$(GREEN)[INFO]$(NC) 检测到 Weston 进程正在运行"; \
 		WESTON_RUNNING=true; \
-	elif systemctl is-active --quiet weston12.service 2>/dev/null; then \
-		echo "$(GREEN)[INFO]$(NC) 检测到 Weston 12 服务正在运行"; \
+	elif systemctl is-active --quiet weston.service 2>/dev/null; then \
+		echo "$(GREEN)[INFO]$(NC) 检测到 Weston 服务正在运行"; \
 		WESTON_RUNNING=true; \
 	fi; \
 	if [ "$$WESTON_RUNNING" = "false" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston 12 未运行，正在启动..."; \
-		$(MAKE) start-weston12; \
+		echo "$(YELLOW)[WARNING]$(NC) Weston 未运行，正在启动..."; \
+		sudo systemctl enable weston.service; \
+		sudo systemctl start weston.service; \
+		sleep 3; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Weston 12 已在运行，跳过启动"; \
+		echo "$(GREEN)[SUCCESS]$(NC) Weston 已在运行，跳过启动"; \
 	fi
-	@# 5. 验证 Wayland 环境
+	@# 7. 验证 Wayland 环境
 	@if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Wayland socket 不存在，等待 Weston 12 完全启动..."; \
+		echo "$(YELLOW)[WARNING]$(NC) Wayland socket 不存在，等待 Weston 完全启动..."; \
 		sleep 5; \
 		if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
-			echo "$(RED)[ERROR]$(NC) Wayland 环境配置失败"; \
+			echo "$(RED)[ERROR]$(NC) Wayland 环境配置失败，请检查日志:"; \
+			echo "  sudo journalctl -u weston -n 50"; \
 			exit 1; \
 		fi; \
 	fi
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland 环境检查完成（Weston 12）"
+	@WAYLAND_SOCKET=$$(ls /run/user/0/wayland-* 2>/dev/null | head -1 | xargs basename); \
+	echo "$(GREEN)[SUCCESS]$(NC) Wayland 环境检查完成: $$WAYLAND_SOCKET"
 
 # === Wayland环境配置（使用Sway） ===
 install-wayland-deps:
@@ -660,6 +672,48 @@ configure-weston12:
 	@echo "enable-tap=true" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
 	@echo "touchscreen_calibrator=true" | sudo tee -a /etc/xdg/weston/weston.ini > /dev/null
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 配置文件已创建: /etc/xdg/weston/weston.ini"
+
+# 创建系统 Weston systemd 服务（使用 Nvidia Weston 13）
+setup-weston-service:
+	@echo "$(BLUE)[INFO]$(NC) 创建系统 Weston systemd 服务..."
+	@echo "[Unit]" | sudo tee /etc/systemd/system/weston.service > /dev/null
+	@echo "Description=Weston Wayland Compositor (Nvidia Jetson)" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Documentation=man:weston(1) man:weston.ini(5)" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "After=systemd-user-sessions.service multi-user.target" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "[Service]" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Type=simple" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "User=root" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Environment=\"XDG_RUNTIME_DIR=/run/user/0\"" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Environment=\"WAYLAND_DISPLAY=wayland-1\"" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Environment=\"XDG_SESSION_TYPE=wayland\"" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Environment=\"EGL_PLATFORM=wayland\"" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Environment=\"__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl\"" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "ExecStartPre=/bin/mkdir -p /run/user/0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "ExecStartPre=/bin/chmod 0700 /run/user/0" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "ExecStartPre=/bin/sh -c 'rm -f /run/user/0/wayland-*'" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "ExecStartPre=/sbin/modprobe nvidia-drm modeset=1" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "ExecStart=/usr/bin/weston \\" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "    --backend=drm-backend.so \\" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "    --idle-time=0 \\" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "    --use-pixman \\" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "    --log=/var/log/weston.log" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "Restart=always" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "TimeoutStartSec=60" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "StandardOutput=journal" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "StandardError=journal" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "SyslogIdentifier=weston" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "[Install]" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/weston.service > /dev/null
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable weston.service
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 服务已配置并启用"
 
 # 创建 Weston 12 systemd 服务
 setup-weston12-service:
