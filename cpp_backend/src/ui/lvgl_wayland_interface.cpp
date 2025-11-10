@@ -236,15 +236,20 @@ LVGLWaylandInterface::createSubsurface(int x, int y, int width, int height) {
     // 设置 subsurface 位置
     wl_subsurface_set_position(wl_subsurface, x, y);
     
-    // 设置为同步模式
-    wl_subsurface_set_sync(wl_subsurface);
+    // 🔧 修复：使用异步模式让视频独立渲染，不受父surface影响
+    wl_subsurface_set_desync(wl_subsurface);
+    
+    // 🔧 修复：将视频subsurface放置在父surface之上（避免被LVGL遮挡）
+    // 注意：默认情况下subsurface已经在父surface之上，但显式设置更保险
+    // wl_subsurface_place_above(wl_subsurface, pImpl_->wl_surface_);
     
     // 提交更改
     wl_surface_commit(wl_surface);
     wl_display_flush(pImpl_->wl_display_);
     
-    std::cout << "✅ DeepStream Subsurface 创建成功，位置: (" 
-              << x << ", " << y << ")" << std::endl;
+    std::cout << "✅ DeepStream Subsurface 创建成功（异步模式，Z-order: 在LVGL之上）" << std::endl;
+    std::cout << "📍 位置: (" << x << ", " << y << ") 尺寸: " 
+              << width << "x" << height << std::endl;
     
     return handle;
 }
@@ -534,8 +539,9 @@ bool LVGLWaylandInterface::Impl::initializeWaylandDisplay() {
         return false;
     }
     
+    // 🔧 修复：使用DIRECT模式减少渲染问题，确保完整刷新
     lv_display_set_buffers(display_, front_buffer_, back_buffer_,
-                          buffer_size_, LV_DISPLAY_RENDER_MODE_PARTIAL);
+                          buffer_size_, LV_DISPLAY_RENDER_MODE_DIRECT);
     
     // 设置 flush 回调（使用 SHM）
     lv_display_set_flush_cb(display_, [](lv_display_t* disp, const lv_area_t* area, uint8_t* color_p) {
@@ -784,26 +790,27 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_clear_flag(main_container, LV_OBJ_FLAG_SCROLLABLE);
     
     // 创建摄像头面板 (左侧，宽度: 60%)
+    // 🔧 修复：让摄像头面板完全透明，这样DeepStream视频可以显示
     int camera_width = (int)(config_.screen_width * 0.6);
     camera_panel_ = lv_obj_create(main_container);
     lv_obj_set_size(camera_panel_, camera_width, config_.screen_height - 120);
     lv_obj_align(camera_panel_, LV_ALIGN_LEFT_MID, 10, 0);
-    lv_obj_set_style_bg_color(camera_panel_, lv_color_hex(0x1A1A1A), 0);
+    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明背景
+    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 摄像头Canvas
-    camera_canvas_ = lv_canvas_create(camera_panel_);
-    lv_obj_set_size(camera_canvas_, camera_width - 20, (config_.screen_height - 120) - 20);
-    lv_obj_center(camera_canvas_);
+    // 🔧 修复：不创建Canvas，让视频直接显示
+    // DeepStream Subsurface会自动显示在这个位置
+    // 如果需要边框，可以创建一个label
+    lv_obj_t* video_label = lv_label_create(camera_panel_);
+    lv_label_set_text(video_label, "Camera Feed (DeepStream)");
+    lv_obj_set_style_text_color(video_label, lv_color_white(), 0);
+    lv_obj_align(video_label, LV_ALIGN_TOP_LEFT, 5, 5);
     
-    // 为Canvas分配缓冲区
-    static lv_color_t* canvas_buf = nullptr;
-    size_t canvas_buf_size = (camera_width - 20) * ((config_.screen_height - 120) - 20);
-    canvas_buf = (lv_color_t*)malloc(canvas_buf_size * sizeof(lv_color_t));
-    if (canvas_buf) {
-        lv_canvas_set_buffer(camera_canvas_, canvas_buf, camera_width - 20, (config_.screen_height - 120) - 20, LV_COLOR_FORMAT_RGB888);
-        lv_canvas_fill_bg(camera_canvas_, lv_color_hex(0x333333), LV_OPA_COVER);
-    }
+    // 保留camera_canvas_指针为nullptr（视频不使用Canvas）
+    camera_canvas_ = nullptr;
+    
+    std::cout << "📺 摄像头区域已设置为透明，DeepStream视频将显示在下方" << std::endl;
     
     // 创建控制面板 (右侧，宽度: 35%)
     int control_width = (int)(config_.screen_width * 0.35);
@@ -852,40 +859,11 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
 }
 
 void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
-    if (!camera_canvas_ || latest_frame_.empty()) {
-        return;
-    }
+    // 🔧 修复：不再使用Canvas，视频由DeepStream Subsurface直接显示
+    // 这个方法现在是空操作（no-op），视频渲染由GPU加速的waylandsink处理
     
-    std::lock_guard<std::mutex> lock(canvas_mutex_);
-    
-    try {
-        // 获取Canvas尺寸
-        lv_coord_t canvas_width = lv_obj_get_width(camera_canvas_);
-        lv_coord_t canvas_height = lv_obj_get_height(camera_canvas_);
-        
-        // 调整图像尺寸
-        cv::Mat resized_frame;
-        cv::resize(latest_frame_, resized_frame, cv::Size(canvas_width, canvas_height));
-        
-        // 转换颜色格式 (BGR -> RGB)
-        cv::Mat rgb_frame;
-        cv::cvtColor(resized_frame, rgb_frame, cv::COLOR_BGR2RGB);
-        
-        // 更新Canvas缓冲区
-        lv_color_t* canvas_buf = (lv_color_t*)lv_canvas_get_buf(camera_canvas_);
-        if (canvas_buf) {
-            for (int y = 0; y < canvas_height; y++) {
-                for (int x = 0; x < canvas_width; x++) {
-                    cv::Vec3b pixel = rgb_frame.at<cv::Vec3b>(y, x);
-                    lv_color_t color = lv_color_make(pixel[0], pixel[1], pixel[2]);
-                    canvas_buf[y * canvas_width + x] = color;
-                }
-            }
-            lv_obj_invalidate(camera_canvas_);
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Canvas帧更新失败: " << e.what() << std::endl;
-    }
+    // 如果将来需要叠加检测框等信息，可以在这里实现
+    return;
 }
 
 
