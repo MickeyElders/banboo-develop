@@ -240,12 +240,16 @@ LVGLWaylandInterface::createSubsurface(int x, int y, int width, int height) {
     // 🔧 修复：使用异步模式让视频独立渲染，不受父surface影响
     wl_subsurface_set_desync(wl_subsurface);
     
-    // 🔧 修复：将视频subsurface放置在父surface之上（避免被LVGL遮挡）
-    // 注意：默认情况下subsurface已经在父surface之上，但显式设置更保险
-    // wl_subsurface_place_above(wl_subsurface, pImpl_->wl_surface_);
+    // 🔧 修复：显式将视频subsurface放置在父surface之上（避免被LVGL遮挡）
+    // 这确保点击 LVGL UI 后视频仍然可见
+    wl_subsurface_place_above(wl_subsurface, pImpl_->wl_surface_);
     
-    // 提交更改
+    // 提交更改到视频 surface
     wl_surface_commit(wl_surface);
+    
+    // 同时提交父 surface 以应用 Z-order 变化
+    wl_surface_commit(pImpl_->wl_surface_);
+    
     wl_display_flush(pImpl_->wl_display_);
     
     std::cout << "✅ DeepStream Subsurface 创建成功（异步模式，Z-order: 在LVGL之上）" << std::endl;
@@ -630,14 +634,19 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     int area_width = area->x2 - area->x1 + 1;
     int area_height = area->y2 - area->y1 + 1;
     
-    // 🔧 修复：复制 LVGL 传入的渲染数据到正确位置
+    // 🔧 修复：正确转换 LVGL 颜色到 ARGB8888 格式
     #if LV_COLOR_DEPTH == 32
-        // 32位颜色：直接内存拷贝（最高效）
+        // 32位颜色：逐像素转换，确保正确的字节序
         int color_idx = 0;
         for (int y = area->y1; y <= area->y2; y++) {
-            uint32_t* row_start = pixels + y * width + area->x1;
-            memcpy(row_start, &color_p[color_idx], area_width * sizeof(lv_color_t));
-            color_idx += area_width;
+            for (int x = area->x1; x <= area->x2; x++) {
+                lv_color_t c = color_p[color_idx++];
+                // LVGL 32位格式可能是 XRGB8888，转换为 ARGB8888
+                uint8_t r = c.red;
+                uint8_t g = c.green;
+                uint8_t b = c.blue;
+                pixels[y * width + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+            }
         }
     #elif LV_COLOR_DEPTH == 16
         // 16位颜色：RGB565 -> ARGB8888
