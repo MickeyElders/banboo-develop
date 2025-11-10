@@ -36,9 +36,11 @@
 #include <cstring>
 #include <string>
 
-// 🔧 修复：禁用EGL，完全使用SHM避免与DeepStream冲突
-// #define HAS_DRM_EGL_BACKEND 1
+// 🔧 修复：使用条件编译避免重定义警告
+// HAS_DRM_EGL_BACKEND 在 CMakeLists.txt 中定义
+#ifndef HAS_DRM_EGL_BACKEND
 #define HAS_DRM_EGL_BACKEND 0
+#endif
 
 // 🆕 辅助函数：创建匿名共享内存文件（在Impl类外部定义）
 static int createAnonymousFile(size_t size) {
@@ -877,7 +879,8 @@ bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     
     // 创建 xdg_surface（toplevel 窗口不需要 positioner）
     std::cout << "🎯 创建 XDG Surface..." << std::endl;
-    xdg_surface_ = xdg_wm_base_create_xdg_surface(xdg_wm_base_, wl_surface_);
+    // 🔧 修复：新版协议使用 xdg_wm_base_get_xdg_surface 而非 xdg_wm_base_create_xdg_surface
+    xdg_surface_ = xdg_wm_base_get_xdg_surface(xdg_wm_base_, wl_surface_);
     if (!xdg_surface_) {
         std::cerr << "❌ 无法创建xdg_surface" << std::endl;
         return false;
