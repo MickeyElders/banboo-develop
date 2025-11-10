@@ -667,15 +667,8 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     // 提交到 Wayland
     wl_surface_attach(wl_surface_, wl_buffer_, 0, 0);
     
-    // 🔧 修复：第一次刷新时标记整个屏幕为脏区域，确保完整渲染
-    static bool first_flush = true;
-    if (first_flush) {
-        wl_surface_damage(wl_surface_, 0, 0, width, height);
-        first_flush = false;
-        std::cout << "🖼️  首次 flush：标记整个屏幕 (" << width << "x" << height << ")" << std::endl;
-    } else {
-        wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
-    }
+    // 🔧 修复：只 damage 实际更新的区域（LVGL 会自动处理所有需要的刷新）
+    wl_surface_damage(wl_surface_, area->x1, area->y1, area_width, area_height);
     
     wl_surface_commit(wl_surface_);
     wl_display_flush(wl_display_);
@@ -878,21 +871,10 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     // 加载主屏幕
     lv_screen_load(main_screen_);
     
-    // 🔧 修复：强制刷新整个屏幕，PARTIAL 模式需要多次调用
+    // 🔧 修复：标记整个屏幕为脏，让 UI 线程自然刷新
     lv_obj_invalidate(main_screen_);
     
-    // PARTIAL 模式下，lv_refr_now() 每次只刷新一个区域
-    // 需要循环调用直到所有脏区域都被刷新完成
-    int max_refresh_attempts = 20;  // 最多 20 次（应该足够刷新 1920x1200）
-    for (int i = 0; i < max_refresh_attempts; i++) {
-        lv_refr_now(display_);
-        
-        // 检查是否还有脏区域需要刷新
-        // LVGL 内部会标记脏区域，如果没有了会自动停止
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    
-    std::cout << "✅ UI 创建完成，已强制刷新整个屏幕（循环模式）" << std::endl;
+    std::cout << "✅ UI 创建完成，已标记屏幕需要刷新" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
