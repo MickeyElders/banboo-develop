@@ -393,11 +393,8 @@ void LVGLWaylandInterface::uiThreadLoop() {
     
     std::cout << "🚀 LVGL UI线程启动 (刷新率: " << pImpl_->config_.refresh_rate << "fps)" << std::endl;
     
-    int loop_count = 0;
     while (!pImpl_->should_stop_.load()) {
         auto now = std::chrono::steady_clock::now();
-        loop_count++;
-        
         
         // ✅ 关键修复：处理Wayland事件循环
         pImpl_->handleWaylandEvents();
@@ -410,9 +407,6 @@ void LVGLWaylandInterface::uiThreadLoop() {
         
         // 更新Canvas（如果有新帧）
         if (pImpl_->new_frame_available_.load()) {
-            if (loop_count <= 5) {
-                std::cout << "🖼️ 更新Canvas帧" << std::endl;
-            }
             pImpl_->updateCanvasFromFrame();
             pImpl_->new_frame_available_.store(false);
         }
@@ -622,13 +616,16 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     // 为了简化，我们现在延迟销毁（或者保持不销毁，让系统回收）
     // wl_buffer_destroy(buffer);  // 暂时注释掉
     
+    // 🔧 修复：禁用 flush 日志，避免日志泛滥
+    // 如需调试可取消下面的注释
+    /*
     static int flush_count = 0;
-    flush_count++;
-    if (flush_count <= 5) {
+    if (++flush_count <= 3) {
         std::cout << "🖼️  LVGL flush #" << flush_count 
                   << " 区域: [" << area->x1 << "," << area->y1 
                   << " -> " << area->x2 << "," << area->y2 << "]" << std::endl;
     }
+    */
 }
 
 bool LVGLWaylandInterface::Impl::initializeFallbackDisplay() {
@@ -860,6 +857,9 @@ void LVGLWaylandInterface::Impl::updateCanvasFromFrame() {
 bool LVGLWaylandInterface::Impl::initializeWaylandClient() {
     std::cout << "正在初始化Wayland客户端..." << std::endl;
     
+    // 🔧 修复：禁用 Wayland 协议调试日志
+    unsetenv("WAYLAND_DEBUG");
+    
     // 连接 display
     wl_display_ = wl_display_connect(nullptr);
     if (!wl_display_) {
@@ -1025,33 +1025,37 @@ void LVGLWaylandInterface::Impl::xdgToplevelConfigure(
     struct wl_array* states) {
     
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    std::cout << "📐 XDG toplevel configure: " << width << "x" << height << std::endl;
     
-    // 如果合成器建议新尺寸，更新配置
-    if (width > 0 && height > 0) {
-        impl->config_.screen_width = width;
-        impl->config_.screen_height = height;
-        std::cout << "📏 更新窗口尺寸为: " << width << "x" << height << std::endl;
-    }
+    // 🔧 修复：只在首次 configure 或尺寸变化时打印日志
+    static bool first_toplevel_config = true;
+    static int32_t last_width = 0;
+    static int32_t last_height = 0;
     
-    // 打印窗口状态
-    if (states && states->size > 0) {
-        uint32_t* state_data = static_cast<uint32_t*>(states->data);
-        size_t num_states = states->size / sizeof(uint32_t);
+    bool size_changed = (width != last_width || height != last_height);
+    
+    if (first_toplevel_config || size_changed) {
+        if (width > 0 && height > 0) {
+            std::cout << "📐 窗口尺寸: " << width << "x" << height << std::endl;
+            impl->config_.screen_width = width;
+            impl->config_.screen_height = height;
+            last_width = width;
+            last_height = height;
+        }
         
-        for (size_t i = 0; i < num_states; i++) {
-            switch (state_data[i]) {
-                case XDG_TOPLEVEL_STATE_MAXIMIZED:
-                    std::cout << "🔲 窗口状态: 最大化" << std::endl;
+        // 只在首次打印窗口状态
+        if (first_toplevel_config && states && states->size > 0) {
+            uint32_t* state_data = static_cast<uint32_t*>(states->data);
+            size_t num_states = states->size / sizeof(uint32_t);
+            
+            for (size_t i = 0; i < num_states; i++) {
+                if (state_data[i] == XDG_TOPLEVEL_STATE_FULLSCREEN) {
+                    std::cout << "🔳 窗口模式: 全屏" << std::endl;
                     break;
-                case XDG_TOPLEVEL_STATE_FULLSCREEN:
-                    std::cout << "🔳 窗口状态: 全屏" << std::endl;
-                    break;
-                case XDG_TOPLEVEL_STATE_ACTIVATED:
-                    std::cout << "✨ 窗口状态: 激活" << std::endl;
-                    break;
+                }
             }
         }
+        
+        first_toplevel_config = false;
     }
 }
 
@@ -1069,33 +1073,29 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
                                                   uint32_t id, const char* interface, uint32_t version) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     
-    std::cout << "🔍 发现Wayland接口: " << interface << " (id=" << id << ", version=" << version << ")" << std::endl;
-    
+    // 🔧 修复：只打印关键接口的绑定信息
     if (strcmp(interface, "wl_compositor") == 0) {
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, 1));
-        std::cout << "✅ 绑定wl_compositor成功" << std::endl;
+        std::cout << "✅ 绑定wl_compositor" << std::endl;
     }
     else if (strcmp(interface, "wl_subcompositor") == 0) {
-        // 🆕 关键：绑定subcompositor接口，用于创建subsurface
         impl->wl_subcompositor_ = static_cast<struct wl_subcompositor*>(
             wl_registry_bind(registry, id, &wl_subcompositor_interface, 1));
-        std::cout << "✅ 绑定wl_subcompositor成功（支持Subsurface架构）" << std::endl;
+        std::cout << "✅ 绑定wl_subcompositor" << std::endl;
     }
     else if (strcmp(interface, "wl_shm") == 0) {
-        // 🆕 新增：绑定共享内存接口，用于创建buffer
         impl->wl_shm_ = static_cast<struct wl_shm*>(
             wl_registry_bind(registry, id, &wl_shm_interface, 1));
-        std::cout << "✅ 绑定wl_shm成功" << std::endl;
+        std::cout << "✅ 绑定wl_shm" << std::endl;
     }
     else if (strcmp(interface, "xdg_wm_base") == 0) {
-    // 🔧 修复：使用服务器支持的版本号（最高 version 3）
-    // 版本 1 会导致 Weston 无法正确解析协议消息，出现 xdg_positioner 错误
     uint32_t use_version = (version < 3) ? version : 3;
     impl->xdg_wm_base_ = static_cast<struct xdg_wm_base*>(
         wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version));
-    std::cout << "✅ 绑定xdg_wm_base成功 (version " << use_version << ")" << std::endl;
+    std::cout << "✅ 绑定xdg_wm_base (v" << use_version << ")" << std::endl;
     }
+    // 其他接口静默绑定，不打印日志
 }
 
 void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry* registry, uint32_t id) {
@@ -1104,18 +1104,22 @@ void LVGLWaylandInterface::Impl::registryRemover(void* data, struct wl_registry*
 
 // ✅ 新增：xdg-shell协议回调函数实现
 void LVGLWaylandInterface::Impl::xdgWmBasePing(void* data, struct xdg_wm_base* xdg_wm_base, uint32_t serial) {
-    std::cout << "🏓 收到xdg_wm_base ping, serial=" << serial << std::endl;
+    // 🔧 修复：静默处理 ping/pong，不打印日志
     xdg_wm_base_pong(xdg_wm_base, serial);
-    std::cout << "✅ 已回复xdg_wm_base pong" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::xdgSurfaceConfigure(void* data, struct xdg_surface* xdg_surface, uint32_t serial) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
-    std::cout << "📐 收到XDG surface配置, serial=" << serial << std::endl;
+    
+    // 🔧 修复：只在首次 configure 时打印日志
+    static bool first_configure = true;
+    if (first_configure) {
+        std::cout << "📐 收到首次 XDG surface 配置" << std::endl;
+        first_configure = false;
+    }
     
     // 步骤6: 确认configure（协议要求必须ack）
     xdg_surface_ack_configure(xdg_surface, serial);
-    std::cout << "✅ 已确认xdg surface配置" << std::endl;
     
     // 设置标志，通知主线程configure已到达
     impl->configure_received_.store(true);
@@ -1134,6 +1138,9 @@ void LVGLWaylandInterface::Impl::xdgToplevelClose(void* data, struct xdg_topleve
 void LVGLWaylandInterface::Impl::frameCallback(void* data, struct wl_callback* callback, uint32_t time) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     
+    // 🔧 修复：完全禁用帧回调日志，避免日志泛滥
+    // 如需调试，可以取消下面的注释
+    /*
     static uint32_t last_time = 0;
     if (last_time > 0) {
         uint32_t delta = time - last_time;
@@ -1141,12 +1148,13 @@ void LVGLWaylandInterface::Impl::frameCallback(void* data, struct wl_callback* c
             float fps = 1000.0f / delta;
             static int frame_count = 0;
             frame_count++;
-            if (frame_count % 60 == 0) { // 每60帧打印一次
-                std::cout << "🎬 Wayland帧回调: " << fps << " fps (时间=" << time << "ms)" << std::endl;
+            if (frame_count % 300 == 0) { // 每5秒（60fps）打印一次
+                std::cout << "🎬 Wayland FPS: " << fps << std::endl;
             }
         }
     }
     last_time = time;
+    */
     
     // 销毁当前回调
     if (callback) {
@@ -1181,46 +1189,34 @@ void LVGLWaylandInterface::Impl::requestFrame() {
 
 // ✅ 新增：Wayland事件处理函数
 void LVGLWaylandInterface::Impl::handleWaylandEvents() {
-    static int event_count = 0;
-    
     if (!wl_display_) {
         return;
     }
     
-    // 🔍 详细的事件处理日志
-    event_count++;
-    if (event_count <= 10 || event_count % 120 == 0) { // 前10次和每2秒（60fps）
-        std::cout << "🔄 处理Wayland事件 #" << event_count << std::endl;
-    }
+    // 🔧 修复：完全禁用事件处理日志，避免日志泛滥
+    // 只在出错时打印错误信息
     
     // 处理所有待处理的事件，但不阻塞
-    int pending_events = 0;
     while (wl_display_prepare_read(wl_display_) != 0) {
         wl_display_dispatch_pending(wl_display_);
-        pending_events++;
-    }
-    
-    if (pending_events > 0 && event_count <= 10) {
-        std::cout << "📨 处理了 " << pending_events << " 个待处理事件" << std::endl;
     }
     
     // 检查是否有数据可读
     if (wl_display_flush(wl_display_) < 0) {
-        if (event_count <= 10) {
-            std::cerr << "⚠️  Wayland display flush失败" << std::endl;
+        static int flush_error_count = 0;
+        if (flush_error_count++ < 3) {  // 只打印前3次错误
+            std::cerr << "❌ Wayland display flush失败" << std::endl;
         }
     }
     
     // 读取并分发事件（非阻塞）
     if (wl_display_read_events(wl_display_) >= 0) {
-        int dispatched = wl_display_dispatch_pending(wl_display_);
-        if (dispatched > 0 && event_count <= 10) {
-            std::cout << "✅ 分发了 " << dispatched << " 个新事件" << std::endl;
-        }
+        wl_display_dispatch_pending(wl_display_);
     } else {
         wl_display_cancel_read(wl_display_);
-        if (event_count <= 10) {
-            std::cout << "❌ Wayland事件读取取消" << std::endl;
+        static int read_error_count = 0;
+        if (read_error_count++ < 3) {  // 只打印前3次错误
+            std::cerr << "❌ Wayland事件读取失败" << std::endl;
         }
     }
 }
