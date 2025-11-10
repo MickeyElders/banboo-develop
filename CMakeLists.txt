@@ -619,6 +619,7 @@ add_custom_command(
     COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} ${XDG_SHELL_CLIENT_HEADER}
     DEPENDS ${XDG_SHELL_XML}
     COMMENT "Generating xdg-shell client header"
+    VERBATIM
 )
 
 # 生成 xdg-shell 协议实现代码
@@ -628,11 +629,16 @@ add_custom_command(
     COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} ${XDG_SHELL_PROTOCOL_CODE}
     DEPENDS ${XDG_SHELL_XML}
     COMMENT "Generating xdg-shell protocol code"
+    VERBATIM
 )
 
-# 将生成的文件添加到源文件列表
-# 注意：同时添加 .c 和 .h，确保 CMake 正确处理依赖关系
-list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE} ${XDG_SHELL_CLIENT_HEADER})
+# 创建自定义目标确保协议文件在编译前生成
+add_custom_target(generate_wayland_protocols
+    DEPENDS ${XDG_SHELL_CLIENT_HEADER} ${XDG_SHELL_PROTOCOL_CODE}
+)
+
+# 将生成的协议实现添加到源文件列表
+list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE})
 
 # 添加生成文件的包含目录
 include_directories(${WAYLAND_PROTOCOLS_GEN_DIR})
@@ -759,6 +765,9 @@ add_executable(bamboo_integrated
     integrated_main.cpp
     ${VALID_SOURCES}
 )
+
+# 确保协议文件在编译前生成
+add_dependencies(bamboo_integrated generate_wayland_protocols)
 
 # 确保只有我们的主程序是默认构建目标
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bamboo_integrated)
