@@ -583,6 +583,7 @@ compile-weston12: install-weston12-build-deps download-weston12
 	@echo "$(CYAN)[COMPILE]$(NC) 开始编译 Weston 12.0.0 (预计 15-30 分钟)..."
 	@cd /tmp/weston12-build/weston-12.0.0 && \
 		echo "$(BLUE)[INFO]$(NC) 配置 Meson..." && \
+		rm -rf build && \
 		meson setup build \
 			--prefix=/usr \
 			--libexecdir=/usr/lib/weston \
@@ -591,16 +592,18 @@ compile-weston12: install-weston12-build-deps download-weston12
 			-Dbackend-wayland=false \
 			-Dbackend-x11=false \
 			-Dbackend-rdp=false \
+			-Dbackend-pipewire=false \
 			-Drenderer-gl=true \
 			-Dxwayland=false \
 			-Dshell-desktop=true \
 			-Dshell-fullscreen=true \
 			-Dshell-ivi=false \
 			-Dshell-kiosk=true \
-			-Dcolor-management-lcms=true \
+			-Dcolor-management-lcms=false \
 			-Dsystemd=true \
 			-Dremoting=false \
 			-Dpipewire=false \
+			-Dbackend-drm-screencast-vaapi=false \
 			-Ddemo-clients=false \
 			-Dsimple-clients=[] \
 			-Dresize-pool=true && \
