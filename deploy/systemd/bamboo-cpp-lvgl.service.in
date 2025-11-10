@@ -20,7 +20,8 @@ Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="HOME=/root"
 
 # Wayland 显示设置（支持 Weston12/Sway/Mutter）
-Environment="WAYLAND_DISPLAY=wayland-0"
+# 🔧 修复：Weston 12 使用 wayland-1，Sway 使用 wayland-0
+Environment="WAYLAND_DISPLAY=wayland-1"
 Environment="WAYLAND_DEBUG=0"
 Environment="EGL_PLATFORM=wayland"
 Environment="QT_QPA_PLATFORM=wayland"
