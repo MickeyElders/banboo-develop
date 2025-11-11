@@ -109,7 +109,10 @@ bool DeepStreamManager::initializeWithSubsurface(
     void* parent_surface,
     const SubsurfaceConfig& config) {
     
-    std::cout << "🎬 [DeepStream] 初始化Wayland Subsurface模式..." << std::endl;
+    std::cout << "🎬 [DeepStream] 初始化Wayland Subsurface模式（完整版：自动创建subsurface）..." << std::endl;
+    std::cout << "📐 Subsurface配置: offset(" << config.offset_x << ", " << config.offset_y 
+              << ") size(" << config.width << "x" << config.height << ") "
+              << (config.use_sync_mode ? "同步模式" : "异步模式") << std::endl;
     
     // 🔧 修复：正确的类型转换
     auto* wl_display = static_cast<struct wl_display*>(parent_display);
@@ -181,9 +184,20 @@ bool DeepStreamManager::initializeWithSubsurface(
         std::cout << "⚡ [DeepStream] 使用异步模式（独立刷新）" << std::endl;
     }
     
-    // 提交subsurface设置
+    // 🔧 关键步骤5：设置 Z-order（确保视频在 LVGL 之上）
+    wl_subsurface_place_above(wl_subsurface, wl_parent_surface);
+    std::cout << "🔝 [DeepStream] Subsurface Z-order: 置于父surface之上" << std::endl;
+    
+    // 提交subsurface设置到视频 surface
     wl_surface_commit(wl_surface);
+    std::cout << "✅ [DeepStream] Subsurface 设置已提交到视频 surface" << std::endl;
+    
+    // 同时提交父 surface 以应用 Z-order 变化
+    wl_surface_commit(wl_parent_surface);
+    std::cout << "✅ [DeepStream] 父 surface 已提交（应用 Z-order 变化）" << std::endl;
+    
     wl_display_flush(wl_display);
+    std::cout << "✅ [DeepStream] Display flush 完成" << std::endl;
     
     // 🔧 关键修复：调用完整的initialize()流程
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;

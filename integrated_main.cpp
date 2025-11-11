@@ -670,10 +670,10 @@ public:
         // 配置Subsurface
         deepstream::SubsurfaceConfig subsurface_config;
         subsurface_config.offset_x = 0;
-        subsurface_config.offset_y = 80;  // 跳过LVGL头部面板
+        subsurface_config.offset_y = 60;  // 🔧 修复：匹配LVGL头部面板高度（60px）
         subsurface_config.width = 960;
         subsurface_config.height = 640;
-        subsurface_config.use_sync_mode = true;
+        subsurface_config.use_sync_mode = false;  // 🔧 修复：使用异步模式，视频独立刷新，无需等待父surface
         
         // 🔧 关键：使用Subsurface模式初始化
         if (!deepstream_manager_->initializeWithSubsurface(
