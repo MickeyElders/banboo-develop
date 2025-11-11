@@ -283,6 +283,25 @@ void LVGLWaylandInterface::destroySubsurface(SubsurfaceHandle handle) {
     }
 }
 
+bool LVGLWaylandInterface::getCameraPanelCoords(int& x, int& y, int& width, int& height) {
+    if (!pImpl_ || !pImpl_->camera_panel_) {
+        return false;
+    }
+    
+    // 强制更新布局以获取最新坐标
+    lv_obj_update_layout(pImpl_->camera_panel_);
+    
+    lv_area_t area;
+    lv_obj_get_coords(pImpl_->camera_panel_, &area);
+    
+    x = area.x1;
+    y = area.y1;
+    width = area.x2 - area.x1;
+    height = area.y2 - area.y1;
+    
+    return true;
+}
+
 LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<bamboo_cut::core::DataBridge> data_bridge) 
     : pImpl_(std::make_unique<Impl>()) {
     // 🆕 初始化数据源（与原始 UI 一致）
@@ -980,9 +999,9 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
     lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
     
-    // 🔧 关键修复：阻止 LVGL 渲染这个区域，让 subsurface 视频可见
+    // 🔧 关键修复：完全透明但保持布局参与
     lv_obj_set_style_opa(camera_panel_, LV_OPA_0, 0);  // 完全透明（包括子对象）
-    lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_IGNORE_LAYOUT);  // 忽略布局系统的渲染优化
+    // ❌ 不能使用 IGNORE_LAYOUT，会破坏 Flex 布局计算！
     
     std::cout << "📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度，完全透明）" << std::endl;
     

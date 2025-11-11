@@ -664,16 +664,26 @@ public:
         
         std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
         
+        // 🔧 关键修复：获取 camera_panel 的实际坐标（在Flex布局完成后）
+        int camera_x = 0, camera_y = 60, camera_width = 960, camera_height = 640;
+        if (lvgl_interface_->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height)) {
+            std::cout << "✅ 获取 camera_panel 实际坐标: ("
+                      << camera_x << ", " << camera_y << ") "
+                      << camera_width << "x" << camera_height << std::endl;
+        } else {
+            std::cout << "⚠️  无法获取 camera_panel 坐标，使用默认值" << std::endl;
+        }
+        
         // 创建DeepStream管理器（使用Subsurface）
         deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         
-        // 配置Subsurface
+        // 配置Subsurface（使用实际坐标）
         deepstream::SubsurfaceConfig subsurface_config;
-        subsurface_config.offset_x = 0;
-        subsurface_config.offset_y = 60;  // 🔧 修复：匹配LVGL头部面板高度（60px）
-        subsurface_config.width = 960;
-        subsurface_config.height = 640;
-        subsurface_config.use_sync_mode = false;  // 🔧 修复：使用异步模式，视频独立刷新，无需等待父surface
+        subsurface_config.offset_x = camera_x;
+        subsurface_config.offset_y = camera_y;
+        subsurface_config.width = camera_width;
+        subsurface_config.height = camera_height;
+        subsurface_config.use_sync_mode = false;  // 异步模式，视频独立刷新
         
         // 🔧 关键：使用Subsurface模式初始化
         if (!deepstream_manager_->initializeWithSubsurface(

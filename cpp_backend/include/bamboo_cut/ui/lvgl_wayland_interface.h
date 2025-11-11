@@ -170,6 +170,16 @@ public:
      * @param handle Subsurface句柄
      */
     void destroySubsurface(SubsurfaceHandle handle);
+    
+    /**
+     * @brief 获取摄像头面板的实际坐标（在Flex布局完成后）
+     * @param x 返回X坐标
+     * @param y 返回Y坐标
+     * @param width 返回宽度
+     * @param height 返回高度
+     * @return 成功返回true，如果camera_panel未创建返回false
+     */
+    bool getCameraPanelCoords(int& x, int& y, int& width, int& height);
 
 private:
     // 内部实现指针
