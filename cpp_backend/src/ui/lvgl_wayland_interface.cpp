@@ -814,78 +814,100 @@ void LVGLWaylandInterface::Impl::initializeTheme() {
 }
 
 void LVGLWaylandInterface::Impl::createMainInterface() {
-    // 创建主屏幕
+    // 🎨 使用原始 UI 的配色方案
+    lv_color_t color_background = lv_color_hex(0x1A1F26);   // 温和深色背景
+    lv_color_t color_surface    = lv_color_hex(0x252B35);   // 卡片表面
+    lv_color_t color_primary    = lv_color_hex(0x5B9BD5);   // 柔和蓝色主色
+    lv_color_t color_success    = lv_color_hex(0x7FB069);   // 柔和绿色
+    lv_color_t color_warning    = lv_color_hex(0xE6A055);   // 温和橙色
+    lv_color_t color_error      = lv_color_hex(0xD67B7B);   // 柔和红色
+    
+    // 创建主屏幕 - 使用 Flex 布局（与原始 UI 一致）
     main_screen_ = lv_obj_create(nullptr);
     lv_obj_set_size(main_screen_, config_.screen_width, config_.screen_height);
+    lv_obj_set_style_bg_color(main_screen_, color_background, 0);
+    lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(main_screen_, 0, 0);
     lv_obj_clear_flag(main_screen_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(main_screen_, lv_color_hex(0x1E1E1E), 0);
     
-    // 创建头部面板 (高度: 60px)
+    // 🔧 关键：设置主屏幕为垂直 Flex 布局（与原始 UI 一致）
+    lv_obj_set_flex_flow(main_screen_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(main_screen_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(main_screen_, 5, 0);
+    
+    // === 创建头部面板 === (固定高度，使用 Flex)
     header_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(header_panel_, config_.screen_width, 60);
-    lv_obj_align(header_panel_, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_bg_color(header_panel_, lv_color_hex(0x2A2A2A), 0);
+    lv_obj_set_width(header_panel_, lv_pct(100));
+    lv_obj_set_height(header_panel_, 60);
+    lv_obj_set_flex_grow(header_panel_, 0);  // 不允许增长
+    lv_obj_set_style_bg_color(header_panel_, color_surface, 0);
+    lv_obj_set_style_radius(header_panel_, 0, 0);  // 无圆角
+    lv_obj_set_style_border_width(header_panel_, 0, 0);
+    lv_obj_set_style_pad_all(header_panel_, 10, 0);
     lv_obj_clear_flag(header_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
     // 头部标题
     lv_obj_t* title_label = lv_label_create(header_panel_);
     lv_label_set_text(title_label, "Bamboo Recognition System - Wayland Mode");
     lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_18, 0);
     lv_obj_center(title_label);
     
-    // 创建主容器 (中间部分) - 位于头部下方，底部上方
+    // === 创建中间容器 === (占据剩余空间，使用水平 Flex 布局)
     lv_obj_t* main_container = lv_obj_create(main_screen_);
-    lv_obj_set_size(main_container, config_.screen_width, config_.screen_height - 120); // 减去头部和底部
-    // 🔧 修复：使用 TOP_MID 对齐，并向下偏移 60px（头部高度）
-    lv_obj_align(main_container, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_set_width(main_container, lv_pct(100));
+    lv_obj_set_flex_grow(main_container, 1);  // 占据剩余空间
     lv_obj_set_style_bg_opa(main_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_opa(main_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_pad_all(main_container, 0, 0);  // 移除内边距
+    lv_obj_set_style_border_width(main_container, 0, 0);
+    lv_obj_set_style_pad_all(main_container, 5, 0);
     lv_obj_clear_flag(main_container, LV_OBJ_FLAG_SCROLLABLE);
     
-    std::cout << "📐 [UI] 主容器位置: Y=60, 尺寸: " << config_.screen_width << "x" << (config_.screen_height - 120) << std::endl;
+    // 🔧 设置为水平 Flex 布局（左右排列摄像头和控制面板）
+    lv_obj_set_flex_flow(main_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(main_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(main_container, 10, 0);
     
-    // 创建摄像头面板 (左侧，宽度: 60%)
-    // 🔧 修复：让摄像头面板完全透明，这样DeepStream视频可以显示
-    int camera_width = (int)(config_.screen_width * 0.6);
-    int camera_height = config_.screen_height - 120;
+    std::cout << "📐 [UI] 主容器使用 Flex 布局，水平排列" << std::endl;
     
+    // === 创建摄像头面板 === (左侧，占 75% 宽度，使用 Flex)
     camera_panel_ = lv_obj_create(main_container);
-    lv_obj_set_size(camera_panel_, camera_width, camera_height);
-    lv_obj_align(camera_panel_, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_height(camera_panel_, lv_pct(100));
+    lv_obj_set_flex_grow(camera_panel_, 3);  // 占 3/4 空间
     lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明背景
     lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
+    lv_obj_set_style_pad_all(camera_panel_, 0, 0);
+    lv_obj_set_style_radius(camera_panel_, 8, 0);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
-    
-    std::cout << "📐 [UI] 摄像头面板尺寸: " << camera_width << "x" << camera_height 
-              << " (screen: " << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
-    
-    // 🔧 修复：让摄像头面板不接收点击事件，点击穿透
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
     lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
     
-    // 🔧 修复：不创建Canvas，让视频直接显示
-    // DeepStream Subsurface会自动显示在这个位置
-    // 如果需要边框，可以创建一个label
+    std::cout << "📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度)" << std::endl;
+    
+    // 🔧 摄像头区域标签（仅用于调试）
     lv_obj_t* video_label = lv_label_create(camera_panel_);
-    lv_label_set_text(video_label, "Camera Feed (DeepStream)");
-    lv_obj_set_style_text_color(video_label, lv_color_white(), 0);
-    lv_obj_align(video_label, LV_ALIGN_TOP_LEFT, 5, 5);
+    lv_label_set_text(video_label, LV_SYMBOL_VIDEO " Camera Feed");
+    lv_obj_set_style_text_color(video_label, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(video_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(video_label, LV_ALIGN_TOP_LEFT, 10, 10);
     
     // 保留camera_canvas_指针为nullptr（视频不使用Canvas）
     camera_canvas_ = nullptr;
     
-    std::cout << "📺 摄像头区域已设置为透明，DeepStream视频将显示在下方" << std::endl;
+    std::cout << "📺 摄像头区域已设置为透明，DeepStream视频将显示在 subsurface" << std::endl;
     
-    // 创建控制面板 (右侧，宽度: 35%)
-    int control_width = (int)(config_.screen_width * 0.35);
+    // === 创建控制面板 === (右侧，占 25% 宽度，使用 Flex)
     control_panel_ = lv_obj_create(main_container);
-    lv_obj_set_size(control_panel_, control_width, config_.screen_height - 120);
-    lv_obj_align(control_panel_, LV_ALIGN_RIGHT_MID, -10, 0);
-    lv_obj_set_style_bg_color(control_panel_, lv_color_hex(0x2A2A2A), 0);
+    lv_obj_set_height(control_panel_, lv_pct(100));
+    lv_obj_set_flex_grow(control_panel_, 1);  // 占 1/4 空间
+    lv_obj_set_style_bg_color(control_panel_, color_surface, 0);
+    lv_obj_set_style_radius(control_panel_, 12, 0);
+    lv_obj_set_style_border_width(control_panel_, 2, 0);
+    lv_obj_set_style_border_color(control_panel_, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_border_opa(control_panel_, LV_OPA_50, 0);
+    lv_obj_set_style_pad_all(control_panel_, 15, 0);
     lv_obj_clear_flag(control_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
-    std::cout << "📐 [UI] 控制面板尺寸: " << control_width << "x" << (config_.screen_height - 120) << std::endl;
+    std::cout << "📐 [UI] 控制面板: flex_grow=1 (25% 宽度)" << std::endl;
     
     // 🔧 详细控制面板 - 使用 Flex 垂直布局
     lv_obj_set_flex_flow(control_panel_, LV_FLEX_FLOW_COLUMN);
@@ -989,18 +1011,25 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_label_set_text(stop_label, LV_SYMBOL_STOP " Stop Detection");
     lv_obj_center(stop_label);
     
-    // 创建底部面板 (高度: 60px)
+    // === 创建底部面板 === (固定高度，使用 Flex)
     footer_panel_ = lv_obj_create(main_screen_);
-    lv_obj_set_size(footer_panel_, config_.screen_width, 60);
-    lv_obj_align(footer_panel_, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_bg_color(footer_panel_, lv_color_hex(0x2A2A2A), 0);
+    lv_obj_set_width(footer_panel_, lv_pct(100));
+    lv_obj_set_height(footer_panel_, 60);
+    lv_obj_set_flex_grow(footer_panel_, 0);  // 不允许增长
+    lv_obj_set_style_bg_color(footer_panel_, color_surface, 0);
+    lv_obj_set_style_radius(footer_panel_, 0, 0);  // 无圆角
+    lv_obj_set_style_border_width(footer_panel_, 0, 0);
+    lv_obj_set_style_pad_all(footer_panel_, 10, 0);
     lv_obj_clear_flag(footer_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
     // 底部状态信息
     lv_obj_t* status_label = lv_label_create(footer_panel_);
-    lv_label_set_text(status_label, "状态: Wayland模式 - 准备就绪");
-    lv_obj_set_style_text_color(status_label, lv_color_white(), 0);
+    lv_label_set_text(status_label, LV_SYMBOL_OK " Wayland Mode - Ready");
+    lv_obj_set_style_text_color(status_label, color_success, 0);
+    lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
     lv_obj_center(status_label);
+    
+    std::cout << "📐 [UI] 底部面板: 固定高度 60px" << std::endl;
     
     // 加载主屏幕
     lv_screen_load(main_screen_);
