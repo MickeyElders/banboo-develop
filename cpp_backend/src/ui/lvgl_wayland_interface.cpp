@@ -887,25 +887,106 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     
     std::cout << "📐 [UI] 控制面板尺寸: " << control_width << "x" << (config_.screen_height - 120) << std::endl;
     
-    // 控制面板标题
-    lv_obj_t* control_title = lv_label_create(control_panel_);
-    lv_label_set_text(control_title, "控制面板");
-    lv_obj_set_style_text_color(control_title, lv_color_white(), 0);
-    lv_obj_align(control_title, LV_ALIGN_TOP_MID, 0, 10);
+    // 🔧 详细控制面板 - 使用 Flex 垂直布局
+    lv_obj_set_flex_flow(control_panel_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(control_panel_, 10, 0);
     
-    // 创建一些控制按钮
-    lv_obj_t* start_btn = lv_btn_create(control_panel_);
-    lv_obj_set_size(start_btn, control_width - 40, 40);
-    lv_obj_align(start_btn, LV_ALIGN_TOP_MID, 0, 50);
+    // === 标题 ===
+    lv_obj_t* control_title = lv_label_create(control_panel_);
+    lv_label_set_text(control_title, LV_SYMBOL_SETTINGS " System Info");
+    lv_obj_set_style_text_color(control_title, lv_color_hex(0x5B9BD5), 0);
+    lv_obj_set_style_text_font(control_title, &lv_font_montserrat_16, 0);
+    
+    // === Jetson 监控区域 ===
+    lv_obj_t* jetson_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(jetson_section, lv_pct(100));
+    lv_obj_set_height(jetson_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(jetson_section, 8, 0);
+    lv_obj_set_style_border_width(jetson_section, 1, 0);
+    lv_obj_set_style_border_color(jetson_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(jetson_section, 10, 0);
+    lv_obj_set_flex_flow(jetson_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(jetson_section, 6, 0);
+    lv_obj_clear_flag(jetson_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* jetson_title = lv_label_create(jetson_section);
+    lv_label_set_text(jetson_title, LV_SYMBOL_CHARGE " Jetson Orin Nano");
+    lv_obj_set_style_text_color(jetson_title, lv_color_hex(0x70A5DB), 0);
+    
+    // CPU 信息
+    lv_obj_t* cpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(cpu_label, "CPU: --% @ --MHz");
+    lv_obj_set_style_text_color(cpu_label, lv_color_white(), 0);
+    
+    // GPU 信息
+    lv_obj_t* gpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(gpu_label, "GPU: --% @ --MHz");
+    lv_obj_set_style_text_color(gpu_label, lv_color_white(), 0);
+    
+    // 内存信息
+    lv_obj_t* mem_label = lv_label_create(jetson_section);
+    lv_label_set_text(mem_label, "RAM: --MB / --MB");
+    lv_obj_set_style_text_color(mem_label, lv_color_white(), 0);
+    
+    // 温度信息
+    lv_obj_t* temp_label = lv_label_create(jetson_section);
+    lv_label_set_text(temp_label, "Temp: CPU --°C GPU --°C");
+    lv_obj_set_style_text_color(temp_label, lv_color_hex(0xE6A055), 0);
+    
+    // === AI 模型区域 ===
+    lv_obj_t* ai_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(ai_section, lv_pct(100));
+    lv_obj_set_height(ai_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(ai_section, 8, 0);
+    lv_obj_set_style_border_width(ai_section, 1, 0);
+    lv_obj_set_style_border_color(ai_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(ai_section, 10, 0);
+    lv_obj_set_flex_flow(ai_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(ai_section, 6, 0);
+    lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* ai_title = lv_label_create(ai_section);
+    lv_label_set_text(ai_title, LV_SYMBOL_IMAGE " AI Model");
+    lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
+    
+    lv_obj_t* fps_label = lv_label_create(ai_section);
+    lv_label_set_text(fps_label, "FPS: -- fps");
+    lv_obj_set_style_text_color(fps_label, lv_color_white(), 0);
+    
+    lv_obj_t* detect_label = lv_label_create(ai_section);
+    lv_label_set_text(detect_label, "Detected: 0 objects");
+    lv_obj_set_style_text_color(detect_label, lv_color_white(), 0);
+    
+    // === 控制按钮 ===
+    lv_obj_t* btn_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(btn_section, lv_pct(100));
+    lv_obj_set_height(btn_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(btn_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn_section, 0, 0);
+    lv_obj_set_style_pad_all(btn_section, 0, 0);
+    lv_obj_set_flex_flow(btn_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(btn_section, 8, 0);
+    lv_obj_clear_flag(btn_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* start_btn = lv_btn_create(btn_section);
+    lv_obj_set_width(start_btn, lv_pct(100));
+    lv_obj_set_height(start_btn, 40);
+    lv_obj_set_style_bg_color(start_btn, lv_color_hex(0x7FB069), 0);
+    lv_obj_set_style_radius(start_btn, 8, 0);
     lv_obj_t* start_label = lv_label_create(start_btn);
-    lv_label_set_text(start_label, "开始检测");
+    lv_label_set_text(start_label, LV_SYMBOL_PLAY " Start Detection");
     lv_obj_center(start_label);
     
-    lv_obj_t* stop_btn = lv_btn_create(control_panel_);
-    lv_obj_set_size(stop_btn, control_width - 40, 40);
-    lv_obj_align(stop_btn, LV_ALIGN_TOP_MID, 0, 100);
+    lv_obj_t* stop_btn = lv_btn_create(btn_section);
+    lv_obj_set_width(stop_btn, lv_pct(100));
+    lv_obj_set_height(stop_btn, 40);
+    lv_obj_set_style_bg_color(stop_btn, lv_color_hex(0xD67B7B), 0);
+    lv_obj_set_style_radius(stop_btn, 8, 0);
     lv_obj_t* stop_label = lv_label_create(stop_btn);
-    lv_label_set_text(stop_label, "停止检测");
+    lv_label_set_text(stop_label, LV_SYMBOL_STOP " Stop Detection");
     lv_obj_center(stop_label);
     
     // 创建底部面板 (高度: 60px)
