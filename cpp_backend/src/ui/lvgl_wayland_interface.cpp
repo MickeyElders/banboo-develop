@@ -642,12 +642,14 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     int area_height = area->y2 - area->y1 + 1;
     
     #if LV_COLOR_DEPTH == 32
-        // 逐行拷贝更新区域
-        int color_idx = 0;
+        // 逐行拷贝更新区域（修复：正确处理 LVGL 的 color_p 布局）
+        // LVGL 的 color_p 是连续的像素数据，直接对应更新区域
+        const uint32_t* src_pixels = reinterpret_cast<const uint32_t*>(color_p);
+        
         for (int y = area->y1; y <= area->y2; y++) {
-            uint32_t* row_start = full_frame_buffer_ + y * width + area->x1;
-            memcpy(row_start, &color_p[color_idx], area_width * sizeof(uint32_t));
-            color_idx += area_width;
+            uint32_t* dst_row = full_frame_buffer_ + y * width + area->x1;
+            const uint32_t* src_row = src_pixels + (y - area->y1) * area_width;
+            memcpy(dst_row, src_row, area_width * sizeof(uint32_t));
         }
     #else
         #error "Only LV_COLOR_DEPTH=32 is supported"
@@ -689,9 +691,10 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     
     wl_surface_commit(wl_surface_);
     
-    // 立即处理 Wayland 事件，确保合成器响应
+    // 🔧 性能优化：只用 flush，不用 roundtrip
+    // roundtrip 会阻塞等待合成器响应，导致事件延迟（41-43ms）
+    // flush 是异步的，性能更好
     wl_display_flush(wl_display_);
-    wl_display_roundtrip(wl_display_);
     
     // 设置 buffer 释放回调
     static const struct wl_buffer_listener buffer_listener = {
