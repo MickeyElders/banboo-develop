@@ -132,6 +132,18 @@ lv_obj_t* LVGLInterface::createFooterPanel() {
     lv_obj_add_event_cb(footer_widgets_.power_btn, onSettingsButtonClicked,
                         LV_EVENT_CLICKED, this);
     
+    // 🔧 修复：添加 process_label（进程信息）
+    footer_widgets_.process_label = lv_label_create(aux_controls);
+    lv_label_set_text(footer_widgets_.process_label, "Process: Ready");
+    lv_obj_set_style_text_color(footer_widgets_.process_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(footer_widgets_.process_label, &lv_font_montserrat_12, 0);
+    
+    // 🔧 修复：添加 stats_label（统计信息）
+    footer_widgets_.stats_label = lv_label_create(aux_controls);
+    lv_label_set_text(footer_widgets_.stats_label, "Stats: 0/0");
+    lv_obj_set_style_text_color(footer_widgets_.stats_label, color_primary_, 0);
+    lv_obj_set_style_text_font(footer_widgets_.stats_label, &lv_font_montserrat_12, 0);
+    
     return footer_panel_;
 #else
     return nullptr;

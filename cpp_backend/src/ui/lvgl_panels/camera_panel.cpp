@@ -120,6 +120,46 @@ lv_obj_t* LVGLInterface::createCameraPanel(lv_obj_t* parent) {
     lv_obj_set_style_text_color(camera_widgets_.status_value, lv_color_hex(0x00FF00), 0);
     lv_obj_set_style_text_font(camera_widgets_.status_value, &lv_font_montserrat_12, 0);
     
+    // 🔧 修复：添加缺失的摄像头信息标签（左上角覆盖层）
+    lv_obj_t* info_overlay = lv_obj_create(camera_panel_);
+    lv_obj_set_size(info_overlay, 250, LV_SIZE_CONTENT);
+    lv_obj_align(info_overlay, LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_set_style_bg_color(info_overlay, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(info_overlay, LV_OPA_60, 0);  // 60%透明度
+    lv_obj_set_style_border_opa(info_overlay, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_radius(info_overlay, 8, 0);
+    lv_obj_set_style_pad_all(info_overlay, 10, 0);
+    lv_obj_clear_flag(info_overlay, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // 设置为垂直Flex布局
+    lv_obj_set_flex_flow(info_overlay, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(info_overlay, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(info_overlay, 4, 0);
+    
+    // 摄像头信息标签
+    camera_widgets_.info_label = lv_label_create(info_overlay);
+    lv_label_set_text(camera_widgets_.info_label, LV_SYMBOL_VIDEO " Camera Info:");
+    lv_obj_set_style_text_color(camera_widgets_.info_label, color_primary_, 0);
+    lv_obj_set_style_text_font(camera_widgets_.info_label, &lv_font_montserrat_14, 0);
+    
+    // 坐标值
+    camera_widgets_.coord_value = lv_label_create(info_overlay);
+    lv_label_set_text(camera_widgets_.coord_value, "Coord: (0, 0)");
+    lv_obj_set_style_text_color(camera_widgets_.coord_value, lv_color_white(), 0);
+    lv_obj_set_style_text_font(camera_widgets_.coord_value, &lv_font_montserrat_12, 0);
+    
+    // 质量值
+    camera_widgets_.quality_value = lv_label_create(info_overlay);
+    lv_label_set_text(camera_widgets_.quality_value, "Quality: Grade A");
+    lv_obj_set_style_text_color(camera_widgets_.quality_value, color_success_, 0);
+    lv_obj_set_style_text_font(camera_widgets_.quality_value, &lv_font_montserrat_12, 0);
+    
+    // 刀片值
+    camera_widgets_.blade_value = lv_label_create(info_overlay);
+    lv_label_set_text(camera_widgets_.blade_value, "Blade: Normal");
+    lv_obj_set_style_text_color(camera_widgets_.blade_value, color_warning_, 0);
+    lv_obj_set_style_text_font(camera_widgets_.blade_value, &lv_font_montserrat_12, 0);
+    
     return camera_panel_;
 #else
     return nullptr;

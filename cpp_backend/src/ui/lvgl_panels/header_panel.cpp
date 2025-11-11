@@ -119,6 +119,12 @@ lv_obj_t* LVGLInterface::createHeaderPanel() {
     lv_obj_set_flex_flow(heartbeat_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(heartbeat_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
+    // 🔧 修复：添加 heartbeat_label
+    header_widgets_.heartbeat_label = lv_label_create(heartbeat_container);
+    lv_label_set_text(header_widgets_.heartbeat_label, LV_SYMBOL_CHARGE " Online");
+    lv_obj_set_style_text_color(header_widgets_.heartbeat_label, color_success_, 0);
+    lv_obj_set_style_text_font(header_widgets_.heartbeat_label, &lv_font_montserrat_14, 0);
+    
     // Response Time
     header_widgets_.response_label = lv_label_create(status_container);
     lv_label_set_text(header_widgets_.response_label, LV_SYMBOL_LOOP " 15ms");
