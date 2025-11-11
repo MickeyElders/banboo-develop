@@ -680,19 +680,16 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 🔧 关键修复：使用 buffer damage 而不是 surface damage
-    // buffer damage 更精确，避免合成器缓存问题
+    // 🔧 使用 wl_surface_damage_buffer (version 4+)
+    // 比 wl_surface_damage 更精确，直接标记 buffer 坐标系的损坏区域
     wl_surface_attach(wl_surface_, buffer, 0, 0);
     
-    // 使用 wl_surface_damage_buffer 标记 buffer 坐标系的损坏区域
+    // 使用 buffer damage（buffer 坐标系）
     wl_surface_damage_buffer(wl_surface_, 0, 0, width, height);
-    
-    // 🔧 额外：同时使用传统 damage 以兼容旧版合成器
-    wl_surface_damage(wl_surface_, 0, 0, width, height);
     
     wl_surface_commit(wl_surface_);
     
-    // 🔧 关键：提交后立即处理 Wayland 事件，确保合成器响应
+    // 立即处理 Wayland 事件，确保合成器响应
     wl_display_flush(wl_display_);
     wl_display_roundtrip(wl_display_);
     
@@ -1152,11 +1149,13 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
                                                   uint32_t id, const char* interface, uint32_t version) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     
-    // 🔧 修复：只打印关键接口的绑定信息
+    // 🔧 修复：绑定 wl_compositor version 4 以支持 wl_surface_damage_buffer
+    // wl_surface_damage_buffer() 需要 wl_surface version 4+ (在 wl_compositor v4 中引入)
     if (strcmp(interface, "wl_compositor") == 0) {
+        uint32_t use_version = (version >= 4) ? 4 : version;
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
-            wl_registry_bind(registry, id, &wl_compositor_interface, 1));
-        std::cout << "✅ 绑定wl_compositor" << std::endl;
+            wl_registry_bind(registry, id, &wl_compositor_interface, use_version));
+        std::cout << "✅ 绑定wl_compositor (v" << use_version << ")" << std::endl;
     }
     else if (strcmp(interface, "wl_subcompositor") == 0) {
         impl->wl_subcompositor_ = static_cast<struct wl_subcompositor*>(
