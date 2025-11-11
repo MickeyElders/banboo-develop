@@ -1151,34 +1151,47 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_color(control_widgets_.ai_confidence_label, color_success, 0);
     lv_obj_set_style_text_font(control_widgets_.ai_confidence_label, &lv_font_montserrat_12, 0);
     
-    // === 控制按钮 ===
-    lv_obj_t* btn_section = lv_obj_create(control_panel_);
-    lv_obj_set_width(btn_section, lv_pct(100));
-    lv_obj_set_height(btn_section, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(btn_section, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(btn_section, 0, 0);
-    lv_obj_set_style_pad_all(btn_section, 0, 0);
-    lv_obj_set_flex_flow(btn_section, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_gap(btn_section, 8, 0);
-    lv_obj_clear_flag(btn_section, LV_OBJ_FLAG_SCROLLABLE);
+    // === 系统版本信息区域 ===
+    lv_obj_t* version_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(version_section, lv_pct(100));
+    lv_obj_set_height(version_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(version_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(version_section, 8, 0);
+    lv_obj_set_style_border_width(version_section, 1, 0);
+    lv_obj_set_style_border_color(version_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(version_section, 10, 0);
+    lv_obj_set_flex_flow(version_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(version_section, 4, 0);
+    lv_obj_clear_flag(version_section, LV_OBJ_FLAG_SCROLLABLE);
     
-    lv_obj_t* start_btn = lv_btn_create(btn_section);
-    lv_obj_set_width(start_btn, lv_pct(100));
-    lv_obj_set_height(start_btn, 40);
-    lv_obj_set_style_bg_color(start_btn, lv_color_hex(0x7FB069), 0);
-    lv_obj_set_style_radius(start_btn, 8, 0);
-    lv_obj_t* start_label = lv_label_create(start_btn);
-    lv_label_set_text(start_label, LV_SYMBOL_PLAY " Start Detection");
-    lv_obj_center(start_label);
+    lv_obj_t* version_title = lv_label_create(version_section);
+    lv_label_set_text(version_title, LV_SYMBOL_LIST " System Info");
+    lv_obj_set_style_text_color(version_title, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(version_title, &lv_font_montserrat_12, 0);
     
-    lv_obj_t* stop_btn = lv_btn_create(btn_section);
-    lv_obj_set_width(stop_btn, lv_pct(100));
-    lv_obj_set_height(stop_btn, 40);
-    lv_obj_set_style_bg_color(stop_btn, lv_color_hex(0xD67B7B), 0);
-    lv_obj_set_style_radius(stop_btn, 8, 0);
-    lv_obj_t* stop_label = lv_label_create(stop_btn);
-    lv_label_set_text(stop_label, LV_SYMBOL_STOP " Stop Detection");
-    lv_obj_center(stop_label);
+    // JetPack版本
+    control_widgets_.jetpack_version_label = lv_label_create(version_section);
+    lv_label_set_text(control_widgets_.jetpack_version_label, "JetPack: 5.1.2");
+    lv_obj_set_style_text_color(control_widgets_.jetpack_version_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.jetpack_version_label, &lv_font_montserrat_10, 0);
+    
+    // CUDA版本
+    control_widgets_.cuda_version_label = lv_label_create(version_section);
+    lv_label_set_text(control_widgets_.cuda_version_label, "CUDA: 11.4");
+    lv_obj_set_style_text_color(control_widgets_.cuda_version_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.cuda_version_label, &lv_font_montserrat_10, 0);
+    
+    // TensorRT版本
+    control_widgets_.tensorrt_version_label = lv_label_create(version_section);
+    lv_label_set_text(control_widgets_.tensorrt_version_label, "TensorRT: 8.5.2");
+    lv_obj_set_style_text_color(control_widgets_.tensorrt_version_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.tensorrt_version_label, &lv_font_montserrat_10, 0);
+    
+    // LVGL版本
+    control_widgets_.lvgl_version_label = lv_label_create(version_section);
+    lv_label_set_text(control_widgets_.lvgl_version_label, "LVGL: 9.0.0");
+    lv_obj_set_style_text_color(control_widgets_.lvgl_version_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.lvgl_version_label, &lv_font_montserrat_10, 0);
     
     // === 摄像头状态区域 ===
     lv_obj_t* camera_section = lv_obj_create(control_panel_);
@@ -1276,55 +1289,124 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_warning, 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
     
-    // === 创建底部面板 === (固定高度，使用 Flex)
+    // === 创建底部面板 === (按照原版结构：Start/Pause/Stop/Emergency/Power按钮)
     footer_panel_ = lv_obj_create(main_screen_);
     lv_obj_set_width(footer_panel_, lv_pct(100));
-    lv_obj_set_height(footer_panel_, 60);
+    lv_obj_set_height(footer_panel_, 80);  // 原版高度80px
     lv_obj_set_flex_grow(footer_panel_, 0);  // 不允许增长
     lv_obj_set_style_bg_color(footer_panel_, color_surface, 0);
-    lv_obj_set_style_radius(footer_panel_, 0, 0);  // 无圆角
-    lv_obj_set_style_border_width(footer_panel_, 0, 0);
-    lv_obj_set_style_pad_all(footer_panel_, 10, 0);
+    lv_obj_set_style_radius(footer_panel_, 20, 0);  // 原版圆角20
+    lv_obj_set_style_border_width(footer_panel_, 1, 0);
+    lv_obj_set_style_border_color(footer_panel_, lv_color_hex(0x3A4048), 0);
+    lv_obj_set_style_border_opa(footer_panel_, LV_OPA_40, 0);
+    lv_obj_set_style_pad_all(footer_panel_, 16, 0);
     lv_obj_clear_flag(footer_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 🔧 设置底部为水平 Flex 布局（左中右三部分）
+    // 🔧 设置底部为水平 Flex 布局
     lv_obj_set_flex_flow(footer_panel_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(footer_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(footer_panel_, 20, 0);
+    lv_obj_set_flex_align(footer_panel_, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(footer_panel_, 12, 0);
     
-    // === 左侧：系统状态 ===
-    control_widgets_.status_label = lv_label_create(footer_panel_);
-    lv_label_set_text(control_widgets_.status_label, LV_SYMBOL_OK " Wayland Mode - Ready");
-    lv_obj_set_style_text_color(control_widgets_.status_label, color_success, 0);
-    lv_obj_set_style_text_font(control_widgets_.status_label, &lv_font_montserrat_12, 0);
+    // === 主操作区域（Start/Pause/Stop按钮，占70%） ===
+    lv_obj_t* main_controls = lv_obj_create(footer_panel_);
+    lv_obj_set_size(main_controls, lv_pct(70), lv_pct(100));
+    lv_obj_set_style_bg_opa(main_controls, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(main_controls, 0, 0);
+    lv_obj_set_style_pad_all(main_controls, 0, 0);
+    lv_obj_set_flex_flow(main_controls, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(main_controls, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(main_controls, LV_OBJ_FLAG_SCROLLABLE);
     
-    // === 中间：进程信息 ===
-    control_widgets_.process_label = lv_label_create(footer_panel_);
-    lv_label_set_text(control_widgets_.process_label, LV_SYMBOL_SETTINGS " Process: Idle");
+    // Start 按钮
+    lv_obj_t* start_btn = lv_btn_create(main_controls);
+    lv_obj_set_size(start_btn, 110, 48);
+    lv_obj_set_style_bg_color(start_btn, color_success, 0);  // 绿色
+    lv_obj_set_style_radius(start_btn, 12, 0);
+    lv_obj_t* start_label = lv_label_create(start_btn);
+    lv_label_set_text(start_label, LV_SYMBOL_PLAY " START");
+    lv_obj_set_style_text_font(start_label, &lv_font_montserrat_16, 0);
+    lv_obj_center(start_label);
+    
+    // Pause 按钮
+    lv_obj_t* pause_btn = lv_btn_create(main_controls);
+    lv_obj_set_size(pause_btn, 110, 48);
+    lv_obj_set_style_bg_color(pause_btn, color_warning, 0);  // 橙色
+    lv_obj_set_style_radius(pause_btn, 12, 0);
+    lv_obj_t* pause_label = lv_label_create(pause_btn);
+    lv_label_set_text(pause_label, LV_SYMBOL_PAUSE " PAUSE");
+    lv_obj_set_style_text_font(pause_label, &lv_font_montserrat_16, 0);
+    lv_obj_center(pause_label);
+    
+    // Stop 按钮
+    lv_obj_t* stop_btn = lv_btn_create(main_controls);
+    lv_obj_set_size(stop_btn, 110, 48);
+    lv_obj_set_style_bg_color(stop_btn, lv_color_hex(0x6B7280), 0);  // 灰色
+    lv_obj_set_style_radius(stop_btn, 12, 0);
+    lv_obj_t* stop_label = lv_label_create(stop_btn);
+    lv_label_set_text(stop_label, LV_SYMBOL_STOP " STOP");
+    lv_obj_set_style_text_font(stop_label, &lv_font_montserrat_16, 0);
+    lv_obj_center(stop_label);
+    
+    // === 危险操作区域（Emergency按钮） ===
+    lv_obj_t* danger_zone = lv_obj_create(footer_panel_);
+    lv_obj_set_size(danger_zone, 70, lv_pct(100));
+    lv_obj_set_style_bg_opa(danger_zone, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(danger_zone, 0, 0);
+    lv_obj_set_style_pad_all(danger_zone, 0, 0);
+    lv_obj_set_flex_flow(danger_zone, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(danger_zone, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(danger_zone, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // Emergency 按钮（急停，红色大按钮）
+    lv_obj_t* emergency_btn = lv_btn_create(danger_zone);
+    lv_obj_set_size(emergency_btn, 60, 60);
+    lv_obj_set_style_bg_color(emergency_btn, color_error, 0);  // 红色
+    lv_obj_set_style_radius(emergency_btn, 30, 0);  // 圆形
+    lv_obj_t* emergency_label = lv_label_create(emergency_btn);
+    lv_label_set_text(emergency_label, LV_SYMBOL_WARNING);
+    lv_obj_set_style_text_font(emergency_label, &lv_font_montserrat_24, 0);
+    lv_obj_center(emergency_label);
+    
+    // === 辅助操作区域（Power按钮 + 状态标签，占20%） ===
+    lv_obj_t* aux_controls = lv_obj_create(footer_panel_);
+    lv_obj_set_size(aux_controls, lv_pct(20), lv_pct(100));
+    lv_obj_set_style_bg_opa(aux_controls, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(aux_controls, 0, 0);
+    lv_obj_set_style_pad_all(aux_controls, 0, 0);
+    lv_obj_set_flex_flow(aux_controls, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(aux_controls, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(aux_controls, 4, 0);
+    lv_obj_clear_flag(aux_controls, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // Power/Settings 按钮
+    lv_obj_t* power_btn = lv_btn_create(aux_controls);
+    lv_obj_set_size(power_btn, 48, 48);
+    lv_obj_set_style_bg_color(power_btn, color_primary, 0);
+    lv_obj_set_style_radius(power_btn, 12, 0);
+    lv_obj_t* power_label = lv_label_create(power_btn);
+    lv_label_set_text(power_label, LV_SYMBOL_SETTINGS);
+    lv_obj_set_style_text_font(power_label, &lv_font_montserrat_16, 0);
+    lv_obj_center(power_label);
+    
+    // Process 标签
+    control_widgets_.process_label = lv_label_create(aux_controls);
+    lv_label_set_text(control_widgets_.process_label, "Process: Ready");
     lv_obj_set_style_text_color(control_widgets_.process_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.process_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(control_widgets_.process_label, &lv_font_montserrat_10, 0);
     
-    // === 右侧：UI FPS 和统计信息 ===
-    lv_obj_t* right_info = lv_obj_create(footer_panel_);
-    lv_obj_set_size(right_info, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(right_info, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(right_info, 0, 0);
-    lv_obj_set_style_pad_all(right_info, 0, 0);
-    lv_obj_set_flex_flow(right_info, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_gap(right_info, 15, 0);
-    lv_obj_clear_flag(right_info, LV_OBJ_FLAG_SCROLLABLE);
+    // Stats 标签
+    control_widgets_.stats_label = lv_label_create(aux_controls);
+    lv_label_set_text(control_widgets_.stats_label, "Stats: 0/0");
+    lv_obj_set_style_text_color(control_widgets_.stats_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.stats_label, &lv_font_montserrat_10, 0);
     
-    control_widgets_.ui_fps_label = lv_label_create(right_info);
-    lv_label_set_text(control_widgets_.ui_fps_label, LV_SYMBOL_EYE_OPEN " UI: -- fps");
+    // UI FPS 标签
+    control_widgets_.ui_fps_label = lv_label_create(aux_controls);
+    lv_label_set_text(control_widgets_.ui_fps_label, "UI: -- fps");
     lv_obj_set_style_text_color(control_widgets_.ui_fps_label, color_primary, 0);
-    lv_obj_set_style_text_font(control_widgets_.ui_fps_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(control_widgets_.ui_fps_label, &lv_font_montserrat_10, 0);
     
-    control_widgets_.stats_label = lv_label_create(right_info);
-    lv_label_set_text(control_widgets_.stats_label, LV_SYMBOL_LIST " Stats: 0/0");
-    lv_obj_set_style_text_color(control_widgets_.stats_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.stats_label, &lv_font_montserrat_12, 0);
-    
-    std::cout << "📐 [UI] 底部面板: 固定高度 60px，水平 Flex 布局" << std::endl;
+    std::cout << "📐 [UI] 底部面板: 80px高度，Start/Pause/Stop/Emergency/Power按钮" << std::endl;
     
     // 加载主屏幕
     lv_screen_load(main_screen_);
