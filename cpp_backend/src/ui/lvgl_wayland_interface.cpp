@@ -1173,25 +1173,25 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     control_widgets_.jetpack_version_label = lv_label_create(version_section);
     lv_label_set_text(control_widgets_.jetpack_version_label, "JetPack: 5.1.2");
     lv_obj_set_style_text_color(control_widgets_.jetpack_version_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.jetpack_version_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.jetpack_version_label, &lv_font_montserrat_12, 0);
     
     // CUDA版本
     control_widgets_.cuda_version_label = lv_label_create(version_section);
     lv_label_set_text(control_widgets_.cuda_version_label, "CUDA: 11.4");
     lv_obj_set_style_text_color(control_widgets_.cuda_version_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.cuda_version_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.cuda_version_label, &lv_font_montserrat_12, 0);
     
     // TensorRT版本
     control_widgets_.tensorrt_version_label = lv_label_create(version_section);
     lv_label_set_text(control_widgets_.tensorrt_version_label, "TensorRT: 8.5.2");
     lv_obj_set_style_text_color(control_widgets_.tensorrt_version_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.tensorrt_version_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.tensorrt_version_label, &lv_font_montserrat_12, 0);
     
     // LVGL版本
     control_widgets_.lvgl_version_label = lv_label_create(version_section);
     lv_label_set_text(control_widgets_.lvgl_version_label, "LVGL: 9.0.0");
     lv_obj_set_style_text_color(control_widgets_.lvgl_version_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.lvgl_version_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.lvgl_version_label, &lv_font_montserrat_12, 0);
     
     // === 摄像头状态区域 ===
     lv_obj_t* camera_section = lv_obj_create(control_panel_);
@@ -1392,19 +1392,19 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     control_widgets_.process_label = lv_label_create(aux_controls);
     lv_label_set_text(control_widgets_.process_label, "Process: Ready");
     lv_obj_set_style_text_color(control_widgets_.process_label, lv_color_hex(0xB0B8C1), 0);
-    lv_obj_set_style_text_font(control_widgets_.process_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.process_label, &lv_font_montserrat_12, 0);
     
     // Stats 标签
     control_widgets_.stats_label = lv_label_create(aux_controls);
     lv_label_set_text(control_widgets_.stats_label, "Stats: 0/0");
     lv_obj_set_style_text_color(control_widgets_.stats_label, color_primary, 0);
-    lv_obj_set_style_text_font(control_widgets_.stats_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.stats_label, &lv_font_montserrat_12, 0);
     
     // UI FPS 标签
     control_widgets_.ui_fps_label = lv_label_create(aux_controls);
     lv_label_set_text(control_widgets_.ui_fps_label, "UI: -- fps");
     lv_obj_set_style_text_color(control_widgets_.ui_fps_label, color_primary, 0);
-    lv_obj_set_style_text_font(control_widgets_.ui_fps_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(control_widgets_.ui_fps_label, &lv_font_montserrat_12, 0);
     
     std::cout << "📐 [UI] 底部面板: 80px高度，Start/Pause/Stop/Emergency/Power按钮" << std::endl;
     
