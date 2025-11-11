@@ -96,6 +96,9 @@ public:
     lv_obj_t* footer_panel_ = nullptr;
     lv_obj_t* camera_canvas_ = nullptr;
     
+    // 🆕 缓存 camera_panel 的坐标（避免每次 flush 都计算）
+    int camera_x1_ = 0, camera_y1_ = 0, camera_x2_ = 0, camera_y2_ = 0;
+    
     // Wayland EGL后端 - 现代xdg-shell协议实现 + Subsurface支持
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
@@ -793,6 +796,24 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     // 使用 buffer damage（buffer 坐标系）
     wl_surface_damage_buffer(wl_surface_, 0, 0, width, height);
     
+    // 🔧 关键修复：设置 opaque region，排除 camera_panel 区域
+    // 这告诉 compositor 哪些区域是完全不透明的（LVGL UI），哪些区域应该让 subsurface 显示（camera区域）
+    if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {  // 使用缓存的坐标
+        // 创建 region：整个屏幕
+        struct wl_region* opaque_region = wl_compositor_create_region(wl_compositor_);
+        wl_region_add(opaque_region, 0, 0, width, height);
+        
+        // 减去 camera_panel 区域（让 subsurface 可见）
+        wl_region_subtract(opaque_region, 
+                          camera_x1_, camera_y1_,
+                          camera_x2_ - camera_x1_ + 1,
+                          camera_y2_ - camera_y1_ + 1);
+        
+        // 设置 opaque region
+        wl_surface_set_opaque_region(wl_surface_, opaque_region);
+        wl_region_destroy(opaque_region);
+    }
+    
     wl_surface_commit(wl_surface_);
     
     // 🔧 性能优化：只用 flush，不用 roundtrip
@@ -1445,11 +1466,19 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_update_layout(main_screen_);  // 强制更新布局
     lv_area_t camera_area;
     lv_obj_get_coords(camera_panel_, &camera_area);
+    
+    // 🆕 缓存 camera_panel 坐标，用于设置 opaque region（避免每次 flush 都计算）
+    camera_x1_ = camera_area.x1;
+    camera_y1_ = camera_area.y1;
+    camera_x2_ = camera_area.x2;
+    camera_y2_ = camera_area.y2;
+    
     std::cout << "\n🔍 [关键诊断] camera_panel 最终坐标: ("
               << camera_area.x1 << ", " << camera_area.y1 << ") → ("
               << camera_area.x2 << ", " << camera_area.y2 << ")" << std::endl;
     std::cout << "🔍 [关键诊断] camera_panel 尺寸: " 
               << (camera_area.x2 - camera_area.x1) << "x" << (camera_area.y2 - camera_area.y1) << std::endl;
+    std::cout << "✅ [Wayland] camera_panel 坐标已缓存，用于 opaque region 设置" << std::endl;
     std::cout << "⚠️  [关键] DeepStream subsurface 当前位置: (0, 60) 尺寸: 960x640" << std::endl;
     std::cout << "⚠️  [关键] 如果两者不匹配，视频将显示在错误位置！\n" << std::endl;
     
