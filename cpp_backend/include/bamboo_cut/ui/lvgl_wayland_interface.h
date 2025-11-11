@@ -23,6 +23,16 @@ typedef struct _lv_indev_t lv_indev_t;
 struct _lv_display_t;
 typedef struct _lv_display_t lv_display_t;
 
+// 前向声明 bamboo_cut 命名空间下的类型
+namespace bamboo_cut {
+namespace core {
+    class DataBridge;
+}
+namespace utils {
+    class JetsonMonitor;
+}
+} // namespace bamboo_cut
+
 namespace bamboo_cut {
 namespace ui {
 
@@ -51,15 +61,6 @@ struct LVGLWaylandConfig {
  * 提供标准Wayland客户端模式的LVGL界面
  * 替代原有的DRM直接访问方案，支持Wayland Subsurface架构
  */
-// 前向声明
-namespace core {
-    class DataBridge;
-}
-
-namespace utils {
-    class JetsonMonitor;
-}
-
 class LVGLWaylandInterface {
 public:
     /**

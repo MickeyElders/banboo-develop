@@ -139,11 +139,11 @@ public:
     std::atomic<bool> new_frame_available_{false};
     
     // 🆕 数据源（与原始 UI 一致）
-    std::shared_ptr<core::DataBridge> data_bridge_;
-    std::shared_ptr<utils::JetsonMonitor> jetson_monitor_;
+    std::shared_ptr<bamboo_cut::core::DataBridge> data_bridge_;
+    std::shared_ptr<bamboo_cut::utils::JetsonMonitor> jetson_monitor_;
     
     // 性能监控
-    std::chrono::high_resolution_clock::time_point last_update_time_;
+    std::chrono::steady_clock::time_point last_update_time_;  // 🔧 使用 steady_clock
     int frame_count_ = 0;
     float ui_fps_ = 0.0f;
     
@@ -283,12 +283,12 @@ void LVGLWaylandInterface::destroySubsurface(SubsurfaceHandle handle) {
     }
 }
 
-LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<core::DataBridge> data_bridge) 
+LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<bamboo_cut::core::DataBridge> data_bridge) 
     : pImpl_(std::make_unique<Impl>()) {
     // 🆕 初始化数据源（与原始 UI 一致）
     pImpl_->data_bridge_ = data_bridge;
-    pImpl_->jetson_monitor_ = std::make_shared<utils::JetsonMonitor>();
-    pImpl_->last_update_time_ = std::chrono::high_resolution_clock::now();
+    pImpl_->jetson_monitor_ = std::make_shared<bamboo_cut::utils::JetsonMonitor>();
+    pImpl_->last_update_time_ = std::chrono::steady_clock::now();  // 🔧 使用 steady_clock
     
     // 🆕 初始化主题颜色（使用原始 UI 配色）
     pImpl_->theme_colors_ = ui::LVGLThemeColors();
