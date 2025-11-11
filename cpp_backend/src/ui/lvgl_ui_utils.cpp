@@ -108,8 +108,8 @@ bool updateJetsonMonitoring(
         // === 更新温度信息 ===
         if (widgets.cpu_temp_label) {
             std::ostringstream temp_text;
-            temp_text << "Temp: CPU " << stats.temperature.cpu_temp_c << "°C "
-                      << "GPU " << stats.temperature.gpu_temp_c << "°C";
+            temp_text << "Temp: CPU " << stats.temperature.cpu_temp << "°C "
+                      << "GPU " << stats.temperature.gpu_temp << "°C";
             lv_label_set_text(widgets.cpu_temp_label, temp_text.str().c_str());
         }
         
