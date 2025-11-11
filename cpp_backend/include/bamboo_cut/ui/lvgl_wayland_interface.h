@@ -51,9 +51,22 @@ struct LVGLWaylandConfig {
  * 提供标准Wayland客户端模式的LVGL界面
  * 替代原有的DRM直接访问方案，支持Wayland Subsurface架构
  */
+// 前向声明
+namespace core {
+    class DataBridge;
+}
+
+namespace utils {
+    class JetsonMonitor;
+}
+
 class LVGLWaylandInterface {
 public:
-    LVGLWaylandInterface();
+    /**
+     * @brief 构造函数
+     * @param data_bridge 数据桥接器（用于获取推理结果等数据）
+     */
+    explicit LVGLWaylandInterface(std::shared_ptr<core::DataBridge> data_bridge = nullptr);
     ~LVGLWaylandInterface();
 
     /**

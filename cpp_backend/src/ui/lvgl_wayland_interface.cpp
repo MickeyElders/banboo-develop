@@ -5,6 +5,8 @@
 
 #include "bamboo_cut/ui/lvgl_wayland_interface.h"
 #include "bamboo_cut/utils/logger.h"
+#include "bamboo_cut/core/data_bridge.h"           // 🆕 数据桥接器
+#include "bamboo_cut/utils/jetson_monitor.h"       // 🆕 Jetson 系统监控
 #include <lvgl.h>
 #include <iostream>
 #include <cstdlib>
@@ -13,7 +15,9 @@
 #include <chrono>
 #include <thread>
 #include <condition_variable>
-#include <poll.h>   
+#include <poll.h>
+#include <sstream>      // 🆕 用于字符串格式化
+#include <iomanip>      // 🆕 用于格式化输出   
 
 // 系统头文件
 #include <errno.h>
@@ -132,6 +136,15 @@ public:
     // Canvas更新
     cv::Mat latest_frame_;
     std::atomic<bool> new_frame_available_{false};
+    
+    // 🆕 数据源（与原始 UI 一致）
+    std::shared_ptr<core::DataBridge> data_bridge_;
+    std::shared_ptr<utils::JetsonMonitor> jetson_monitor_;
+    
+    // 性能监控
+    std::chrono::high_resolution_clock::time_point last_update_time_;
+    int frame_count_ = 0;
+    float ui_fps_ = 0.0f;
     
     // 初始化状态
     bool wayland_initialized_ = false;
@@ -265,8 +278,12 @@ void LVGLWaylandInterface::destroySubsurface(SubsurfaceHandle handle) {
     }
 }
 
-LVGLWaylandInterface::LVGLWaylandInterface() 
+LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<core::DataBridge> data_bridge) 
     : pImpl_(std::make_unique<Impl>()) {
+    // 🆕 初始化数据源（与原始 UI 一致）
+    pImpl_->data_bridge_ = data_bridge;
+    pImpl_->jetson_monitor_ = std::make_shared<utils::JetsonMonitor>();
+    pImpl_->last_update_time_ = std::chrono::high_resolution_clock::now();
 }
 
 LVGLWaylandInterface::~LVGLWaylandInterface() {
