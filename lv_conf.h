@@ -270,7 +270,7 @@
 #define LV_FONT_MONTSERRAT_12_SUBPX      0
 #define LV_FONT_MONTSERRAT_28_COMPRESSED 0  /*bpp = 3*/
 #define LV_FONT_DEJAVU_16_PERSIAN_HEBREW 0  /*Hebrew, Arabic, Persian letters and all their forms*/
-#define LV_FONT_SIMSUN_16_CJK            1  /*🔧 启用中文字体支持（1000个常用CJK字符）*/
+#define LV_FONT_SIMSUN_16_CJK            0  /*系统 LVGL 未预编译此字体，需要自定义字体*/
 
 /*Pixel perfect monospace fonts*/
 #define LV_FONT_UNSCII_8  0
@@ -282,8 +282,9 @@
 #define LV_FONT_CUSTOM_DECLARE
 
 /*Always set a default font*/
-/* 🔧 修复：使用支持中文的字体作为默认字体 */
-#define LV_FONT_DEFAULT &lv_font_simsun_16_cjk
+/* 🔧 注意：系统预编译的 LVGL 可能不包含 SimSun 字体 */
+/* 先使用标准 Montserrat 字体确保编译通过，后续添加自定义中文字体 */
+#define LV_FONT_DEFAULT &lv_font_montserrat_14
 
 /*Enable handling large font and/or fonts with a lot of characters.
  *The limit depends on the font size, font face and bpp.

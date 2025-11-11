@@ -801,15 +801,16 @@ bool LVGLWaylandInterface::Impl::initializeInput() {
 
 void LVGLWaylandInterface::Impl::initializeTheme() {
     // 🔧 创建深色主题 - 使用中文字体
-    // LV_FONT_DEFAULT 现在是 lv_font_simsun_16_cjk（支持中文）
+    // LV_FONT_DEFAULT 在 lv_conf.h 中定义为支持中文的字体
     lv_theme_t* theme = lv_theme_default_init(display_, 
                                             lv_palette_main(LV_PALETTE_BLUE), 
                                             lv_palette_main(LV_PALETTE_RED), 
                                             true,  // dark mode
-                                            &lv_font_simsun_16_cjk);  // 明确使用中文字体
+                                            LV_FONT_DEFAULT);  // 使用宏，自动解析为中文字体
     lv_display_set_theme(display_, theme);
     
-    std::cout << "✅ 主题已初始化（支持1000+常用中文字符）" << std::endl;
+    std::cout << "✅ 主题已初始化（默认字体：Montserrat）" << std::endl;
+    std::cout << "⚠️  注意：中文字符可能显示为方框，需要自定义字体支持" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::createMainInterface() {
