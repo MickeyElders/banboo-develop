@@ -27,10 +27,15 @@ namespace bamboo_cut {
 namespace ui {
 
 /**
- * @brief UI 控件集合 - 用于动态更新的控件引用
+ * @brief UI 控件集合 - 用于动态更新的控件引用（与原版UI对齐）
  */
 struct LVGLControlWidgets {
-    // Jetson 系统监控组件
+    // === Header 组件 ===
+    lv_obj_t* system_title = nullptr;
+    lv_obj_t* heartbeat_label = nullptr;
+    lv_obj_t* response_label = nullptr;
+    
+    // === Jetson 系统监控组件 ===
     lv_obj_t* cpu_bar = nullptr;
     lv_obj_t* cpu_label = nullptr;
     lv_obj_t* cpu_temp_label = nullptr;
@@ -42,23 +47,58 @@ struct LVGLControlWidgets {
     lv_obj_t* mem_bar = nullptr;
     lv_obj_t* mem_label = nullptr;
     lv_obj_t* swap_usage_label = nullptr;
+    lv_obj_t* thermal_warning_label = nullptr;  // 🆕 热区警告
     
-    // AI 模型监控组件
+    // === 功率信息 ===
+    lv_obj_t* power_cpu_label = nullptr;         // 🆕 CPU功率
+    lv_obj_t* power_gpu_label = nullptr;         // 🆕 GPU功率
+    lv_obj_t* power_total_label = nullptr;       // 🆕 总功率
+    
+    // === AI 模型监控组件 ===
     lv_obj_t* ai_fps_label = nullptr;
     lv_obj_t* ai_inference_time_label = nullptr;
     lv_obj_t* ai_total_detections_label = nullptr;
     lv_obj_t* ai_confidence_label = nullptr;
+    lv_obj_t* ai_model_name_label = nullptr;     // 🆕 模型名称
     
-    // 摄像头状态组件
+    // === 摄像头状态组件 ===
     lv_obj_t* camera_status_label = nullptr;
     lv_obj_t* camera_fps_label = nullptr;
+    lv_obj_t* camera_resolution_label = nullptr;  // 🆕 分辨率
+    lv_obj_t* camera_format_label = nullptr;      // 🆕 格式
     
-    // Modbus 通信组件
+    // === Modbus 通信组件 ===
     lv_obj_t* modbus_connection_label = nullptr;
     lv_obj_t* modbus_latency_label = nullptr;
     lv_obj_t* modbus_error_count_label = nullptr;
+    lv_obj_t* modbus_read_count_label = nullptr;   // 🆕 读取计数
+    lv_obj_t* modbus_write_count_label = nullptr;  // 🆕 写入计数
+    lv_obj_t* modbus_slave_status_label = nullptr; // 🆕 从站状态
     
-    // 状态和性能
+    // === 工作流程状态 ===
+    lv_obj_t* workflow_state_label = nullptr;      // 🆕 工作流状态
+    lv_obj_t* workflow_progress_bar = nullptr;     // 🆕 进度条
+    lv_obj_t* cut_sequence_label = nullptr;        // 🆕 切割序列
+    lv_obj_t* quality_grade_label = nullptr;       // 🆕 质量分级
+    lv_obj_t* operation_hint_label = nullptr;      // 🆕 操作提示
+    
+    // === 摄像头信息（左侧面板）===
+    lv_obj_t* camera_info_label = nullptr;         // 🆕 摄像头信息
+    lv_obj_t* coord_value_label = nullptr;         // 🆕 坐标值
+    lv_obj_t* quality_value_label = nullptr;       // 🆕 质量值
+    lv_obj_t* blade_value_label = nullptr;         // 🆕 刀片值
+    
+    // === 系统版本信息 ===
+    lv_obj_t* jetpack_version_label = nullptr;     // 🆕 JetPack版本
+    lv_obj_t* cuda_version_label = nullptr;        // 🆕 CUDA版本
+    lv_obj_t* tensorrt_version_label = nullptr;    // 🆕 TensorRT版本
+    lv_obj_t* opencv_version_label = nullptr;      // 🆕 OpenCV版本
+    lv_obj_t* lvgl_version_label = nullptr;        // 🆕 LVGL版本
+    lv_obj_t* build_time_label = nullptr;          // 🆕 编译时间
+    
+    // === Footer 组件 ===
+    lv_obj_t* process_label = nullptr;             // 🆕 进程标签
+    lv_obj_t* stats_label = nullptr;               // 🆕 统计标签
     lv_obj_t* status_label = nullptr;
     lv_obj_t* ui_fps_label = nullptr;
 };

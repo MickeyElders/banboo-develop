@@ -913,12 +913,26 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_pad_all(header_panel_, 10, 0);
     lv_obj_clear_flag(header_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 头部标题
-    lv_obj_t* title_label = lv_label_create(header_panel_);
-    lv_label_set_text(title_label, "Bamboo Recognition System - Wayland Mode");
-    lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_16, 0);
-    lv_obj_center(title_label);
+    // 🆕 设置头部为水平Flex布局
+    lv_obj_set_flex_flow(header_panel_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(header_panel_, 20, 0);
+    
+    // 🆕 系统标题
+    control_widgets_.system_title = lv_label_create(header_panel_);
+    lv_label_set_text(control_widgets_.system_title, LV_SYMBOL_HOME " Bamboo Recognition System");
+    lv_obj_set_style_text_color(control_widgets_.system_title, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.system_title, &lv_font_montserrat_16, 0);
+    
+    // 🆕 心跳标签（显示系统运行状态）
+    control_widgets_.heartbeat_label = lv_label_create(header_panel_);
+    lv_label_set_text(control_widgets_.heartbeat_label, LV_SYMBOL_LOOP " Online");
+    lv_obj_set_style_text_color(control_widgets_.heartbeat_label, color_success, 0);
+    
+    // 🆕 响应时间标签
+    control_widgets_.response_label = lv_label_create(header_panel_);
+    lv_label_set_text(control_widgets_.response_label, LV_SYMBOL_CHARGE " 12ms");
+    lv_obj_set_style_text_color(control_widgets_.response_label, color_primary, 0);
     
     // === 创建中间容器 === (占据剩余空间，使用水平 Flex 布局)
     lv_obj_t* main_container = lv_obj_create(main_screen_);
