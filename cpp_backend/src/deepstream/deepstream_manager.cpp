@@ -8,6 +8,7 @@
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
+#include <gst/video/videooverlay.h>  // 🔧 GstVideoOverlay 接口
 #include <fstream>
 #include <cstdlib>
 #include <fcntl.h>
@@ -115,6 +116,9 @@ bool DeepStreamManager::initializeWithSubsurface(
     auto* wl_compositor = static_cast<struct wl_compositor*>(parent_compositor);
     auto* wl_subcompositor = static_cast<struct wl_subcompositor*>(parent_subcompositor);
     auto* wl_parent_surface = static_cast<struct wl_surface*>(parent_surface);
+    
+    // 🔧 保存父窗口的 wl_display，用于传递给 waylandsink
+    parent_wl_display_ = parent_display;
     
     // 🔧 新增：检查父display健康状态
     if (wl_display) {
@@ -350,19 +354,6 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 std::cerr << "❌ 管道字符串为空，配置错误" << std::endl;
                 return false;
             }
-             // 🔧 关键：在启动管道前，将 waylandsink 绑定到 subsurface
-            if (video_surface_) {
-                GstElement* waylandsink = gst_bin_get_by_name(GST_BIN(pipeline_), "video_sink");
-                if (waylandsink) {
-                    // 将 waylandsink 的输出绑定到我们的 subsurface
-                    auto* wl_surface = static_cast<struct wl_surface*>(video_surface_);
-                    g_object_set(waylandsink, "wayland-surface", wl_surface, NULL);
-                    std::cout << "✅ [DeepStream] waylandsink已绑定到subsurface" << std::endl;
-                    gst_object_unref(waylandsink);
-                } else {
-                    std::cerr << "⚠️ [DeepStream] 未找到waylandsink元素" << std::endl;
-                }
-            }
             // 创建管道
             GError *error = nullptr;
             pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
@@ -409,18 +400,65 @@ bool DeepStreamManager::startSinglePipelineMode() {
             }
             bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
             
-            // 🔧 关键：在启动管道前，将waylandsink绑定到subsurface
-            if (video_subsurface_ && video_surface_) {
-                GstElement* waylandsink = gst_bin_get_by_name(GST_BIN(pipeline_), "video_sink");
-                if (waylandsink) {
-                    // 将waylandsink的输出绑定到我们的subsurface
-                    auto* wl_surface = static_cast<struct wl_surface*>(video_surface_);
-                    g_object_set(waylandsink, "wayland-surface", wl_surface, NULL);
-                    std::cout << "✅ [DeepStream] waylandsink已绑定到subsurface" << std::endl;
-                    gst_object_unref(waylandsink);
-                } else {
-                    std::cerr << "⚠️ [DeepStream] 未找到waylandsink元素" << std::endl;
-                }
+            // 🔧 修复：通过 GstVideoOverlay 接口传递 subsurface 给 waylandsink
+            // waylandsink 实现了 GstVideoOverlay 接口，支持外部窗口句柄
+            if (video_surface_) {
+                // 设置同步消息处理器，处理 Wayland display context 和 window handle
+                gst_bus_set_sync_handler(bus_, 
+                    [](GstBus* bus, GstMessage* message, gpointer user_data) -> GstBusSyncReply {
+                        DeepStreamManager* self = static_cast<DeepStreamManager*>(user_data);
+                        
+                        // 处理 Wayland display context 请求
+                        if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_NEED_CONTEXT) {
+                            const gchar* context_type;
+                            gst_message_parse_context_type(message, &context_type);
+                            
+                            if (g_strcmp0(context_type, "GstWaylandDisplayHandleContextType") == 0) {
+                                // 创建 Wayland display context
+                                GstContext* context = gst_context_new("GstWaylandDisplayHandleContextType", TRUE);
+                                GstStructure* structure = gst_context_writable_structure(context);
+                                
+                                // 设置 Wayland display（waylandsink 需要）
+                                gst_structure_set(structure, 
+                                    "display", G_TYPE_POINTER, self->parent_wl_display_,
+                                    NULL);
+                                
+                                gst_element_set_context(GST_ELEMENT(GST_MESSAGE_SRC(message)), context);
+                                gst_context_unref(context);
+                                
+                                std::cout << "✅ [DeepStream] Wayland display context 已传递" << std::endl;
+                                return GST_BUS_DROP;
+                            }
+                        }
+                        
+                        // 🔧 关键：处理 prepare-window-handle 消息（GstVideoOverlay）
+                        if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ELEMENT) {
+                            const GstStructure* structure = gst_message_get_structure(message);
+                            
+                            if (gst_structure_has_name(structure, "prepare-window-handle")) {
+                                // waylandsink 请求窗口句柄，传递我们的 subsurface
+                                GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
+                                
+                                if (GST_IS_VIDEO_OVERLAY(sink)) {
+                                    // 将 wl_surface 指针作为窗口句柄传递
+                                    // 对于 Wayland，这是标准做法
+                                    gst_video_overlay_set_window_handle(
+                                        GST_VIDEO_OVERLAY(sink),
+                                        reinterpret_cast<guintptr>(self->video_surface_)
+                                    );
+                                    
+                                    std::cout << "✅ [DeepStream] 已将 subsurface 设置为 waylandsink 的窗口句柄" << std::endl;
+                                    return GST_BUS_DROP;
+                                }
+                            }
+                        }
+                        
+                        return GST_BUS_PASS;
+                    }, 
+                    this, 
+                    NULL);
+                
+                std::cout << "✅ [DeepStream] 已设置 Wayland 显示和窗口句柄传递机制" << std::endl;
             }
             
             // 🔧 改进：分阶段启动管道，降低段错误风险

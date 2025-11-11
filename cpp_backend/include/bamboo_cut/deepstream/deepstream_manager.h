@@ -432,6 +432,7 @@ private:
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
     
     // 🆕 Wayland Subsurface成员变量（使用void*避免类型冲突）
+    void* parent_wl_display_ = nullptr;  // 父窗口的 Wayland display（wl_display*）
     void* video_surface_ = nullptr;      // 视频子表面（wl_surface*）
     void* video_subsurface_ = nullptr;   // Subsurface对象（wl_subsurface*）
     SubsurfaceConfig subsurface_config_; // Subsurface配置
