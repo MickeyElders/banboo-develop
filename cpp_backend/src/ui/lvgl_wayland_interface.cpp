@@ -980,10 +980,11 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
     lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
     
-    // 🧪 临时测试：完全隐藏 camera_panel 看视频是否显示
-    lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_HIDDEN);
+    // 🔧 关键修复：阻止 LVGL 渲染这个区域，让 subsurface 视频可见
+    lv_obj_set_style_opa(camera_panel_, LV_OPA_0, 0);  // 完全透明（包括子对象）
+    lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_IGNORE_LAYOUT);  // 忽略布局系统的渲染优化
     
-    std::cout << "📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度)" << std::endl;
+    std::cout << "📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度，完全透明）" << std::endl;
     
     // 🔧 摄像头区域标签（仅用于调试）
     lv_obj_t* video_label = lv_label_create(camera_panel_);
@@ -1420,6 +1421,18 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_invalidate(camera_panel_);
     lv_obj_invalidate(control_panel_);
     lv_obj_invalidate(footer_panel_);
+    
+    // 🔍 在布局完成后获取 camera_panel 的实际坐标
+    lv_obj_update_layout(main_screen_);  // 强制更新布局
+    lv_area_t camera_area;
+    lv_obj_get_coords(camera_panel_, &camera_area);
+    std::cout << "\n🔍 [关键诊断] camera_panel 最终坐标: ("
+              << camera_area.x1 << ", " << camera_area.y1 << ") → ("
+              << camera_area.x2 << ", " << camera_area.y2 << ")" << std::endl;
+    std::cout << "🔍 [关键诊断] camera_panel 尺寸: " 
+              << (camera_area.x2 - camera_area.x1) << "x" << (camera_area.y2 - camera_area.y1) << std::endl;
+    std::cout << "⚠️  [关键] DeepStream subsurface 当前位置: (0, 60) 尺寸: 960x640" << std::endl;
+    std::cout << "⚠️  [关键] 如果两者不匹配，视频将显示在错误位置！\n" << std::endl;
     
     std::cout << "✅ UI 创建完成，已标记所有面板需要刷新" << std::endl;
 }
