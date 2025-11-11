@@ -844,12 +844,17 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     // 创建摄像头面板 (左侧，宽度: 60%)
     // 🔧 修复：让摄像头面板完全透明，这样DeepStream视频可以显示
     int camera_width = (int)(config_.screen_width * 0.6);
+    int camera_height = config_.screen_height - 120;
+    
     camera_panel_ = lv_obj_create(main_container);
-    lv_obj_set_size(camera_panel_, camera_width, config_.screen_height - 120);
+    lv_obj_set_size(camera_panel_, camera_width, camera_height);
     lv_obj_align(camera_panel_, LV_ALIGN_LEFT_MID, 10, 0);
     lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明背景
     lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    std::cout << "📐 [UI] 摄像头面板尺寸: " << camera_width << "x" << camera_height 
+              << " (screen: " << config_.screen_width << "x" << config_.screen_height << ")" << std::endl;
     
     // 🔧 修复：让摄像头面板不接收点击事件，点击穿透
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
@@ -875,6 +880,8 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_align(control_panel_, LV_ALIGN_RIGHT_MID, -10, 0);
     lv_obj_set_style_bg_color(control_panel_, lv_color_hex(0x2A2A2A), 0);
     lv_obj_clear_flag(control_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    std::cout << "📐 [UI] 控制面板尺寸: " << control_width << "x" << (config_.screen_height - 120) << std::endl;
     
     // 控制面板标题
     lv_obj_t* control_title = lv_label_create(control_panel_);
