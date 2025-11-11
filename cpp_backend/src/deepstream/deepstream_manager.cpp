@@ -184,20 +184,36 @@ bool DeepStreamManager::initializeWithSubsurface(
         std::cout << "⚡ [DeepStream] 使用异步模式（独立刷新）" << std::endl;
     }
     
-    // 🔧 关键步骤5：设置 Z-order（确保视频在 LVGL 之上）
-    wl_subsurface_place_above(wl_subsurface, wl_parent_surface);
-    std::cout << "🔝 [DeepStream] Subsurface Z-order: 置于父surface之上" << std::endl;
+    // 🔧 关键步骤5：Z-order 说明
+    // ⚠️  重要：Wayland subsurface 的 Z-order 规则
+    // - Subsurface **默认**在 parent surface 之上（不需要 place_above parent）
+    // - place_above/below 用于设置**兄弟 subsurface** 之间的顺序
+    // - 如果只有一个 subsurface，它自动在 parent 之上
+    // 
+    // 因此，我们的 subsurface（视频）会自动显示在 parent surface（LVGL UI）之上
+    // 只要 parent surface 的 camera_panel 区域是透明的，视频就能透过显示
+    std::cout << "🔝 [DeepStream] Subsurface Z-order: 自动位于父 surface 之上（Wayland 默认行为）" << std::endl;
     
-    // 提交subsurface设置到视频 surface
+    // 🔧 关键步骤6：commit subsurface 和 parent surface
+    // ⚠️  注意：Wayland subsurface 机制
+    // - subsurface 相对于 parent surface 的位置/Z-order 在 parent commit 时生效
+    // - subsurface 自己的 buffer 在 subsurface commit 时生效
+    // - 在 desync 模式下，subsurface 可以独立 commit，不需要与 parent 同步
     wl_surface_commit(wl_surface);
-    std::cout << "✅ [DeepStream] Subsurface 设置已提交到视频 surface" << std::endl;
+    std::cout << "✅ [DeepStream] Subsurface 已 commit（空 commit，等待 waylandsink attach buffer）" << std::endl;
     
-    // 同时提交父 surface 以应用 Z-order 变化
     wl_surface_commit(wl_parent_surface);
-    std::cout << "✅ [DeepStream] 父 surface 已提交（应用 Z-order 变化）" << std::endl;
+    std::cout << "✅ [DeepStream] 父 surface 已 commit（应用 subsurface 位置和 Z-order）" << std::endl;
     
     wl_display_flush(wl_display);
     std::cout << "✅ [DeepStream] Display flush 完成" << std::endl;
+    
+    std::cout << "\n🔍 [架构诊断] Waylandsink 预期行为：" << std::endl;
+    std::cout << "  1️⃣ waylandsink 接收 subsurface 作为 window_handle" << std::endl;
+    std::cout << "  2️⃣ waylandsink attach video buffer 到 subsurface" << std::endl;
+    std::cout << "  3️⃣ waylandsink commit subsurface（显示视频帧）" << std::endl;
+    std::cout << "  4️⃣ compositor 混合: 父 surface（LVGL UI，camera area 透明）+ subsurface（视频）" << std::endl;
+    std::cout << "  ✅ 结果：UI + 视频同时可见\n" << std::endl;
     
     // 🔧 关键修复：调用完整的initialize()流程
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;
