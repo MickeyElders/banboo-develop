@@ -980,6 +980,9 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
     lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
     
+    // 🧪 临时测试：完全隐藏 camera_panel 看视频是否显示
+    lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_HIDDEN);
+    
     std::cout << "📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度)" << std::endl;
     
     // 🔧 摄像头区域标签（仅用于调试）
