@@ -1641,17 +1641,18 @@ VideoLayout DeepStreamManager::calculateWaylandVideoLayout(const DeepStreamConfi
     std::cout << "[DeepStreamManager] 计算Wayland视频布局..." << std::endl;
     std::cout << "  摄像头输入: " << config.camera_width << "x" << config.camera_height << std::endl;
     
-    // 计算可用区域（减去顶部和底部栏）
+    // 🔧 关键修复：使用 subsurface 的实际尺寸（从 initializeWithSubsurface 传入）
+    // config.screen_width 和 config.screen_height 已经是 subsurface 的实际尺寸
+    layout.width = config.screen_width;
+    layout.height = config.screen_height;
+    
+    // 计算可用区域（用于显示）
     layout.available_width = config.screen_width;
-    layout.available_height = config.screen_height - config.header_height - config.footer_height;
+    layout.available_height = config.screen_height;
     
-    // 🔧 修复：目标显示尺寸（固定为960x640以匹配Canvas）
-    layout.width = 960;   // 固定宽度
-    layout.height = 640;  // 固定高度
-    
-    // 窗口位置（跳过头部面板）
-    layout.offset_x = 0;  // 左对齐
-    layout.offset_y = config.header_height;  // 头部面板下方
+    // 窗口位置（使用 subsurface 的偏移量，而不是固定的 header_height）
+    layout.offset_x = 0;  // 相对于 subsurface 自身
+    layout.offset_y = 0;  // 相对于 subsurface 自身
     
     std::cout << "[DeepStreamManager] 布局计算完成: "
               << layout.width << "x" << layout.height
