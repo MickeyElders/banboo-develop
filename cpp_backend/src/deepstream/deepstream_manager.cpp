@@ -335,7 +335,10 @@ bool DeepStreamManager::startSinglePipelineMode() {
         for (int retry = 0; retry < MAX_RETRIES; retry++) {
             if (retry > 0) {
                 std::cout << "重试启动管道 (第" << retry + 1 << "次尝试)..." << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+                // 🔧 增加重试延迟，确保摄像头资源完全释放
+                // nvargus-daemon 需要更多时间清理资源
+                std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS * (retry + 1)));
+                std::cout << "等待摄像头资源释放..." << std::endl;
             }
             
             // 🔧 新增：清理之前的管道状态
@@ -724,6 +727,9 @@ void DeepStreamManager::stop() {
     if (pipeline2_) {
         gst_element_set_state(pipeline2_, GST_STATE_NULL);
     }
+    
+    // 🔧 新增：完全停止时才清理 subsurface
+    cleanupSubsurface();
     
     running_ = false;
     std::cout << "DeepStream 管道已停止" << std::endl;
@@ -1161,7 +1167,14 @@ void DeepStreamManager::cleanup() {
         pipeline2_ = nullptr;
     }
     
-    // 🔧 新增：清理Wayland Subsurface资源
+    // 🔧 修复：不在 cleanup() 中销毁 subsurface
+    // subsurface 的生命周期由父窗口管理，重试时需要保留
+    // 只有在完全停止时才销毁
+    // 注意：清理动作已移至 cleanupSubsurface()
+}
+
+// 🆕 新增：专门清理 subsurface 资源（仅在完全停止时调用）
+void DeepStreamManager::cleanupSubsurface() {
     if (video_subsurface_) {
         auto* wl_subsurface = static_cast<struct wl_subsurface*>(video_subsurface_);
         wl_subsurface_destroy(wl_subsurface);

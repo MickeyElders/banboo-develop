@@ -407,6 +407,11 @@ private:
     void cleanup();
 
     /**
+     * @brief 清理 Wayland subsurface 资源（仅在完全停止时调用）
+     */
+    void cleanupSubsurface();
+
+    /**
      * @brief 配置JetPack 6的NVMM环境
      */
     void configureNVMMEnvironment();

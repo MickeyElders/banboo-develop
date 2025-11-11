@@ -833,13 +833,17 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
     lv_obj_center(title_label);
     
-    // 创建主容器 (中间部分)
+    // 创建主容器 (中间部分) - 位于头部下方，底部上方
     lv_obj_t* main_container = lv_obj_create(main_screen_);
     lv_obj_set_size(main_container, config_.screen_width, config_.screen_height - 120); // 减去头部和底部
-    lv_obj_align(main_container, LV_ALIGN_CENTER, 0, 0);
+    // 🔧 修复：使用 TOP_MID 对齐，并向下偏移 60px（头部高度）
+    lv_obj_align(main_container, LV_ALIGN_TOP_MID, 0, 60);
     lv_obj_set_style_bg_opa(main_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(main_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(main_container, 0, 0);  // 移除内边距
     lv_obj_clear_flag(main_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    std::cout << "📐 [UI] 主容器位置: Y=60, 尺寸: " << config_.screen_width << "x" << (config_.screen_height - 120) << std::endl;
     
     // 创建摄像头面板 (左侧，宽度: 60%)
     // 🔧 修复：让摄像头面板完全透明，这样DeepStream视频可以显示
