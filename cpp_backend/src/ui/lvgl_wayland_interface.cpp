@@ -4,6 +4,7 @@
  */
 
 #include "bamboo_cut/ui/lvgl_wayland_interface.h"
+#include "bamboo_cut/ui/lvgl_ui_utils.h"           // 🆕 共享 UI 工具函数
 #include "bamboo_cut/utils/logger.h"
 #include "bamboo_cut/core/data_bridge.h"           // 🆕 数据桥接器
 #include "bamboo_cut/utils/jetson_monitor.h"       // 🆕 Jetson 系统监控
@@ -146,6 +147,10 @@ public:
     int frame_count_ = 0;
     float ui_fps_ = 0.0f;
     
+    // 🆕 UI 控件引用（用于动态更新）
+    LVGLControlWidgets control_widgets_;
+    LVGLThemeColors theme_colors_;
+    
     // 初始化状态
     bool wayland_initialized_ = false;
     bool display_initialized_ = false;
@@ -284,6 +289,9 @@ LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<core::DataBridge> dat
     pImpl_->data_bridge_ = data_bridge;
     pImpl_->jetson_monitor_ = std::make_shared<utils::JetsonMonitor>();
     pImpl_->last_update_time_ = std::chrono::high_resolution_clock::now();
+    
+    // 🆕 初始化主题颜色（使用原始 UI 配色）
+    pImpl_->theme_colors_ = ui::LVGLThemeColors();
 }
 
 LVGLWaylandInterface::~LVGLWaylandInterface() {
@@ -330,6 +338,12 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     
     // 创建主界面
     pImpl_->createMainInterface();
+    
+    // 🆕 启动 Jetson 系统监控（如果可用）
+    if (pImpl_->jetson_monitor_) {
+        pImpl_->jetson_monitor_->start();
+        std::cout << "✅ Jetson 系统监控已启动" << std::endl;
+    }
     
     // 🔧 关键：UI 创建完成后设置标志，启用正常渲染
     std::cout << "✅ UI 创建完成，启用正常渲染..." << std::endl;
@@ -432,9 +446,15 @@ bool LVGLWaylandInterface::isWaylandEnvironmentAvailable() {
 
 void LVGLWaylandInterface::uiThreadLoop() {
     auto last_update = std::chrono::steady_clock::now();
+    auto last_data_update = std::chrono::steady_clock::now();
     const auto frame_time = std::chrono::milliseconds(1000 / pImpl_->config_.refresh_rate);
+    const auto data_update_interval = std::chrono::milliseconds(500);  // 每 500ms 更新一次数据
     
     std::cout << "🚀 LVGL UI线程启动 (刷新率: " << pImpl_->config_.refresh_rate << "fps)" << std::endl;
+    
+    // 等待几帧后再开始数据更新（确保 UI 完全初始化）
+    int warmup_frames = 0;
+    const int warmup_threshold = 10;
     
     while (!pImpl_->should_stop_.load()) {
         auto now = std::chrono::steady_clock::now();
@@ -452,6 +472,36 @@ void LVGLWaylandInterface::uiThreadLoop() {
         if (pImpl_->new_frame_available_.load()) {
             pImpl_->updateCanvasFromFrame();
             pImpl_->new_frame_available_.store(false);
+        }
+        
+        // 🆕 定期更新动态数据（Jetson 监控、AI 统计等）
+        warmup_frames++;
+        if (warmup_frames > warmup_threshold) {
+            auto data_elapsed = now - last_data_update;
+            if (data_elapsed >= data_update_interval) {
+                std::lock_guard<std::mutex> lock(pImpl_->ui_mutex_);
+                
+                // 更新 Jetson 系统监控
+                ui::updateJetsonMonitoring(pImpl_->control_widgets_, 
+                                          pImpl_->jetson_monitor_, 
+                                          pImpl_->theme_colors_);
+                
+                // 更新 AI 模型统计
+                ui::updateAIModelStats(pImpl_->control_widgets_, 
+                                      pImpl_->data_bridge_);
+                
+                // 计算 UI FPS
+                pImpl_->frame_count_++;
+                auto time_since_last = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - pImpl_->last_update_time_).count();
+                if (time_since_last >= 1000) {
+                    pImpl_->ui_fps_ = (pImpl_->frame_count_ * 1000.0f) / time_since_last;
+                    pImpl_->frame_count_ = 0;
+                    pImpl_->last_update_time_ = now;
+                }
+                
+                last_data_update = now;
+            }
         }
         
         // 控制帧率
@@ -867,7 +917,7 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_t* title_label = lv_label_create(header_panel_);
     lv_label_set_text(title_label, "Bamboo Recognition System - Wayland Mode");
     lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_16, 0);
     lv_obj_center(title_label);
     
     // === 创建中间容器 === (占据剩余空间，使用水平 Flex 布局)
@@ -955,24 +1005,24 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_color(jetson_title, lv_color_hex(0x70A5DB), 0);
     
     // CPU 信息
-    lv_obj_t* cpu_label = lv_label_create(jetson_section);
-    lv_label_set_text(cpu_label, "CPU: --% @ --MHz");
-    lv_obj_set_style_text_color(cpu_label, lv_color_white(), 0);
+    control_widgets_.cpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.cpu_label, "CPU: --% @ --MHz");
+    lv_obj_set_style_text_color(control_widgets_.cpu_label, lv_color_white(), 0);
     
     // GPU 信息
-    lv_obj_t* gpu_label = lv_label_create(jetson_section);
-    lv_label_set_text(gpu_label, "GPU: --% @ --MHz");
-    lv_obj_set_style_text_color(gpu_label, lv_color_white(), 0);
+    control_widgets_.gpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.gpu_label, "GPU: --% @ --MHz");
+    lv_obj_set_style_text_color(control_widgets_.gpu_label, lv_color_white(), 0);
     
     // 内存信息
-    lv_obj_t* mem_label = lv_label_create(jetson_section);
-    lv_label_set_text(mem_label, "RAM: --MB / --MB");
-    lv_obj_set_style_text_color(mem_label, lv_color_white(), 0);
+    control_widgets_.mem_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.mem_label, "RAM: --MB / --MB");
+    lv_obj_set_style_text_color(control_widgets_.mem_label, lv_color_white(), 0);
     
     // 温度信息
-    lv_obj_t* temp_label = lv_label_create(jetson_section);
-    lv_label_set_text(temp_label, "Temp: CPU --°C GPU --°C");
-    lv_obj_set_style_text_color(temp_label, lv_color_hex(0xE6A055), 0);
+    control_widgets_.cpu_temp_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.cpu_temp_label, "Temp: CPU --°C GPU --°C");
+    lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, lv_color_hex(0xE6A055), 0);
     
     // === AI 模型区域 ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
@@ -991,13 +1041,13 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_label_set_text(ai_title, LV_SYMBOL_IMAGE " AI Model");
     lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
     
-    lv_obj_t* fps_label = lv_label_create(ai_section);
-    lv_label_set_text(fps_label, "FPS: -- fps");
-    lv_obj_set_style_text_color(fps_label, lv_color_white(), 0);
+    control_widgets_.ai_fps_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_fps_label, "FPS: -- fps");
+    lv_obj_set_style_text_color(control_widgets_.ai_fps_label, lv_color_white(), 0);
     
-    lv_obj_t* detect_label = lv_label_create(ai_section);
-    lv_label_set_text(detect_label, "Detected: 0 objects");
-    lv_obj_set_style_text_color(detect_label, lv_color_white(), 0);
+    control_widgets_.ai_total_detections_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_total_detections_label, "Detected: 0 objects");
+    lv_obj_set_style_text_color(control_widgets_.ai_total_detections_label, lv_color_white(), 0);
     
     // === 控制按钮 ===
     lv_obj_t* btn_section = lv_obj_create(control_panel_);
