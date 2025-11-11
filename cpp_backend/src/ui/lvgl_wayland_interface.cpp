@@ -402,9 +402,11 @@ bool LVGLWaylandInterface::isFullyInitialized() const {
         return false;
     }
     
-    if (!pImpl_->camera_canvas_) {
-        return false;
-    }
+    // 🔧 注意：Wayland 版本使用 subsurface 渲染视频，不需要 camera_canvas_
+    // camera_canvas_ 被设置为 nullptr 是正常的
+    // if (!pImpl_->camera_canvas_) {
+    //     return false;
+    // }
     
     return fully_initialized_.load();
 }

@@ -1137,6 +1137,34 @@ gboolean DeepStreamManager::busCallback(GstBus* bus, GstMessage* msg, gpointer d
 }
 
 void DeepStreamManager::cleanup() {
+    // 🔧 关键修复：先将管道设置为 NULL 状态，确保摄像头资源完全释放
+    if (pipeline_) {
+        std::cout << "🔄 [DeepStream] 正在停止管道并释放摄像头资源..." << std::endl;
+        
+        // 先设置为 NULL 状态，等待资源释放
+        GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_NULL);
+        if (ret == GST_STATE_CHANGE_ASYNC) {
+            // 等待状态变化完成（最多3秒）
+            GstState state;
+            ret = gst_element_get_state(pipeline_, &state, NULL, 3 * GST_SECOND);
+            if (ret == GST_STATE_CHANGE_FAILURE) {
+                std::cerr << "⚠️ [DeepStream] 管道停止失败，但继续清理" << std::endl;
+            } else {
+                std::cout << "✅ [DeepStream] 管道已停止至 NULL 状态" << std::endl;
+            }
+        }
+        
+        // 额外等待，确保 nvarguscamerasrc 完全释放摄像头
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    
+    if (pipeline2_) {
+        std::cout << "🔄 [DeepStream] 正在停止管道2..." << std::endl;
+        gst_element_set_state(pipeline2_, GST_STATE_NULL);
+        // 等待一小段时间确保资源释放
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    
     if (bus_watch_id_ > 0) {
         g_source_remove(bus_watch_id_);
         bus_watch_id_ = 0;
@@ -1160,6 +1188,7 @@ void DeepStreamManager::cleanup() {
     if (pipeline_) {
         gst_object_unref(pipeline_);
         pipeline_ = nullptr;
+        std::cout << "✅ [DeepStream] 管道已释放" << std::endl;
     }
     
     if (pipeline2_) {
