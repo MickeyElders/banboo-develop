@@ -443,14 +443,30 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
                                 if (GST_IS_VIDEO_OVERLAY(sink)) {
-                                    // 将 wl_surface 指针作为窗口句柄传递
-                                    // 对于 Wayland，这是标准做法
+                                    // 1️⃣ 设置窗口句柄（将 wl_surface 指针传递给 waylandsink）
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
                                         reinterpret_cast<guintptr>(self->video_surface_)
                                     );
                                     
                                     std::cout << "✅ [DeepStream] 已将 subsurface 设置为 waylandsink 的窗口句柄" << std::endl;
+                                    
+                                    // 2️⃣ 设置渲染矩形（位置和大小）
+                                    // 🔧 关键：render_rectangle 的坐标是相对于 subsurface 自身的，不是相对于主 surface
+                                    // subsurface 的位置通过 wl_subsurface_set_position 设置（在 createSubsurface 中）
+                                    // 这里应该填充整个 subsurface，所以是 (0, 0, width, height)
+                                    gst_video_overlay_set_render_rectangle(
+                                        GST_VIDEO_OVERLAY(sink),
+                                        0,  // X: 填充整个 subsurface
+                                        0,  // Y: 填充整个 subsurface
+                                        self->video_layout_.width,
+                                        self->video_layout_.height
+                                    );
+                                    
+                                    std::cout << "✅ [DeepStream] 已设置渲染矩形: (0, 0) "
+                                              << self->video_layout_.width << "x" << self->video_layout_.height 
+                                              << " (填充整个 subsurface)" << std::endl;
+                                    
                                     return GST_BUS_DROP;
                                 }
                             }
