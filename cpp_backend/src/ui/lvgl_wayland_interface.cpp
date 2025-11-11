@@ -800,13 +800,16 @@ bool LVGLWaylandInterface::Impl::initializeInput() {
 }
 
 void LVGLWaylandInterface::Impl::initializeTheme() {
-    // 使用默认主题
+    // 🔧 创建深色主题 - 使用中文字体
+    // LV_FONT_DEFAULT 现在是 lv_font_simsun_16_cjk（支持中文）
     lv_theme_t* theme = lv_theme_default_init(display_, 
                                             lv_palette_main(LV_PALETTE_BLUE), 
                                             lv_palette_main(LV_PALETTE_RED), 
-                                            true, 
-                                            LV_FONT_DEFAULT);
+                                            true,  // dark mode
+                                            &lv_font_simsun_16_cjk);  // 明确使用中文字体
     lv_display_set_theme(display_, theme);
+    
+    std::cout << "✅ 主题已初始化（支持1000+常用中文字符）" << std::endl;
 }
 
 void LVGLWaylandInterface::Impl::createMainInterface() {
@@ -1152,13 +1155,15 @@ void LVGLWaylandInterface::Impl::registryHandler(void* data, struct wl_registry*
                                                   uint32_t id, const char* interface, uint32_t version) {
     LVGLWaylandInterface::Impl* impl = static_cast<LVGLWaylandInterface::Impl*>(data);
     
-    // 🔧 修复：绑定 wl_compositor version 4 以支持 wl_surface_damage_buffer
-    // wl_surface_damage_buffer() 需要 wl_surface version 4+ (在 wl_compositor v4 中引入)
+    // 🔧 升级：绑定 wl_compositor version 5（服务器支持的最高版本）
+    // Version 4: 添加 wl_surface_damage_buffer() 支持
+    // Version 5: 协议稳定版本，最佳兼容性
     if (strcmp(interface, "wl_compositor") == 0) {
-        uint32_t use_version = (version >= 4) ? 4 : version;
+        // 使用服务器支持的最高版本（最多 v5）
+        uint32_t use_version = (version >= 5) ? 5 : version;
         impl->wl_compositor_ = static_cast<struct wl_compositor*>(
             wl_registry_bind(registry, id, &wl_compositor_interface, use_version));
-        std::cout << "✅ 绑定wl_compositor (v" << use_version << ")" << std::endl;
+        std::cout << "✅ 绑定wl_compositor (v" << use_version << ", 服务器支持: v" << version << ")" << std::endl;
     }
     else if (strcmp(interface, "wl_subcompositor") == 0) {
         impl->wl_subcompositor_ = static_cast<struct wl_subcompositor*>(
