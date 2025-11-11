@@ -492,6 +492,14 @@ void LVGLWaylandInterface::uiThreadLoop() {
                 ui::updateAIModelStats(pImpl_->control_widgets_, 
                                       pImpl_->data_bridge_);
                 
+                // 更新摄像头状态
+                ui::updateCameraStatus(pImpl_->control_widgets_, 
+                                      pImpl_->data_bridge_);
+                
+                // 更新 Modbus 通信状态
+                ui::updateModbusStatus(pImpl_->control_widgets_, 
+                                      pImpl_->data_bridge_);
+                
                 // 计算 UI FPS
                 pImpl_->frame_count_++;
                 auto time_since_last = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -500,6 +508,14 @@ void LVGLWaylandInterface::uiThreadLoop() {
                     pImpl_->ui_fps_ = (pImpl_->frame_count_ * 1000.0f) / time_since_last;
                     pImpl_->frame_count_ = 0;
                     pImpl_->last_update_time_ = now;
+                    
+                    // 更新 UI FPS 标签
+                    if (pImpl_->control_widgets_.ui_fps_label) {
+                        std::ostringstream fps_text;
+                        fps_text << LV_SYMBOL_EYE_OPEN " UI: " << std::fixed << std::setprecision(1) 
+                                << pImpl_->ui_fps_ << " fps";
+                        lv_label_set_text(pImpl_->control_widgets_.ui_fps_label, fps_text.str().c_str());
+                    }
                 }
                 
                 last_data_update = now;
@@ -1164,6 +1180,102 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_label_set_text(stop_label, LV_SYMBOL_STOP " Stop Detection");
     lv_obj_center(stop_label);
     
+    // === 摄像头状态区域 ===
+    lv_obj_t* camera_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(camera_section, lv_pct(100));
+    lv_obj_set_height(camera_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(camera_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(camera_section, 8, 0);
+    lv_obj_set_style_border_width(camera_section, 1, 0);
+    lv_obj_set_style_border_color(camera_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(camera_section, 10, 0);
+    lv_obj_set_flex_flow(camera_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(camera_section, 6, 0);
+    lv_obj_clear_flag(camera_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* camera_section_title = lv_label_create(camera_section);
+    lv_label_set_text(camera_section_title, LV_SYMBOL_VIDEO " Camera Status");
+    lv_obj_set_style_text_color(camera_section_title, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(camera_section_title, &lv_font_montserrat_14, 0);
+    
+    // 摄像头状态
+    control_widgets_.camera_status_label = lv_label_create(camera_section);
+    lv_label_set_text(control_widgets_.camera_status_label, "Status: Offline");
+    lv_obj_set_style_text_color(control_widgets_.camera_status_label, color_error, 0);
+    lv_obj_set_style_text_font(control_widgets_.camera_status_label, &lv_font_montserrat_12, 0);
+    
+    // 摄像头 FPS
+    control_widgets_.camera_fps_label = lv_label_create(camera_section);
+    lv_label_set_text(control_widgets_.camera_fps_label, "FPS: -- fps");
+    lv_obj_set_style_text_color(control_widgets_.camera_fps_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera_fps_label, &lv_font_montserrat_12, 0);
+    
+    // 分辨率
+    control_widgets_.camera_resolution_label = lv_label_create(camera_section);
+    lv_label_set_text(control_widgets_.camera_resolution_label, "Resolution: --");
+    lv_obj_set_style_text_color(control_widgets_.camera_resolution_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera_resolution_label, &lv_font_montserrat_12, 0);
+    
+    // 格式
+    control_widgets_.camera_format_label = lv_label_create(camera_section);
+    lv_label_set_text(control_widgets_.camera_format_label, "Format: --");
+    lv_obj_set_style_text_color(control_widgets_.camera_format_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.camera_format_label, &lv_font_montserrat_12, 0);
+    
+    // === Modbus 通信区域 ===
+    lv_obj_t* modbus_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(modbus_section, lv_pct(100));
+    lv_obj_set_height(modbus_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(modbus_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(modbus_section, 8, 0);
+    lv_obj_set_style_border_width(modbus_section, 1, 0);
+    lv_obj_set_style_border_color(modbus_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(modbus_section, 10, 0);
+    lv_obj_set_flex_flow(modbus_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(modbus_section, 6, 0);
+    lv_obj_clear_flag(modbus_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* modbus_title = lv_label_create(modbus_section);
+    lv_label_set_text(modbus_title, LV_SYMBOL_SHUFFLE " Modbus TCP");
+    lv_obj_set_style_text_color(modbus_title, lv_color_hex(0xD67B7B), 0);
+    lv_obj_set_style_text_font(modbus_title, &lv_font_montserrat_14, 0);
+    
+    // PLC 连接状态
+    control_widgets_.modbus_connection_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_connection_label, "PLC: Disconnected");
+    lv_obj_set_style_text_color(control_widgets_.modbus_connection_label, color_error, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_connection_label, &lv_font_montserrat_12, 0);
+    
+    // 地址
+    control_widgets_.modbus_address_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_address_label, "Addr: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_address_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_address_label, &lv_font_montserrat_12, 0);
+    
+    // 延迟
+    control_widgets_.modbus_latency_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_latency_label, "Latency: --ms");
+    lv_obj_set_style_text_color(control_widgets_.modbus_latency_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_latency_label, &lv_font_montserrat_12, 0);
+    
+    // 错误计数
+    control_widgets_.modbus_error_count_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_error_count_label, "Errors: 0");
+    lv_obj_set_style_text_color(control_widgets_.modbus_error_count_label, color_success, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_error_count_label, &lv_font_montserrat_12, 0);
+    
+    // 消息计数
+    control_widgets_.modbus_message_count_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_message_count_label, "Messages: 0");
+    lv_obj_set_style_text_color(control_widgets_.modbus_message_count_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_message_count_label, &lv_font_montserrat_12, 0);
+    
+    // 心跳状态
+    control_widgets_.modbus_heartbeat_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_heartbeat_label, "Heartbeat: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_heartbeat_label, color_warning, 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
+    
     // === 创建底部面板 === (固定高度，使用 Flex)
     footer_panel_ = lv_obj_create(main_screen_);
     lv_obj_set_width(footer_panel_, lv_pct(100));
@@ -1175,14 +1287,44 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_pad_all(footer_panel_, 10, 0);
     lv_obj_clear_flag(footer_panel_, LV_OBJ_FLAG_SCROLLABLE);
     
-    // 底部状态信息
-    lv_obj_t* status_label = lv_label_create(footer_panel_);
-    lv_label_set_text(status_label, LV_SYMBOL_OK " Wayland Mode - Ready");
-    lv_obj_set_style_text_color(status_label, color_success, 0);
-    lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
-    lv_obj_center(status_label);
+    // 🔧 设置底部为水平 Flex 布局（左中右三部分）
+    lv_obj_set_flex_flow(footer_panel_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(footer_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(footer_panel_, 20, 0);
     
-    std::cout << "📐 [UI] 底部面板: 固定高度 60px" << std::endl;
+    // === 左侧：系统状态 ===
+    control_widgets_.status_label = lv_label_create(footer_panel_);
+    lv_label_set_text(control_widgets_.status_label, LV_SYMBOL_OK " Wayland Mode - Ready");
+    lv_obj_set_style_text_color(control_widgets_.status_label, color_success, 0);
+    lv_obj_set_style_text_font(control_widgets_.status_label, &lv_font_montserrat_12, 0);
+    
+    // === 中间：进程信息 ===
+    control_widgets_.process_label = lv_label_create(footer_panel_);
+    lv_label_set_text(control_widgets_.process_label, LV_SYMBOL_SETTINGS " Process: Idle");
+    lv_obj_set_style_text_color(control_widgets_.process_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.process_label, &lv_font_montserrat_12, 0);
+    
+    // === 右侧：UI FPS 和统计信息 ===
+    lv_obj_t* right_info = lv_obj_create(footer_panel_);
+    lv_obj_set_size(right_info, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(right_info, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(right_info, 0, 0);
+    lv_obj_set_style_pad_all(right_info, 0, 0);
+    lv_obj_set_flex_flow(right_info, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_gap(right_info, 15, 0);
+    lv_obj_clear_flag(right_info, LV_OBJ_FLAG_SCROLLABLE);
+    
+    control_widgets_.ui_fps_label = lv_label_create(right_info);
+    lv_label_set_text(control_widgets_.ui_fps_label, LV_SYMBOL_EYE_OPEN " UI: -- fps");
+    lv_obj_set_style_text_color(control_widgets_.ui_fps_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.ui_fps_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.stats_label = lv_label_create(right_info);
+    lv_label_set_text(control_widgets_.stats_label, LV_SYMBOL_LIST " Stats: 0/0");
+    lv_obj_set_style_text_color(control_widgets_.stats_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.stats_label, &lv_font_montserrat_12, 0);
+    
+    std::cout << "📐 [UI] 底部面板: 固定高度 60px，水平 Flex 布局" << std::endl;
     
     // 加载主屏幕
     lv_screen_load(main_screen_);
