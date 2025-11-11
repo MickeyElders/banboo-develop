@@ -1019,26 +1019,73 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_t* jetson_title = lv_label_create(jetson_section);
     lv_label_set_text(jetson_title, LV_SYMBOL_CHARGE " Jetson Orin Nano");
     lv_obj_set_style_text_color(jetson_title, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(jetson_title, &lv_font_montserrat_14, 0);
     
-    // CPU 信息
+    // === CPU 信息（带进度条）===
     control_widgets_.cpu_label = lv_label_create(jetson_section);
     lv_label_set_text(control_widgets_.cpu_label, "CPU: --% @ --MHz");
     lv_obj_set_style_text_color(control_widgets_.cpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_label, &lv_font_montserrat_12, 0);
     
-    // GPU 信息
+    control_widgets_.cpu_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.cpu_bar, lv_pct(100), 10);
+    lv_obj_set_style_bg_color(control_widgets_.cpu_bar, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_bg_opa(control_widgets_.cpu_bar, LV_OPA_COVER, 0);
+    lv_bar_set_value(control_widgets_.cpu_bar, 0, LV_ANIM_OFF);
+    
+    // === GPU 信息（带进度条）===
     control_widgets_.gpu_label = lv_label_create(jetson_section);
     lv_label_set_text(control_widgets_.gpu_label, "GPU: --% @ --MHz");
     lv_obj_set_style_text_color(control_widgets_.gpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_label, &lv_font_montserrat_12, 0);
     
-    // 内存信息
+    control_widgets_.gpu_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.gpu_bar, lv_pct(100), 10);
+    lv_obj_set_style_bg_color(control_widgets_.gpu_bar, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_bg_opa(control_widgets_.gpu_bar, LV_OPA_COVER, 0);
+    lv_bar_set_value(control_widgets_.gpu_bar, 0, LV_ANIM_OFF);
+    
+    // === 内存信息（带进度条）===
     control_widgets_.mem_label = lv_label_create(jetson_section);
     lv_label_set_text(control_widgets_.mem_label, "RAM: --MB / --MB");
     lv_obj_set_style_text_color(control_widgets_.mem_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.mem_label, &lv_font_montserrat_12, 0);
     
-    // 温度信息
+    control_widgets_.mem_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.mem_bar, lv_pct(100), 10);
+    lv_obj_set_style_bg_color(control_widgets_.mem_bar, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_bg_opa(control_widgets_.mem_bar, LV_OPA_COVER, 0);
+    lv_bar_set_value(control_widgets_.mem_bar, 0, LV_ANIM_OFF);
+    
+    // === SWAP 使用率 ===
+    control_widgets_.swap_usage_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.swap_usage_label, "SWAP: --MB");
+    lv_obj_set_style_text_color(control_widgets_.swap_usage_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.swap_usage_label, &lv_font_montserrat_12, 0);
+    
+    // === 温度信息 ===
     control_widgets_.cpu_temp_label = lv_label_create(jetson_section);
-    lv_label_set_text(control_widgets_.cpu_temp_label, "Temp: CPU --°C GPU --°C");
+    lv_label_set_text(control_widgets_.cpu_temp_label, "CPU: --°C");
     lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_temp_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.gpu_temp_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.gpu_temp_label, "GPU: --°C");
+    lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_temp_label, &lv_font_montserrat_12, 0);
+    
+    // === 热区警告 ===
+    control_widgets_.thermal_warning_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.thermal_warning_label, "");
+    lv_obj_set_style_text_color(control_widgets_.thermal_warning_label, color_error, 0);
+    lv_obj_set_style_text_font(control_widgets_.thermal_warning_label, &lv_font_montserrat_12, 0);
+    lv_obj_add_flag(control_widgets_.thermal_warning_label, LV_OBJ_FLAG_HIDDEN);  // 默认隐藏
+    
+    // === 功率信息 ===
+    control_widgets_.power_total_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.power_total_label, "Power: --W");
+    lv_obj_set_style_text_color(control_widgets_.power_total_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.power_total_label, &lv_font_montserrat_12, 0);
     
     // === AI 模型区域 ===
     lv_obj_t* ai_section = lv_obj_create(control_panel_);
@@ -1056,14 +1103,37 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_t* ai_title = lv_label_create(ai_section);
     lv_label_set_text(ai_title, LV_SYMBOL_IMAGE " AI Model");
     lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
+    lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
     
+    // === 模型名称 ===
+    control_widgets_.ai_model_name_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_model_name_label, "Model: YOLOv8");
+    lv_obj_set_style_text_color(control_widgets_.ai_model_name_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_model_name_label, &lv_font_montserrat_12, 0);
+    
+    // === FPS ===
     control_widgets_.ai_fps_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.ai_fps_label, "FPS: -- fps");
     lv_obj_set_style_text_color(control_widgets_.ai_fps_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_fps_label, &lv_font_montserrat_12, 0);
     
+    // === 推理时间 ===
+    control_widgets_.ai_inference_time_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_inference_time_label, "Inference: --ms");
+    lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
+    
+    // === 检测数量 ===
     control_widgets_.ai_total_detections_label = lv_label_create(ai_section);
     lv_label_set_text(control_widgets_.ai_total_detections_label, "Detected: 0 objects");
     lv_obj_set_style_text_color(control_widgets_.ai_total_detections_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_total_detections_label, &lv_font_montserrat_12, 0);
+    
+    // === 置信度 ===
+    control_widgets_.ai_confidence_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_confidence_label, "Confidence: --%");
+    lv_obj_set_style_text_color(control_widgets_.ai_confidence_label, color_success, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_confidence_label, &lv_font_montserrat_12, 0);
     
     // === 控制按钮 ===
     lv_obj_t* btn_section = lv_obj_create(control_panel_);
