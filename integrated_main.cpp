@@ -666,7 +666,7 @@ public:
         
         // 🔧 关键修复：获取 camera_panel 的实际坐标（在Flex布局完成后）
         int camera_x = 0, camera_y = 60, camera_width = 960, camera_height = 640;
-        if (lvgl_interface_->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height)) {
+        if (lvgl_if->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height)) {
             std::cout << "✅ 获取 camera_panel 实际坐标: ("
                       << camera_x << ", " << camera_y << ") "
                       << camera_width << "x" << camera_height << std::endl;
