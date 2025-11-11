@@ -547,7 +547,45 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 std::cout << "管道异步启动中，等待状态变化..." << std::endl;
                 ret = gst_element_get_state(pipeline_, &state, NULL, 15 * GST_SECOND);
                 if (ret == GST_STATE_CHANGE_FAILURE) {
-                    std::cerr << "管道异步启动失败" << std::endl;
+                    std::cerr << "❌ 管道异步启动失败，进行错误诊断..." << std::endl;
+                    
+                    // 获取详细错误信息
+                    GstBus* bus = gst_element_get_bus(pipeline_);
+                    GstMessage* msg = gst_bus_timed_pop_filtered(bus, 2 * GST_SECOND,
+                        static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
+                        
+                    if (msg) {
+                        GError* err;
+                        gchar* debug_info;
+                        
+                        if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_ERROR) {
+                            gst_message_parse_error(msg, &err, &debug_info);
+                            std::cerr << "📛 GStreamer错误: " << err->message << std::endl;
+                        } else if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_WARNING) {
+                            gst_message_parse_warning(msg, &err, &debug_info);
+                            std::cerr << "⚠️ GStreamer警告: " << err->message << std::endl;
+                        }
+                        
+                        if (debug_info) {
+                            std::cerr << "🔍 调试信息: " << debug_info << std::endl;
+                            
+                            // 检查常见错误模式
+                            if (strstr(debug_info, "Wayland") || strstr(debug_info, "wl_")) {
+                                std::cout << "💡 检测到Wayland相关错误，可能是surface未就绪..." << std::endl;
+                            } else if (strstr(debug_info, "NVMM") || strstr(debug_info, "nvarguscamerasrc")) {
+                                std::cout << "💡 检测到NVMM/摄像头错误，可能是资源冲突..." << std::endl;
+                            } else if (strstr(debug_info, "waylandsink")) {
+                                std::cout << "💡 检测到waylandsink错误，可能是display连接问题..." << std::endl;
+                            }
+                            g_free(debug_info);
+                        }
+                        g_error_free(err);
+                        gst_message_unref(msg);
+                    } else {
+                        std::cerr << "⚠️ 无法从bus获取错误消息（可能超时）" << std::endl;
+                    }
+                    if (bus) gst_object_unref(bus);
+                    
                     cleanup();
                     if (retry < MAX_RETRIES - 1) continue;
                     return false;
