@@ -385,12 +385,12 @@ bool updateWorkflowStatus(
             
             if(is_active) {
                 // 当前激活步骤 - 使用主题色
-                lv_obj_set_style_bg_color(step, theme_colors.color_primary, 0);
-                lv_obj_set_style_border_color(step, theme_colors.color_primary, 0);
+                lv_obj_set_style_bg_color(step, theme_colors.primary, 0);
+                lv_obj_set_style_border_color(step, theme_colors.primary, 0);
             } else if(is_completed) {
                 // 已完成步骤 - 使用成功色
-                lv_obj_set_style_bg_color(step, theme_colors.color_success, 0);
-                lv_obj_set_style_border_color(step, theme_colors.color_success, 0);
+                lv_obj_set_style_bg_color(step, theme_colors.success, 0);
+                lv_obj_set_style_border_color(step, theme_colors.success, 0);
             } else {
                 // 未完成步骤 - 使用默认灰色
                 lv_obj_set_style_bg_color(step, lv_color_hex(0x2A3441), 0);
