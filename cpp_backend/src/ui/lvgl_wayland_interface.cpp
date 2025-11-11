@@ -99,6 +99,9 @@ public:
     // 🆕 缓存 camera_panel 的坐标（避免每次 flush 都计算）
     int camera_x1_ = 0, camera_y1_ = 0, camera_x2_ = 0, camera_y2_ = 0;
     
+    // 🆕 DeepStream subsurface 指针（用于维护 Z-order）
+    struct wl_subsurface* video_subsurface_ = nullptr;
+    
     // Wayland EGL后端 - 现代xdg-shell协议实现 + Subsurface支持
     struct wl_display* wl_display_ = nullptr;
     struct wl_registry* wl_registry_ = nullptr;
@@ -758,6 +761,25 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
             const uint32_t* src_row = src_pixels + (y - area->y1) * area_width;
             memcpy(dst_row, src_row, area_width * sizeof(uint32_t));
         }
+        
+        // 🔧 关键修复：保持 camera_panel 区域完全透明
+        // 即使 LVGL 更新了该区域，我们也要覆盖为透明，让 subsurface 视频显示出来
+        if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {
+            // 检查更新区域是否与 camera_panel 重叠
+            int overlap_x1 = std::max(area->x1, camera_x1_);
+            int overlap_y1 = std::max(area->y1, camera_y1_);
+            int overlap_x2 = std::min(area->x2, camera_x2_);
+            int overlap_y2 = std::min(area->y2, camera_y2_);
+            
+            if (overlap_x1 <= overlap_x2 && overlap_y1 <= overlap_y2) {
+                // 有重叠，清除重叠区域为完全透明
+                for (int y = overlap_y1; y <= overlap_y2; y++) {
+                    for (int x = overlap_x1; x <= overlap_x2; x++) {
+                        full_frame_buffer_[y * width + x] = 0x00000000;  // 完全透明
+                    }
+                }
+            }
+        }
     #else
         #error "Only LV_COLOR_DEPTH=32 is supported"
     #endif
@@ -795,24 +817,6 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     
     // 使用 buffer damage（buffer 坐标系）
     wl_surface_damage_buffer(wl_surface_, 0, 0, width, height);
-    
-    // 🔧 关键修复：设置 opaque region，排除 camera_panel 区域
-    // 这告诉 compositor 哪些区域是完全不透明的（LVGL UI），哪些区域应该让 subsurface 显示（camera区域）
-    if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {  // 使用缓存的坐标
-        // 创建 region：整个屏幕
-        struct wl_region* opaque_region = wl_compositor_create_region(wl_compositor_);
-        wl_region_add(opaque_region, 0, 0, width, height);
-        
-        // 减去 camera_panel 区域（让 subsurface 可见）
-        wl_region_subtract(opaque_region, 
-                          camera_x1_, camera_y1_,
-                          camera_x2_ - camera_x1_ + 1,
-                          camera_y2_ - camera_y1_ + 1);
-        
-        // 设置 opaque region
-        wl_surface_set_opaque_region(wl_surface_, opaque_region);
-        wl_region_destroy(opaque_region);
-    }
     
     wl_surface_commit(wl_surface_);
     
@@ -1467,7 +1471,7 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_area_t camera_area;
     lv_obj_get_coords(camera_panel_, &camera_area);
     
-    // 🆕 缓存 camera_panel 坐标，用于设置 opaque region（避免每次 flush 都计算）
+    // 🆕 缓存 camera_panel 坐标
     camera_x1_ = camera_area.x1;
     camera_y1_ = camera_area.y1;
     camera_x2_ = camera_area.x2;
@@ -1478,7 +1482,19 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
               << camera_area.x2 << ", " << camera_area.y2 << ")" << std::endl;
     std::cout << "🔍 [关键诊断] camera_panel 尺寸: " 
               << (camera_area.x2 - camera_area.x1) << "x" << (camera_area.y2 - camera_area.y1) << std::endl;
-    std::cout << "✅ [Wayland] camera_panel 坐标已缓存，用于 opaque region 设置" << std::endl;
+    
+    // 🔧 关键修复：将 camera_panel 区域的 buffer 设置为完全透明
+    // 这样 subsurface 的视频就能显示出来
+    int width = config_.screen_width;
+    if (full_frame_buffer_) {
+        std::cout << "🔧 [Wayland] 清除 camera_panel 区域的 buffer（设为完全透明）..." << std::endl;
+        for (int y = camera_y1_; y <= camera_y2_; y++) {
+            for (int x = camera_x1_; x <= camera_x2_; x++) {
+                full_frame_buffer_[y * width + x] = 0x00000000;  // 完全透明
+            }
+        }
+        std::cout << "✅ [Wayland] camera_panel 区域已清除，subsurface 视频将可见" << std::endl;
+    }
     std::cout << "⚠️  [关键] DeepStream subsurface 当前位置: (0, 60) 尺寸: 960x640" << std::endl;
     std::cout << "⚠️  [关键] 如果两者不匹配，视频将显示在错误位置！\n" << std::endl;
     
