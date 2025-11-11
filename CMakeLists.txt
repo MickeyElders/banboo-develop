@@ -582,11 +582,13 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/ui/lvgl_ui_utils.cpp
     cpp_backend/src/ui/lvgl_updates.cpp
     cpp_backend/src/ui/lvgl_events.cpp
-    cpp_backend/src/ui/lvgl_panels/header_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/camera_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/control_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/status_panel.cpp
-    cpp_backend/src/ui/lvgl_panels/footer_panel.cpp
+    # 🔧 注意：以下 panel 文件仅用于 DRM 版本（LVGLInterface）
+    # Wayland 版本（LVGLWaylandInterface）使用内联面板创建
+    # cpp_backend/src/ui/lvgl_panels/header_panel.cpp
+    # cpp_backend/src/ui/lvgl_panels/camera_panel.cpp
+    # cpp_backend/src/ui/lvgl_panels/control_panel.cpp
+    # cpp_backend/src/ui/lvgl_panels/status_panel.cpp
+    # cpp_backend/src/ui/lvgl_panels/footer_panel.cpp
     cpp_backend/src/utils/config_loader.cpp
     cpp_backend/src/utils/system_monitor.cpp
     cpp_backend/src/utils/jetson_monitor.cpp
