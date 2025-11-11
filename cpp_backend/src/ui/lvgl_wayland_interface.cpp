@@ -818,6 +818,35 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     // 使用 buffer damage（buffer 坐标系）
     wl_surface_damage_buffer(wl_surface_, 0, 0, width, height);
     
+    // 🔧 关键修复1：设置 opaque region，排除 camera_panel 区域
+    // 告诉 compositor："除了 camera_panel，其他区域都是不透明的"
+    // Compositor 会：
+    // - 在 opaque region：不渲染下层内容（优化）
+    // - 在非 opaque region（camera_panel）：alpha blend，让 subsurface 透过
+    if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {
+        struct wl_region* opaque_region = wl_compositor_create_region(wl_compositor_);
+        // UI 区域（不透明）：整个屏幕
+        wl_region_add(opaque_region, 0, 0, width, height);
+        // 减去 camera_panel（透明区域，让 subsurface 可见）
+        wl_region_subtract(opaque_region,
+                          camera_x1_, camera_y1_,
+                          camera_x2_ - camera_x1_ + 1,
+                          camera_y2_ - camera_y1_ + 1);
+        wl_surface_set_opaque_region(wl_surface_, opaque_region);
+        wl_region_destroy(opaque_region);
+        
+        // 🔧 关键修复2：设置 input region，排除 camera_panel 区域
+        // 告诉 compositor："camera_panel 不接收输入，传递给 subsurface"
+        struct wl_region* input_region = wl_compositor_create_region(wl_compositor_);
+        wl_region_add(input_region, 0, 0, width, height);
+        wl_region_subtract(input_region,
+                          camera_x1_, camera_y1_,
+                          camera_x2_ - camera_x1_ + 1,
+                          camera_y2_ - camera_y1_ + 1);
+        wl_surface_set_input_region(wl_surface_, input_region);
+        wl_region_destroy(input_region);
+    }
+    
     wl_surface_commit(wl_surface_);
     
     // 🔧 性能优化：只用 flush，不用 roundtrip
