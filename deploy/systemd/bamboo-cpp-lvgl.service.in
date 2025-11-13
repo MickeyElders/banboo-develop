@@ -18,6 +18,7 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu"
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="HOME=/root"
+EnvironmentFile=-@CMAKE_INSTALL_PREFIX@/etc/bamboo/bamboo-env
 
 # Wayland 显示设置（自动适配）
 # Weston 13 使用 wayland-0，Weston 12 使用 wayland-1
