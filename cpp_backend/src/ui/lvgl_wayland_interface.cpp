@@ -161,6 +161,7 @@ public:
     bool wayland_initialized_ = false;
     bool display_initialized_ = false;
     bool input_initialized_ = false;
+    bool debug_camera_panel_opaque_ = false;
     // 🔧 修复：移除EGL状态标志
     // bool wayland_egl_initialized_ = false;
     // bool egl_initialized_ = false;
@@ -1045,8 +1046,18 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     camera_panel_ = lv_obj_create(main_container);
     lv_obj_set_height(camera_panel_, lv_pct(100));
     lv_obj_set_flex_grow(camera_panel_, 3);  // 占 3/4 空间
-    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明背景
-    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
+
+    if (debug_camera_panel_opaque_) {
+        lv_obj_set_style_bg_color(camera_panel_, lv_color_hex(0x1D2330), 0);
+        lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_80, 0);
+        lv_obj_set_style_border_color(camera_panel_, lv_color_hex(0x4A90E2), 0);
+        lv_obj_set_style_border_opa(camera_panel_, LV_OPA_60, 0);
+        lv_obj_set_style_border_width(camera_panel_, 2, 0);
+    } else {
+        lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明背景
+        lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
+    }
+
     lv_obj_set_style_pad_all(camera_panel_, 0, 0);
     lv_obj_set_style_radius(camera_panel_, 8, 0);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
@@ -1054,7 +1065,7 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
     
     // 🔧 关键修复：完全透明但保持布局参与
-    lv_obj_set_style_opa(camera_panel_, LV_OPA_0, 0);  // 完全透明（包括子对象）
+    lv_obj_set_style_opa(camera_panel_, debug_camera_panel_opaque_ ? LV_OPA_COVER : LV_OPA_0, 0);  // 完全透明（包括子对象）
     // ❌ 不能使用 IGNORE_LAYOUT，会破坏 Flex 布局计算！
     
     std::cout << "📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度，完全透明）" << std::endl;
