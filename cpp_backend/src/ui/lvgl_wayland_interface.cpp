@@ -787,25 +787,6 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
             const uint32_t* src_row = src_pixels + (y - area->y1) * area_width;
             memcpy(dst_row, src_row, area_width * sizeof(uint32_t));
         }
-        
-        // 🔧 关键修复：保持 camera_panel 区域完全透明
-        // 即使 LVGL 更新了该区域，我们也要覆盖为透明，让 subsurface 视频显示出来
-        if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {
-            // 检查更新区域是否与 camera_panel 重叠
-            int overlap_x1 = std::max(area->x1, camera_x1_);
-            int overlap_y1 = std::max(area->y1, camera_y1_);
-            int overlap_x2 = std::min(area->x2, camera_x2_);
-            int overlap_y2 = std::min(area->y2, camera_y2_);
-            
-            if (overlap_x1 <= overlap_x2 && overlap_y1 <= overlap_y2) {
-                // 有重叠，清除重叠区域为完全透明
-                for (int y = overlap_y1; y <= overlap_y2; y++) {
-                    for (int x = overlap_x1; x <= overlap_x2; x++) {
-                        full_frame_buffer_[y * width + x] = 0x00000000;  // 完全透明
-                    }
-                }
-            }
-        }
     #else
         #error "Only LV_COLOR_DEPTH=32 is supported"
     #endif
