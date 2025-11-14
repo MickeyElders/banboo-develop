@@ -1,4 +1,4 @@
-﻿# AI绔瑰瓙璇嗗埆绯荤粺 - C++ LVGL涓€浣撳寲鏋勫缓鍜岄儴缃茶剼鏈?
+# AI绔瑰瓙璇嗗埆绯荤粺 - C++ LVGL涓€浣撳寲鏋勫缓鍜岄儴缃茶剼鏈?
 # 鐗堟湰: 5.0.0 (C++ LVGL Integrated Architecture)
 # C++鎺ㄧ悊鍚庣 + LVGL鐣岄潰 + Modbus閫氫俊鐨勫畬鏁翠竴浣撳寲绯荤粺
 
@@ -51,12 +51,12 @@ install: all install-system install-service
 	@echo "鏈嶅姟鍚嶇О: $(SERVICE_NAME)"
 	@echo "瀹夎鐩綍: $(INSTALL_DIR)"
 	@echo "鍙墽琛屾枃浠? $(INSTALL_DIR)/bin/$(BINARY_NAME)"
-	@echo "Wayland鐜: 宸茶嚜鍔ㄩ厤缃?
+	@echo "Wayland鐜: 宸茶嚜鍔ㄩ厤缃?"
 	@echo "浣跨敤 'make start' 鍚姩绯荤粺"
 
 deploy: auto-setup-environment install enable-service start
-	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺閮ㄧ讲瀹屾垚锛?
-	@echo "Wayland鐜锛圵eston 12锛夊凡鑷姩閰嶇疆骞跺惎鍔?
+	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺閮ㄧ讲瀹屾垚锛?"
+	@echo "Wayland鐜锛圵eston 12锛夊凡鑷姩閰嶇疆骞跺惎鍔?"
 
 help:
 	@echo "$(CYAN)===============================================$(NC)"
@@ -80,27 +80,27 @@ help:
 	@echo "$(GREEN)鍗曡繘绋嬬粺涓€鏋舵瀯:$(NC)"
 	@echo "  unified          - 鏋勫缓鍗曡繘绋婰VGL+GStreamer缁熶竴鏋舵瀯"
 	@echo "  unified-run      - 杩愯缁熶竴鏋舵瀯"
-	@echo "  unified-test     - 娴嬭瘯缁熶竴鏋舵瀯鍜岀幆澧?
+	@echo "  unified-test     - 娴嬭瘯缁熶竴鏋舵瀯鍜岀幆澧?"
 	@echo "  unified-clean    - 娓呯悊缁熶竴鏋舵瀯鏋勫缓鏂囦欢"
 	@echo ""
 	@echo "$(GREEN)鎽勫儚澶磋瘖鏂伐鍏?$(NC)"
-	@echo "  camera-diag      - 杩愯瀹屾暣鎽勫儚澶磋瘖鏂?
+	@echo "  camera-diag      - 杩愯瀹屾暣鎽勫儚澶磋瘖鏂?"
 	@echo "  camera-test      - 娴嬭瘯鎽勫儚澶磋闂?(浣跨敤 SENSOR_ID=X 鎸囧畾sensor)"
 	@echo "  camera-fix       - 杩愯缁煎悎浜や簰寮忔憚鍍忓ご淇鑴氭湰"
 	@echo "  camera-fix-quick - 搴旂敤蹇€熼潪浜や簰寮忔憚鍍忓ご淇"
 	@echo "  camera-fix-test  - 娴嬭瘯鎽勫儚澶翠慨澶嶅悗鍔熻兘 (浣跨敤 SENSOR_ID=X)"
 	@echo ""
 	@echo "$(GREEN)NVIDIA-DRM 杩佺Щ楠岃瘉:$(NC)"
-	@echo "  enable-nvidia-drm- 鍚敤NVIDIA-DRM椹卞姩锛堟浛鎹egra_drm锛?
-	@echo "  force-nvidia-drm - 寮哄埗杩佺Щnvidia-drm锛堝鐞嗛〗鍥虹殑tegra_drm锛?
+	@echo "  enable-nvidia-drm- 鍚敤NVIDIA-DRM椹卞姩锛堟浛鎹egra_drm锛?"
+	@echo "  force-nvidia-drm - 寮哄埗杩佺Щnvidia-drm锛堝鐞嗛〗鍥虹殑tegra_drm锛?"
 	@echo "  nvidia-drm-test  - 杩愯瀹屾暣鐨凬VIDIA-DRM杩佺Щ楠岃瘉娴嬭瘯"
-	@echo "  nvidia-drm-report- 鐢熸垚NVIDIA-DRM杩佺Щ鐘舵€佹姤鍛?
-	@echo "  nvidia-drm-complete - 杩愯瀹屾暣鐨勮縼绉婚獙璇佹祦绋?
+	@echo "  nvidia-drm-report- 鐢熸垚NVIDIA-DRM杩佺Щ鐘舵€佹姤鍛?"
+	@echo "  nvidia-drm-complete - 杩愯瀹屾暣鐨勮縼绉婚獙璇佹祦绋?"
 	@echo ""
 	@echo "$(GREEN)瀹夎鍛戒护:$(NC)"
 	@echo "  install          - 瀹屾暣瀹夎绯荤粺"
 	@echo "  install-deps     - 瀹夎鎵€鏈変緷璧?绯荤粺+Wayland+LVGL)"
-	@echo "  install-system-deps - 浠呭畨瑁呯郴缁熶緷璧?
+	@echo "  install-system-deps - 浠呭畨瑁呯郴缁熶緷璧?"
 	@echo "  install-wayland-deps - 瀹夎Wayland鐜鍜孲way"
 	@echo "  install-lvgl     - 妫€鏌ュ苟瀹夎LVGL"
 	@echo "  install-system   - 瀹夎缂栬瘧濂界殑绯荤粺"
@@ -110,20 +110,20 @@ help:
 	@echo "  start            - 鍚姩鏈嶅姟"
 	@echo "  stop             - 鍋滄鏈嶅姟"
 	@echo "  restart          - 閲嶅惎鏈嶅姟"
-	@echo "  status           - 鏌ョ湅鏈嶅姟鐘舵€?
+	@echo "  status           - 鏌ョ湅鏈嶅姟鐘舵€?"
 	@echo "  logs             - 鏌ョ湅鏈嶅姟鏃ュ織"
-	@echo "  enable-service   - 鍚敤寮€鏈鸿嚜鍚?
-	@echo "  disable-service  - 绂佺敤寮€鏈鸿嚜鍚?
+	@echo "  enable-service   - 鍚敤寮€鏈鸿嚜鍚?"
+	@echo "  disable-service  - 绂佺敤寮€鏈鸿嚜鍚?"
 	@echo ""
 	@echo "$(GREEN)Wayland鐜绠＄悊锛圫way锛?$(NC)"
 	@echo "  setup-wayland    - 閰嶇疆Wayland鐜鍜孲way鏈嶅姟"
-	@echo "  check-wayland    - 妫€鏌ayland鐜瀹屾暣鎬?
+	@echo "  check-wayland    - 妫€鏌ayland鐜瀹屾暣鎬?"
 	@echo ""
 	@echo "$(GREEN)Weston 12 闄嶇骇鏀寔锛堣В鍐?Weston 13 bug锛?$(NC)"
 	@echo "  check-weston-version     - 妫€鏌ュ綋鍓?Weston 鐗堟湰"
 	@echo ""
 	@echo "$(GREEN)缁存姢鍛戒护:$(NC)"
-	@echo "  check-system     - 妫€鏌ョ郴缁熺幆澧?
+	@echo "  check-system     - 妫€鏌ョ郴缁熺幆澧?"
 	@echo "  check-wayland    - 妫€鏌ayland鐜"
 	@echo "  setup-config     - 璁剧疆閰嶇疆鏂囦欢"
 	@echo "  test             - 杩愯绯荤粺娴嬭瘯"
@@ -131,17 +131,17 @@ help:
 	@echo ""
 	@echo "$(YELLOW)鐗规€ц鏄?$(NC)"
 	@echo "  鉁?C++17楂樻€ц兘鎺ㄧ悊寮曟搸"
-	@echo "  鉁?LVGL宸ヤ笟绾цЕ鎽哥晫闈?
-	@echo "  鉁?YOLOv8+TensorRT鍔犻€?
+	@echo "  鉁?LVGL宸ヤ笟绾цЕ鎽哥晫闈?"
+	@echo "  鉁?YOLOv8+TensorRT鍔犻€?"
 	@echo "  鉁?Modbus TCP PLC閫氫俊"
 	@echo "  鉁?Jetson Orin NX浼樺寲"
-	@echo "  鉁?瀹炴椂瑙嗛澶勭悊涓庢娴?
+	@echo "  鉁?瀹炴椂瑙嗛澶勭悊涓庢娴?"
 
 # === 绯荤粺妫€鏌?===
 check-system:
 	@echo "$(BLUE)[INFO]$(NC) 妫€鏌ョ郴缁熺幆澧?.."
 	@if ! command -v cmake >/dev/null 2>&1; then \
-		echo "$(RED)[ERROR]$(NC) cmake鏈畨瑁?; \
+		echo "$(RED)[ERROR]$(NC) cmake鏈畨瑁?"; \
 		exit 1; \
 	fi
 	@if ! command -v g++ >/dev/null 2>&1; then \
@@ -150,25 +150,25 @@ check-system:
 	fi
 	@if ! pkg-config --exists opencv4 2>/dev/null; then \
 		if ! pkg-config --exists opencv 2>/dev/null; then \
-			echo "$(RED)[ERROR]$(NC) OpenCV寮€鍙戝簱鏈畨瑁?; \
+			echo "$(RED)[ERROR]$(NC) OpenCV寮€鍙戝簱鏈畨瑁?"; \
 			exit 1; \
 		fi; \
 	fi
 	@if ! pkg-config --exists gstreamer-1.0 2>/dev/null; then \
-		echo "$(RED)[ERROR]$(NC) GStreamer寮€鍙戝簱鏈畨瑁?; \
+		echo "$(RED)[ERROR]$(NC) GStreamer寮€鍙戝簱鏈畨瑁?"; \
 		exit 1; \
 	fi
 	@if [ ! -f "/usr/include/modbus/modbus.h" ] && [ ! -f "/usr/local/include/modbus/modbus.h" ]; then \
 		echo "$(YELLOW)[WARNING]$(NC) libmodbus寮€鍙戝簱鏈壘鍒帮紝灏嗙鐢∕odbus鍔熻兘"; \
 	fi
 	@if [ ! -f "/usr/include/lvgl/lvgl.h" ] && [ ! -f "/usr/local/include/lvgl/lvgl.h" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) LVGL寮€鍙戝簱鏈壘鍒帮紝灏嗙鐢ㄧ晫闈㈠姛鑳?; \
+		echo "$(YELLOW)[WARNING]$(NC) LVGL寮€鍙戝簱鏈壘鍒帮紝灏嗙鐢ㄧ晫闈㈠姛鑳?"; \
 	fi
 	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺鐜妫€鏌ラ€氳繃"
 
 # === 渚濊禆瀹夎 ===
 install-deps: install-system-deps install-lvgl9-auto
-	@echo "$(GREEN)[SUCCESS]$(NC) 鎵€鏈変緷璧栧畨瑁呭畬鎴?
+	@echo "$(GREEN)[SUCCESS]$(NC) 鎵€鏈変緷璧栧畨瑁呭畬鎴?"
 
 # === 鑷姩鐜閰嶇疆 ===
 # 浣跨敤 Weston 12锛堟帹鑽愮敤浜?Jetson + Nvidia锛?
@@ -186,7 +186,7 @@ auto-setup-environment:
 	@sudo modprobe nvidia-drm modeset=1 2>/dev/null || true
 	@if ! grep -q "options nvidia-drm modeset=1" /etc/modprobe.d/nvidia-drm.conf 2>/dev/null; then \
 		echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia-drm.conf >/dev/null; \
-		echo "$(GREEN)[SUCCESS]$(NC) Nvidia DRM 妯″潡閰嶇疆宸蹭繚瀛?; \
+		echo "$(GREEN)[SUCCESS]$(NC) Nvidia DRM 妯″潡閰嶇疆宸蹭繚瀛?"; \
 	fi
 	@# 3. 閰嶇疆鐢ㄦ埛鏉冮檺
 	@echo "$(BLUE)[INFO]$(NC) 閰嶇疆 DRM 璁惧鏉冮檺..."
@@ -215,7 +215,7 @@ auto-setup-environment:
 		sudo systemctl start weston.service; \
 		sleep 3; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Weston 宸插湪杩愯锛岃烦杩囧惎鍔?; \
+		echo "$(GREEN)[SUCCESS]$(NC) Weston 宸插湪杩愯锛岃烦杩囧惎鍔?"; \
 	fi
 	@# 7. 楠岃瘉 Wayland 鐜
 	@if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
@@ -228,7 +228,7 @@ auto-setup-environment:
 		libwayland-egl1 \
 		wayland-protocols \
 		libxkbcommon-dev
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland渚濊禆瀹夎瀹屾垚锛圫way锛?
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland渚濊禆瀹夎瀹屾垚锛圫way锛?"
 
 # 妫€鏌?Mutter 鏄惁宸插畨瑁?
 check-mutter:
@@ -268,7 +268,7 @@ setup-mutter:
 	@echo "[Install]" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/mutter-wayland.service > /dev/null
 	@sudo systemctl daemon-reload
-	@echo "$(GREEN)[SUCCESS]$(NC) Mutter鏈嶅姟閰嶇疆瀹屾垚锛堝凡鍖呭惈D-Bus鍚姩锛?
+	@echo "$(GREEN)[SUCCESS]$(NC) Mutter鏈嶅姟閰嶇疆瀹屾垚锛堝凡鍖呭惈D-Bus鍚姩锛?"
 
 # 鍚姩 Mutter
 start-mutter: check-mutter setup-mutter
@@ -289,7 +289,7 @@ start-mutter: check-mutter setup-mutter
 stop-mutter:
 	@echo "$(BLUE)[INFO]$(NC) 鍋滄Mutter..."
 	@sudo systemctl stop mutter-wayland || true
-	@echo "$(GREEN)[SUCCESS]$(NC) Mutter宸插仠姝?
+	@echo "$(GREEN)[SUCCESS]$(NC) Mutter宸插仠姝?"
 
 # 妫€鏌?Mutter 鐘舵€?
 mutter-status:
@@ -317,7 +317,7 @@ mutter-logs:
 
 	@sleep 3
 		echo "WAYLAND_DISPLAY=$$(ls /run/user/0/wayland-* 2>/dev/null | head -n1 | xargs basename)"; \
-		echo "瑙︽懜鎺у埗: 宸插惎鐢?; \
+		echo "瑙︽懜鎺у埗: 宸插惎鐢?"; \
 	else \
 		exit 1; \
 	fi
@@ -331,7 +331,7 @@ mutter-logs:
 	@libinput list-devices 2>/dev/null | grep -A 5 "Capabilities.*touch" || echo "鏈娴嬪埌瑙︽懜璁惧"
 
 
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland鐜閰嶇疆瀹屾垚锛圫way + 瑙︽懜鎺у埗锛?
+	@echo "$(GREEN)[SUCCESS]$(NC) Wayland鐜閰嶇疆瀹屾垚锛圫way + 瑙︽懜鎺у埗锛?"
 
 # ============================================================================
 # Weston 12 闄嶇骇鏀寔锛堣В鍐?Weston 13 鐨?xdg_positioner bug锛?
@@ -347,9 +347,9 @@ check-weston-version:
 		echo "$(CYAN)褰撳墠 Weston 鐗堟湰: $$WESTON_VERSION$(NC)"; \
 		WESTON_MAJOR=$$(echo $$WESTON_VERSION | cut -d. -f1); \
 		if [ "$$WESTON_MAJOR" = "12" ]; then \
-			echo "$(GREEN)[SUCCESS]$(NC) 鉁?Weston 12 宸插畨瑁?; \
+			echo "$(GREEN)[SUCCESS]$(NC) 鉁?Weston 12 宸插畨瑁?"; \
 		elif [ "$$WESTON_MAJOR" = "13" ]; then \
-			echo "$(YELLOW)[WARNING]$(NC) 鈿?Weston 13 瀛樺湪宸茬煡 xdg_positioner bug锛屽缓璁檷绾?; \
+			echo "$(YELLOW)[WARNING]$(NC) 鈿?Weston 13 瀛樺湪宸茬煡 xdg_positioner bug锛屽缓璁檷绾?"; \
 		elif [ "$$WESTON_MAJOR" = "9" ] || [ "$$WESTON_MAJOR" = "10" ]; then \
 			echo "$(YELLOW)[WARNING]$(NC) 鈿?Weston 鐗堟湰杈冩棫 ($$WESTON_VERSION)锛屽缓璁崌绾у埌 12"; \
 		else \
@@ -358,7 +358,7 @@ check-weston-version:
 		which weston; \
 		ls -lh $$(which weston); \
 	else \
-		echo "$(RED)[ERROR]$(NC) 鉁?Weston 鏈畨瑁?; \
+		echo "$(RED)[ERROR]$(NC) 鉁?Weston 鏈畨瑁?"; \
 	fi
 	@echo ""
 	@echo "$(CYAN)DRM 璁惧鐘舵€?$(NC)"
@@ -375,11 +375,11 @@ backup-current-weston:
 	fi; \
 	if [ -f "/root/.config/weston.ini" ]; then \
 		sudo cp /root/.config/weston.ini /opt/backup/weston/weston.ini.$$BACKUP_DATE; \
-		echo "$(GREEN)[SUCCESS]$(NC) 鐢ㄦ埛閰嶇疆宸插浠?; \
+		echo "$(GREEN)[SUCCESS]$(NC) 鐢ㄦ埛閰嶇疆宸插浠?"; \
 	fi; \
 	if [ -f "/etc/systemd/system/weston.service" ]; then \
 		sudo cp /etc/systemd/system/weston.service /opt/backup/weston/weston.service.$$BACKUP_DATE; \
-		echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟鏂囦欢宸插浠?; \
+		echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟鏂囦欢宸插浠?"; \
 	fi
 	@echo "$(GREEN)[SUCCESS]$(NC) 澶囦唤瀹屾垚"
 
@@ -410,7 +410,7 @@ uninstall-current-weston:
 	@sudo rm -f /usr/lib/aarch64-linux-gnu/libweston-*.so* 2>/dev/null || true
 	@sudo rm -f /usr/local/lib/libweston-*.so* 2>/dev/null || true
 	@sudo ldconfig
-	@echo "$(GREEN)[SUCCESS]$(NC) Weston 宸插嵏杞?
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 宸插嵏杞?"
 
 # 瀹夎 Weston 12 缂栬瘧渚濊禆
 	@echo "$(BLUE)[INFO]$(NC) 瀹夎 Weston 12 缂栬瘧渚濊禆..."
@@ -455,7 +455,7 @@ uninstall-current-weston:
 	@echo "$(BLUE)[INFO]$(NC) 瑙ｅ帇婧愮爜..."
 		rm -rf weston-12.0.0 && \
 		tar -xf weston-12.0.0.tar.xz
-	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12.0.0 婧愮爜宸插噯澶?
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12.0.0 婧愮爜宸插噯澶?"
 
 # 缂栬瘧 Weston 12
 	@echo "$(CYAN)[COMPILE]$(NC) 寮€濮嬬紪璇?Weston 12.0.0 (棰勮 15-30 鍒嗛挓)..."
@@ -584,7 +584,7 @@ setup-weston-service:
 # 鍋滄 Weston 12
 	@echo "$(BLUE)[INFO]$(NC) 鍋滄 Weston 12..."
 	@sudo pkill -9 weston 2>/dev/null || true
-	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 宸插仠姝?
+	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 宸插仠姝?"
 
 # 鏌ョ湅 Weston 12 鐘舵€?
 	@echo "$(CYAN)=== Weston 12 鏈嶅姟鐘舵€?===$(NC)"
@@ -596,7 +596,7 @@ setup-weston-service:
 	@ls -lah /run/user/0/wayland-* 2>/dev/null || echo "鏃?Wayland socket"
 	@echo ""
 	@echo "$(CYAN)=== DRM 璁惧 ===$(NC)"
-	@ls -la /dev/dri/ 2>/dev/null || echo "DRM 璁惧涓嶅瓨鍦?
+	@ls -la /dev/dri/ 2>/dev/null || echo "DRM 璁惧涓嶅瓨鍦?"
 
 # 鏌ョ湅 Weston 12 鏃ュ織
 	@echo "$(CYAN)=== Weston 12 systemd 鏃ュ織 (鏈€杩?100 琛? ===$(NC)"
@@ -667,7 +667,7 @@ setup-weston-service:
 check-wayland:
 	@echo "$(BLUE)[INFO]$(NC) 妫€鏌ayland鐜锛圫way锛?.."
 	@echo -n "Wayland socket: "
-	@ls /run/user/0/wayland-* 2>/dev/null && echo "瀛樺湪" || echo "涓嶅瓨鍦?
+	@ls /run/user/0/wayland-* 2>/dev/null && echo "瀛樺湪" || echo "涓嶅瓨鍦?"
 	@echo -n "Wayland搴? "
 	@pkg-config --exists wayland-client && echo "宸插畨瑁? || echo "鏈畨瑁?
 	@echo -n "EGL搴? "
@@ -710,7 +710,7 @@ install-system-deps:
 	@if lspci | grep -i nvidia >/dev/null 2>&1; then \
 		echo "$(BLUE)[INFO]$(NC) 妫€娴嬪埌NVIDIA GPU锛屾鏌UDA鐜..."; \
 		if [ -d "/usr/local/cuda" ]; then \
-			echo "$(GREEN)[SUCCESS]$(NC) CUDA鐜宸插畨瑁?; \
+			echo "$(GREEN)[SUCCESS]$(NC) CUDA鐜宸插畨瑁?"; \
 		else \
 			echo "$(YELLOW)[WARNING]$(NC) CUDA鐜鏈畨瑁咃紝璇锋墜鍔ㄥ畨瑁匔UDA鍜孴ensorRT"; \
 		fi \
@@ -811,7 +811,7 @@ install-lvgl9-auto:
 		LVGL_VERSION=$$(PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --modversion lvgl 2>/dev/null); \
 		echo "$(BLUE)[INFO]$(NC) 鍙戠幇宸插畨瑁呯殑LVGL鐗堟湰: $$LVGL_VERSION"; \
 		if [ "$$(echo $$LVGL_VERSION | cut -d. -f1)" = "9" ]; then \
-			echo "$(GREEN)[SUCCESS]$(NC) LVGL涓荤増鏈负v9 鉁?; \
+			echo "$(GREEN)[SUCCESS]$(NC) LVGL涓荤増鏈负v9 鉁?"; \
 			LVGL_VERSION_OK=true; \
 		else \
 			echo "$(YELLOW)[WARNING]$(NC) LVGL鐗堟湰涓嶆槸v9 (褰撳墠: $$LVGL_VERSION)"; \
@@ -820,9 +820,9 @@ install-lvgl9-auto:
 		echo "$(YELLOW)[WARNING]$(NC) pkg-config鏈壘鍒癓VGL"; \
 	fi; \
 	if [ -f "/usr/local/include/lvgl/lvgl.h" ]; then \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL澶存枃浠跺瓨鍦?鉁?; \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL澶存枃浠跺瓨鍦?鉁?"; \
 		if grep -q "lv_display_create\|lv_disp_create" /usr/local/include/lvgl/lvgl.h 2>/dev/null; then \
-			echo "$(GREEN)[SUCCESS]$(NC) LVGL v9 API鍙敤 鉁?; \
+			echo "$(GREEN)[SUCCESS]$(NC) LVGL v9 API鍙敤 鉁?"; \
 			LVGL_API_OK=true; \
 		else \
 			echo "$(YELLOW)[WARNING]$(NC) 鏈娴嬪埌LVGL v9 API"; \
@@ -831,7 +831,7 @@ install-lvgl9-auto:
 		echo "$(YELLOW)[WARNING]$(NC) LVGL澶存枃浠朵笉瀛樺湪"; \
 	fi; \
 	if ls /usr/local/lib/liblvgl.so* >/dev/null 2>&1; then \
-		echo "$(GREEN)[SUCCESS]$(NC) LVGL搴撴枃浠跺瓨鍦?鉁?; \
+		echo "$(GREEN)[SUCCESS]$(NC) LVGL搴撴枃浠跺瓨鍦?鉁?"; \
 		LVGL_INSTALLED=true; \
 	else \
 		echo "$(YELLOW)[WARNING]$(NC) LVGL搴撴枃浠朵笉瀛樺湪"; \
@@ -874,7 +874,7 @@ compile-yolo-lib:
 		-o libnvdsinfer_yolo_bamboo.so
 	@sudo cp libnvdsinfer_yolo_bamboo.so $(INSTALL_DIR)/lib/
 	@sudo chmod 755 $(INSTALL_DIR)/lib/libnvdsinfer_yolo_bamboo.so
-	@echo "$(GREEN)[SUCCESS]$(NC) 鉁?YOLO瑙ｆ瀽搴撶紪璇戦儴缃插畬鎴?
+	@echo "$(GREEN)[SUCCESS]$(NC) 鉁?YOLO瑙ｆ瀽搴撶紪璇戦儴缃插畬鎴?"
 
 # === 绯荤粺瀹夎 ===
 install-system: compile-yolo-lib
@@ -893,11 +893,11 @@ install-system: compile-yolo-lib
 	@echo "$(BLUE)[INFO]$(NC) 纭繚nvinfer閰嶇疆鏂囦欢鍜屾爣绛炬枃浠跺瓨鍦?.."
 	@if [ -f "config/nvinfer_config.txt" ]; then \
 		sudo cp config/nvinfer_config.txt $(INSTALL_DIR)/config/; \
-		echo "$(GREEN)[SUCCESS]$(NC) nvinfer閰嶇疆鏂囦欢宸插鍒?; \
+		echo "$(GREEN)[SUCCESS]$(NC) nvinfer閰嶇疆鏂囦欢宸插鍒?"; \
 	fi
 	@if [ -f "config/labels.txt" ]; then \
 		sudo cp config/labels.txt $(INSTALL_DIR)/config/; \
-		echo "$(GREEN)[SUCCESS]$(NC) 鏍囩鏂囦欢宸插鍒?; \
+		echo "$(GREEN)[SUCCESS]$(NC) 鏍囩鏂囦欢宸插鍒?"; \
 	fi
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/logs
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/backup
@@ -928,11 +928,11 @@ install-service: setup-config
 
 enable-service:
 	@sudo systemctl enable $(SERVICE_NAME)
-	@echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟宸插惎鐢ㄥ紑鏈鸿嚜鍚?
+	@echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟宸插惎鐢ㄥ紑鏈鸿嚜鍚?"
 
 disable-service:
 	@sudo systemctl disable $(SERVICE_NAME)
-	@echo "$(BLUE)[INFO]$(NC) 鏈嶅姟宸茬鐢ㄥ紑鏈鸿嚜鍚?
+	@echo "$(BLUE)[INFO]$(NC) 鏈嶅姟宸茬鐢ㄥ紑鏈鸿嚜鍚?"
 
 start:
 	@echo "$(BLUE)[INFO]$(NC) 鍚姩$(SERVICE_NAME)鏈嶅姟..."
@@ -948,7 +948,7 @@ start:
 stop:
 	@echo "$(BLUE)[INFO]$(NC) 鍋滄$(SERVICE_NAME)鏈嶅姟..."
 	@sudo systemctl stop $(SERVICE_NAME)
-	@echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟宸插仠姝?
+	@echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟宸插仠姝?"
 
 restart:
 	@echo "$(BLUE)[INFO]$(NC) 閲嶅惎$(SERVICE_NAME)鏈嶅姟..."
@@ -965,7 +965,7 @@ status:
 	@sudo systemctl status $(SERVICE_NAME) --no-pager -l
 	@echo ""
 	@echo "$(CYAN)=== 绯荤粺璧勬簮 ===$(NC)"
-	@ps aux | grep $(BINARY_NAME) | grep -v grep || echo "杩涚▼鏈繍琛?
+	@ps aux | grep $(BINARY_NAME) | grep -v grep || echo "杩涚▼鏈繍琛?"
 
 logs:
 	@echo "$(CYAN)=== 瀹炴椂鏃ュ織 (鎸塁trl+C閫€鍑? ===$(NC)"
@@ -989,7 +989,7 @@ test:
 	@if [ -f "cpp_backend/tests/run_tests.sh" ]; then \
 		cd cpp_backend && bash tests/run_tests.sh; \
 	else \
-		echo "$(YELLOW)[WARNING]$(NC) 娴嬭瘯鑴氭湰涓嶅瓨鍦?; \
+		echo "$(YELLOW)[WARNING]$(NC) 娴嬭瘯鑴氭湰涓嶅瓨鍦?"; \
 	fi
 
 backup:
@@ -1004,25 +1004,25 @@ backup:
 
 # 蹇€熼噸鏂伴儴缃诧紙璺宠繃渚濊禆妫€鏌ワ級
 redeploy: stop clean build-system install-system restart
-	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺閲嶆柊閮ㄧ讲瀹屾垚锛?
+	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺閲嶆柊閮ㄧ讲瀹屾垚锛?"
 
 # 瀹屾暣閲嶆柊閮ㄧ讲锛堝寘鎷緷璧栨鏌ワ級
 full-redeploy: stop install-deps build-system install-system restart
-	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺瀹屾暣閲嶆柊閮ㄧ讲瀹屾垚锛?
+	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺瀹屾暣閲嶆柊閮ㄧ讲瀹屾垚锛?"
 
 # 鏅鸿兘閲嶆柊閮ㄧ讲锛堜粎鍦ㄥ繀瑕佹椂瀹夎渚濊禆锛?
 smart-redeploy: stop check-deps-if-needed build-system install-system restart
-	@echo "$(GREEN)[SUCCESS]$(NC) 鏅鸿兘閲嶆柊閮ㄧ讲瀹屾垚锛?
+	@echo "$(GREEN)[SUCCESS]$(NC) 鏅鸿兘閲嶆柊閮ㄧ讲瀹屾垚锛?"
 
 # 妫€鏌ヤ緷璧栨槸鍚﹂渶瑕侀噸鏂板畨瑁?
 check-deps-if-needed:
 	@echo "$(BLUE)[INFO]$(NC) 妫€鏌ユ槸鍚﹂渶瑕侀噸鏂板畨瑁呬緷璧?.."
 	@NEED_DEPS=false; \
 	if ! PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --exists lvgl 2>/dev/null; then \
-		echo "$(YELLOW)[WARNING]$(NC) LVGL鏈壘鍒帮紝闇€瑕佸畨瑁呬緷璧?; \
+		echo "$(YELLOW)[WARNING]$(NC) LVGL鏈壘鍒帮紝闇€瑕佸畨瑁呬緷璧?"; \
 		NEED_DEPS=true; \
 	elif [ "$$(PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pkg-config --modversion lvgl 2>/dev/null | cut -d. -f1)" != "9" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) LVGL鐗堟湰涓嶆槸v9锛岄渶瑕佹洿鏂?; \
+		echo "$(YELLOW)[WARNING]$(NC) LVGL鐗堟湰涓嶆槸v9锛岄渶瑕佹洿鏂?"; \
 		NEED_DEPS=true; \
 	else \
 		echo "$(GREEN)[SUCCESS]$(NC) 渚濊禆宸叉弧瓒筹紝璺宠繃瀹夎姝ラ"; \
@@ -1046,7 +1046,7 @@ uninstall:
 	@sudo rm -f /etc/systemd/system/$(SERVICE_NAME).service
 	@sudo systemctl daemon-reload
 	@sudo rm -rf $(INSTALL_DIR)
-	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺宸插嵏杞?
+	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺宸插嵏杞?"
 
 # === 鍗曡繘绋嬬粺涓€鏋舵瀯 ===
 unified: unified-build
@@ -1077,10 +1077,10 @@ unified-test:
 	@if command -v eglinfo >/dev/null 2>&1; then \
 		eglinfo | head -10; \
 	else \
-		echo "$(YELLOW)[WARNING]$(NC) eglinfo鏈畨瑁咃紝璺宠繃EGL妫€鏌?; \
+		echo "$(YELLOW)[WARNING]$(NC) eglinfo鏈畨瑁咃紝璺宠繃EGL妫€鏌?"; \
 	fi
 	@echo "$(CYAN)妫€鏌RM璁惧...$(NC)"
-	@ls -la /dev/dri/ || echo "$(YELLOW)[WARNING]$(NC) DRM璁惧涓嶅彲鐢?
+	@ls -la /dev/dri/ || echo "$(YELLOW)[WARNING]$(NC) DRM璁惧涓嶅彲鐢?"
 	@echo "$(CYAN)妫€鏌ユ憚鍍忓ご璁惧...$(NC)"
 	@ls -la /dev/video* || echo "$(YELLOW)[WARNING]$(NC) 鎽勫儚澶磋澶囦笉鍙敤"
 	@echo "$(GREEN)[SUCCESS]$(NC) 鐜妫€鏌ュ畬鎴愶紝杩愯缁熶竴鏋舵瀯..."
@@ -1129,7 +1129,7 @@ camera-fix-quick:
 	@echo "4. 璁剧疆EGL鐜..."
 	@echo "export EGL_PLATFORM=drm" >> ~/.bashrc
 	@echo "export __EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" >> ~/.bashrc
-	@echo "$(GREEN)[SUCCESS]$(NC) 蹇€熶慨澶嶅凡搴旂敤锛岃杩愯 'source ~/.bashrc' 骞堕噸璇?
+	@echo "$(GREEN)[SUCCESS]$(NC) 蹇€熶慨澶嶅凡搴旂敤锛岃杩愯 'source ~/.bashrc' 骞堕噸璇?"
 
 camera-fix-test: test_camera_fix.cpp
 	@echo "$(BLUE)[INFO]$(NC) 鏋勫缓鎽勫儚澶翠慨澶嶆祴璇曞伐鍏?.."
@@ -1148,8 +1148,8 @@ enable-nvidia-drm:
 force-nvidia-drm:
 	@echo "$(BLUE)[INFO]$(NC) 寮哄埗杩佺Щ鍒癗VIDIA-DRM椹卞姩..."
 	@chmod +x deploy/scripts/force_nvidia_drm.sh
-	@echo "$(RED)[DANGER]$(NC) 姝ゆ搷浣滃皢寮哄埗淇敼绯荤粺椹卞姩锛屽彲鑳藉奖鍝嶅浘褰㈡樉绀?
-	@echo "$(YELLOW)[WARNING]$(NC) 寤鸿鍏堝浠介噸瑕佹暟鎹紝鎿嶄綔闇€瑕侀噸鍚郴缁?
+	@echo "$(RED)[DANGER]$(NC) 姝ゆ搷浣滃皢寮哄埗淇敼绯荤粺椹卞姩锛屽彲鑳藉奖鍝嶅浘褰㈡樉绀?"
+	@echo "$(YELLOW)[WARNING]$(NC) 寤鸿鍏堝浠介噸瑕佹暟鎹紝鎿嶄綔闇€瑕侀噸鍚郴缁?"
 	@read -p "纭寮哄埗杩佺Щ鍒癗VIDIA-DRM? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
 	sudo deploy/scripts/force_nvidia_drm.sh
 
@@ -1166,10 +1166,10 @@ nvidia-drm-report:
 	@echo "鐢熸垚鏃堕棿: $$(date)" >> nvidia_drm_status.txt
 	@echo "" >> nvidia_drm_status.txt
 	@echo "=== 椹卞姩妯″潡鐘舵€?===" >> nvidia_drm_status.txt
-	@lsmod | grep -E "nvidia|tegra|drm" >> nvidia_drm_status.txt 2>/dev/null || echo "鏈壘鍒扮浉鍏虫ā鍧? >> nvidia_drm_status.txt
+	@lsmod | grep -E "nvidia|tegra|drm" >> nvidia_drm_status.txt 2>/dev/null || echo "鏈壘鍒扮浉鍏虫ā鍧?" >> nvidia_drm_status.txt
 	@echo "" >> nvidia_drm_status.txt
 	@echo "=== DRM璁惧鐘舵€?===" >> nvidia_drm_status.txt
-	@ls -la /dev/dri/ >> nvidia_drm_status.txt 2>/dev/null || echo "DRM璁惧涓嶅瓨鍦? >> nvidia_drm_status.txt
+	@ls -la /dev/dri/ >> nvidia_drm_status.txt 2>/dev/null || echo "DRM璁惧涓嶅瓨鍦?" >> nvidia_drm_status.txt
 	@echo "" >> nvidia_drm_status.txt
 	@echo "=== EGL鐜 ===" >> nvidia_drm_status.txt
 	@echo "EGL_PLATFORM=$$EGL_PLATFORM" >> nvidia_drm_status.txt
@@ -1181,7 +1181,7 @@ nvidia-drm-report:
 	@cat nvidia_drm_status.txt
 
 nvidia-drm-complete: nvidia-drm-test nvidia-drm-report
-	@echo "$(GREEN)[COMPLETE]$(NC) NVIDIA-DRM杩佺Щ楠岃瘉鍏ㄩ儴瀹屾垚锛?
+	@echo "$(GREEN)[COMPLETE]$(NC) NVIDIA-DRM杩佺Щ楠岃瘉鍏ㄩ儴瀹屾垚锛?"
 	@echo "鏌ョ湅瀹屾暣鎶ュ憡:"
 	@echo "  楠岃瘉鎶ュ憡: nvidia_drm_migration_report.txt"
 	@echo "  鐘舵€佹姤鍛? nvidia_drm_status.txt"
@@ -1192,7 +1192,7 @@ nvidia-drm-complete: nvidia-drm-test nvidia-drm-report
 dev-run:
 	@echo "$(BLUE)[INFO]$(NC) 寮€鍙戞ā寮忕洿鎺ヨ繍琛?.."
 	@if [ ! -f "$(BUILD_DIR)/bamboo_integrated" ]; then \
-		echo "$(RED)[ERROR]$(NC) 鍙墽琛屾枃浠朵笉瀛樺湪锛岃鍏堟瀯寤虹郴缁?; \
+		echo "$(RED)[ERROR]$(NC) 鍙墽琛屾枃浠朵笉瀛樺湪锛岃鍏堟瀯寤虹郴缁?"; \
 		exit 1; \
 	fi
 	@cd $(BUILD_DIR) && sudo ./bamboo_integrated --verbose --config ../config/system_config.yaml
@@ -1203,9 +1203,9 @@ monitor:
 		clear; \
 		echo "$(GREEN)鏃堕棿: $$(date)$(NC)"; \
 		echo "$(CYAN)鏈嶅姟鐘舵€?$(NC)"; \
-		systemctl is-active $(SERVICE_NAME) 2>/dev/null || echo "鏈繍琛?; \
+		systemctl is-active $(SERVICE_NAME) 2>/dev/null || echo "鏈繍琛?"; \
 		echo "$(CYAN)绯荤粺璧勬簮:$(NC)"; \
-		ps aux | grep $(BINARY_NAME) | grep -v grep | head -5 || echo "杩涚▼鏈繍琛?; \
+		ps aux | grep $(BINARY_NAME) | grep -v grep | head -5 || echo "杩涚▼鏈繍琛?"; \
 		echo "$(CYAN)鍐呭瓨浣跨敤:$(NC)"; \
 		free -h | head -2; \
 		echo "$(CYAN)纾佺洏浣跨敤:$(NC)"; \
