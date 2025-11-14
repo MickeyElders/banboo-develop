@@ -1097,26 +1097,22 @@ private:
         // 启用 Wayland 调试
         setenv("WAYLAND_DEBUG", "1", 1);
 
-        // 确保正确的 runtime 目录
+        // 确保正确的 runtime 目录（优先使用现有 XDG_RUNTIME_DIR）
         const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
         if (!runtime_dir || access(runtime_dir, W_OK) != 0) {
-            std::cout << "⚠️ XDG_RUNTIME_DIR 不可写，尝试修复..." << std::endl;
-            setenv("XDG_RUNTIME_DIR", "/run/user/0", 1);
+            // Jetson + nvweston 场景：使用 /run/nvidia-wayland
+            std::cout << "⚠️ XDG_RUNTIME_DIR 不可写或未配置，设置为 /run/nvidia-wayland" << std::endl;
+            setenv("XDG_RUNTIME_DIR", "/run/nvidia-wayland", 1);
+            runtime_dir = getenv("XDG_RUNTIME_DIR");
         }
-        // 检查WAYLAND_DISPLAY环境变量
+        // 检查 WAYLAND_DISPLAY 环境变量
         const char* wayland_display = getenv("WAYLAND_DISPLAY");
         if (!wayland_display) {
             wayland_display = "wayland-0";
             setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
         
-        // 🔧 修复：优先使用XDG_RUNTIME_DIR环境变量
-        if (!runtime_dir) {
-            runtime_dir = "/run/user/0";  // 默认使用root的runtime目录
-            setenv("XDG_RUNTIME_DIR", runtime_dir, 1);
-        }
-        
-        // 构建socket路径
+        // 构建 socket 路径
         std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
         
         // 🔧 修复：使用access()检查socket文件（正确的方法）
@@ -1273,14 +1269,14 @@ private:
             setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
         
-        // 🔧 修复：优先使用XDG_RUNTIME_DIR环境变量
+        // 🔧 优先使用 XDG_RUNTIME_DIR（nvweston: /run/nvidia-wayland）
         const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
-        if (!runtime_dir) {
-            runtime_dir = "/run/user/0";
+        if (!runtime_dir || runtime_dir[0] != '/') {
+            runtime_dir = "/run/nvidia-wayland";
             setenv("XDG_RUNTIME_DIR", runtime_dir, 1);
         }
         
-        // 构建socket路径
+        // 构建 socket 路径
         std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
         
         // 🔧 修复：使用access()检查socket文件

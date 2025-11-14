@@ -635,8 +635,22 @@ bool LVGLWaylandInterface::Impl::checkWaylandEnvironment() {
     }
     std::cout << "✅ WAYLAND_DISPLAY = " << wayland_display << std::endl;
     
-    // 检查wayland socket是否存在
-    std::string socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
+    // 构建 socket 路径：
+    //  1. 如果 WAYLAND_DISPLAY 已经是绝对路径（以 / 开头），直接使用
+    //  2. 否则优先使用 XDG_RUNTIME_DIR（nvweston 为 /run/nvidia-wayland）
+    //  3. 再退回到 /run/user/<uid>
+    std::string socket_path;
+    if (wayland_display[0] == '/') {
+        socket_path = wayland_display;
+    } else {
+        const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
+        if (runtime_dir && runtime_dir[0] == '/') {
+            socket_path = std::string(runtime_dir) + "/" + wayland_display;
+        } else {
+            socket_path = "/run/user/" + std::to_string(getuid()) + "/" + wayland_display;
+        }
+    }
+    
     if (access(socket_path.c_str(), F_OK) != 0) {
         std::cerr << "❌ Wayland socket不存在: " << socket_path << std::endl;
         return false;

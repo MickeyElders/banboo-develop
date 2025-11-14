@@ -1628,10 +1628,10 @@ bool DeepStreamManager::checkWaylandEnvironment() {
         std::cout << "[DeepStream] 设置WAYLAND_DISPLAY=" << wayland_display << std::endl;
     }
     
-    // 检查XDG_RUNTIME_DIR
+    // 检查 XDG_RUNTIME_DIR：优先使用已有值，否则在 Jetson + nvweston 场景下使用 /run/nvidia-wayland
     const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
-    if (!runtime_dir) {
-        setenv("XDG_RUNTIME_DIR", "/run/user/1000", 0);
+    if (!runtime_dir || runtime_dir[0] != '/') {
+        setenv("XDG_RUNTIME_DIR", "/run/nvidia-wayland", 0);
         runtime_dir = getenv("XDG_RUNTIME_DIR");
         std::cout << "[DeepStream] 设置XDG_RUNTIME_DIR=" << runtime_dir << std::endl;
     }
