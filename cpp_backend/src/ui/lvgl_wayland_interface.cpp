@@ -41,6 +41,7 @@
 #include <fcntl.h>
 #include <cstring>
 #include <string>
+#include <algorithm>
 
 // 🔧 修复：使用条件编译避免重定义警告
 // HAS_DRM_EGL_BACKEND 在 CMakeLists.txt 中定义
@@ -318,6 +319,16 @@ LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<bamboo_cut::core::Dat
     
     // 🆕 初始化主题颜色（使用原始 UI 配色）
     pImpl_->theme_colors_ = ui::LVGLThemeColors();
+
+    // 🧪 调试：允许通过环境变量让摄像头面板保持不透明，方便诊断
+    if (const char* env_value = std::getenv("BAMBOO_CAMERA_PANEL_OPAQUE")) {
+        std::string value = env_value;
+        std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+        if (value == "1" || value == "true" || value == "yes" || value == "on" || value == "debug") {
+            pImpl_->debug_camera_panel_opaque_ = true;
+            std::cout << "⚠️  [Debug] 摄像头面板使用不透明模式 (BAMBOO_CAMERA_PANEL_OPAQUE=" << env_value << ")" << std::endl;
+        }
+    }
 }
 
 LVGLWaylandInterface::~LVGLWaylandInterface() {
