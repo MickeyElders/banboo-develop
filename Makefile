@@ -9,10 +9,6 @@
         start-mutter stop-mutter mutter-status mutter-logs check-mutter setup-mutter \
         start-weston stop-weston weston-status auto-setup-environment \
         check-weston-version backup-current-weston uninstall-current-weston \
-        install-weston12-build-deps download-weston12 compile-weston12 \
-        install-weston12 configure-weston12 setup-weston12-service \
-        start-weston12 stop-weston12 weston12-status weston12-logs \
-        downgrade-to-weston12 test-weston12 \
         build-debug test-system backup
 
 # === 绯荤粺閰嶇疆 ===
@@ -121,20 +117,10 @@ help:
 	@echo ""
 	@echo "$(GREEN)Wayland鐜绠＄悊锛圫way锛?$(NC)"
 	@echo "  setup-wayland    - 閰嶇疆Wayland鐜鍜孲way鏈嶅姟"
-	@echo "  start-sway       - 鍚姩Sway鍚堟垚鍣紙鑷姩瀹夎+閰嶇疆+鍚姩锛?
-	@echo "  stop-sway        - 鍋滄Sway鍚堟垚鍣?
-	@echo "  sway-status      - 鏌ョ湅Sway鐘舵€佸拰瑙︽懜璁惧"
-	@echo "  sway-logs        - 鏌ョ湅Sway鏃ュ織"
 	@echo "  check-wayland    - 妫€鏌ayland鐜瀹屾暣鎬?
 	@echo ""
 	@echo "$(GREEN)Weston 12 闄嶇骇鏀寔锛堣В鍐?Weston 13 bug锛?$(NC)"
-	@echo "  downgrade-to-weston12    - 馃殌 涓€閿檷绾у埌 Weston 12锛堟帹鑽愶級"
 	@echo "  check-weston-version     - 妫€鏌ュ綋鍓?Weston 鐗堟湰"
-	@echo "  start-weston12           - 鍚姩 Weston 12 鏈嶅姟"
-	@echo "  stop-weston12            - 鍋滄 Weston 12 鏈嶅姟"
-	@echo "  weston12-status          - 鏌ョ湅 Weston 12 鐘舵€?
-	@echo "  weston12-logs            - 鏌ョ湅 Weston 12 鏃ュ織"
-	@echo "  test-weston12            - 娴嬭瘯 Weston 12 鐜"
 	@echo ""
 	@echo "$(GREEN)缁存姢鍛戒护:$(NC)"
 	@echo "  check-system     - 妫€鏌ョ郴缁熺幆澧?
@@ -211,15 +197,8 @@ auto-setup-environment:
 		$(MAKE) setup-weston-service; \
 	fi
 	@# 5. 鍋滄鍏朵粬 Wayland 鍚堟垚鍣?
-	@if systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
-		echo "$(BLUE)[INFO]$(NC) 鍋滄 Sway 鏈嶅姟..."; \
-		sudo systemctl stop sway-wayland.service; \
-		sudo systemctl disable sway-wayland.service; \
 	fi
-	@if systemctl is-active --quiet weston12.service 2>/dev/null; then \
 		echo "$(BLUE)[INFO]$(NC) 鍋滄 Weston 12 鏈嶅姟..."; \
-		sudo systemctl stop weston12.service; \
-		sudo systemctl disable weston12.service; \
 	fi
 	@# 6. 鍚姩 Weston
 	@WESTON_RUNNING=false; \
@@ -243,9 +222,6 @@ auto-setup-environment:
 		echo "$(YELLOW)[WARNING]$(NC) Wayland socket 涓嶅瓨鍦紝绛夊緟 Weston 瀹屽叏鍚姩..."; \
 		sleep 5; \
 	@sudo apt-get install -y \
-		sway \
-		swaylock \
-		swayidle \
 		xwayland \
 		libinput-tools \
 		libwayland-dev \
@@ -329,121 +305,24 @@ mutter-logs:
 	@sudo journalctl -u mutter-wayland -f --no-hostname
 
 # ============================================================================
-# Sway Wayland 鍚堟垚鍣紙鎺ㄨ崘鐢ㄤ簬宓屽叆寮忥紝鏀寔瑙︽懜鎺у埗锛?
 # ============================================================================
 
-# 妫€鏌?Sway 鏄惁宸插畨瑁?
-check-sway:
 	@echo "$(BLUE)[INFO]$(NC) 妫€鏌way鍚堟垚鍣?.."
-	@if ! command -v sway >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Sway鏈畨瑁咃紝姝ｅ湪瀹夎..."; \
-		sudo apt-get update && sudo apt-get install -y sway swaylock swayidle xwayland libinput-tools; \
 	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Sway宸插畨瑁? $$(sway --version 2>&1 | head -n1)"; \
 	fi
 
-# 鍒涘缓 Sway 閰嶇疆鏂囦欢锛堟敮鎸佽Е鎽告帶鍒讹級
-setup-sway-config:
-	@echo "$(BLUE)[INFO]$(NC) 鍒涘缓Sway閰嶇疆鏂囦欢锛堟敮鎸佽Е鎽告帶鍒讹級..."
-	@sudo mkdir -p /root/.config/sway
-	@echo "# Sway閰嶇疆 - Bamboo璇嗗埆绯荤粺锛堣Е鎽告帶鍒朵紭鍖栵級" | sudo tee /root/.config/sway/config > /dev/null
-	@echo "# 鑷姩鐢熸垚锛岃鍕挎墜鍔ㄧ紪杈? | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 鍩虹璁剧疆" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "set \$$mod Mod4" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 杈撳嚭閰嶇疆锛堟牴鎹疄闄呭睆骞曡皟鏁达級" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "output * bg #000000 solid_color" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "output * mode 1920x1080@60Hz" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 瑙︽懜灞?瑙︽懜鏉挎敮鎸侀厤缃? | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "input type:touchscreen {" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    tap enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    drag enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    events enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "}" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "input type:touchpad {" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    tap enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    natural_scroll enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    dwt enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "    drag enabled" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "}" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 绂佺敤灞忓箷閿佸畾鍜岀數婧愮鐞嗭紙宸ヤ笟搴旂敤锛? | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "exec swayidle -w timeout 0 'echo disabled' before-sleep 'echo disabled'" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 绂佺敤绐楀彛瑁呴グ锛堝叏灞忔ā寮忥級" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "default_border none" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "default_floating_border none" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "titlebar_border_thickness 0" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "titlebar_padding 0" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 鐒︾偣閰嶇疆" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "focus_follows_mouse no" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "mouse_warping none" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "# 鑷姩鍏ㄥ睆搴旂敤" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "for_window [title=\".*\"] fullscreen enable" | sudo tee -a /root/.config/sway/config > /dev/null
-	@echo "" | sudo tee -a /root/.config/sway/config > /dev/null
-	@sudo chmod 644 /root/.config/sway/config
-	@echo "$(GREEN)[SUCCESS]$(NC) Sway閰嶇疆鏂囦欢鍒涘缓瀹屾垚"
 
-# 閰嶇疆 Sway 鏈嶅姟
-setup-sway:
-	@echo "$(BLUE)[INFO]$(NC) 閰嶇疆Sway Wayland鏈嶅姟..."
 	@sudo mkdir -p /etc/systemd/system
-	@echo "[Unit]" | sudo tee /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Description=Sway Wayland Compositor (Touch-Enabled)" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "After=multi-user.target" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "[Service]" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Type=simple" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "User=root" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "ExecStartPre=/bin/sh -c 'mkdir -p /run/user/0 && chmod 700 /run/user/0'" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "ExecStart=/usr/bin/sway --unsupported-gpu" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=XDG_RUNTIME_DIR=/run/user/0" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=WAYLAND_DISPLAY=wayland-1" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=XDG_SESSION_TYPE=wayland" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=EGL_PLATFORM=wayland" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=WLR_NO_HARDWARE_CURSORS=1" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=WLR_RENDERER=gles2" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Environment=LIBINPUT_DEFAULT_TOUCH_ENABLED=1" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "Restart=always" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "[Install]" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
-	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/sway-wayland.service > /dev/null
 	@sudo systemctl daemon-reload
-	@echo "$(GREEN)[SUCCESS]$(NC) Sway鏈嶅姟閰嶇疆瀹屾垚锛堝凡鍚敤瑙︽懜鏀寔锛?
 
-# 鍚姩 Sway
-start-sway: check-sway setup-sway-config setup-sway
-	@echo "$(BLUE)[INFO]$(NC) 鍚姩Sway Wayland鍚堟垚鍣?.."
-	@sudo systemctl enable sway-wayland
-	@sudo systemctl start sway-wayland
 	@sleep 3
-	@if sudo systemctl is-active --quiet sway-wayland; then \
-		echo "$(GREEN)[SUCCESS]$(NC) Sway鍚姩鎴愬姛"; \
 		echo "WAYLAND_DISPLAY=$$(ls /run/user/0/wayland-* 2>/dev/null | head -n1 | xargs basename)"; \
 		echo "瑙︽懜鎺у埗: 宸插惎鐢?; \
 	else \
-		echo "$(RED)[ERROR]$(NC) Sway鍚姩澶辫触"; \
-		sudo journalctl -u sway-wayland -n 30 --no-pager; \
 		exit 1; \
 	fi
 
-# 鍋滄 Sway
-stop-sway:
-	@echo "$(BLUE)[INFO]$(NC) 鍋滄Sway..."
-	@sudo systemctl stop sway-wayland || true
-	@echo "$(GREEN)[SUCCESS]$(NC) Sway宸插仠姝?
 
-# 妫€鏌?Sway 鐘舵€?
-sway-status:
-	@echo "$(CYAN)=== Sway鐘舵€?===$(NC)"
-	@sudo systemctl status sway-wayland --no-pager -l || true
 	@echo ""
 	@echo "$(CYAN)=== Wayland Socket ===$(NC)"
 	@ls -lah /run/user/0/wayland-* 2>/dev/null || echo "鏃燱ayland socket"
@@ -451,12 +330,7 @@ sway-status:
 	@echo "$(CYAN)=== 瑙︽懜璁惧 ===$(NC)"
 	@libinput list-devices 2>/dev/null | grep -A 5 "Capabilities.*touch" || echo "鏈娴嬪埌瑙︽懜璁惧"
 
-# Sway 鏃ュ織
-sway-logs:
-	@echo "$(CYAN)=== Sway鏃ュ織 ===$(NC)"
-	@sudo journalctl -u sway-wayland -f --no-hostname
 
-setup-wayland: start-sway
 	@echo "$(GREEN)[SUCCESS]$(NC) Wayland鐜閰嶇疆瀹屾垚锛圫way + 瑙︽懜鎺у埗锛?
 
 # ============================================================================
@@ -464,10 +338,6 @@ setup-wayland: start-sway
 # ============================================================================
 
 .PHONY: check-weston-version backup-current-weston uninstall-current-weston \
-        install-weston12-build-deps download-weston12 compile-weston12 \
-        install-weston12 configure-weston12 setup-weston12-service \
-        start-weston12 stop-weston12 weston12-status weston12-logs \
-        downgrade-to-weston12 test-weston12
 
 # 妫€鏌ュ綋鍓?Weston 鐗堟湰
 check-weston-version:
@@ -543,7 +413,6 @@ uninstall-current-weston:
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 宸插嵏杞?
 
 # 瀹夎 Weston 12 缂栬瘧渚濊禆
-install-weston12-build-deps:
 	@echo "$(BLUE)[INFO]$(NC) 瀹夎 Weston 12 缂栬瘧渚濊禆..."
 	@sudo apt-get update
 	@sudo apt-get install -y \
@@ -578,24 +447,18 @@ install-weston12-build-deps:
 	@echo "$(GREEN)[SUCCESS]$(NC) 渚濊禆瀹夎瀹屾垚"
 
 # 涓嬭浇 Weston 12.0.0 婧愮爜
-download-weston12:
 	@echo "$(BLUE)[INFO]$(NC) 涓嬭浇 Weston 12.0.0 婧愮爜..."
-	@sudo mkdir -p /tmp/weston12-build
-	@cd /tmp/weston12-build && \
 		if [ ! -f "weston-12.0.0.tar.xz" ]; then \
 			wget -q --show-progress https://wayland.freedesktop.org/releases/weston-12.0.0.tar.xz || \
 			wget -q --show-progress https://gitlab.freedesktop.org/wayland/weston/-/archive/12.0.0/weston-12.0.0.tar.gz -O weston-12.0.0.tar.xz; \
 		fi
 	@echo "$(BLUE)[INFO]$(NC) 瑙ｅ帇婧愮爜..."
-	@cd /tmp/weston12-build && \
 		rm -rf weston-12.0.0 && \
 		tar -xf weston-12.0.0.tar.xz
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12.0.0 婧愮爜宸插噯澶?
 
 # 缂栬瘧 Weston 12
-compile-weston12: install-weston12-build-deps download-weston12
 	@echo "$(CYAN)[COMPILE]$(NC) 寮€濮嬬紪璇?Weston 12.0.0 (棰勮 15-30 鍒嗛挓)..."
-	@cd /tmp/weston12-build/weston-12.0.0 && \
 		echo "$(BLUE)[INFO]$(NC) 閰嶇疆 Meson..." && \
 		rm -rf build && \
 		meson setup build \
@@ -626,9 +489,7 @@ compile-weston12: install-weston12-build-deps download-weston12
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12.0.0 缂栬瘧瀹屾垚"
 
 # 瀹夎 Weston 12
-install-weston12: compile-weston12
 	@echo "$(BLUE)[INFO]$(NC) 瀹夎 Weston 12..."
-	@cd /tmp/weston12-build/weston-12.0.0/build && \
 		sudo meson install
 	@sudo ldconfig
 	@echo "$(BLUE)[INFO]$(NC) 楠岃瘉瀹夎..."
@@ -636,7 +497,6 @@ install-weston12: compile-weston12
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 瀹夎瀹屾垚"
 
 # 閰嶇疆 Weston 12
-configure-weston12:
 	@echo "$(BLUE)[INFO]$(NC) 閰嶇疆 Weston 12..."
 	@sudo mkdir -p /etc/xdg/weston
 	@echo "[core]" | sudo tee /etc/xdg/weston/weston.ini > /dev/null
@@ -703,52 +563,13 @@ setup-weston-service:
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 鏈嶅姟宸查厤缃苟鍚敤"
 
 # 鍒涘缓 Weston 12 systemd 鏈嶅姟
-setup-weston12-service:
 	@echo "$(BLUE)[INFO]$(NC) 鍒涘缓 Weston 12 systemd 鏈嶅姟..."
-	@echo "[Unit]" | sudo tee /etc/systemd/system/weston12.service > /dev/null
-	@echo "Description=Weston 12 Wayland Compositor (Jetson Optimized)" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Documentation=man:weston(1) man:weston.ini(5)" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "After=systemd-user-sessions.service multi-user.target" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "[Service]" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Type=simple" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "User=root" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Environment=\"XDG_RUNTIME_DIR=/run/user/0\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Environment=\"WAYLAND_DISPLAY=wayland-0\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Environment=\"XDG_SESSION_TYPE=wayland\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Environment=\"EGL_PLATFORM=wayland\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Environment=\"__EGL_VENDOR_LIBRARY_DIRS=/usr/lib/aarch64-linux-gnu/tegra-egl\"" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "ExecStartPre=/bin/mkdir -p /run/user/0" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "ExecStartPre=/bin/chmod 0700 /run/user/0" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "ExecStartPre=/bin/sh -c 'rm -f /run/user/0/wayland-*'" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "ExecStart=/usr/bin/weston \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "    --backend=drm-backend.so \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "    --idle-time=0 \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "    --use-pixman \\" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "    --log=/var/log/weston12.log" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "Restart=always" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "RestartSec=3" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "TimeoutStartSec=60" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "StandardOutput=journal" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "StandardError=journal" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "SyslogIdentifier=weston12" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "[Install]" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
-	@echo "WantedBy=multi-user.target" | sudo tee -a /etc/systemd/system/weston12.service > /dev/null
 	@sudo systemctl daemon-reload
-	@sudo systemctl enable weston12.service
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 鏈嶅姟宸查厤缃苟鍚敤"
 
 # 鍚姩 Weston 12
-start-weston12:
 	@echo "$(BLUE)[INFO]$(NC) 鍚姩 Weston 12..."
-	@sudo systemctl start weston12.service
 	@sleep 3
-	@if sudo systemctl is-active --quiet weston12.service; then \
 		echo "$(GREEN)[SUCCESS]$(NC) 鉁?Weston 12 鍚姩鎴愬姛"; \
 		echo "$(CYAN)Wayland Socket:$(NC)"; \
 		ls -la /run/user/0/wayland-* 2>/dev/null || echo "$(YELLOW)绛夊緟 socket 鍒涘缓...$(NC)"; \
@@ -757,21 +578,16 @@ start-weston12:
 	else \
 		echo "$(RED)[ERROR]$(NC) 鉁?Weston 12 鍚姩澶辫触"; \
 		echo "$(CYAN)鏌ョ湅鏈€杩?30 琛屾棩蹇?$(NC)"; \
-		sudo journalctl -u weston12.service -n 30 --no-pager; \
 		exit 1; \
 	fi
 
 # 鍋滄 Weston 12
-stop-weston12:
 	@echo "$(BLUE)[INFO]$(NC) 鍋滄 Weston 12..."
-	@sudo systemctl stop weston12.service
 	@sudo pkill -9 weston 2>/dev/null || true
 	@echo "$(GREEN)[SUCCESS]$(NC) Weston 12 宸插仠姝?
 
 # 鏌ョ湅 Weston 12 鐘舵€?
-weston12-status:
 	@echo "$(CYAN)=== Weston 12 鏈嶅姟鐘舵€?===$(NC)"
-	@sudo systemctl status weston12.service --no-pager -l || true
 	@echo ""
 	@echo "$(CYAN)=== Weston 杩涚▼ ===$(NC)"
 	@ps aux | grep weston | grep -v grep || echo "鏃?Weston 杩涚▼"
@@ -783,25 +599,18 @@ weston12-status:
 	@ls -la /dev/dri/ 2>/dev/null || echo "DRM 璁惧涓嶅瓨鍦?
 
 # 鏌ョ湅 Weston 12 鏃ュ織
-weston12-logs:
 	@echo "$(CYAN)=== Weston 12 systemd 鏃ュ織 (鏈€杩?100 琛? ===$(NC)"
-	@sudo journalctl -u weston12.service -n 100 --no-pager
 	@echo ""
 	@echo "$(CYAN)=== Weston 12 杩愯鏃ュ織 ===$(NC)"
-	@if [ -f /var/log/weston12.log ]; then \
-		sudo tail -100 /var/log/weston12.log; \
 	else \
-		echo "鏃ュ織鏂囦欢 /var/log/weston12.log 涓嶅瓨鍦?; \
 	fi
 
 # 娴嬭瘯 Weston 12
-test-weston12:
 	@echo "$(BLUE)[INFO]$(NC) 娴嬭瘯 Weston 12..."
 	@echo "$(CYAN)1. 妫€鏌ョ増鏈?$(NC)"
 	@weston --version
 	@echo ""
 	@echo "$(CYAN)2. 妫€鏌ユ湇鍔＄姸鎬?$(NC)"
-	@sudo systemctl is-active weston12.service && echo "$(GREEN)鉁?鏈嶅姟杩愯涓?(NC)" || echo "$(RED)鉁?鏈嶅姟鏈繍琛?(NC)"
 	@echo ""
 	@echo "$(CYAN)3. 妫€鏌?Wayland socket:$(NC)"
 	@ls -la /run/user/0/wayland-* 2>/dev/null && echo "$(GREEN)鉁?Socket 瀛樺湪$(NC)" || echo "$(RED)鉁?Socket 涓嶅瓨鍦?(NC)"
@@ -816,7 +625,6 @@ test-weston12:
 	fi
 
 # 馃殌 涓€閿檷绾у埌 Weston 12锛堟帹鑽愪娇鐢級
-downgrade-to-weston12:
 	@echo "$(CYAN)======================================$(NC)"
 	@echo "$(CYAN)  Weston 12 瀹屾暣闄嶇骇娴佺▼$(NC)"
 	@echo "$(CYAN)======================================$(NC)"
@@ -831,48 +639,33 @@ downgrade-to-weston12:
 	@$(MAKE) uninstall-current-weston
 	@echo ""
 	@echo "$(BLUE)[姝ラ 4/9]$(NC) 缂栬瘧 Weston 12 (闇€瑕?15-30 鍒嗛挓)..."
-	@$(MAKE) install-weston12
 	@echo ""
 	@echo "$(BLUE)[姝ラ 5/9]$(NC) 閰嶇疆 Weston 12..."
-	@$(MAKE) configure-weston12
 	@echo ""
 	@echo "$(BLUE)[姝ラ 6/9]$(NC) 鍒涘缓 systemd 鏈嶅姟..."
-	@$(MAKE) setup-weston12-service
 	@echo ""
 	@echo "$(BLUE)[姝ラ 7/9]$(NC) 鍚姩 Weston 12..."
-	@$(MAKE) start-weston12
 	@echo ""
 	@echo "$(BLUE)[姝ラ 8/9]$(NC) 娴嬭瘯 Weston 12..."
-	@$(MAKE) test-weston12
 	@echo ""
 	@echo "$(BLUE)[姝ラ 9/9]$(NC) 娓呯悊涓存椂鏂囦欢..."
-	@sudo rm -rf /tmp/weston12-build
 	@echo ""
 	@echo "$(GREEN)======================================$(NC)"
 	@echo "$(GREEN)  鉁撯湏鉁?Weston 12 闄嶇骇瀹屾垚锛?(NC)"
 	@echo "$(GREEN)======================================$(NC)"
 	@echo ""
 	@echo "$(CYAN)涓嬩竴姝ユ搷浣?$(NC)"
-	@echo "  1. 鏌ョ湅 Weston 12 鐘舵€? $(YELLOW)make weston12-status$(NC)"
-	@echo "  2. 鏌ョ湅 Weston 12 鏃ュ織: $(YELLOW)make weston12-logs$(NC)"
 	@echo "  3. 閲嶆柊閮ㄧ讲搴旂敤: $(YELLOW)make redeploy$(NC)"
 	@echo "  4. 鏌ョ湅搴旂敤鏃ュ織: $(YELLOW)sudo journalctl -u bamboo-cpp-lvgl -f$(NC)"
 	@echo ""
 	@echo "$(CYAN)濡傛灉閬囧埌闂:$(NC)"
-	@echo "  - 鏌ョ湅鏈嶅姟鐘舵€? $(YELLOW)make weston12-status$(NC)"
-	@echo "  - 閲嶅惎 Weston 12: $(YELLOW)sudo systemctl restart weston12$(NC)"
 	@echo "  - 鎭㈠澶囦唤: 鏌ョ湅 /opt/backup/weston/"
 	@echo ""
 
 # 鍏煎鎬у埆鍚嶏紙鏇存柊涓轰娇鐢?Weston 12锛?
-start-weston: start-weston12
-stop-weston: stop-weston12
-weston-status: weston12-status
 
 check-wayland:
 	@echo "$(BLUE)[INFO]$(NC) 妫€鏌ayland鐜锛圫way锛?.."
-	@echo -n "Sway鏈嶅姟鐘舵€? "
-	@sudo systemctl is-active sway-wayland.service 2>/dev/null || echo "鏈繍琛?
 	@echo -n "Wayland socket: "
 	@ls /run/user/0/wayland-* 2>/dev/null && echo "瀛樺湪" || echo "涓嶅瓨鍦?
 	@echo -n "Wayland搴? "
@@ -1425,4 +1218,5 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 .DEFAULT_GOAL := help
+
 
