@@ -163,9 +163,14 @@ auto-setup-environment:
 		echo "$(YELLOW)[WARNING]$(NC) Weston 鏈嶅姟鏈厤缃紝姝ｅ湪閰嶇疆..."; \
 		$(MAKE) setup-weston-service; \
 	fi
-	@# 5. 鍋滄鍏朵粬 Wayland 鍚堟垚鍣?
+	@# 5. 停止其他 Wayland 合成器，避免占用 DRM/TTY
+	@if systemctl is-active --quiet weston12.service 2>/dev/null; then \
+		echo "$(BLUE)[INFO]$(NC) 停止 Weston 12 服务..."; \
+		sudo systemctl stop weston12.service; \
 	fi
-		echo "$(BLUE)[INFO]$(NC) 鍋滄 Weston 12 鏈嶅姟..."; \
+	@if systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
+		echo "$(BLUE)[INFO]$(NC) 停止 Sway 服务..."; \
+		sudo systemctl stop sway-wayland.service; \
 	fi
 	@# 6. 鍚姩 Weston
 	@WESTON_RUNNING=false; \
