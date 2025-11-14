@@ -1,6 +1,6 @@
-# AI绔瑰瓙璇嗗埆绯荤粺 - C++ LVGL涓€浣撳寲鏋勫缓鍜岄儴缃茶剼鏈?
-# 鐗堟湰: 5.0.0 (C++ LVGL Integrated Architecture)
-# C++鎺ㄧ悊鍚庣 + LVGL鐣岄潰 + Modbus閫氫俊鐨勫畬鏁翠竴浣撳寲绯荤粺
+# AI竹子识别系统 - C++ LVGL 一体化构建与部署脚本
+# 版本: 5.0.0 (C++ LVGL Integrated Architecture)
+# 组件: C++ 推理后端 + LVGL 界面 + Modbus 通信的一体化系统
 
 .PHONY: all install clean test deploy start stop restart status logs \
         install-deps install-system-deps install-lvgl build-lvgl-from-source \
@@ -11,14 +11,14 @@
         check-weston-version backup-current-weston uninstall-current-weston \
         build-debug test-system backup
 
-# === 绯荤粺閰嶇疆 ===
+# === 系统配置 ===
 PROJECT_NAME := bamboo-recognition-system
 VERSION := 5.0.0
 INSTALL_DIR := /opt/bamboo-cut
 SERVICE_NAME := bamboo-cpp-lvgl
 BINARY_NAME := bamboo_integrated
 
-# === C++ LVGL涓€浣撳寲鏋勫缓閰嶇疆 ===
+# === C++ LVGL 一体化构建配置 ===
 BUILD_DIR := build
 CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
@@ -30,7 +30,7 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DENABLE_CPP_INFERENCE=ON \
                -DENABLE_HARDWARE_ACCELERATION=ON
 
-# === 棰滆壊瀹氫箟 ===
+# === 颜色定义 ===
 RED := \033[0;31m
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
@@ -45,7 +45,7 @@ export LC_ALL := zh_CN.UTF-8
 export LC_CTYPE := zh_CN.UTF-8
 
 
-# === 涓昏鐩爣 ===
+# === 主要目标 ===
 
 all: check-system auto-setup-environment install-deps build-system
 	@echo "$(CYAN)=== AI竹子识别系统构建完成 (v$(VERSION)) ===$(NC)"
@@ -830,9 +830,9 @@ build-debug:
 	@cd $(BUILD_DIR)_debug && make -j$(shell nproc)
 	@echo "$(GREEN)[SUCCESS]$(NC) 璋冭瘯鐗堟湰鏋勫缓瀹屾垚"
 
-# 馃敡 鏂板锛氱紪璇戣嚜瀹氫箟YOLO瑙ｆ瀽搴?
+# 🔧 编译自定义 YOLO 解析库
 compile-yolo-lib:
-	@echo "$(BLUE)[INFO]$(NC) 馃敡 缂栬瘧鑷畾涔塝OLO瑙ｆ瀽搴?.."
+	@echo "$(BLUE)[INFO]$(NC) 🔧 编译自定义 YOLO 解析库..."
 	@sudo mkdir -p $(INSTALL_DIR)/lib
 	@g++ -shared -fPIC \
 		-I/opt/nvidia/deepstream/deepstream/sources/includes \
@@ -841,34 +841,34 @@ compile-yolo-lib:
 		-o libnvdsinfer_yolo_bamboo.so
 	@sudo cp libnvdsinfer_yolo_bamboo.so $(INSTALL_DIR)/lib/
 	@sudo chmod 755 $(INSTALL_DIR)/lib/libnvdsinfer_yolo_bamboo.so
-	@echo "$(GREEN)[SUCCESS]$(NC) 鉁?YOLO瑙ｆ瀽搴撶紪璇戦儴缃插畬鎴?"
+	@echo "$(GREEN)[SUCCESS]$(NC) 自定义 YOLO 解析库已部署"
 
-# === 绯荤粺瀹夎 ===
+# === 系统安装 ===
 install-system: compile-yolo-lib
-	@echo "$(BLUE)[INFO]$(NC) 瀹夎C++ LVGL绯荤粺鍒?(INSTALL_DIR)..."
+	@echo "$(BLUE)[INFO]$(NC) 安装 C++ LVGL 系统到 $(INSTALL_DIR)..."
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
-		echo "$(RED)[ERROR]$(NC) 鏋勫缓鐩綍涓嶅瓨鍦紝璇峰厛杩愯 make build-system"; \
+		echo "$(RED)[ERROR]$(NC) 构建目录不存在，请先运行 make build-system"; \
 		exit 1; \
 	fi
 	@sudo mkdir -p $(INSTALL_DIR)
 	@cd $(BUILD_DIR) && sudo make install
 	@sudo mkdir -p $(INSTALL_DIR)/logs
 	@sudo mkdir -p $(INSTALL_DIR)/backup
-	@echo "$(BLUE)[INFO]$(NC) 澶嶅埗閰嶇疆鏂囦欢..."
+	@echo "$(BLUE)[INFO]$(NC) 复制配置文件..."
 	@sudo mkdir -p $(INSTALL_DIR)/config
 	@sudo cp -r config/* $(INSTALL_DIR)/config/ 2>/dev/null || true
-	@echo "$(BLUE)[INFO]$(NC) 纭繚nvinfer閰嶇疆鏂囦欢鍜屾爣绛炬枃浠跺瓨鍦?.."
+	@echo "$(BLUE)[INFO]$(NC) 确认 nvinfer 配置与标签文件..."
 	@if [ -f "config/nvinfer_config.txt" ]; then \
 		sudo cp config/nvinfer_config.txt $(INSTALL_DIR)/config/; \
-		echo "$(GREEN)[SUCCESS]$(NC) nvinfer閰嶇疆鏂囦欢宸插鍒?"; \
+		echo "$(GREEN)[SUCCESS]$(NC) nvinfer 配置已复制"; \
 	fi
 	@if [ -f "config/labels.txt" ]; then \
 		sudo cp config/labels.txt $(INSTALL_DIR)/config/; \
-		echo "$(GREEN)[SUCCESS]$(NC) 鏍囩鏂囦欢宸插鍒?"; \
+		echo "$(GREEN)[SUCCESS]$(NC) 标签文件已复制"; \
 	fi
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/logs
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/backup
-	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺瀹夎瀹屾垚"
+	@echo "$(GREEN)[SUCCESS]$(NC) 系统安装完成"
 
 # === 閰嶇疆璁剧疆 ===
 setup-config:
@@ -913,18 +913,20 @@ start:
 	fi
 
 stop:
-	@echo "$(BLUE)[INFO]$(NC) 鍋滄$(SERVICE_NAME)鏈嶅姟..."
+	@echo "$(BLUE)[INFO]$(NC) 停止 $(SERVICE_NAME) 服务..."
+	@sudo systemctl daemon-reload || true
 	@sudo systemctl stop $(SERVICE_NAME)
-	@echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟宸插仠姝?"
+	@echo "$(GREEN)[SUCCESS]$(NC) 服务已停止"
 
 restart:
-	@echo "$(BLUE)[INFO]$(NC) 閲嶅惎$(SERVICE_NAME)鏈嶅姟..."
+	@echo "$(BLUE)[INFO]$(NC) 重启 $(SERVICE_NAME) 服务..."
+	@sudo systemctl daemon-reload || true
 	@sudo systemctl restart $(SERVICE_NAME)
 	@sleep 3
 	@if sudo systemctl is-active --quiet $(SERVICE_NAME); then \
-		echo "$(GREEN)[SUCCESS]$(NC) 鏈嶅姟閲嶅惎鎴愬姛"; \
+		echo "$(GREEN)[SUCCESS]$(NC) 服务重启成功"; \
 	else \
-		echo "$(RED)[ERROR]$(NC) 鏈嶅姟閲嶅惎澶辫触锛岃鏌ョ湅鏃ュ織"; \
+		echo "$(RED)[ERROR]$(NC) 服务重启失败，请查看日志"; \
 	fi
 
 status:
@@ -999,12 +1001,12 @@ check-deps-if-needed:
 		$(MAKE) install-deps; \
 	fi
 
-# === 娓呯悊 ===
+# === 清理 ===
 clean:
-	@echo "$(BLUE)[INFO]$(NC) 娓呯悊鏋勫缓鐩綍..."
+	@echo "$(BLUE)[INFO]$(NC) 清理构建目录..."
 	@rm -rf $(BUILD_DIR)
 	@rm -rf $(BUILD_DIR)_debug
-	@echo "$(GREEN)[SUCCESS]$(NC) 娓呯悊瀹屾垚"
+	@echo "$(GREEN)[SUCCESS]$(NC) 清理完成"
 
 uninstall:
 	@echo "$(BLUE)[INFO]$(NC) 鍗歌浇绯荤粺..."
