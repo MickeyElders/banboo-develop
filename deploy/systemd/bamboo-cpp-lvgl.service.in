@@ -15,12 +15,12 @@ ExecReload=/bin/kill -USR1 $MAINPID
 # 基础环境变量
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu"
-Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="XDG_RUNTIME_DIR=/run/nvidia-wayland"
 Environment="HOME=/root"
 EnvironmentFile=-@CMAKE_INSTALL_PREFIX@/etc/bamboo/bamboo-env
 
-# Wayland 设置（默认 Weston 13 使用 wayland-0）
-Environment="WAYLAND_DISPLAY=wayland-0"
+# Wayland 设置：连接 NVIDIA nvweston
+Environment="WAYLAND_DISPLAY=/run/nvidia-wayland/wayland-0"
 Environment="WAYLAND_DEBUG=0"
 Environment="EGL_PLATFORM=wayland"
 Environment="QT_QPA_PLATFORM=wayland"
@@ -44,11 +44,10 @@ ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video0 2>/dev/null); do kill 
 ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video1 2>/dev/null); do kill -9 $p; done || true'
 ExecStartPre=/bin/bash -c 'systemctl restart nvargus-daemon'
 
-# 自动唤起 Wayland 合成器：Weston > Sway > Mutter
-ExecStartPre=/bin/bash -c 'if systemctl list-unit-files | grep -q weston12.service; then systemctl is-active --quiet weston12.service || systemctl start weston12.service; elif systemctl list-unit-files | grep -q sway-wayland.service; then systemctl is-active --quiet sway-wayland.service || systemctl start sway-wayland.service; elif systemctl list-unit-files | grep -q mutter-wayland.service; then systemctl is-active --quiet mutter-wayland.service || systemctl start mutter-wayland.service; elif systemctl list-unit-files | grep -q weston.service; then systemctl is-active --quiet weston.service || systemctl start weston.service; fi'
-ExecStartPre=/bin/bash -c 'if [ ! -S /run/user/0/wayland-0 ] && [ ! -S /run/user/0/wayland-1 ]; then echo "⚠️ Wayland 合成器未就绪，尝试自动启动..."; if systemctl list-unit-files | grep -q weston12.service; then systemctl start weston12.service 2>/dev/null || true; elif [ -f /usr/bin/sway ]; then systemctl start sway-wayland.service 2>/dev/null || true; elif [ -f /usr/bin/mutter ]; then systemctl start mutter-wayland.service 2>/dev/null || true; elif [ -f /usr/bin/weston ]; then systemctl start weston.service 2>/dev/null || true; fi; sleep 3; fi'
-ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/user/0/wayland-0 ] && [ ! -S /run/user/0/wayland-1 ]; do sleep 1; done" || echo "Wayland socket 未就绪，将以降级模式继续"'
-ExecStartPre=/bin/sleep 3
+# 确保 nvweston 已经启动并提供 /run/nvidia-wayland/wayland-0
+ExecStartPre=/bin/bash -c 'systemctl is-active --quiet nvweston.service || systemctl start nvweston.service'
+ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/nvidia-wayland/wayland-0 ]; do sleep 1; done" || echo \"[WARN] nvweston socket 未就绪，将以降级模式继续\"'
+ExecStartPre=/bin/sleep 1
 
 # 自定义停止逻辑
 ExecStop=/bin/bash -c 'kill -TERM $MAINPID; sleep 2; pkill -9 -g $MAINPID bamboo_integrated || true'
