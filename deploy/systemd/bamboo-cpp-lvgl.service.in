@@ -19,8 +19,8 @@ Environment="XDG_RUNTIME_DIR=/run/nvidia-wayland"
 Environment="HOME=/root"
 EnvironmentFile=-@CMAKE_INSTALL_PREFIX@/etc/bamboo/bamboo-env
 
-# Wayland 设置：连接 NVIDIA nvweston
-Environment="WAYLAND_DISPLAY=/run/nvidia-wayland/wayland-0"
+# Wayland 设置：连接 NVIDIA nvweston（socket 位于 /run/nvidia-wayland/wayland-0）
+Environment="WAYLAND_DISPLAY=wayland-0"
 Environment="WAYLAND_DEBUG=0"
 Environment="EGL_PLATFORM=wayland"
 Environment="QT_QPA_PLATFORM=wayland"
