@@ -1249,6 +1249,18 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_color(control_widgets_.lvgl_version_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.lvgl_version_label, &lv_font_montserrat_12, 0);
     
+    // OpenCV version
+    control_widgets_.opencv_version_label = lv_label_create(version_section);
+    lv_label_set_text(control_widgets_.opencv_version_label, "OpenCV: 4.x");
+    lv_obj_set_style_text_color(control_widgets_.opencv_version_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.opencv_version_label, &lv_font_montserrat_12, 0);
+    
+    // Build time
+    control_widgets_.build_time_label = lv_label_create(version_section);
+    lv_label_set_text(control_widgets_.build_time_label, "Build: " __DATE__ " " __TIME__);
+    lv_obj_set_style_text_color(control_widgets_.build_time_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.build_time_label, &lv_font_montserrat_12, 0);
+    
     // === 摄像头状态区域 ===
     lv_obj_t* camera_section = lv_obj_create(control_panel_);
     lv_obj_set_width(camera_section, lv_pct(100));
@@ -1346,6 +1358,42 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_font(control_widgets_.modbus_heartbeat_label, &lv_font_montserrat_12, 0);
     
     // === 创建底部面板 === (按照原版结构：Start/Pause/Stop/Emergency/Power按钮)
+    // Modbus extension (register summary)
+    control_widgets_.modbus_system_status_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_system_status_label, "40001 System: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_system_status_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_plc_command_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_plc_command_label, "40002 PLC Cmd: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_plc_command_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_coord_ready_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_coord_ready_label, "40003 Coord Ready: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_coord_ready_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_coord_ready_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_x_coordinate_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_x_coordinate_label, "40004 X: -- mm");
+    lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_x_coordinate_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_cut_quality_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_cut_quality_label, "40006 Quality: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_cut_quality_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_cut_quality_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_blade_number_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_blade_number_label, "40007 Blade: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_blade_number_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_health_status_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_health_status_label, "40008 Health: --%");
+    lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_health_status_label, &lv_font_montserrat_12, 0);
+
     footer_panel_ = lv_obj_create(main_screen_);
     lv_obj_set_width(footer_panel_, lv_pct(100));
     lv_obj_set_height(footer_panel_, 80);  // 原版高度80px

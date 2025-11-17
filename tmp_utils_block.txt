@@ -1,0 +1,120 @@
+                std::ostringstream gpu_text;
+                gpu_text << "GPU: " << gpu_usage << "% @" << gpu_freq << "MHz";
+                lv_label_set_text(widgets.gpu_label, gpu_text.str().c_str());
+                
+                lv_obj_set_style_bg_color(widgets.gpu_bar, colors.warning, LV_PART_INDICATOR);
+            }
+        }
+        
+        // === 更新内存信息 ===
+        if (widgets.mem_bar && widgets.mem_label) {
+            if (stats.memory.ram_total_mb > 0 && stats.memory.ram_used_mb >= 0 &&
+                stats.memory.ram_used_mb <= stats.memory.ram_total_mb) {
+                
+                int mem_percentage = (stats.memory.ram_used_mb * 100) / stats.memory.ram_total_mb;
+                mem_percentage = std::max(0, std::min(100, mem_percentage));
+                
+                lv_bar_set_value(widgets.mem_bar, mem_percentage, LV_ANIM_ON);
+                
+                std::ostringstream mem_text;
+                mem_text << "RAM: " << stats.memory.ram_used_mb << "/" 
+                         << stats.memory.ram_total_mb << "MB";
+                lv_label_set_text(widgets.mem_label, mem_text.str().c_str());
+                
+                lv_obj_set_style_bg_color(widgets.mem_bar, colors.warning, LV_PART_INDICATOR);
+            }
+        }
+        
+        // === 更新温度信息 ===
+        if (widgets.cpu_temp_label) {
+            std::ostringstream temp_text;
+            temp_text << "Temp: CPU " << stats.temperature.cpu_temp << "°C "
+                      << "GPU " << stats.temperature.gpu_temp << "°C";
+            lv_label_set_text(widgets.cpu_temp_label, temp_text.str().c_str());
+        }
+        
+        // === 更新 SWAP 使用情况 ===
+        if (widgets.swap_usage_label) {
+            std::ostringstream swap_text;
+            swap_text << "SWAP: " << stats.memory.swap_used_mb << "/" 
+                      << stats.memory.swap_total_mb << "MB";
+            lv_label_set_text(widgets.swap_usage_label, swap_text.str().c_str());
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[lvgl_ui_utils] Exception in updateJetsonMonitoring: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// ==================== AI 模型统计更新 ====================
+
+bool updateAIModelStats(
+    LVGLControlWidgets& widgets,
+    std::shared_ptr<bamboo_cut::core::DataBridge> data_bridge) {
+    
+    if (!data_bridge) {
+        return false;
+    }
+    
+    try {
+        // 获取 AI 模型统计数据
+        // 注意：这些方法需要在 DataBridge 中实�?
+        
+        // === 更新 FPS ===
+        if (widgets.ai_fps_label) {
+            // TODO: �?DataBridge 获取实际 FPS
+            static int simulated_fps = 0;
+            simulated_fps = (simulated_fps + 1) % 60 + 20;  // 模拟 20-80 fps
+            
+            std::ostringstream fps_text;
+            fps_text << "FPS: " << simulated_fps << " fps";
+            lv_label_set_text(widgets.ai_fps_label, fps_text.str().c_str());
+        }
+        
+        // === 更新检测数�?===
+        if (widgets.ai_total_detections_label) {
+            // TODO: �?DataBridge 获取实际检测数�?
+            static int detection_count = 0;
+            detection_count++;
+            
+            std::ostringstream detect_text;
+            detect_text << "Detected: " << detection_count << " objects";
+            lv_label_set_text(widgets.ai_total_detections_label, detect_text.str().c_str());
+        }
+        
+        // === 更新推理时间 ===
+        if (widgets.ai_inference_time_label) {
+            // TODO: �?DataBridge 获取实际推理时间
+            static int inference_ms = 0;
+            inference_ms = (inference_ms + 1) % 30 + 10;  // 模拟 10-40ms
+            
+            std::ostringstream time_text;
+            time_text << "Inference: " << inference_ms << "ms";
+            lv_label_set_text(widgets.ai_inference_time_label, time_text.str().c_str());
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[lvgl_ui_utils] Exception in updateAIModelStats: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// ==================== 摄像头状态更�?====================
+
+bool updateCameraStatus(
+    LVGLControlWidgets& widgets,
+    std::shared_ptr<bamboo_cut::core::DataBridge> data_bridge) {
+    
+    if (!data_bridge) {
+        return false;
+    }
+    
+    try {
+        // === 更新摄像头状�?===
+        if (widgets.camera_status_label) {
+            lv_label_set_text(widgets.camera_status_label, "Camera: Online");

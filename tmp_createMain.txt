@@ -1,0 +1,263 @@
+void LVGLWaylandInterface::Impl::createMainInterface() {
+    // ?? 使用原始 UI 的配色方案
+    lv_color_t color_background = lv_color_hex(0x1A1F26);   // 温和深色背景
+    lv_color_t color_surface    = lv_color_hex(0x252B35);   // 卡片表面
+    lv_color_t color_primary    = lv_color_hex(0x5B9BD5);   // 柔和蓝色主色
+    lv_color_t color_success    = lv_color_hex(0x7FB069);   // 柔和绿色
+    lv_color_t color_warning    = lv_color_hex(0xE6A055);   // 温和橙色
+    lv_color_t color_error      = lv_color_hex(0xD67B7B);   // 柔和红色
+    
+    // 创建主屏幕 - 使用 Flex 布局（与原始 UI 一致）
+    main_screen_ = lv_obj_create(nullptr);
+    lv_obj_set_size(main_screen_, config_.screen_width, config_.screen_height);
+    lv_obj_set_style_bg_color(main_screen_, color_background, 0);
+    lv_obj_set_style_bg_opa(main_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(main_screen_, 0, 0);
+    lv_obj_clear_flag(main_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // ?? 关键：设置主屏幕为垂直 Flex 布局（与原始 UI 一致）
+    lv_obj_set_flex_flow(main_screen_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(main_screen_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(main_screen_, 5, 0);
+    
+    // === 创建头部面板 === (固定高度，使用 Flex)
+    header_panel_ = lv_obj_create(main_screen_);
+    lv_obj_set_width(header_panel_, lv_pct(100));
+    lv_obj_set_height(header_panel_, 60);
+    lv_obj_set_flex_grow(header_panel_, 0);  // 不允许增长
+    lv_obj_set_style_bg_color(header_panel_, color_surface, 0);
+    lv_obj_set_style_radius(header_panel_, 0, 0);  // 无圆角
+    lv_obj_set_style_border_width(header_panel_, 0, 0);
+    lv_obj_set_style_pad_all(header_panel_, 10, 0);
+    lv_obj_clear_flag(header_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // ?? 设置头部为水平Flex布局
+    lv_obj_set_flex_flow(header_panel_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(header_panel_, 20, 0);
+    
+    // ?? 系统标题
+    control_widgets_.system_title = lv_label_create(header_panel_);
+    lv_label_set_text(control_widgets_.system_title, LV_SYMBOL_HOME " Bamboo Recognition System");
+    lv_obj_set_style_text_color(control_widgets_.system_title, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.system_title, &lv_font_montserrat_16, 0);
+    
+    // ?? 心跳标签（显示系统运行状态）
+    control_widgets_.heartbeat_label = lv_label_create(header_panel_);
+    lv_label_set_text(control_widgets_.heartbeat_label, LV_SYMBOL_LOOP " Online");
+    lv_obj_set_style_text_color(control_widgets_.heartbeat_label, color_success, 0);
+    
+    // ?? 响应时间标签
+    control_widgets_.response_label = lv_label_create(header_panel_);
+    lv_label_set_text(control_widgets_.response_label, LV_SYMBOL_CHARGE " 12ms");
+    lv_obj_set_style_text_color(control_widgets_.response_label, color_primary, 0);
+    
+    // === 创建中间容器 === (占据剩余空间，使用水平 Flex 布局)
+    lv_obj_t* main_container = lv_obj_create(main_screen_);
+    lv_obj_set_width(main_container, lv_pct(100));
+    lv_obj_set_flex_grow(main_container, 1);  // 占据剩余空间
+    lv_obj_set_style_bg_opa(main_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(main_container, 0, 0);
+    lv_obj_set_style_pad_all(main_container, 5, 0);
+    lv_obj_clear_flag(main_container, LV_OBJ_FLAG_SCROLLABLE);
+    
+    // ?? 设置为水平 Flex 布局（左右排列摄像头和控制面板）
+    lv_obj_set_flex_flow(main_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(main_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(main_container, 10, 0);
+    
+    std::cout << "?? [UI] 主容器使用 Flex 布局，水平排列" << std::endl;
+    
+    // === 创建摄像头面板 === (左侧，占 75% 宽度，使用 Flex)
+    camera_panel_ = lv_obj_create(main_container);
+    lv_obj_set_height(camera_panel_, lv_pct(100));
+    lv_obj_set_flex_grow(camera_panel_, 3);  // 占 3/4 空间
+
+    if (debug_camera_panel_opaque_) {
+        lv_obj_set_style_bg_color(camera_panel_, lv_color_hex(0x1D2330), 0);
+        lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_80, 0);
+        lv_obj_set_style_border_color(camera_panel_, lv_color_hex(0x4A90E2), 0);
+        lv_obj_set_style_border_opa(camera_panel_, LV_OPA_60, 0);
+        lv_obj_set_style_border_width(camera_panel_, 2, 0);
+    } else {
+        lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);  // ?? 透明背景
+        lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // ?? 透明边框
+    }
+
+    lv_obj_set_style_pad_all(camera_panel_, 0, 0);
+    lv_obj_set_style_radius(camera_panel_, 8, 0);
+    lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
+    lv_obj_add_flag(camera_panel_, LV_OBJ_FLAG_EVENT_BUBBLE);  // 让事件向上传递
+    
+    // ?? 关键修复：完全透明但保持布局参与
+    lv_obj_set_style_opa(camera_panel_, debug_camera_panel_opaque_ ? LV_OPA_COVER : LV_OPA_0, 0);  // 完全透明（包括子对象）
+    // ? 不能使用 IGNORE_LAYOUT，会破坏 Flex 布局计算！
+    
+    std::cout << "?? [UI] 摄像头面板: flex_grow=3 (75% 宽度，完全透明）" << std::endl;
+    
+    // ?? 摄像头区域标签（仅用于调试）
+    lv_obj_t* video_label = lv_label_create(camera_panel_);
+    lv_label_set_text(video_label, LV_SYMBOL_VIDEO " Camera Feed");
+    // Force camera panel fully transparent so subsurface video is visible
+    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_opa(camera_panel_, LV_OPA_0, 0);
+    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(camera_panel_, 0, 0);
+    lv_obj_set_style_text_color(video_label, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(video_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(video_label, LV_ALIGN_TOP_LEFT, 10, 10);
+    
+    // 保留camera_canvas_指针为nullptr（视频不使用Canvas）
+    camera_canvas_ = nullptr;
+    
+    std::cout << "?? 摄像头区域已设置为透明，DeepStream视频将显示在 subsurface" << std::endl;
+    
+    // === 创建控制面板 === (右侧，占 25% 宽度，使用 Flex)
+    control_panel_ = lv_obj_create(main_container);
+    lv_obj_set_height(control_panel_, lv_pct(100));
+    lv_obj_set_flex_grow(control_panel_, 1);  // 占 1/4 空间
+    lv_obj_set_style_bg_color(control_panel_, color_surface, 0);
+    lv_obj_set_style_radius(control_panel_, 12, 0);
+    lv_obj_set_style_border_width(control_panel_, 2, 0);
+    lv_obj_set_style_border_color(control_panel_, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_border_opa(control_panel_, LV_OPA_50, 0);
+    lv_obj_set_style_pad_all(control_panel_, 15, 0);
+    lv_obj_clear_flag(control_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    
+    std::cout << "?? [UI] 控制面板: flex_grow=1 (25% 宽度)" << std::endl;
+    
+    // ?? 详细控制面板 - 使用 Flex 垂直布局
+    lv_obj_set_flex_flow(control_panel_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(control_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_gap(control_panel_, 10, 0);
+    
+    // === 标题 ===
+    lv_obj_t* control_title = lv_label_create(control_panel_);
+    lv_label_set_text(control_title, LV_SYMBOL_SETTINGS " System Info");
+    lv_obj_set_style_text_color(control_title, lv_color_hex(0x5B9BD5), 0);
+    lv_obj_set_style_text_font(control_title, &lv_font_montserrat_16, 0);
+    
+    // === Jetson 监控区域 ===
+    lv_obj_t* jetson_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(jetson_section, lv_pct(100));
+    lv_obj_set_height(jetson_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(jetson_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(jetson_section, 8, 0);
+    lv_obj_set_style_border_width(jetson_section, 1, 0);
+    lv_obj_set_style_border_color(jetson_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(jetson_section, 10, 0);
+    lv_obj_set_flex_flow(jetson_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(jetson_section, 6, 0);
+    lv_obj_clear_flag(jetson_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* jetson_title = lv_label_create(jetson_section);
+    lv_label_set_text(jetson_title, LV_SYMBOL_CHARGE " Jetson Orin Nano");
+    lv_obj_set_style_text_color(jetson_title, lv_color_hex(0x70A5DB), 0);
+    lv_obj_set_style_text_font(jetson_title, &lv_font_montserrat_14, 0);
+    
+    // === CPU 信息（带进度条）===
+    control_widgets_.cpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.cpu_label, "CPU: --% @ --MHz");
+    lv_obj_set_style_text_color(control_widgets_.cpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.cpu_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.cpu_bar, lv_pct(100), 10);
+    lv_obj_set_style_bg_color(control_widgets_.cpu_bar, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_bg_opa(control_widgets_.cpu_bar, LV_OPA_COVER, 0);
+    lv_bar_set_value(control_widgets_.cpu_bar, 0, LV_ANIM_OFF);
+    
+    // === GPU 信息（带进度条）===
+    control_widgets_.gpu_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.gpu_label, "GPU: --% @ --MHz");
+    lv_obj_set_style_text_color(control_widgets_.gpu_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.gpu_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.gpu_bar, lv_pct(100), 10);
+    lv_obj_set_style_bg_color(control_widgets_.gpu_bar, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_bg_opa(control_widgets_.gpu_bar, LV_OPA_COVER, 0);
+    lv_bar_set_value(control_widgets_.gpu_bar, 0, LV_ANIM_OFF);
+    
+    // === 内存信息（带进度条）===
+    control_widgets_.mem_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.mem_label, "RAM: --MB / --MB");
+    lv_obj_set_style_text_color(control_widgets_.mem_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.mem_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.mem_bar = lv_bar_create(jetson_section);
+    lv_obj_set_size(control_widgets_.mem_bar, lv_pct(100), 10);
+    lv_obj_set_style_bg_color(control_widgets_.mem_bar, lv_color_hex(0x2A3441), 0);
+    lv_obj_set_style_bg_opa(control_widgets_.mem_bar, LV_OPA_COVER, 0);
+    lv_bar_set_value(control_widgets_.mem_bar, 0, LV_ANIM_OFF);
+    
+    // === SWAP 使用率 ===
+    control_widgets_.swap_usage_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.swap_usage_label, "SWAP: --MB");
+    lv_obj_set_style_text_color(control_widgets_.swap_usage_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.swap_usage_label, &lv_font_montserrat_12, 0);
+    
+    // === 温度信息 ===
+    control_widgets_.cpu_temp_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.cpu_temp_label, "CPU: --°C");
+    lv_obj_set_style_text_color(control_widgets_.cpu_temp_label, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(control_widgets_.cpu_temp_label, &lv_font_montserrat_12, 0);
+    
+    control_widgets_.gpu_temp_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.gpu_temp_label, "GPU: --°C");
+    lv_obj_set_style_text_color(control_widgets_.gpu_temp_label, lv_color_hex(0xE6A055), 0);
+    lv_obj_set_style_text_font(control_widgets_.gpu_temp_label, &lv_font_montserrat_12, 0);
+    
+    // === 热区警告 ===
+    control_widgets_.thermal_warning_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.thermal_warning_label, "");
+    lv_obj_set_style_text_color(control_widgets_.thermal_warning_label, color_error, 0);
+    lv_obj_set_style_text_font(control_widgets_.thermal_warning_label, &lv_font_montserrat_12, 0);
+    lv_obj_add_flag(control_widgets_.thermal_warning_label, LV_OBJ_FLAG_HIDDEN);  // 默认隐藏
+    
+    // === 功率信息 ===
+    control_widgets_.power_total_label = lv_label_create(jetson_section);
+    lv_label_set_text(control_widgets_.power_total_label, "Power: --W");
+    lv_obj_set_style_text_color(control_widgets_.power_total_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.power_total_label, &lv_font_montserrat_12, 0);
+    
+    // === AI 模型区域 ===
+    lv_obj_t* ai_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(ai_section, lv_pct(100));
+    lv_obj_set_height(ai_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(ai_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(ai_section, 8, 0);
+    lv_obj_set_style_border_width(ai_section, 1, 0);
+    lv_obj_set_style_border_color(ai_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(ai_section, 10, 0);
+    lv_obj_set_flex_flow(ai_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(ai_section, 6, 0);
+    lv_obj_clear_flag(ai_section, LV_OBJ_FLAG_SCROLLABLE);
+    
+    lv_obj_t* ai_title = lv_label_create(ai_section);
+    lv_label_set_text(ai_title, LV_SYMBOL_IMAGE " AI Model");
+    lv_obj_set_style_text_color(ai_title, lv_color_hex(0x7FB069), 0);
+    lv_obj_set_style_text_font(ai_title, &lv_font_montserrat_14, 0);
+    
+    // === 模型名称 ===
+    control_widgets_.ai_model_name_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_model_name_label, "Model: YOLOv8");
+    lv_obj_set_style_text_color(control_widgets_.ai_model_name_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_model_name_label, &lv_font_montserrat_12, 0);
+    
+    // === FPS ===
+    control_widgets_.ai_fps_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_fps_label, "FPS: -- fps");
+    lv_obj_set_style_text_color(control_widgets_.ai_fps_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_fps_label, &lv_font_montserrat_12, 0);
+    
+    // === 推理时间 ===
+    control_widgets_.ai_inference_time_label = lv_label_create(ai_section);
+    lv_label_set_text(control_widgets_.ai_inference_time_label, "Inference: --ms");
+    lv_obj_set_style_text_color(control_widgets_.ai_inference_time_label, color_primary, 0);
+    lv_obj_set_style_text_font(control_widgets_.ai_inference_time_label, &lv_font_montserrat_12, 0);
+    
+    // === 检测数量 ===
+    control_widgets_.ai_total_detections_label = lv_label_create(ai_section);
+

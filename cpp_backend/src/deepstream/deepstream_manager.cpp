@@ -502,10 +502,10 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                     // 这里应该填充整个 subsurface，所以是 (0, 0, width, height)
                                     gst_video_overlay_set_render_rectangle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        0,  // X: 填充整个 subsurface
-                                        0,  // Y: 填充整个 subsurface
-                                        self->video_layout_.width,
-                                        self->video_layout_.height
+                                        self->subsurface_config_.offset_x,
+                                        self->subsurface_config_.offset_y,
+                                        self->subsurface_config_.width,
+                                        self->subsurface_config_.height
                                     );
                                     
                                     std::cout << "? [DeepStream] 已设置渲染矩形: (0, 0) "
