@@ -1,6 +1,6 @@
-ï»¿/**
+/**
  * @file deepstream_manager.cpp
- * @brief DeepStream AIæ¨ç†å’Œè§†é¢‘æ˜¾ç¤ºç®¡ç†å™¨å®ç° - æ”¯æŒnvdrmvideosinkå åŠ å¹³é¢æ¨¡å¼
+ * @brief DeepStream AIÍÆÀíºÍÊÓÆµÏÔÊ¾¹ÜÀíÆ÷ÊµÏÖ - Ö§³Önvdrmvideosinkµş¼ÓÆ½ÃæÄ£Ê½
  */
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
@@ -8,12 +8,12 @@
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
-#include <gst/video/videooverlay.h>  // ?? GstVideoOverlay æ¥å£
+#include <gst/video/videooverlay.h>  // ?? GstVideoOverlay ½Ó¿Ú
 #include <fstream>
 #include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
-// Waylandæ¶æ„ä¸‹ç§»é™¤DRMå¤´æ–‡ä»¶ä¾èµ–
+// Wayland¼Ü¹¹ÏÂÒÆ³ıDRMÍ·ÎÄ¼şÒÀÀµ
 // #include <xf86drm.h>
 // #include <xf86drmMode.h>
 #include <thread>
@@ -21,7 +21,7 @@
 #include <set>
 #include <gst/app/gstappsink.h>
 
-// ?? æ–°å¢ï¼šWaylandå¤´æ–‡ä»¶åŒ…å«
+// ?? ĞÂÔö£ºWaylandÍ·ÎÄ¼ş°üº¬
 #include <wayland-client.h>
 
 #ifdef ENABLE_LVGL
@@ -64,7 +64,7 @@ DeepStreamManager::DeepStreamManager(void* lvgl_interface)
     , video_surface_(nullptr)
     , video_subsurface_(nullptr) {
     
-    std::cout << "DeepStreamManager æ„é€ å‡½æ•°å®Œæˆï¼ˆæ”¯æŒLVGLç•Œé¢é›†æˆï¼‰" << std::endl;
+    std::cout << "DeepStreamManager ¹¹Ôìº¯ÊıÍê³É£¨Ö§³ÖLVGL½çÃæ¼¯³É£©" << std::endl;
 }
 
 DeepStreamManager::~DeepStreamManager() {
@@ -79,26 +79,26 @@ bool DeepStreamManager::initializeWithSubsurface(
     int width,
     int height) {
     
-    std::cout << "?? [DeepStream] åˆå§‹åŒ–Wayland Subsurfaceæ¨¡å¼..." << std::endl;
+    std::cout << "?? [DeepStream] ³õÊ¼»¯Wayland SubsurfaceÄ£Ê½..." << std::endl;
     
-    // ä¿å­˜ subsurface æŒ‡é’ˆ
+    // ±£´æ subsurface Ö¸Õë
     video_surface_ = wl_surface;
     
-    // é…ç½®åŸºç¡€å‚æ•°
+    // ÅäÖÃ»ù´¡²ÎÊı
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     config_.screen_width = width;
     config_.screen_height = height;
     
-    // åˆå§‹åŒ–GStreamer
+    // ³õÊ¼»¯GStreamer
     if (!gst_is_initialized()) {
         gst_init(nullptr, nullptr);
     }
     
-    // è®¡ç®—å¸ƒå±€
+    // ¼ÆËã²¼¾Ö
     video_layout_ = calculateWaylandVideoLayout(config_);
     
     initialized_ = true;
-    std::cout << "? [DeepStream] Subsurfaceåˆå§‹åŒ–å®Œæˆ" << std::endl;
+    std::cout << "? [DeepStream] Subsurface³õÊ¼»¯Íê³É" << std::endl;
     return true;
 }
 
@@ -109,156 +109,156 @@ bool DeepStreamManager::initializeWithSubsurface(
     void* parent_surface,
     const SubsurfaceConfig& config) {
     
-    std::cout << "?? [DeepStream] åˆå§‹åŒ–Wayland Subsurfaceæ¨¡å¼ï¼ˆå®Œæ•´ç‰ˆï¼šè‡ªåŠ¨åˆ›å»ºsubsurfaceï¼‰..." << std::endl;
-    std::cout << "?? Subsurfaceé…ç½®: offset(" << config.offset_x << ", " << config.offset_y 
+    std::cout << "?? [DeepStream] ³õÊ¼»¯Wayland SubsurfaceÄ£Ê½£¨ÍêÕû°æ£º×Ô¶¯´´½¨subsurface£©..." << std::endl;
+    std::cout << "?? SubsurfaceÅäÖÃ: offset(" << config.offset_x << ", " << config.offset_y 
               << ") size(" << config.width << "x" << config.height << ") "
-              << (config.use_sync_mode ? "åŒæ­¥æ¨¡å¼" : "å¼‚æ­¥æ¨¡å¼") << std::endl;
+              << (config.use_sync_mode ? "Í¬²½Ä£Ê½" : "Òì²½Ä£Ê½") << std::endl;
     
-    // ?? ä¿®å¤ï¼šæ­£ç¡®çš„ç±»å‹è½¬æ¢
+    // ?? ĞŞ¸´£ºÕıÈ·µÄÀàĞÍ×ª»»
     auto* wl_display = static_cast<struct wl_display*>(parent_display);
     auto* wl_compositor = static_cast<struct wl_compositor*>(parent_compositor);
     auto* wl_subcompositor = static_cast<struct wl_subcompositor*>(parent_subcompositor);
     auto* wl_parent_surface = static_cast<struct wl_surface*>(parent_surface);
     
-    // ?? ä¿å­˜çˆ¶çª—å£çš„ wl_displayï¼Œç”¨äºä¼ é€’ç»™ waylandsink
+    // ?? ±£´æ¸¸´°¿ÚµÄ wl_display£¬ÓÃÓÚ´«µİ¸ø waylandsink
     parent_wl_display_ = parent_display;
     
-    // ?? æ–°å¢ï¼šæ£€æŸ¥çˆ¶displayå¥åº·çŠ¶æ€
+    // ?? ĞÂÔö£º¼ì²é¸¸display½¡¿µ×´Ì¬
     if (wl_display) {
         int parent_error_code = wl_display_get_error(wl_display);
         if (parent_error_code != 0) {
-            std::cerr << "? [DeepStream] çˆ¶Wayland displayå·²æŸåï¼Œé”™è¯¯ç : " 
+            std::cerr << "? [DeepStream] ¸¸Wayland displayÒÑËğ»µ£¬´íÎóÂë: " 
                       << parent_error_code << std::endl;
-            std::cerr << "?? [DeepStream] é™çº§åˆ°AppSinkæ¨¡å¼" << std::endl;
+            std::cerr << "?? [DeepStream] ½µ¼¶µ½AppSinkÄ£Ê½" << std::endl;
             
-            // åˆ›å»ºAppSinké…ç½®
+            // ´´½¨AppSinkÅäÖÃ
             config_.sink_mode = VideoSinkMode::APPSINK;
             config_.screen_width = config.width;
             config_.screen_height = config.height;
             
-            return initialize(config_);  // ä½¿ç”¨AppSinkæ¨¡å¼åˆå§‹åŒ–
+            return initialize(config_);  // Ê¹ÓÃAppSinkÄ£Ê½³õÊ¼»¯
         }
     }
     
-    // éªŒè¯å‚æ•°
+    // ÑéÖ¤²ÎÊı
     if (!wl_display || !wl_compositor || !wl_subcompositor || !wl_parent_surface) {
-        std::cerr << "? [DeepStream] æ— æ•ˆçš„Waylandçˆ¶çª—å£å¯¹è±¡" << std::endl;
+        std::cerr << "? [DeepStream] ÎŞĞ§µÄWayland¸¸´°¿Ú¶ÔÏó" << std::endl;
         return false;
     }
     
     subsurface_config_ = config;
     
-    // ?? å…³é”®æ­¥éª¤1ï¼šåˆ›å»ºè§†é¢‘è¡¨é¢
+    // ?? ¹Ø¼ü²½Öè1£º´´½¨ÊÓÆµ±íÃæ
     auto* wl_surface = wl_compositor_create_surface(wl_compositor);
     video_surface_ = static_cast<void*>(wl_surface);
     if (!video_surface_) {
-        std::cerr << "? [DeepStream] åˆ›å»ºè§†é¢‘surfaceå¤±è´¥" << std::endl;
+        std::cerr << "? [DeepStream] ´´½¨ÊÓÆµsurfaceÊ§°Ü" << std::endl;
         return false;
     }
-    std::cout << "? [DeepStream] åˆ›å»ºè§†é¢‘surface" << std::endl;
+    std::cout << "? [DeepStream] ´´½¨ÊÓÆµsurface" << std::endl;
     
-    // ?? å…³é”®æ­¥éª¤2ï¼šåˆ›å»ºsubsurfaceå¹¶é™„åŠ åˆ°çˆ¶è¡¨é¢
+    // ?? ¹Ø¼ü²½Öè2£º´´½¨subsurface²¢¸½¼Óµ½¸¸±íÃæ
     auto* wl_subsurface = wl_subcompositor_get_subsurface(
         wl_subcompositor, wl_surface, wl_parent_surface);
     video_subsurface_ = static_cast<void*>(wl_subsurface);
     
     if (!video_subsurface_) {
-        std::cerr << "? [DeepStream] åˆ›å»ºsubsurfaceå¤±è´¥" << std::endl;
+        std::cerr << "? [DeepStream] ´´½¨subsurfaceÊ§°Ü" << std::endl;
         wl_surface_destroy(wl_surface);
         video_surface_ = nullptr;
         return false;
     }
-    std::cout << "? [DeepStream] åˆ›å»ºsubsurfaceå¹¶é™„åŠ åˆ°çˆ¶çª—å£" << std::endl;
+    std::cout << "? [DeepStream] ´´½¨subsurface²¢¸½¼Óµ½¸¸´°¿Ú" << std::endl;
     
-    // ?? å…³é”®æ­¥éª¤3ï¼šè®¾ç½®subsurfaceä½ç½®
+    // ?? ¹Ø¼ü²½Öè3£ºÉèÖÃsubsurfaceÎ»ÖÃ
     wl_subsurface_set_position(wl_subsurface, config.offset_x, config.offset_y);
-    std::cout << "?? [DeepStream] Subsurfaceä½ç½®: ("
+    std::cout << "?? [DeepStream] SubsurfaceÎ»ÖÃ: ("
               << config.offset_x << ", " << config.offset_y << ")" << std::endl;
     
-    // ?? å…³é”®æ­¥éª¤4ï¼šè®¾ç½®åŒæ­¥æ¨¡å¼
+    // ?? ¹Ø¼ü²½Öè4£ºÉèÖÃÍ¬²½Ä£Ê½
     if (config.use_sync_mode) {
         wl_subsurface_set_sync(wl_subsurface);
-        std::cout << "?? [DeepStream] ä½¿ç”¨åŒæ­¥æ¨¡å¼ï¼ˆä¸çˆ¶çª—å£åŒæ­¥åˆ·æ–°ï¼‰" << std::endl;
+        std::cout << "?? [DeepStream] Ê¹ÓÃÍ¬²½Ä£Ê½£¨Óë¸¸´°¿ÚÍ¬²½Ë¢ĞÂ£©" << std::endl;
     } else {
         wl_subsurface_set_desync(wl_subsurface);
-        std::cout << "? [DeepStream] ä½¿ç”¨å¼‚æ­¥æ¨¡å¼ï¼ˆç‹¬ç«‹åˆ·æ–°ï¼‰" << std::endl;
+        std::cout << "? [DeepStream] Ê¹ÓÃÒì²½Ä£Ê½£¨¶ÀÁ¢Ë¢ĞÂ£©" << std::endl;
     }
     
-    // ?? å…³é”®æ­¥éª¤5ï¼šZ-order è¯´æ˜
-    // ??  é‡è¦ï¼šWayland subsurface çš„ Z-order è§„åˆ™
-    // - Subsurface **é»˜è®¤**åœ¨ parent surface ä¹‹ä¸Šï¼ˆä¸éœ€è¦ place_above parentï¼‰
-    // - place_above/below ç”¨äºè®¾ç½®**å…„å¼Ÿ subsurface** ä¹‹é—´çš„é¡ºåº
-    // - å¦‚æœåªæœ‰ä¸€ä¸ª subsurfaceï¼Œå®ƒè‡ªåŠ¨åœ¨ parent ä¹‹ä¸Š
+    // ?? ¹Ø¼ü²½Öè5£ºZ-order ËµÃ÷
+    // ??  ÖØÒª£ºWayland subsurface µÄ Z-order ¹æÔò
+    // - Subsurface **Ä¬ÈÏ**ÔÚ parent surface Ö®ÉÏ£¨²»ĞèÒª place_above parent£©
+    // - place_above/below ÓÃÓÚÉèÖÃ**ĞÖµÜ subsurface** Ö®¼äµÄË³Ğò
+    // - Èç¹ûÖ»ÓĞÒ»¸ö subsurface£¬Ëü×Ô¶¯ÔÚ parent Ö®ÉÏ
     // 
-    // å› æ­¤ï¼Œæˆ‘ä»¬çš„ subsurfaceï¼ˆè§†é¢‘ï¼‰ä¼šè‡ªåŠ¨æ˜¾ç¤ºåœ¨ parent surfaceï¼ˆLVGL UIï¼‰ä¹‹ä¸Š
-    // åªè¦ parent surface çš„ camera_panel åŒºåŸŸæ˜¯é€æ˜çš„ï¼Œè§†é¢‘å°±èƒ½é€è¿‡æ˜¾ç¤º
-    std::cout << "?? [DeepStream] Subsurface Z-order: è‡ªåŠ¨ä½äºçˆ¶ surface ä¹‹ä¸Šï¼ˆWayland é»˜è®¤è¡Œä¸ºï¼‰" << std::endl;
+    // Òò´Ë£¬ÎÒÃÇµÄ subsurface£¨ÊÓÆµ£©»á×Ô¶¯ÏÔÊ¾ÔÚ parent surface£¨LVGL UI£©Ö®ÉÏ
+    // Ö»Òª parent surface µÄ camera_panel ÇøÓòÊÇÍ¸Ã÷µÄ£¬ÊÓÆµ¾ÍÄÜÍ¸¹ıÏÔÊ¾
+    std::cout << "?? [DeepStream] Subsurface Z-order: ×Ô¶¯Î»ÓÚ¸¸ surface Ö®ÉÏ£¨Wayland Ä¬ÈÏĞĞÎª£©" << std::endl;
     
-    // ?? å…³é”®æ­¥éª¤6ï¼šcommit subsurface å’Œ parent surface
-    // ??  æ³¨æ„ï¼šWayland subsurface æœºåˆ¶
-    // - subsurface ç›¸å¯¹äº parent surface çš„ä½ç½®/Z-order åœ¨ parent commit æ—¶ç”Ÿæ•ˆ
-    // - subsurface è‡ªå·±çš„ buffer åœ¨ subsurface commit æ—¶ç”Ÿæ•ˆ
-    // - åœ¨ desync æ¨¡å¼ä¸‹ï¼Œsubsurface å¯ä»¥ç‹¬ç«‹ commitï¼Œä¸éœ€è¦ä¸ parent åŒæ­¥
+    // ?? ¹Ø¼ü²½Öè6£ºcommit subsurface ºÍ parent surface
+    // ??  ×¢Òâ£ºWayland subsurface »úÖÆ
+    // - subsurface Ïà¶ÔÓÚ parent surface µÄÎ»ÖÃ/Z-order ÔÚ parent commit Ê±ÉúĞ§
+    // - subsurface ×Ô¼ºµÄ buffer ÔÚ subsurface commit Ê±ÉúĞ§
+    // - ÔÚ desync Ä£Ê½ÏÂ£¬subsurface ¿ÉÒÔ¶ÀÁ¢ commit£¬²»ĞèÒªÓë parent Í¬²½
     wl_surface_commit(wl_surface);
-    std::cout << "? [DeepStream] Subsurface å·² commitï¼ˆç©º commitï¼Œç­‰å¾… waylandsink attach bufferï¼‰" << std::endl;
+    std::cout << "? [DeepStream] Subsurface ÒÑ commit£¨¿Õ commit£¬µÈ´ı waylandsink attach buffer£©" << std::endl;
     
     wl_surface_commit(wl_parent_surface);
-    std::cout << "? [DeepStream] çˆ¶ surface å·² commitï¼ˆåº”ç”¨ subsurface ä½ç½®å’Œ Z-orderï¼‰" << std::endl;
+    std::cout << "? [DeepStream] ¸¸ surface ÒÑ commit£¨Ó¦ÓÃ subsurface Î»ÖÃºÍ Z-order£©" << std::endl;
     
     wl_display_flush(wl_display);
-    std::cout << "? [DeepStream] Display flush å®Œæˆ" << std::endl;
+    std::cout << "? [DeepStream] Display flush Íê³É" << std::endl;
     
-    std::cout << "\n?? [æ¶æ„è¯Šæ–­] Waylandsink é¢„æœŸè¡Œä¸ºï¼š" << std::endl;
-    std::cout << "  1?? waylandsink æ¥æ”¶ subsurface ä½œä¸º window_handle" << std::endl;
-    std::cout << "  2?? waylandsink attach video buffer åˆ° subsurface" << std::endl;
-    std::cout << "  3?? waylandsink commit subsurfaceï¼ˆæ˜¾ç¤ºè§†é¢‘å¸§ï¼‰" << std::endl;
-    std::cout << "  4?? compositor æ··åˆ: çˆ¶ surfaceï¼ˆLVGL UIï¼Œcamera area é€æ˜ï¼‰+ subsurfaceï¼ˆè§†é¢‘ï¼‰" << std::endl;
-    std::cout << "  ? ç»“æœï¼šUI + è§†é¢‘åŒæ—¶å¯è§\n" << std::endl;
+    std::cout << "\n?? [¼Ü¹¹Õï¶Ï] Waylandsink Ô¤ÆÚĞĞÎª£º" << std::endl;
+    std::cout << "  1?? waylandsink ½ÓÊÕ subsurface ×÷Îª window_handle" << std::endl;
+    std::cout << "  2?? waylandsink attach video buffer µ½ subsurface" << std::endl;
+    std::cout << "  3?? waylandsink commit subsurface£¨ÏÔÊ¾ÊÓÆµÖ¡£©" << std::endl;
+    std::cout << "  4?? compositor »ìºÏ: ¸¸ surface£¨LVGL UI£¬camera area Í¸Ã÷£©+ subsurface£¨ÊÓÆµ£©" << std::endl;
+    std::cout << "  ? ½á¹û£ºUI + ÊÓÆµÍ¬Ê±¿É¼û\n" << std::endl;
     
-    // ?? å…³é”®ä¿®å¤ï¼šè°ƒç”¨å®Œæ•´çš„initialize()æµç¨‹
+    // ?? ¹Ø¼üĞŞ¸´£ºµ÷ÓÃÍêÕûµÄinitialize()Á÷³Ì
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     config_.screen_width = config.width;
     config_.screen_height = config.height;
     
     if (!initialize(config_)) {
-        std::cerr << "? [DeepStream] DeepStreamé…ç½®åˆå§‹åŒ–å¤±è´¥" << std::endl;
+        std::cerr << "? [DeepStream] DeepStreamÅäÖÃ³õÊ¼»¯Ê§°Ü" << std::endl;
         return false;
     }
     
-    std::cout << "? [DeepStream] Wayland Subsurfaceåˆå§‹åŒ–å®Œæˆ" << std::endl;
+    std::cout << "? [DeepStream] Wayland Subsurface³õÊ¼»¯Íê³É" << std::endl;
     return true;
 }
 
 bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
-    std::cout << "[DeepStreamManager] åˆå§‹åŒ–Waylandè§†é¢‘ç³»ç»Ÿ..." << std::endl;
+    std::cout << "[DeepStreamManager] ³õÊ¼»¯WaylandÊÓÆµÏµÍ³..." << std::endl;
     
     config_ = config;
     
-    // ?? æ¶æ„é‡æ„ï¼šä½¿ç”¨Wayland Subsurfaceæ¨¡å¼æ›¿ä»£appsink
-    std::cout << "[DeepStreamManager] ?? æ¶æ„é‡æ„ï¼šè¿ç§»åˆ°Wayland Subsurfaceæ¨¡å¼" << std::endl;
-    std::cout << "[DeepStreamManager] ?? ç›®æ ‡ï¼šé›¶æ‹·è´GPUç¡¬ä»¶åˆæˆï¼Œæå‡æ€§èƒ½" << std::endl;
+    // ?? ¼Ü¹¹ÖØ¹¹£ºÊ¹ÓÃWayland SubsurfaceÄ£Ê½Ìæ´úappsink
+    std::cout << "[DeepStreamManager] ?? ¼Ü¹¹ÖØ¹¹£ºÇ¨ÒÆµ½Wayland SubsurfaceÄ£Ê½" << std::endl;
+    std::cout << "[DeepStreamManager] ?? Ä¿±ê£ºÁã¿½±´GPUÓ²¼şºÏ³É£¬ÌáÉıĞÔÄÜ" << std::endl;
     
-    // æ£€æŸ¥æ˜¯å¦æœ‰å¯ç”¨çš„Subsurfaceé…ç½®
+    // ¼ì²éÊÇ·ñÓĞ¿ÉÓÃµÄSubsurfaceÅäÖÃ
     if (video_subsurface_) {
-        std::cout << "[DeepStreamManager] æ£€æµ‹åˆ°Subsurfaceé…ç½®ï¼Œä½¿ç”¨waylandsinkæ¨¡å¼" << std::endl;
+        std::cout << "[DeepStreamManager] ¼ì²âµ½SubsurfaceÅäÖÃ£¬Ê¹ÓÃwaylandsinkÄ£Ê½" << std::endl;
         config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     } else {
-        std::cout << "[DeepStreamManager] æœªé…ç½®Subsurfaceï¼Œå›é€€åˆ°appsinkæ¨¡å¼" << std::endl;
+        std::cout << "[DeepStreamManager] Î´ÅäÖÃSubsurface£¬»ØÍËµ½appsinkÄ£Ê½" << std::endl;
         config_.sink_mode = VideoSinkMode::APPSINK;
     }
     
-    // åˆå§‹åŒ–GStreamer
+    // ³õÊ¼»¯GStreamer
     if (!gst_is_initialized()) {
         gst_init(nullptr, nullptr);
-        std::cout << "[DeepStreamManager] GStreameråˆå§‹åŒ–å®Œæˆ" << std::endl;
+        std::cout << "[DeepStreamManager] GStreamer³õÊ¼»¯Íê³É" << std::endl;
     }
     
-    // ?? æ¶æ„é‡æ„ï¼šæ£€æŸ¥appsinkæ¶æ„æ‰€éœ€æ’ä»¶
+    // ?? ¼Ü¹¹ÖØ¹¹£º¼ì²éappsink¼Ü¹¹ËùĞè²å¼ş
     const char* required_plugins[] = {"nvarguscamerasrc", "nvvidconv", "appsink"};
     const char* plugin_descriptions[] = {
-        "nvarguscamerasrc (NVIDIAæ‘„åƒå¤´æº)",
-        "nvvidconv (NVIDIAè§†é¢‘è½¬æ¢)",
-        "appsink (åº”ç”¨ç¨‹åºæ•°æ®æ¥æ”¶)"
+        "nvarguscamerasrc (NVIDIAÉãÏñÍ·Ô´)",
+        "nvvidconv (NVIDIAÊÓÆµ×ª»»)",
+        "appsink (Ó¦ÓÃ³ÌĞòÊı¾İ½ÓÊÕ)"
     };
     
     bool all_plugins_available = true;
@@ -268,77 +268,77 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
             std::cout << "[DeepStreamManager] ? " << plugin_descriptions[i] << std::endl;
             gst_object_unref(factory);
         } else {
-            std::cerr << "[DeepStreamManager] ? " << plugin_descriptions[i] << " ä¸å¯ç”¨" << std::endl;
+            std::cerr << "[DeepStreamManager] ? " << plugin_descriptions[i] << " ²»¿ÉÓÃ" << std::endl;
             all_plugins_available = false;
         }
     }
     
     if (!all_plugins_available) {
-        std::cerr << "[DeepStreamManager] å…³é”®æ’ä»¶ç¼ºå¤±ï¼Œæ— æ³•ç»§ç»­" << std::endl;
+        std::cerr << "[DeepStreamManager] ¹Ø¼ü²å¼şÈ±Ê§£¬ÎŞ·¨¼ÌĞø" << std::endl;
         return false;
     }
     
-    // æ£€æŸ¥Waylandç¯å¢ƒ
+    // ¼ì²éWayland»·¾³
     if (!checkWaylandEnvironment()) {
-        std::cerr << "[DeepStreamManager] Waylandç¯å¢ƒæ£€æŸ¥å¤±è´¥" << std::endl;
+        std::cerr << "[DeepStreamManager] Wayland»·¾³¼ì²éÊ§°Ü" << std::endl;
         return false;
     }
     
-    // è®¾ç½®EGLå…±äº«ç¯å¢ƒå˜é‡ï¼Œè§£å†³NVMMç¼“å†²åŒºåˆ°EGLImageè½¬æ¢é—®é¢˜
-    std::cout << "[DeepStreamManager] é…ç½®EGLå…±äº«ç¯å¢ƒ..." << std::endl;
+    // ÉèÖÃEGL¹²Ïí»·¾³±äÁ¿£¬½â¾öNVMM»º³åÇøµ½EGLImage×ª»»ÎÊÌâ
+    std::cout << "[DeepStreamManager] ÅäÖÃEGL¹²Ïí»·¾³..." << std::endl;
     setenv("EGL_PLATFORM", "drm", 1);
     setenv("__EGL_VENDOR_LIBRARY_DIRS", "/usr/lib/aarch64-linux-gnu/tegra-egl", 1);
     setenv("EGL_EXTENSIONS", "EGL_EXT_image_dma_buf_import,EGL_EXT_image_dma_buf_import_modifiers", 1);
     
-    // NVIDIAç‰¹å®šçš„EGLè®¾ç½®
+    // NVIDIAÌØ¶¨µÄEGLÉèÖÃ
     setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
     setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
     
-    std::cout << "[DeepStreamManager] EGLå…±äº«ç¯å¢ƒé…ç½®å®Œæˆ" << std::endl;
+    std::cout << "[DeepStreamManager] EGL¹²Ïí»·¾³ÅäÖÃÍê³É" << std::endl;
     
-    // è®¡ç®—è§†é¢‘å¸ƒå±€ï¼ˆç®€åŒ–ç‰ˆï¼‰
+    // ¼ÆËãÊÓÆµ²¼¾Ö£¨¼ò»¯°æ£©
     video_layout_ = calculateWaylandVideoLayout(config);
     
-    std::cout << "[DeepStreamManager] Waylandè§†é¢‘å¸ƒå±€:" << std::endl;
-    std::cout << "  çª—å£ä½ç½®: (" << video_layout_.offset_x << ", " << video_layout_.offset_y << ")" << std::endl;
-    std::cout << "  çª—å£å°ºå¯¸: " << video_layout_.width << "x" << video_layout_.height << std::endl;
+    std::cout << "[DeepStreamManager] WaylandÊÓÆµ²¼¾Ö:" << std::endl;
+    std::cout << "  ´°¿ÚÎ»ÖÃ: (" << video_layout_.offset_x << ", " << video_layout_.offset_y << ")" << std::endl;
+    std::cout << "  ´°¿Ú³ß´ç: " << video_layout_.width << "x" << video_layout_.height << std::endl;
     
     initialized_ = true;
-    std::cout << "[DeepStreamManager] Waylandè§†é¢‘ç³»ç»Ÿåˆå§‹åŒ–å®Œæˆ" << std::endl;
+    std::cout << "[DeepStreamManager] WaylandÊÓÆµÏµÍ³³õÊ¼»¯Íê³É" << std::endl;
     return true;
 }
 
 bool DeepStreamManager::start() {
     if (!initialized_) {
-        std::cerr << "DeepStream æœªåˆå§‹åŒ–" << std::endl;
+        std::cerr << "DeepStream Î´³õÊ¼»¯" << std::endl;
         return false;
     }
     
     if (running_) {
-        std::cout << "DeepStream å·²åœ¨è¿è¡Œ" << std::endl;
+        std::cout << "DeepStream ÒÑÔÚÔËĞĞ" << std::endl;
         return true;
     }
     
-    std::cout << "å¯åŠ¨ DeepStream ç®¡é“..." << std::endl;
-    std::cout << "åŒæ‘„æ¨¡å¼: " << static_cast<int>(config_.dual_mode) << std::endl;
+    std::cout << "Æô¶¯ DeepStream ¹ÜµÀ..." << std::endl;
+    std::cout << "Ë«ÉãÄ£Ê½: " << static_cast<int>(config_.dual_mode) << std::endl;
     
     if (config_.dual_mode == DualCameraMode::SPLIT_SCREEN) {
-        // å¹¶æ’æ˜¾ç¤ºæ¨¡å¼ï¼šåˆ›å»ºä¸¤ä¸ªç‹¬ç«‹ç®¡é“
+        // ²¢ÅÅÏÔÊ¾Ä£Ê½£º´´½¨Á½¸ö¶ÀÁ¢¹ÜµÀ
         return startSplitScreenMode();
     } else {
-        // å•æ‘„åƒå¤´æˆ–ç«‹ä½“è§†è§‰æ¨¡å¼ï¼šå•ç®¡é“
+        // µ¥ÉãÏñÍ·»òÁ¢ÌåÊÓ¾õÄ£Ê½£ºµ¥¹ÜµÀ
         return startSinglePipelineMode();
     }
 }
 
 bool DeepStreamManager::startSinglePipelineMode() {
-    std::lock_guard<std::mutex> lock(pipeline_mutex_);  // ?? çº¿ç¨‹å®‰å…¨ä¿æŠ¤
+    std::lock_guard<std::mutex> lock(pipeline_mutex_);  // ?? Ïß³Ì°²È«±£»¤
     
     const int MAX_RETRIES = 3;
     const int RETRY_DELAY_MS = 3000;
     
-    // ç­‰å¾…LVGLå®Œå…¨åˆå§‹åŒ–åå†å¯åŠ¨DeepStream
-    std::cout << "ç­‰å¾…LVGLå®Œå…¨åˆå§‹åŒ–..." << std::endl;
+    // µÈ´ıLVGLÍêÈ«³õÊ¼»¯ºóÔÙÆô¶¯DeepStream
+    std::cout << "µÈ´ıLVGLÍêÈ«³õÊ¼»¯..." << std::endl;
     
     try {
         if (lvgl_interface_) {
@@ -349,50 +349,50 @@ bool DeepStreamManager::startSinglePipelineMode() {
             while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 wait_count++;
-                std::cout << "ç­‰å¾…LVGL Waylandåˆå§‹åŒ–å®Œæˆ... (" << (wait_count * 0.5) << "ç§’)" << std::endl;
+                std::cout << "µÈ´ıLVGL Wayland³õÊ¼»¯Íê³É... (" << (wait_count * 0.5) << "Ãë)" << std::endl;
             }
             
             if (lvgl_if->isFullyInitialized()) {
-                std::cout << "? LVGL Waylandå·²å®Œå…¨åˆå§‹åŒ–ï¼Œç»§ç»­å¯åŠ¨DeepStreamç®¡é“" << std::endl;
+                std::cout << "? LVGL WaylandÒÑÍêÈ«³õÊ¼»¯£¬¼ÌĞøÆô¶¯DeepStream¹ÜµÀ" << std::endl;
             } else {
-                std::cout << "?? è­¦å‘Šï¼šLVGL Waylandåˆå§‹åŒ–è¶…æ—¶ï¼Œç»§ç»­å¯åŠ¨DeepStreamç®¡é“" << std::endl;
+                std::cout << "?? ¾¯¸æ£ºLVGL Wayland³õÊ¼»¯³¬Ê±£¬¼ÌĞøÆô¶¯DeepStream¹ÜµÀ" << std::endl;
             }
         } else {
-            std::cout << "è­¦å‘Šï¼šLVGL Waylandæ¥å£ä¸å¯ç”¨ï¼Œä½¿ç”¨å›ºå®šå»¶è¿Ÿ" << std::endl;
+            std::cout << "¾¯¸æ£ºLVGL Wayland½Ó¿Ú²»¿ÉÓÃ£¬Ê¹ÓÃ¹Ì¶¨ÑÓ³Ù" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(3000));
         }
         
         for (int retry = 0; retry < MAX_RETRIES; retry++) {
             if (retry > 0) {
-                std::cout << "é‡è¯•å¯åŠ¨ç®¡é“ (ç¬¬" << retry + 1 << "æ¬¡å°è¯•)..." << std::endl;
-                // ?? å¢åŠ é‡è¯•å»¶è¿Ÿï¼Œç¡®ä¿æ‘„åƒå¤´èµ„æºå®Œå…¨é‡Šæ”¾
-                // nvargus-daemon éœ€è¦æ›´å¤šæ—¶é—´æ¸…ç†èµ„æº
+                std::cout << "ÖØÊÔÆô¶¯¹ÜµÀ (µÚ" << retry + 1 << "´Î³¢ÊÔ)..." << std::endl;
+                // ?? Ôö¼ÓÖØÊÔÑÓ³Ù£¬È·±£ÉãÏñÍ·×ÊÔ´ÍêÈ«ÊÍ·Å
+                // nvargus-daemon ĞèÒª¸ü¶àÊ±¼äÇåÀí×ÊÔ´
                 std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS * (retry + 1)));
-                std::cout << "ç­‰å¾…æ‘„åƒå¤´èµ„æºé‡Šæ”¾..." << std::endl;
+                std::cout << "µÈ´ıÉãÏñÍ·×ÊÔ´ÊÍ·Å..." << std::endl;
             }
             
-            // ?? æ–°å¢ï¼šæ¸…ç†ä¹‹å‰çš„ç®¡é“çŠ¶æ€
+            // ?? ĞÂÔö£ºÇåÀíÖ®Ç°µÄ¹ÜµÀ×´Ì¬
             if (pipeline_) {
                 gst_element_set_state(pipeline_, GST_STATE_NULL);
                 gst_object_unref(pipeline_);
                 pipeline_ = nullptr;
             }
             
-            // æ„å»ºç®¡é“
+            // ¹¹½¨¹ÜµÀ
             std::string pipeline_str = buildPipeline(config_, video_layout_);
-            std::cout << "ç®¡é“å­—ç¬¦ä¸²: " << pipeline_str << std::endl;
+            std::cout << "¹ÜµÀ×Ö·û´®: " << pipeline_str << std::endl;
             
-            // ?? æ–°å¢ï¼šéªŒè¯ç®¡é“å­—ç¬¦ä¸²æœ‰æ•ˆæ€§
+            // ?? ĞÂÔö£ºÑéÖ¤¹ÜµÀ×Ö·û´®ÓĞĞ§ĞÔ
             if (pipeline_str.empty()) {
-                std::cerr << "? ç®¡é“å­—ç¬¦ä¸²ä¸ºç©ºï¼Œé…ç½®é”™è¯¯" << std::endl;
+                std::cerr << "? ¹ÜµÀ×Ö·û´®Îª¿Õ£¬ÅäÖÃ´íÎó" << std::endl;
                 return false;
             }
-            // åˆ›å»ºç®¡é“
+            // ´´½¨¹ÜµÀ
             GError *error = nullptr;
             pipeline_ = gst_parse_launch(pipeline_str.c_str(), &error);
             
             if (!pipeline_ || error) {
-                std::cerr << "åˆ›å»ºç®¡é“å¤±è´¥: " << (error ? error->message : "æœªçŸ¥é”™è¯¯") << std::endl;
+                std::cerr << "´´½¨¹ÜµÀÊ§°Ü: " << (error ? error->message : "Î´Öª´íÎó") << std::endl;
                 if (error) {
                     g_error_free(error);
                     error = nullptr;
@@ -401,9 +401,9 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 return false;
             }
             
-            // æ£€æŸ¥NVMMç¼“å†²åŒºå¯ç”¨æ€§
+            // ¼ì²éNVMM»º³åÇø¿ÉÓÃĞÔ
             if (!checkNVMMBufferAvailability()) {
-                std::cout << "NVMMç¼“å†²åŒºæ£€æŸ¥å¤±è´¥ï¼Œç­‰å¾…é‡Šæ”¾..." << std::endl;
+                std::cout << "NVMM»º³åÇø¼ì²éÊ§°Ü£¬µÈ´ıÊÍ·Å..." << std::endl;
                 if (pipeline_) {
                     gst_element_set_state(pipeline_, GST_STATE_NULL);
                     gst_object_unref(pipeline_);
@@ -412,11 +412,11 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 if (retry < MAX_RETRIES - 1) continue;
             }
             
-            // ?? æ–°å¢ï¼šéªŒè¯å…³é”®å…ƒç´ å­˜åœ¨
+            // ?? ĞÂÔö£ºÑéÖ¤¹Ø¼üÔªËØ´æÔÚ
             if (config_.sink_mode == VideoSinkMode::KMSSINK) {
                 GstElement* kmssink = gst_bin_get_by_name(GST_BIN(pipeline_), "kmssink0");
                 if (!kmssink) {
-                    std::cerr << "? æ— æ³•æ‰¾åˆ°kmssinkå…ƒç´ " << std::endl;
+                    std::cerr << "? ÎŞ·¨ÕÒµ½kmssinkÔªËØ" << std::endl;
                     if (retry < MAX_RETRIES - 1) continue;
                     return false;
                 } else {
@@ -424,34 +424,34 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 }
             }
             
-            // è®¾ç½®æ¶ˆæ¯æ€»çº¿
+            // ÉèÖÃÏûÏ¢×ÜÏß
             bus_ = gst_element_get_bus(pipeline_);
             if (!bus_) {
-                std::cerr << "? æ— æ³•è·å–æ¶ˆæ¯æ€»çº¿" << std::endl;
+                std::cerr << "? ÎŞ·¨»ñÈ¡ÏûÏ¢×ÜÏß" << std::endl;
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
             bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
             
-            // ?? ä¿®å¤ï¼šé€šè¿‡ GstVideoOverlay æ¥å£ä¼ é€’ subsurface ç»™ waylandsink
-            // waylandsink å®ç°äº† GstVideoOverlay æ¥å£ï¼Œæ”¯æŒå¤–éƒ¨çª—å£å¥æŸ„
+            // ?? ĞŞ¸´£ºÍ¨¹ı GstVideoOverlay ½Ó¿Ú´«µİ subsurface ¸ø waylandsink
+            // waylandsink ÊµÏÖÁË GstVideoOverlay ½Ó¿Ú£¬Ö§³ÖÍâ²¿´°¿Ú¾ä±ú
             if (video_surface_) {
-                // è®¾ç½®åŒæ­¥æ¶ˆæ¯å¤„ç†å™¨ï¼Œå¤„ç† Wayland display context å’Œ window handle
+                // ÉèÖÃÍ¬²½ÏûÏ¢´¦ÀíÆ÷£¬´¦Àí Wayland display context ºÍ window handle
                 gst_bus_set_sync_handler(bus_, 
                     [](GstBus* bus, GstMessage* message, gpointer user_data) -> GstBusSyncReply {
                         DeepStreamManager* self = static_cast<DeepStreamManager*>(user_data);
                         
-                        // å¤„ç† Wayland display context è¯·æ±‚
+                        // ´¦Àí Wayland display context ÇëÇó
                         if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_NEED_CONTEXT) {
                             const gchar* context_type;
                             gst_message_parse_context_type(message, &context_type);
                             
                             if (g_strcmp0(context_type, "GstWaylandDisplayHandleContextType") == 0) {
-                                // åˆ›å»º Wayland display context
+                                // ´´½¨ Wayland display context
                                 GstContext* context = gst_context_new("GstWaylandDisplayHandleContextType", TRUE);
                                 GstStructure* structure = gst_context_writable_structure(context);
                                 
-                                // è®¾ç½® Wayland displayï¼ˆwaylandsink éœ€è¦ï¼‰
+                                // ÉèÖÃ Wayland display£¨waylandsink ĞèÒª£©
                                 gst_structure_set(structure, 
                                     "display", G_TYPE_POINTER, self->parent_wl_display_,
                                     NULL);
@@ -459,43 +459,43 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 gst_element_set_context(GST_ELEMENT(GST_MESSAGE_SRC(message)), context);
                                 gst_context_unref(context);
                                 
-                                std::cout << "? [DeepStream] Wayland display context å·²ä¼ é€’" << std::endl;
+                                std::cout << "? [DeepStream] Wayland display context ÒÑ´«µİ" << std::endl;
                                 return GST_BUS_DROP;
                             }
                         }
                         
-                        // ?? å…³é”®ï¼šå¤„ç† prepare-window-handle æ¶ˆæ¯ï¼ˆGstVideoOverlayï¼‰
+                        // ?? ¹Ø¼ü£º´¦Àí prepare-window-handle ÏûÏ¢£¨GstVideoOverlay£©
                         if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ELEMENT) {
                             const GstStructure* structure = gst_message_get_structure(message);
                             
                             if (gst_structure_has_name(structure, "prepare-window-handle")) {
-                                // waylandsink è¯·æ±‚çª—å£å¥æŸ„ï¼Œä¼ é€’æˆ‘ä»¬çš„ subsurface
+                                // waylandsink ÇëÇó´°¿Ú¾ä±ú£¬´«µİÎÒÃÇµÄ subsurface
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
                                 if (GST_IS_VIDEO_OVERLAY(sink)) {
-                                    // 1?? è®¾ç½®çª—å£å¥æŸ„ï¼ˆå°† wl_surface æŒ‡é’ˆä¼ é€’ç»™ waylandsinkï¼‰
+                                    // 1?? ÉèÖÃ´°¿Ú¾ä±ú£¨½« wl_surface Ö¸Õë´«µİ¸ø waylandsink£©
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
                                         reinterpret_cast<guintptr>(self->video_surface_)
                                     );
                                     
-                                    std::cout << "? [DeepStream] å·²å°† subsurface è®¾ç½®ä¸º waylandsink çš„çª—å£å¥æŸ„" << std::endl;
+                                    std::cout << "? [DeepStream] ÒÑ½« subsurface ÉèÖÃÎª waylandsink µÄ´°¿Ú¾ä±ú" << std::endl;
                                     
-                                    // 2?? è®¾ç½®æ¸²æŸ“çŸ©å½¢ï¼ˆä½ç½®å’Œå¤§å°ï¼‰
-                                    // ?? å…³é”®ï¼šrender_rectangle çš„åæ ‡æ˜¯ç›¸å¯¹äº subsurface è‡ªèº«çš„ï¼Œä¸æ˜¯ç›¸å¯¹äºä¸» surface
-                                    // subsurface çš„ä½ç½®é€šè¿‡ wl_subsurface_set_position è®¾ç½®ï¼ˆåœ¨ createSubsurface ä¸­ï¼‰
-                                    // è¿™é‡Œåº”è¯¥å¡«å……æ•´ä¸ª subsurfaceï¼Œæ‰€ä»¥æ˜¯ (0, 0, width, height)
+                                    // 2?? ÉèÖÃäÖÈ¾¾ØĞÎ£¨Î»ÖÃºÍ´óĞ¡£©
+                                    // ?? ¹Ø¼ü£ºrender_rectangle µÄ×ø±êÊÇÏà¶ÔÓÚ subsurface ×ÔÉíµÄ£¬²»ÊÇÏà¶ÔÓÚÖ÷ surface
+                                    // subsurface µÄÎ»ÖÃÍ¨¹ı wl_subsurface_set_position ÉèÖÃ£¨ÔÚ createSubsurface ÖĞ£©
+                                    // ÕâÀïÓ¦¸ÃÌî³äÕû¸ö subsurface£¬ËùÒÔÊÇ (0, 0, width, height)
                                     gst_video_overlay_set_render_rectangle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        0,  // X: å¡«å……æ•´ä¸ª subsurface
-                                        0,  // Y: å¡«å……æ•´ä¸ª subsurface
+                                        0,  // X: Ìî³äÕû¸ö subsurface
+                                        0,  // Y: Ìî³äÕû¸ö subsurface
                                         self->video_layout_.width,
                                         self->video_layout_.height
                                     );
                                     
-                                    std::cout << "? [DeepStream] å·²è®¾ç½®æ¸²æŸ“çŸ©å½¢: (0, 0) "
+                                    std::cout << "? [DeepStream] ÒÑÉèÖÃäÖÈ¾¾ØĞÎ: (0, 0) "
                                               << self->video_layout_.width << "x" << self->video_layout_.height 
-                                              << " (å¡«å……æ•´ä¸ª subsurface)" << std::endl;
+                                              << " (Ìî³äÕû¸ö subsurface)" << std::endl;
                                     
                                     return GST_BUS_DROP;
                                 }
@@ -507,61 +507,61 @@ bool DeepStreamManager::startSinglePipelineMode() {
                     this, 
                     NULL);
                 
-                std::cout << "? [DeepStream] å·²è®¾ç½® Wayland æ˜¾ç¤ºå’Œçª—å£å¥æŸ„ä¼ é€’æœºåˆ¶" << std::endl;
+                std::cout << "? [DeepStream] ÒÑÉèÖÃ Wayland ÏÔÊ¾ºÍ´°¿Ú¾ä±ú´«µİ»úÖÆ" << std::endl;
             }
             
-            // ?? æ”¹è¿›ï¼šåˆ†é˜¶æ®µå¯åŠ¨ç®¡é“ï¼Œé™ä½æ®µé”™è¯¯é£é™©
-            std::cout << "æ­£åœ¨åˆ†é˜¶æ®µå¯åŠ¨ç®¡é“..." << std::endl;
+            // ?? ¸Ä½ø£º·Ö½×¶ÎÆô¶¯¹ÜµÀ£¬½µµÍ¶Î´íÎó·çÏÕ
+            std::cout << "ÕıÔÚ·Ö½×¶ÎÆô¶¯¹ÜµÀ..." << std::endl;
             
-            // ç¬¬ä¸€é˜¶æ®µï¼šè®¾ç½®ä¸ºREADYçŠ¶æ€
-            std::cout << "ç¬¬ä¸€é˜¶æ®µï¼šè®¾ç½®ç®¡é“ä¸ºREADYçŠ¶æ€..." << std::endl;
+            // µÚÒ»½×¶Î£ºÉèÖÃÎªREADY×´Ì¬
+            std::cout << "µÚÒ»½×¶Î£ºÉèÖÃ¹ÜµÀÎªREADY×´Ì¬..." << std::endl;
             GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_READY);
             if (ret == GST_STATE_CHANGE_FAILURE) {
-                std::cerr << "? READYçŠ¶æ€è®¾ç½®å¤±è´¥" << std::endl;
+                std::cerr << "? READY×´Ì¬ÉèÖÃÊ§°Ü" << std::endl;
                 cleanup();
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
             
-            // ç­‰å¾…READYçŠ¶æ€ç¨³å®š
+            // µÈ´ıREADY×´Ì¬ÎÈ¶¨
             GstState state;
             ret = gst_element_get_state(pipeline_, &state, NULL, 5 * GST_SECOND);
             if (ret == GST_STATE_CHANGE_FAILURE || state != GST_STATE_READY) {
-                std::cerr << "? READYçŠ¶æ€ç­‰å¾…å¤±è´¥" << std::endl;
+                std::cerr << "? READY×´Ì¬µÈ´ıÊ§°Ü" << std::endl;
                 cleanup();
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
-            std::cout << "? READYçŠ¶æ€è®¾ç½®æˆåŠŸ" << std::endl;
+            std::cout << "? READY×´Ì¬ÉèÖÃ³É¹¦" << std::endl;
             
-            // ç¬¬äºŒé˜¶æ®µï¼šè®¾ç½®ä¸ºPAUSEDçŠ¶æ€
-            std::cout << "ç¬¬äºŒé˜¶æ®µï¼šè®¾ç½®ç®¡é“ä¸ºPAUSEDçŠ¶æ€..." << std::endl;
+            // µÚ¶ş½×¶Î£ºÉèÖÃÎªPAUSED×´Ì¬
+            std::cout << "µÚ¶ş½×¶Î£ºÉèÖÃ¹ÜµÀÎªPAUSED×´Ì¬..." << std::endl;
             ret = gst_element_set_state(pipeline_, GST_STATE_PAUSED);
             if (ret == GST_STATE_CHANGE_FAILURE) {
-                std::cerr << "? PAUSEDçŠ¶æ€è®¾ç½®å¤±è´¥" << std::endl;
+                std::cerr << "? PAUSED×´Ì¬ÉèÖÃÊ§°Ü" << std::endl;
                 cleanup();
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
             
-            // ç­‰å¾…PAUSEDçŠ¶æ€ç¨³å®š
+            // µÈ´ıPAUSED×´Ì¬ÎÈ¶¨
             ret = gst_element_get_state(pipeline_, &state, NULL, 10 * GST_SECOND);
             if (ret == GST_STATE_CHANGE_FAILURE) {
-                std::cerr << "? PAUSEDçŠ¶æ€ç­‰å¾…å¤±è´¥" << std::endl;
+                std::cerr << "? PAUSED×´Ì¬µÈ´ıÊ§°Ü" << std::endl;
                 cleanup();
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
-            std::cout << "? PAUSEDçŠ¶æ€è®¾ç½®æˆåŠŸ" << std::endl;
+            std::cout << "? PAUSED×´Ì¬ÉèÖÃ³É¹¦" << std::endl;
             
-            // ç¬¬ä¸‰é˜¶æ®µï¼šè®¾ç½®ä¸ºPLAYINGçŠ¶æ€
-            std::cout << "ç¬¬ä¸‰é˜¶æ®µï¼šè®¾ç½®ç®¡é“ä¸ºPLAYINGçŠ¶æ€..." << std::endl;
+            // µÚÈı½×¶Î£ºÉèÖÃÎªPLAYING×´Ì¬
+            std::cout << "µÚÈı½×¶Î£ºÉèÖÃ¹ÜµÀÎªPLAYING×´Ì¬..." << std::endl;
             ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
             
             if (ret == GST_STATE_CHANGE_FAILURE) {
-                std::cerr << "å¯åŠ¨ç®¡é“å¤±è´¥ï¼Œè¿›è¡Œé”™è¯¯è¯Šæ–­..." << std::endl;
+                std::cerr << "Æô¶¯¹ÜµÀÊ§°Ü£¬½øĞĞ´íÎóÕï¶Ï..." << std::endl;
                 
-                // è·å–è¯¦ç»†é”™è¯¯ä¿¡æ¯
+                // »ñÈ¡ÏêÏ¸´íÎóĞÅÏ¢
                 GstBus* bus = gst_element_get_bus(pipeline_);
                 GstMessage* msg = gst_bus_timed_pop_filtered(bus, 2 * GST_SECOND,
                     static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
@@ -570,14 +570,14 @@ bool DeepStreamManager::startSinglePipelineMode() {
                     GError* err;
                     gchar* debug_info;
                     gst_message_parse_error(msg, &err, &debug_info);
-                    std::cerr << "GStreameré”™è¯¯: " << err->message << std::endl;
+                    std::cerr << "GStreamer´íÎó: " << err->message << std::endl;
                     if (debug_info) {
-                        std::cerr << "è°ƒè¯•ä¿¡æ¯: " << debug_info << std::endl;
+                        std::cerr << "µ÷ÊÔĞÅÏ¢: " << debug_info << std::endl;
                         
-                        // æ£€æŸ¥æ˜¯å¦ä¸ºDRMç›¸å…³é”™è¯¯
+                        // ¼ì²éÊÇ·ñÎªDRMÏà¹Ø´íÎó
                         if (strstr(debug_info, "DRM") || strstr(debug_info, "plane") ||
                             strstr(debug_info, "kmssink") || strstr(debug_info, "CRTC")) {
-                            std::cout << "æ£€æµ‹åˆ°DRMèµ„æºé”™è¯¯ï¼Œå¯èƒ½æ˜¯planeå†²çª..." << std::endl;
+                            std::cout << "¼ì²âµ½DRM×ÊÔ´´íÎó£¬¿ÉÄÜÊÇplane³åÍ»..." << std::endl;
                         }
                         g_free(debug_info);
                     }
@@ -590,12 +590,12 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             } else if (ret == GST_STATE_CHANGE_ASYNC) {
-                std::cout << "ç®¡é“å¼‚æ­¥å¯åŠ¨ä¸­ï¼Œç­‰å¾…çŠ¶æ€å˜åŒ–..." << std::endl;
+                std::cout << "¹ÜµÀÒì²½Æô¶¯ÖĞ£¬µÈ´ı×´Ì¬±ä»¯..." << std::endl;
                 ret = gst_element_get_state(pipeline_, &state, NULL, 15 * GST_SECOND);
                 if (ret == GST_STATE_CHANGE_FAILURE) {
-                    std::cerr << "? ç®¡é“å¼‚æ­¥å¯åŠ¨å¤±è´¥ï¼Œè¿›è¡Œé”™è¯¯è¯Šæ–­..." << std::endl;
+                    std::cerr << "? ¹ÜµÀÒì²½Æô¶¯Ê§°Ü£¬½øĞĞ´íÎóÕï¶Ï..." << std::endl;
                     
-                    // è·å–è¯¦ç»†é”™è¯¯ä¿¡æ¯
+                    // »ñÈ¡ÏêÏ¸´íÎóĞÅÏ¢
                     GstBus* bus = gst_element_get_bus(pipeline_);
                     GstMessage* msg = gst_bus_timed_pop_filtered(bus, 2 * GST_SECOND,
                         static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING));
@@ -606,29 +606,29 @@ bool DeepStreamManager::startSinglePipelineMode() {
                         
                         if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_ERROR) {
                             gst_message_parse_error(msg, &err, &debug_info);
-                            std::cerr << "?? GStreameré”™è¯¯: " << err->message << std::endl;
+                            std::cerr << "?? GStreamer´íÎó: " << err->message << std::endl;
                         } else if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_WARNING) {
                             gst_message_parse_warning(msg, &err, &debug_info);
-                            std::cerr << "?? GStreamerè­¦å‘Š: " << err->message << std::endl;
+                            std::cerr << "?? GStreamer¾¯¸æ: " << err->message << std::endl;
                         }
                         
                         if (debug_info) {
-                            std::cerr << "?? è°ƒè¯•ä¿¡æ¯: " << debug_info << std::endl;
+                            std::cerr << "?? µ÷ÊÔĞÅÏ¢: " << debug_info << std::endl;
                             
-                            // æ£€æŸ¥å¸¸è§é”™è¯¯æ¨¡å¼
+                            // ¼ì²é³£¼û´íÎóÄ£Ê½
                             if (strstr(debug_info, "Wayland") || strstr(debug_info, "wl_")) {
-                                std::cout << "?? æ£€æµ‹åˆ°Waylandç›¸å…³é”™è¯¯ï¼Œå¯èƒ½æ˜¯surfaceæœªå°±ç»ª..." << std::endl;
+                                std::cout << "?? ¼ì²âµ½WaylandÏà¹Ø´íÎó£¬¿ÉÄÜÊÇsurfaceÎ´¾ÍĞ÷..." << std::endl;
                             } else if (strstr(debug_info, "NVMM") || strstr(debug_info, "nvarguscamerasrc")) {
-                                std::cout << "?? æ£€æµ‹åˆ°NVMM/æ‘„åƒå¤´é”™è¯¯ï¼Œå¯èƒ½æ˜¯èµ„æºå†²çª..." << std::endl;
+                                std::cout << "?? ¼ì²âµ½NVMM/ÉãÏñÍ·´íÎó£¬¿ÉÄÜÊÇ×ÊÔ´³åÍ»..." << std::endl;
                             } else if (strstr(debug_info, "waylandsink")) {
-                                std::cout << "?? æ£€æµ‹åˆ°waylandsinké”™è¯¯ï¼Œå¯èƒ½æ˜¯displayè¿æ¥é—®é¢˜..." << std::endl;
+                                std::cout << "?? ¼ì²âµ½waylandsink´íÎó£¬¿ÉÄÜÊÇdisplayÁ¬½ÓÎÊÌâ..." << std::endl;
                             }
                             g_free(debug_info);
                         }
                         g_error_free(err);
                         gst_message_unref(msg);
                     } else {
-                        std::cerr << "?? æ— æ³•ä»busè·å–é”™è¯¯æ¶ˆæ¯ï¼ˆå¯èƒ½è¶…æ—¶ï¼‰" << std::endl;
+                        std::cerr << "?? ÎŞ·¨´Óbus»ñÈ¡´íÎóÏûÏ¢£¨¿ÉÄÜ³¬Ê±£©" << std::endl;
                     }
                     if (bus) gst_object_unref(bus);
                     
@@ -638,19 +638,19 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 }
             }
             
-            std::cout << "? PLAYINGçŠ¶æ€è®¾ç½®æˆåŠŸ" << std::endl;
+            std::cout << "? PLAYING×´Ì¬ÉèÖÃ³É¹¦" << std::endl;
             
-            // æˆåŠŸå¯åŠ¨ï¼Œè·³å‡ºé‡è¯•å¾ªç¯
+            // ³É¹¦Æô¶¯£¬Ìø³öÖØÊÔÑ­»·
             break;
         }
         
         running_ = true;
         const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
         const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
-        std::cout << "?? DeepStream ç®¡é“å¯åŠ¨æˆåŠŸ (" << mode_name << " Subsurfaceæ¶æ„)" << std::endl;
-        std::cout << "?? æ•°æ®æµ: nvarguscamerasrc â†’ nvinfer â†’ waylandsink â†’ subsurface â†’ GPUåˆæˆ" << std::endl;
+        std::cout << "?? DeepStream ¹ÜµÀÆô¶¯³É¹¦ (" << mode_name << " Subsurface¼Ü¹¹)" << std::endl;
+        std::cout << "?? Êı¾İÁ÷: nvarguscamerasrc ¡ú nvinfer ¡ú waylandsink ¡ú subsurface ¡ú GPUºÏ³É" << std::endl;
         
-        // ? AppSinkå›è°ƒå·²ç§»é™¤ - ä½¿ç”¨Subsurfaceç¡¬ä»¶åˆæˆ
+        // ? AppSink»Øµ÷ÒÑÒÆ³ı - Ê¹ÓÃSubsurfaceÓ²¼şºÏ³É
         // if (config_.sink_mode == VideoSinkMode::APPSINK) {
         //     setupAppSinkCallbacks();
         // }
@@ -658,21 +658,21 @@ bool DeepStreamManager::startSinglePipelineMode() {
         return true;
         
     } catch (const std::exception& e) {
-        std::cerr << "? ç®¡é“å¯åŠ¨å¼‚å¸¸: " << e.what() << std::endl;
+        std::cerr << "? ¹ÜµÀÆô¶¯Òì³£: " << e.what() << std::endl;
         cleanup();
         return false;
     } catch (...) {
-        std::cerr << "? ç®¡é“å¯åŠ¨æœªçŸ¥å¼‚å¸¸" << std::endl;
+        std::cerr << "? ¹ÜµÀÆô¶¯Î´ÖªÒì³£" << std::endl;
         cleanup();
         return false;
     }
 }
 
-// æ–°å¢ï¼šæ£€æŸ¥NVMMç¼“å†²åŒºå¯ç”¨æ€§
+// ĞÂÔö£º¼ì²éNVMM»º³åÇø¿ÉÓÃĞÔ
 bool DeepStreamManager::checkNVMMBufferAvailability() {
-    std::cout << "æ£€æŸ¥NVMMç¼“å†²åŒºå¯ç”¨æ€§..." << std::endl;
+    std::cout << "¼ì²éNVMM»º³åÇø¿ÉÓÃĞÔ..." << std::endl;
     
-    // æ£€æŸ¥ç³»ç»Ÿå†…å­˜ä½¿ç”¨æƒ…å†µ
+    // ¼ì²éÏµÍ³ÄÚ´æÊ¹ÓÃÇé¿ö
     std::ifstream meminfo("/proc/meminfo");
     if (meminfo.is_open()) {
         std::string line;
@@ -689,16 +689,16 @@ bool DeepStreamManager::checkNVMMBufferAvailability() {
         
         if (total_mem > 0 && available_mem > 0) {
             double memory_usage = 1.0 - (double)available_mem / total_mem;
-            std::cout << "ç³»ç»Ÿå†…å­˜ä½¿ç”¨ç‡: " << (memory_usage * 100) << "%" << std::endl;
+            std::cout << "ÏµÍ³ÄÚ´æÊ¹ÓÃÂÊ: " << (memory_usage * 100) << "%" << std::endl;
             
-            if (memory_usage > 0.9) { // å†…å­˜ä½¿ç”¨è¶…è¿‡90%
-                std::cout << "ç³»ç»Ÿå†…å­˜ä½¿ç”¨ç‡è¿‡é«˜ï¼Œå¯èƒ½å½±å“NVMMç¼“å†²åŒºåˆ†é…" << std::endl;
+            if (memory_usage > 0.9) { // ÄÚ´æÊ¹ÓÃ³¬¹ı90%
+                std::cout << "ÏµÍ³ÄÚ´æÊ¹ÓÃÂÊ¹ı¸ß£¬¿ÉÄÜÓ°ÏìNVMM»º³åÇø·ÖÅä" << std::endl;
                 return false;
             }
         }
     }
     
-    // æ£€æŸ¥NVIDIA GPUå†…å­˜
+    // ¼ì²éNVIDIA GPUÄÚ´æ
     std::string gpu_mem_cmd = "nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo '0,0'";
     FILE* pipe = popen(gpu_mem_cmd.c_str(), "r");
     if (pipe) {
@@ -709,10 +709,10 @@ bool DeepStreamManager::checkNVMMBufferAvailability() {
             
             if (total_mem > 0) {
                 double gpu_usage = (double)used_mem / total_mem;
-                std::cout << "GPUå†…å­˜ä½¿ç”¨ç‡: " << (gpu_usage * 100) << "%" << std::endl;
+                std::cout << "GPUÄÚ´æÊ¹ÓÃÂÊ: " << (gpu_usage * 100) << "%" << std::endl;
                 
-                if (gpu_usage > 0.9) { // GPUå†…å­˜ä½¿ç”¨è¶…è¿‡90%
-                    std::cout << "GPUå†…å­˜ä½¿ç”¨ç‡è¿‡é«˜ï¼Œå¯èƒ½å½±å“NVMMç¼“å†²åŒºåˆ†é…" << std::endl;
+                if (gpu_usage > 0.9) { // GPUÄÚ´æÊ¹ÓÃ³¬¹ı90%
+                    std::cout << "GPUÄÚ´æÊ¹ÓÃÂÊ¹ı¸ß£¬¿ÉÄÜÓ°ÏìNVMM»º³åÇø·ÖÅä" << std::endl;
                     pclose(pipe);
                     return false;
                 }
@@ -721,15 +721,15 @@ bool DeepStreamManager::checkNVMMBufferAvailability() {
         pclose(pipe);
     }
     
-    std::cout << "NVMMç¼“å†²åŒºå¯ç”¨æ€§æ£€æŸ¥é€šè¿‡" << std::endl;
+    std::cout << "NVMM»º³åÇø¿ÉÓÃĞÔ¼ì²éÍ¨¹ı" << std::endl;
     return true;
 }
 
 bool DeepStreamManager::startSplitScreenMode() {
-    // è®¡ç®—å·¦å³è§†é¢‘åŒºåŸŸå°ºå¯¸
-    int half_width = video_layout_.width / 2 - 5;  // å‡å»é—´éš™
+    // ¼ÆËã×óÓÒÊÓÆµÇøÓò³ß´ç
+    int half_width = video_layout_.width / 2 - 5;  // ¼õÈ¥¼äÏ¶
     
-    // æ„å»ºå·¦ä¾§æ‘„åƒå¤´ç®¡é“
+    // ¹¹½¨×ó²àÉãÏñÍ·¹ÜµÀ
     std::string pipeline1_str = buildSplitScreenPipeline(
         config_, 
         video_layout_.offset_x,
@@ -737,13 +737,13 @@ bool DeepStreamManager::startSplitScreenMode() {
         half_width,
         video_layout_.height
     );
-    std::cout << "å·¦ä¾§ç®¡é“: " << pipeline1_str << std::endl;
+    std::cout << "×ó²à¹ÜµÀ: " << pipeline1_str << std::endl;
     
-    // æ„å»ºå³ä¾§æ‘„åƒå¤´ç®¡é“
+    // ¹¹½¨ÓÒ²àÉãÏñÍ·¹ÜµÀ
     DeepStreamConfig config2 = config_;
-    config2.camera_id = config_.camera_id_2;  // ä½¿ç”¨å‰¯æ‘„åƒå¤´
+    config2.camera_id = config_.camera_id_2;  // Ê¹ÓÃ¸±ÉãÏñÍ·
     
-    int right_offset_x = video_layout_.offset_x + half_width + 10;  // å³åŠè¾¹åç§»
+    int right_offset_x = video_layout_.offset_x + half_width + 10;  // ÓÒ°ë±ßÆ«ÒÆ
     std::string pipeline2_str = buildSplitScreenPipeline(
         config2,
         right_offset_x,
@@ -751,37 +751,37 @@ bool DeepStreamManager::startSplitScreenMode() {
         half_width,
         video_layout_.height
     );
-    std::cout << "å³ä¾§ç®¡é“: " << pipeline2_str << std::endl;
+    std::cout << "ÓÒ²à¹ÜµÀ: " << pipeline2_str << std::endl;
     
-    // åˆ›å»ºä¸¤ä¸ªç®¡é“
+    // ´´½¨Á½¸ö¹ÜµÀ
     GError *error1 = nullptr, *error2 = nullptr;
     pipeline_ = gst_parse_launch(pipeline1_str.c_str(), &error1);
     pipeline2_ = gst_parse_launch(pipeline2_str.c_str(), &error2);
     
     if (!pipeline_ || error1) {
-        std::cerr << "åˆ›å»ºå·¦ä¾§ç®¡é“å¤±è´¥: " << (error1 ? error1->message : "æœªçŸ¥é”™è¯¯") << std::endl;
+        std::cerr << "´´½¨×ó²à¹ÜµÀÊ§°Ü: " << (error1 ? error1->message : "Î´Öª´íÎó") << std::endl;
         if (error1) g_error_free(error1);
         return false;
     }
     
     if (!pipeline2_ || error2) {
-        std::cerr << "åˆ›å»ºå³ä¾§ç®¡é“å¤±è´¥: " << (error2 ? error2->message : "æœªçŸ¥é”™è¯¯") << std::endl;
+        std::cerr << "´´½¨ÓÒ²à¹ÜµÀÊ§°Ü: " << (error2 ? error2->message : "Î´Öª´íÎó") << std::endl;
         if (error2) g_error_free(error2);
         return false;
     }
     
-    // è®¾ç½®æ¶ˆæ¯æ€»çº¿
+    // ÉèÖÃÏûÏ¢×ÜÏß
     bus_ = gst_element_get_bus(pipeline_);
     bus2_ = gst_element_get_bus(pipeline2_);
     bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
     bus_watch_id2_ = gst_bus_add_watch(bus2_, busCallback, this);
     
-    // å¯åŠ¨ä¸¤ä¸ªç®¡é“
+    // Æô¶¯Á½¸ö¹ÜµÀ
     GstStateChangeReturn ret1 = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     GstStateChangeReturn ret2 = gst_element_set_state(pipeline2_, GST_STATE_PLAYING);
     
     if (ret1 == GST_STATE_CHANGE_FAILURE || ret2 == GST_STATE_CHANGE_FAILURE) {
-        std::cerr << "å¯åŠ¨ç®¡é“å¤±è´¥" << std::endl;
+        std::cerr << "Æô¶¯¹ÜµÀÊ§°Ü" << std::endl;
         cleanup();
         return false;
     }
@@ -789,9 +789,9 @@ bool DeepStreamManager::startSplitScreenMode() {
     running_ = true;
     const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
     const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
-    std::cout << "åŒæ‘„åƒå¤´å¹¶æ’æ˜¾ç¤ºç®¡é“å¯åŠ¨æˆåŠŸ (" << mode_name << ")" << std::endl;
+    std::cout << "Ë«ÉãÏñÍ·²¢ÅÅÏÔÊ¾¹ÜµÀÆô¶¯³É¹¦ (" << mode_name << ")" << std::endl;
     
-    // ? AppSinkå›è°ƒå·²ç§»é™¤ - ä½¿ç”¨Subsurfaceç¡¬ä»¶åˆæˆ
+    // ? AppSink»Øµ÷ÒÑÒÆ³ı - Ê¹ÓÃSubsurfaceÓ²¼şºÏ³É
     // if (config_.sink_mode == VideoSinkMode::APPSINK) {
     //     setupAppSinkCallbacks();
     // }
@@ -802,7 +802,7 @@ bool DeepStreamManager::startSplitScreenMode() {
 void DeepStreamManager::stop() {
     if (!running_) return;
     
-    std::cout << "åœæ­¢ DeepStream ç®¡é“..." << std::endl;
+    std::cout << "Í£Ö¹ DeepStream ¹ÜµÀ..." << std::endl;
     
     if (pipeline_) {
         gst_element_set_state(pipeline_, GST_STATE_NULL);
@@ -812,36 +812,36 @@ void DeepStreamManager::stop() {
         gst_element_set_state(pipeline2_, GST_STATE_NULL);
     }
     
-    // ?? æ–°å¢ï¼šå®Œå…¨åœæ­¢æ—¶æ‰æ¸…ç† subsurface
+    // ?? ĞÂÔö£ºÍêÈ«Í£Ö¹Ê±²ÅÇåÀí subsurface
     cleanupSubsurface();
     
     running_ = false;
-    std::cout << "DeepStream ç®¡é“å·²åœæ­¢" << std::endl;
+    std::cout << "DeepStream ¹ÜµÀÒÑÍ£Ö¹" << std::endl;
 }
 
 bool DeepStreamManager::switchDualMode(DualCameraMode mode) {
     if (config_.dual_mode == mode) {
-        std::cout << "å·²æ˜¯å½“å‰æ¨¡å¼ï¼Œæ— éœ€åˆ‡æ¢" << std::endl;
+        std::cout << "ÒÑÊÇµ±Ç°Ä£Ê½£¬ÎŞĞèÇĞ»»" << std::endl;
         return true;
     }
     
-    std::cout << "åˆ‡æ¢åŒæ‘„æ¨¡å¼: " << static_cast<int>(config_.dual_mode) 
+    std::cout << "ÇĞ»»Ë«ÉãÄ£Ê½: " << static_cast<int>(config_.dual_mode) 
               << " -> " << static_cast<int>(mode) << std::endl;
     
-    // åœæ­¢å½“å‰ç®¡é“
+    // Í£Ö¹µ±Ç°¹ÜµÀ
     bool was_running = running_;
     if (running_) {
         stop();
         cleanup();
     }
     
-    // æ›´æ–°é…ç½®
+    // ¸üĞÂÅäÖÃ
     config_.dual_mode = mode;
     
-    // é‡æ–°è®¡ç®—å¸ƒå±€
+    // ÖØĞÂ¼ÆËã²¼¾Ö
     video_layout_ = calculateVideoLayout(config_);
     
-    // å¦‚æœä¹‹å‰åœ¨è¿è¡Œï¼Œé‡æ–°å¯åŠ¨
+    // Èç¹ûÖ®Ç°ÔÚÔËĞĞ£¬ÖØĞÂÆô¶¯
     if (was_running) {
         return start();
     }
@@ -853,13 +853,13 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
     config_.screen_width = screen_width;
     config_.screen_height = screen_height;
     
-    // é‡æ–°è®¡ç®—å¸ƒå±€
+    // ÖØĞÂ¼ÆËã²¼¾Ö
     video_layout_ = calculateVideoLayout(config_);
     
-    std::cout << "å¸ƒå±€å·²æ›´æ–°: " << video_layout_.width << "x" << video_layout_.height 
+    std::cout << "²¼¾ÖÒÑ¸üĞÂ: " << video_layout_.width << "x" << video_layout_.height 
               << " at (" << video_layout_.offset_x << ", " << video_layout_.offset_y << ")" << std::endl;
     
-    // å¦‚æœæ­£åœ¨è¿è¡Œï¼Œéœ€è¦é‡å¯ç®¡é“ä»¥åº”ç”¨æ–°å¸ƒå±€
+    // Èç¹ûÕıÔÚÔËĞĞ£¬ĞèÒªÖØÆô¹ÜµÀÒÔÓ¦ÓÃĞÂ²¼¾Ö
     if (running_) {
         stop();
         return start();
@@ -870,29 +870,29 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
 
 bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
     const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
-    std::cout << "åˆ‡æ¢sinkæ¨¡å¼: " << mode_names[static_cast<int>(config_.sink_mode)]
+    std::cout << "ÇĞ»»sinkÄ£Ê½: " << mode_names[static_cast<int>(config_.sink_mode)]
               << " -> " << mode_names[static_cast<int>(sink_mode)] << std::endl;
     
-    // åœæ­¢å½“å‰ç®¡é“
+    // Í£Ö¹µ±Ç°¹ÜµÀ
     bool was_running = running_;
     if (running_) {
         stop();
         cleanup();
     }
     
-    // æ›´æ–°sinkæ¨¡å¼
+    // ¸üĞÂsinkÄ£Ê½
     config_.sink_mode = sink_mode;
     
-    // å¦‚æœåˆ‡æ¢åˆ°nvdrmvideosinkï¼Œè®¾ç½®å åŠ å¹³é¢
+    // Èç¹ûÇĞ»»µ½nvdrmvideosink£¬ÉèÖÃµş¼ÓÆ½Ãæ
     if (sink_mode == VideoSinkMode::NVDRMVIDEOSINK) {
         if (!setupDRMOverlayPlane()) {
-            std::cerr << "DRMå åŠ å¹³é¢è®¾ç½®å¤±è´¥ï¼Œæ— æ³•åˆ‡æ¢åˆ°nvdrmvideosinkæ¨¡å¼ï¼Œå›é€€åˆ°appsink" << std::endl;
-            config_.sink_mode = VideoSinkMode::APPSINK;  // å›é€€åˆ°appsink
+            std::cerr << "DRMµş¼ÓÆ½ÃæÉèÖÃÊ§°Ü£¬ÎŞ·¨ÇĞ»»µ½nvdrmvideosinkÄ£Ê½£¬»ØÍËµ½appsink" << std::endl;
+            config_.sink_mode = VideoSinkMode::APPSINK;  // »ØÍËµ½appsink
             return false;
         }
     }
     
-    // å¦‚æœä¹‹å‰åœ¨è¿è¡Œï¼Œé‡æ–°å¯åŠ¨
+    // Èç¹ûÖ®Ç°ÔÚÔËĞĞ£¬ÖØĞÂÆô¶¯
     if (was_running) {
         return start();
     }
@@ -902,7 +902,7 @@ bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
 
 bool DeepStreamManager::configureDRMOverlay(const DRMOverlayConfig& overlay_config) {
     config_.overlay = overlay_config;
-    std::cout << "é…ç½®DRMå åŠ å¹³é¢: plane_id=" << overlay_config.plane_id 
+    std::cout << "ÅäÖÃDRMµş¼ÓÆ½Ãæ: plane_id=" << overlay_config.plane_id 
               << ", z_order=" << overlay_config.z_order << std::endl;
     return true;
 }
@@ -910,85 +910,85 @@ bool DeepStreamManager::configureDRMOverlay(const DRMOverlayConfig& overlay_conf
 DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
     DRMOverlayConfig config;
     
-    // Waylandæ¶æ„ä¸‹ä¸å†éœ€è¦DRMè®¾å¤‡æ£€æµ‹
-    std::cout << "?? Waylandæ¶æ„ï¼šè·³è¿‡DRMè®¾å¤‡æ£€æµ‹ï¼Œä½¿ç”¨waylandsinkç¡¬ä»¶æ¸²æŸ“" << std::endl;
+    // Wayland¼Ü¹¹ÏÂ²»ÔÙĞèÒªDRMÉè±¸¼ì²â
+    std::cout << "?? Wayland¼Ü¹¹£ºÌø¹ıDRMÉè±¸¼ì²â£¬Ê¹ÓÃwaylandsinkÓ²¼şäÖÈ¾" << std::endl;
     
-    // è¿”å›é»˜è®¤é…ç½®ï¼Œè¡¨ç¤ºä¸æ”¯æŒDRM overlay
-    std::cout << "?? å»ºè®®ä½¿ç”¨waylandsinkæ›¿ä»£nvdrmvideosink" << std::endl;
+    // ·µ»ØÄ¬ÈÏÅäÖÃ£¬±íÊ¾²»Ö§³ÖDRM overlay
+    std::cout << "?? ½¨ÒéÊ¹ÓÃwaylandsinkÌæ´únvdrmvideosink" << std::endl;
     return config;
     
-    // Waylandæ¶æ„ä¸‹ä¸å†è¿›è¡ŒDRM planeæ£€æµ‹
-    std::cout << "?? Waylandæ¶æ„ï¼šè·³è¿‡DRM planeæ£€æµ‹å’Œèµ„æºç®¡ç†" << std::endl;
-    std::cout << "?? å»ºè®®ä½¿ç”¨waylandsinkè¿›è¡Œè§†é¢‘æ˜¾ç¤º" << std::endl;
+    // Wayland¼Ü¹¹ÏÂ²»ÔÙ½øĞĞDRM plane¼ì²â
+    std::cout << "?? Wayland¼Ü¹¹£ºÌø¹ıDRM plane¼ì²âºÍ×ÊÔ´¹ÜÀí" << std::endl;
+    std::cout << "?? ½¨ÒéÊ¹ÓÃwaylandsink½øĞĞÊÓÆµÏÔÊ¾" << std::endl;
     
     return config;
 }
 
 bool DeepStreamManager::setupDRMOverlayPlane() {
-    std::lock_guard<std::mutex> lock(drm_mutex_);  // ?? çº¿ç¨‹å®‰å…¨ä¿æŠ¤
+    std::lock_guard<std::mutex> lock(drm_mutex_);  // ?? Ïß³Ì°²È«±£»¤
     
-    std::cout << "?? è®¾ç½®DRMå åŠ å¹³é¢..." << std::endl;
+    std::cout << "?? ÉèÖÃDRMµş¼ÓÆ½Ãæ..." << std::endl;
     
     try {
-        // å¦‚æœæœªé…ç½®å åŠ å¹³é¢ï¼Œè‡ªåŠ¨æ£€æµ‹
+        // Èç¹ûÎ´ÅäÖÃµş¼ÓÆ½Ãæ£¬×Ô¶¯¼ì²â
         if (config_.overlay.plane_id == -1) {
-            std::cout << "?? æ‰§è¡Œæ™ºèƒ½overlay planeæ£€æµ‹..." << std::endl;
+            std::cout << "?? Ö´ĞĞÖÇÄÜoverlay plane¼ì²â..." << std::endl;
             config_.overlay = detectAvailableOverlayPlane();
             if (config_.overlay.plane_id == -1) {
-                std::cerr << "? æœªæ‰¾åˆ°å¯ç”¨çš„DRMå åŠ å¹³é¢" << std::endl;
+                std::cerr << "? Î´ÕÒµ½¿ÉÓÃµÄDRMµş¼ÓÆ½Ãæ" << std::endl;
                 return false;
             }
         }
         
-        // ?? æ–°å¢ï¼šéªŒè¯plane-idæœ‰æ•ˆæ€§
+        // ?? ĞÂÔö£ºÑéÖ¤plane-idÓĞĞ§ĞÔ
         if (config_.overlay.plane_id <= 0) {
-            std::cerr << "? æ— æ•ˆçš„plane_id: " << config_.overlay.plane_id << std::endl;
+            std::cerr << "? ÎŞĞ§µÄplane_id: " << config_.overlay.plane_id << std::endl;
             return false;
         }
         
-        std::cout << "? DRMå åŠ å¹³é¢è®¾ç½®å®Œæˆ: plane_id=" << config_.overlay.plane_id
+        std::cout << "? DRMµş¼ÓÆ½ÃæÉèÖÃÍê³É: plane_id=" << config_.overlay.plane_id
                   << ", crtc_id=" << config_.overlay.crtc_id
                   << ", connector_id=" << config_.overlay.connector_id
                   << ", z_order=" << config_.overlay.z_order << std::endl;
         
-        // ?? æ–°å¢ï¼šéªŒè¯å¤šå±‚æ˜¾ç¤ºé…ç½®
+        // ?? ĞÂÔö£ºÑéÖ¤¶à²ãÏÔÊ¾ÅäÖÃ
         if (!verifyMultiLayerDisplaySetup()) {
-            std::cout << "??  å¤šå±‚æ˜¾ç¤ºéªŒè¯å¤±è´¥ï¼Œä½†ç»§ç»­å°è¯•..." << std::endl;
+            std::cout << "??  ¶à²ãÏÔÊ¾ÑéÖ¤Ê§°Ü£¬µ«¼ÌĞø³¢ÊÔ..." << std::endl;
         }
         
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "? DRMå åŠ å¹³é¢è®¾ç½®å¼‚å¸¸: " << e.what() << std::endl;
+        std::cerr << "? DRMµş¼ÓÆ½ÃæÉèÖÃÒì³£: " << e.what() << std::endl;
         return false;
     }
 }
 
-// ?? æ–°å¢ï¼šéªŒè¯å¤šå±‚æ˜¾ç¤ºè®¾ç½®çš„å‡½æ•°ï¼ˆWaylandæ¶æ„ï¼‰
+// ?? ĞÂÔö£ºÑéÖ¤¶à²ãÏÔÊ¾ÉèÖÃµÄº¯Êı£¨Wayland¼Ü¹¹£©
 bool DeepStreamManager::verifyMultiLayerDisplaySetup() {
-    std::cout << "?? Waylandæ¶æ„ï¼šè·³è¿‡å¤šå±‚æ˜¾ç¤ºéªŒè¯" << std::endl;
-    std::cout << "? Waylandåˆæˆå™¨è‡ªåŠ¨å¤„ç†å¤šå±‚æ˜¾ç¤ºç®¡ç†" << std::endl;
+    std::cout << "?? Wayland¼Ü¹¹£ºÌø¹ı¶à²ãÏÔÊ¾ÑéÖ¤" << std::endl;
+    std::cout << "? WaylandºÏ³ÉÆ÷×Ô¶¯´¦Àí¶à²ãÏÔÊ¾¹ÜÀí" << std::endl;
     
-    // åœ¨Waylandæ¶æ„ä¸‹ï¼Œåˆæˆå™¨è´Ÿè´£æ‰€æœ‰çª—å£å±‚æ¬¡ç®¡ç†
-    // LVGLä½œä¸ºWaylandå®¢æˆ·ç«¯ï¼ŒDeepStreamä½¿ç”¨waylandsink
-    // ä¸éœ€è¦æ‰‹åŠ¨ç®¡ç†DRM plane
+    // ÔÚWayland¼Ü¹¹ÏÂ£¬ºÏ³ÉÆ÷¸ºÔğËùÓĞ´°¿Ú²ã´Î¹ÜÀí
+    // LVGL×÷ÎªWayland¿Í»§¶Ë£¬DeepStreamÊ¹ÓÃwaylandsink
+    // ²»ĞèÒªÊÖ¶¯¹ÜÀíDRM plane
     
-    return true;  // Waylandæ¶æ„ä¸‹æ€»æ˜¯è¿”å›æˆåŠŸ
+    return true;  // Wayland¼Ü¹¹ÏÂ×ÜÊÇ·µ»Ø³É¹¦
 }
 
 VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& config) {
     VideoLayout layout;
     
-    // è®¡ç®—å¯ç”¨åŒºåŸŸï¼ˆå‡å»é¡¶éƒ¨å’Œåº•éƒ¨æ ï¼‰
+    // ¼ÆËã¿ÉÓÃÇøÓò£¨¼õÈ¥¶¥²¿ºÍµ×²¿À¸£©
     layout.available_width = config.screen_width;
     layout.available_height = config.screen_height - config.header_height - config.footer_height;
     
-    // è®¡ç®—è§†é¢‘åŒºåŸŸå°ºå¯¸ï¼ˆæŒ‰æ¯”ä¾‹ï¼‰
+    // ¼ÆËãÊÓÆµÇøÓò³ß´ç£¨°´±ÈÀı£©
     layout.width = static_cast<int>(layout.available_width * config.video_width_ratio);
     layout.height = static_cast<int>(layout.available_height * config.video_height_ratio);
     
-    // è®¡ç®—åç§»é‡ï¼ˆå±…å·¦ä¸Šï¼Œä½†è€ƒè™‘é¡¶éƒ¨æ ï¼‰
-    layout.offset_x = 0;  // å·¦å¯¹é½
-    layout.offset_y = config.header_height;  // é¡¶éƒ¨æ ä¸‹æ–¹
+    // ¼ÆËãÆ«ÒÆÁ¿£¨¾Ó×óÉÏ£¬µ«¿¼ÂÇ¶¥²¿À¸£©
+    layout.offset_x = 0;  // ×ó¶ÔÆë
+    layout.offset_y = config.header_height;  // ¶¥²¿À¸ÏÂ·½
     
     return layout;
 }
@@ -1037,8 +1037,8 @@ std::string DeepStreamManager::buildSplitScreenPipeline(
         case VideoSinkMode::WAYLANDSINK:
             return buildWaylandSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::KMSSINK:
-            // Waylandæ¶æ„ä¸‹ä¸å†æ”¯æŒKMSSinkï¼Œé™çº§åˆ°AppSink
-            std::cout << "?? [DeepStream] Waylandæ¶æ„ä¸‹é™çº§åˆ°AppSinkè½¯ä»¶åˆæˆ" << std::endl;
+            // Wayland¼Ü¹¹ÏÂ²»ÔÙÖ§³ÖKMSSink£¬½µ¼¶µ½AppSink
+            std::cout << "?? [DeepStream] Wayland¼Ü¹¹ÏÂ½µ¼¶µ½AppSinkÈí¼şºÏ³É" << std::endl;
             return buildAppSinkPipeline(config, offset_x, offset_y, width, height);
         case VideoSinkMode::APPSINK:
         default:
@@ -1055,25 +1055,25 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // Waylandæ¶æ„ä¸‹ä¸å†éœ€è¦Xvfb
-    std::cout << "?? Waylandæ¶æ„ä¸‹ç›´æ¥ä½¿ç”¨nvarguscamerasrc..." << std::endl;
+    // Wayland¼Ü¹¹ÏÂ²»ÔÙĞèÒªXvfb
+    std::cout << "?? Wayland¼Ü¹¹ÏÂÖ±½ÓÊ¹ÓÃnvarguscamerasrc..." << std::endl;
     
-    // ?? å…³é”®ä¿®å¤ï¼šä½¿ç”¨BGRAæ ¼å¼ï¼Œè¿™æ˜¯AR24åœ¨DRMä¸­çš„å®é™…å¯¹åº”æ ¼å¼
+    // ?? ¹Ø¼üĞŞ¸´£ºÊ¹ÓÃBGRA¸ñÊ½£¬ÕâÊÇAR24ÔÚDRMÖĞµÄÊµ¼Ê¶ÔÓ¦¸ñÊ½
     pipeline << buildCameraSource(config) << " ! "
-             << "nvvidconv ! "  // NVMM -> RGBAæ ¼å¼è½¬æ¢å’Œç¼©æ”¾ï¼ˆç¡¬ä»¶åŠ é€Ÿï¼‰
+             << "nvvidconv ! "  // NVMM -> RGBA¸ñÊ½×ª»»ºÍËõ·Å£¨Ó²¼ş¼ÓËÙ£©
              << "video/x-raw(memory:NVMM),format=RGBA,width=" << width << ",height=" << height << " ! "
-             << "nvvidconv ! "     // NVMM -> æ ‡å‡†å†…å­˜è½¬æ¢
+             << "nvvidconv ! "     // NVMM -> ±ê×¼ÄÚ´æ×ª»»
              << "video/x-raw,format=RGBA,width=" << width << ",height=" << height << " ! "
-             << "videoconvert ! "  // RGBA -> BGRAæ ¼å¼è½¬æ¢ï¼ˆAR24å¯¹åº”BGRAï¼‰
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "  // ä½¿ç”¨AR24/BGRAæ ¼å¼
+             << "videoconvert ! "  // RGBA -> BGRA¸ñÊ½×ª»»£¨AR24¶ÔÓ¦BGRA£©
+             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "  // Ê¹ÓÃAR24/BGRA¸ñÊ½
              << "kmssink "
-             << "driver-name=nvidia-drm "     // ä½¿ç”¨ nvidia-drm é©±åŠ¨
-             << "plane-id=44 "                // ç”¨æˆ·æŒ‡å®šçš„overlay planeï¼Œæ”¯æŒAR24
-             << "connector-id=-1 "            // è‡ªåŠ¨æ£€æµ‹è¿æ¥å™¨
-             << "can-scale=true "             // å¯ç”¨ç¼©æ”¾æ”¯æŒ
-             << "force-modesetting=false "    // ä¸æ”¹å˜æ˜¾ç¤ºæ¨¡å¼
-             << "sync=false "                 // é™ä½å»¶è¿Ÿ
-             << "restore-crtc=false";         // ä¸æ¢å¤CRTC
+             << "driver-name=nvidia-drm "     // Ê¹ÓÃ nvidia-drm Çı¶¯
+             << "plane-id=44 "                // ÓÃ»§Ö¸¶¨µÄoverlay plane£¬Ö§³ÖAR24
+             << "connector-id=-1 "            // ×Ô¶¯¼ì²âÁ¬½ÓÆ÷
+             << "can-scale=true "             // ÆôÓÃËõ·ÅÖ§³Ö
+             << "force-modesetting=false "    // ²»¸Ä±äÏÔÊ¾Ä£Ê½
+             << "sync=false "                 // ½µµÍÑÓ³Ù
+             << "restore-crtc=false";         // ²»»Ö¸´CRTC
     
     return pipeline.str();
 }
@@ -1088,21 +1088,21 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // æ‘„åƒå¤´æº
+    // ÉãÏñÍ·Ô´
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
              << "! video/x-raw(memory:NVMM)"
              << ",width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1 ";
     
-    // æ ¼å¼è½¬æ¢å’Œç¼©æ”¾
+    // ¸ñÊ½×ª»»ºÍËõ·Å
     pipeline << "! nvvidconv "
              << "! video/x-raw,format=BGRx"
              << ",width=" << width
              << ",height=" << height << " ";
     
-    // ?? å…³é”®ï¼šwaylandsink ä¸è®¾ç½® display å‚æ•°
-    // waylandsink ä¼šåœ¨å¯åŠ¨æ—¶é€šè¿‡ g_object_set ç»‘å®šåˆ°æˆ‘ä»¬çš„ subsurface
+    // ?? ¹Ø¼ü£ºwaylandsink ²»ÉèÖÃ display ²ÎÊı
+    // waylandsink »áÔÚÆô¶¯Ê±Í¨¹ı g_object_set °ó¶¨µ½ÎÒÃÇµÄ subsurface
     pipeline << "! waylandsink name=video_sink "
              << "sync=false "
              << "async=true ";
@@ -1113,18 +1113,18 @@ std::string DeepStreamManager::buildWaylandSinkPipeline(
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
     
-    // åŒæ‘„ç«‹ä½“è§†è§‰ - ä½¿ç”¨ nvstreammux åˆå¹¶ä¸¤è·¯æµ
+    // Ë«ÉãÁ¢ÌåÊÓ¾õ - Ê¹ÓÃ nvstreammux ºÏ²¢Á½Â·Á÷
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "m.sink_0 "  // è¿æ¥åˆ° mux çš„ç¬¬ä¸€ä¸ªè¾“å…¥
+             << "m.sink_0 "  // Á¬½Óµ½ mux µÄµÚÒ»¸öÊäÈë
              
              << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "m.sink_1 "  // è¿æ¥åˆ° mux çš„ç¬¬äºŒä¸ªè¾“å…¥
+             << "m.sink_1 "  // Á¬½Óµ½ mux µÄµÚ¶ş¸öÊäÈë
              
              << "nvstreammux name=m batch-size=1 width=" << config.camera_width
              << " height=" << config.camera_height << " ! "
@@ -1180,9 +1180,9 @@ gboolean DeepStreamManager::busCallback(GstBus* bus, GstMessage* msg, gpointer d
             GError *err;
             gchar *debug;
             gst_message_parse_error(msg, &err, &debug);
-            std::cerr << "DeepStream é”™è¯¯: " << err->message << std::endl;
+            std::cerr << "DeepStream ´íÎó: " << err->message << std::endl;
             if (debug) {
-                std::cerr << "è°ƒè¯•ä¿¡æ¯: " << debug << std::endl;
+                std::cerr << "µ÷ÊÔĞÅÏ¢: " << debug << std::endl;
                 g_free(debug);
             }
             g_error_free(err);
@@ -1192,22 +1192,22 @@ gboolean DeepStreamManager::busCallback(GstBus* bus, GstMessage* msg, gpointer d
             GError *err;
             gchar *debug;
             gst_message_parse_warning(msg, &err, &debug);
-            std::cout << "DeepStream è­¦å‘Š: " << err->message << std::endl;
+            std::cout << "DeepStream ¾¯¸æ: " << err->message << std::endl;
             if (debug) {
-                std::cout << "è°ƒè¯•ä¿¡æ¯: " << debug << std::endl;
+                std::cout << "µ÷ÊÔĞÅÏ¢: " << debug << std::endl;
                 g_free(debug);
             }
             g_error_free(err);
             break;
         }
         case GST_MESSAGE_EOS:
-            std::cout << "DeepStream æµç»“æŸ" << std::endl;
+            std::cout << "DeepStream Á÷½áÊø" << std::endl;
             break;
         case GST_MESSAGE_STATE_CHANGED: {
             if (GST_MESSAGE_SRC(msg) == GST_OBJECT(manager->pipeline_)) {
                 GstState old_state, new_state;
                 gst_message_parse_state_changed(msg, &old_state, &new_state, nullptr);
-                std::cout << "DeepStream çŠ¶æ€å˜æ›´: " 
+                std::cout << "DeepStream ×´Ì¬±ä¸ü: " 
                           << gst_element_state_get_name(old_state) << " -> " 
                           << gst_element_state_get_name(new_state) << std::endl;
             }
@@ -1221,31 +1221,31 @@ gboolean DeepStreamManager::busCallback(GstBus* bus, GstMessage* msg, gpointer d
 }
 
 void DeepStreamManager::cleanup() {
-    // ?? å…³é”®ä¿®å¤ï¼šå…ˆå°†ç®¡é“è®¾ç½®ä¸º NULL çŠ¶æ€ï¼Œç¡®ä¿æ‘„åƒå¤´èµ„æºå®Œå…¨é‡Šæ”¾
+    // ?? ¹Ø¼üĞŞ¸´£ºÏÈ½«¹ÜµÀÉèÖÃÎª NULL ×´Ì¬£¬È·±£ÉãÏñÍ·×ÊÔ´ÍêÈ«ÊÍ·Å
     if (pipeline_) {
-        std::cout << "?? [DeepStream] æ­£åœ¨åœæ­¢ç®¡é“å¹¶é‡Šæ”¾æ‘„åƒå¤´èµ„æº..." << std::endl;
+        std::cout << "?? [DeepStream] ÕıÔÚÍ£Ö¹¹ÜµÀ²¢ÊÍ·ÅÉãÏñÍ·×ÊÔ´..." << std::endl;
         
-        // å…ˆè®¾ç½®ä¸º NULL çŠ¶æ€ï¼Œç­‰å¾…èµ„æºé‡Šæ”¾
+        // ÏÈÉèÖÃÎª NULL ×´Ì¬£¬µÈ´ı×ÊÔ´ÊÍ·Å
         GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_NULL);
         if (ret == GST_STATE_CHANGE_ASYNC) {
-            // ç­‰å¾…çŠ¶æ€å˜åŒ–å®Œæˆï¼ˆæœ€å¤š3ç§’ï¼‰
+            // µÈ´ı×´Ì¬±ä»¯Íê³É£¨×î¶à3Ãë£©
             GstState state;
             ret = gst_element_get_state(pipeline_, &state, NULL, 3 * GST_SECOND);
             if (ret == GST_STATE_CHANGE_FAILURE) {
-                std::cerr << "?? [DeepStream] ç®¡é“åœæ­¢å¤±è´¥ï¼Œä½†ç»§ç»­æ¸…ç†" << std::endl;
+                std::cerr << "?? [DeepStream] ¹ÜµÀÍ£Ö¹Ê§°Ü£¬µ«¼ÌĞøÇåÀí" << std::endl;
             } else {
-                std::cout << "? [DeepStream] ç®¡é“å·²åœæ­¢è‡³ NULL çŠ¶æ€" << std::endl;
+                std::cout << "? [DeepStream] ¹ÜµÀÒÑÍ£Ö¹ÖÁ NULL ×´Ì¬" << std::endl;
             }
         }
         
-        // é¢å¤–ç­‰å¾…ï¼Œç¡®ä¿ nvarguscamerasrc å®Œå…¨é‡Šæ”¾æ‘„åƒå¤´
+        // ¶îÍâµÈ´ı£¬È·±£ nvarguscamerasrc ÍêÈ«ÊÍ·ÅÉãÏñÍ·
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     
     if (pipeline2_) {
-        std::cout << "?? [DeepStream] æ­£åœ¨åœæ­¢ç®¡é“2..." << std::endl;
+        std::cout << "?? [DeepStream] ÕıÔÚÍ£Ö¹¹ÜµÀ2..." << std::endl;
         gst_element_set_state(pipeline2_, GST_STATE_NULL);
-        // ç­‰å¾…ä¸€å°æ®µæ—¶é—´ç¡®ä¿èµ„æºé‡Šæ”¾
+        // µÈ´ıÒ»Ğ¡¶ÎÊ±¼äÈ·±£×ÊÔ´ÊÍ·Å
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
     
@@ -1272,7 +1272,7 @@ void DeepStreamManager::cleanup() {
     if (pipeline_) {
         gst_object_unref(pipeline_);
         pipeline_ = nullptr;
-        std::cout << "? [DeepStream] ç®¡é“å·²é‡Šæ”¾" << std::endl;
+        std::cout << "? [DeepStream] ¹ÜµÀÒÑÊÍ·Å" << std::endl;
     }
     
     if (pipeline2_) {
@@ -1280,38 +1280,38 @@ void DeepStreamManager::cleanup() {
         pipeline2_ = nullptr;
     }
     
-    // ?? ä¿®å¤ï¼šä¸åœ¨ cleanup() ä¸­é”€æ¯ subsurface
-    // subsurface çš„ç”Ÿå‘½å‘¨æœŸç”±çˆ¶çª—å£ç®¡ç†ï¼Œé‡è¯•æ—¶éœ€è¦ä¿ç•™
-    // åªæœ‰åœ¨å®Œå…¨åœæ­¢æ—¶æ‰é”€æ¯
-    // æ³¨æ„ï¼šæ¸…ç†åŠ¨ä½œå·²ç§»è‡³ cleanupSubsurface()
+    // ?? ĞŞ¸´£º²»ÔÚ cleanup() ÖĞÏú»Ù subsurface
+    // subsurface µÄÉúÃüÖÜÆÚÓÉ¸¸´°¿Ú¹ÜÀí£¬ÖØÊÔÊ±ĞèÒª±£Áô
+    // Ö»ÓĞÔÚÍêÈ«Í£Ö¹Ê±²ÅÏú»Ù
+    // ×¢Òâ£ºÇåÀí¶¯×÷ÒÑÒÆÖÁ cleanupSubsurface()
 }
 
-// ?? æ–°å¢ï¼šä¸“é—¨æ¸…ç† subsurface èµ„æºï¼ˆä»…åœ¨å®Œå…¨åœæ­¢æ—¶è°ƒç”¨ï¼‰
+// ?? ĞÂÔö£º×¨ÃÅÇåÀí subsurface ×ÊÔ´£¨½öÔÚÍêÈ«Í£Ö¹Ê±µ÷ÓÃ£©
 void DeepStreamManager::cleanupSubsurface() {
     if (video_subsurface_) {
         auto* wl_subsurface = static_cast<struct wl_subsurface*>(video_subsurface_);
         wl_subsurface_destroy(wl_subsurface);
         video_subsurface_ = nullptr;
-        std::cout << "? [DeepStream] å·²æ¸…ç†video_subsurface_" << std::endl;
+        std::cout << "? [DeepStream] ÒÑÇåÀívideo_subsurface_" << std::endl;
     }
     
     if (video_surface_) {
         auto* wl_surface = static_cast<struct wl_surface*>(video_surface_);
         wl_surface_destroy(wl_surface);
         video_surface_ = nullptr;
-        std::cout << "? [DeepStream] å·²æ¸…ç†video_surface_" << std::endl;
+        std::cout << "? [DeepStream] ÒÑÇåÀívideo_surface_" << std::endl;
     }
 }
 
-// æ–°å¢ï¼šæ„å»ºæ‘„åƒå¤´æºå­—ç¬¦ä¸²
-// ?? ä¿®å¤ï¼šå›åˆ°ä½¿ç”¨nvarguscamerasrcï¼Œå› ä¸ºGBMå…±äº«DRMèµ„æºåä¸å†æœ‰å†²çª
+// ĞÂÔö£º¹¹½¨ÉãÏñÍ·Ô´×Ö·û´®
+// ?? ĞŞ¸´£º»Øµ½Ê¹ÓÃnvarguscamerasrc£¬ÒòÎªGBM¹²ÏíDRM×ÊÔ´ºó²»ÔÙÓĞ³åÍ»
 std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config) {
     std::ostringstream source;
     
     switch (config.camera_source) {
         case CameraSourceMode::NVARGUSCAMERA:
-            // ?? å…³é”®ä¿®å¤ï¼šå›åˆ°ä½¿ç”¨nvarguscamerasrc Argusé©±åŠ¨
-            std::cout << "?? é…ç½®nvarguscamerasrc Argusé©±åŠ¨æ‘„åƒå¤´..." << std::endl;
+            // ?? ¹Ø¼üĞŞ¸´£º»Øµ½Ê¹ÓÃnvarguscamerasrc ArgusÇı¶¯
+            std::cout << "?? ÅäÖÃnvarguscamerasrc ArgusÇı¶¯ÉãÏñÍ·..." << std::endl;
             
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
                    << "! video/x-raw(memory:NVMM)"
@@ -1322,8 +1322,8 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         case CameraSourceMode::V4L2SRC:
-            // ä¿ç•™v4l2srcä½œä¸ºå¤‡ç”¨æ–¹æ¡ˆ
-            std::cout << "?? é…ç½®v4l2srcå¤‡ç”¨æ–¹æ¡ˆ..." << std::endl;
+            // ±£Áôv4l2src×÷Îª±¸ÓÃ·½°¸
+            std::cout << "?? ÅäÖÃv4l2src±¸ÓÃ·½°¸..." << std::endl;
             source << "v4l2src device=/dev/video" << config.camera_id << " "
                    << "io-mode=2 "
                    << "! video/x-raw"
@@ -1353,8 +1353,8 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
             break;
             
         default:
-            // é»˜è®¤ä½¿ç”¨nvarguscamerasrc
-            std::cout << "?? ä½¿ç”¨é»˜è®¤nvarguscamerasrcæ–¹æ¡ˆ..." << std::endl;
+            // Ä¬ÈÏÊ¹ÓÃnvarguscamerasrc
+            std::cout << "?? Ê¹ÓÃÄ¬ÈÏnvarguscamerasrc·½°¸..." << std::endl;
             source << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
                    << "! video/x-raw(memory:NVMM)"
                    << ",width=" << config.camera_width
@@ -1367,7 +1367,7 @@ std::string DeepStreamManager::buildCameraSource(const DeepStreamConfig& config)
     return source.str();
 }
 
-// æ–°å¢ï¼šæ„å»ºKMSSinkç®¡é“ - ä½¿ç”¨GBMå…±äº«DRMèµ„æºçš„åˆ†å±‚æ˜¾ç¤º
+// ĞÂÔö£º¹¹½¨KMSSink¹ÜµÀ - Ê¹ÓÃGBM¹²ÏíDRM×ÊÔ´µÄ·Ö²ãÏÔÊ¾
 std::string DeepStreamManager::buildKMSSinkPipeline(
     const DeepStreamConfig& config,
     int offset_x,
@@ -1377,54 +1377,54 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // Waylandæ¶æ„ä¸‹ä¸å†éœ€è¦Xvfb
-    std::cout << "?? Waylandæ¶æ„ä¸‹ç›´æ¥ä½¿ç”¨nvarguscamerasrc..." << std::endl;
+    // Wayland¼Ü¹¹ÏÂ²»ÔÙĞèÒªXvfb
+    std::cout << "?? Wayland¼Ü¹¹ÏÂÖ±½ÓÊ¹ÓÃnvarguscamerasrc..." << std::endl;
     
-    // ?? å…³é”®ä¿®å¤ï¼šä½¿ç”¨nvarguscamerasrc + GBMå…±äº«DRMèµ„æº
-    std::cout << "?? æ„å»ºGBMå…±äº«DRMçš„KMSSinkç®¡é“ (ç¼©æ”¾åˆ° " << width << "x" << height << ")..." << std::endl;
+    // ?? ¹Ø¼üĞŞ¸´£ºÊ¹ÓÃnvarguscamerasrc + GBM¹²ÏíDRM×ÊÔ´
+    std::cout << "?? ¹¹½¨GBM¹²ÏíDRMµÄKMSSink¹ÜµÀ (Ëõ·Åµ½ " << width << "x" << height << ")..." << std::endl;
     
-    // æ„å»ºnvarguscamerasrcæ‘„åƒå¤´æºï¼ˆç°åœ¨å¯ä»¥æ­£å¸¸å·¥ä½œï¼Œå› ä¸ºGBMå…±äº«DRMèµ„æºï¼‰
+    // ¹¹½¨nvarguscamerasrcÉãÏñÍ·Ô´£¨ÏÖÔÚ¿ÉÒÔÕı³£¹¤×÷£¬ÒòÎªGBM¹²ÏíDRM×ÊÔ´£©
     pipeline << buildCameraSource(config) << " ! ";
     
-    // ?? å…³é”®ä¿®å¤ï¼šç›´æ¥ä½¿ç”¨NV12æ ¼å¼ï¼Œè®©GStreamerè‡ªåŠ¨åå•†å†…å­˜ç±»å‹
-    std::cout << "?? ç›´æ¥ä½¿ç”¨NV12æ ¼å¼ï¼Œè®©GStreamerè‡ªåŠ¨åå•†å†…å­˜ç±»å‹å’Œç¼©æ”¾" << std::endl;
+    // ?? ¹Ø¼üĞŞ¸´£ºÖ±½ÓÊ¹ÓÃNV12¸ñÊ½£¬ÈÃGStreamer×Ô¶¯Ğ­ÉÌÄÚ´æÀàĞÍ
+    std::cout << "?? Ö±½ÓÊ¹ÓÃNV12¸ñÊ½£¬ÈÃGStreamer×Ô¶¯Ğ­ÉÌÄÚ´æÀàĞÍºÍËõ·Å" << std::endl;
     
-    // è®©GStreamerè‡ªåŠ¨åå•†ä»NVMMåˆ°æ ‡å‡†å†…å­˜çš„è½¬æ¢ï¼Œä¿æŒNV12æ ¼å¼
-    pipeline << "nvvidconv ! "  // NVMMåˆ°æ ‡å‡†å†…å­˜è½¬æ¢ï¼Œä¿æŒNV12æ ¼å¼
+    // ÈÃGStreamer×Ô¶¯Ğ­ÉÌ´ÓNVMMµ½±ê×¼ÄÚ´æµÄ×ª»»£¬±£³ÖNV12¸ñÊ½
+    pipeline << "nvvidconv ! "  // NVMMµ½±ê×¼ÄÚ´æ×ª»»£¬±£³ÖNV12¸ñÊ½
              << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
              << "queue "
-             << "max-size-buffers=4 "      // é€‚ä¸­çš„ç¼“å†²åŒºæ·±åº¦
+             << "max-size-buffers=4 "      // ÊÊÖĞµÄ»º³åÇøÉî¶È
              << "max-size-time=0 "
              << "leaky=downstream "
              << "! ";
     
-    // ?? å…³é”®ä¿®å¤ï¼šä½¿ç”¨GBMåç«¯æä¾›çš„overlay planeï¼Œå®ç°çœŸæ­£çš„åˆ†å±‚æ˜¾ç¤º
+    // ?? ¹Ø¼üĞŞ¸´£ºÊ¹ÓÃGBMºó¶ËÌá¹©µÄoverlay plane£¬ÊµÏÖÕæÕıµÄ·Ö²ãÏÔÊ¾
     if (config_.overlay.plane_id > 0) {
-        std::cout << "?? ä½¿ç”¨GBMå…±äº«çš„overlay plane: " << config_.overlay.plane_id << std::endl;
+        std::cout << "?? Ê¹ÓÃGBM¹²ÏíµÄoverlay plane: " << config_.overlay.plane_id << std::endl;
         pipeline << "kmssink "
-                 << "plane-id=" << config_.overlay.plane_id << " "     // ä½¿ç”¨GBMåˆ†é…çš„overlay plane
-                 << "connector-id=" << config_.overlay.connector_id << " " // ä½¿ç”¨GBMå…±äº«çš„connector
-                 << "force-modesetting=false " // ä¸æ”¹å˜æ˜¾ç¤ºæ¨¡å¼ï¼ŒLVGLå·²é€šè¿‡GBMè®¾ç½®
-                 << "can-scale=true "          // å¯ç”¨ç¡¬ä»¶ç¼©æ”¾
-                 << "sync=false "              // ä½å»¶è¿Ÿæ¨¡å¼
-                 << "restore-crtc=false";      // ä¸æ¢å¤CRTCï¼Œä¿æŒGBMç®¡ç†
+                 << "plane-id=" << config_.overlay.plane_id << " "     // Ê¹ÓÃGBM·ÖÅäµÄoverlay plane
+                 << "connector-id=" << config_.overlay.connector_id << " " // Ê¹ÓÃGBM¹²ÏíµÄconnector
+                 << "force-modesetting=false " // ²»¸Ä±äÏÔÊ¾Ä£Ê½£¬LVGLÒÑÍ¨¹ıGBMÉèÖÃ
+                 << "can-scale=true "          // ÆôÓÃÓ²¼şËõ·Å
+                 << "sync=false "              // µÍÑÓ³ÙÄ£Ê½
+                 << "restore-crtc=false";      // ²»»Ö¸´CRTC£¬±£³ÖGBM¹ÜÀí
     } else {
-        std::cout << "??  GBMåç«¯æœªæä¾›overlay planeï¼Œä½¿ç”¨ç”¨æˆ·æŒ‡å®šçš„plane-id=44" << std::endl;
-        // ?? ä¿®å¤ï¼šç›´æ¥ä½¿ç”¨ç”¨æˆ·æŒ‡å®šçš„overlay plane-id=44ï¼Œæ”¯æŒAR24/ABGRæ ¼å¼
+        std::cout << "??  GBMºó¶ËÎ´Ìá¹©overlay plane£¬Ê¹ÓÃÓÃ»§Ö¸¶¨µÄplane-id=44" << std::endl;
+        // ?? ĞŞ¸´£ºÖ±½ÓÊ¹ÓÃÓÃ»§Ö¸¶¨µÄoverlay plane-id=44£¬Ö§³ÖAR24/ABGR¸ñÊ½
         pipeline << "kmssink "
-                 << "plane-id=44 "             // ç”¨æˆ·æŒ‡å®šçš„overlay planeï¼Œæ”¯æŒAR24/ABGR
-                 << "connector-id=-1 "         // è‡ªåŠ¨æ£€æµ‹è¿æ¥å™¨
-                 << "force-modesetting=false " // ä¸å¼ºåˆ¶è®¾ç½®æ¨¡å¼
-                 << "can-scale=true "          // å¯ç”¨ç¡¬ä»¶ç¼©æ”¾
-                 << "sync=false "              // ä½å»¶è¿Ÿæ¨¡å¼
-                 << "restore-crtc=false";      // ä¸æ¢å¤CRTCï¼Œä¿æŒGBMç®¡ç†
+                 << "plane-id=44 "             // ÓÃ»§Ö¸¶¨µÄoverlay plane£¬Ö§³ÖAR24/ABGR
+                 << "connector-id=-1 "         // ×Ô¶¯¼ì²âÁ¬½ÓÆ÷
+                 << "force-modesetting=false " // ²»Ç¿ÖÆÉèÖÃÄ£Ê½
+                 << "can-scale=true "          // ÆôÓÃÓ²¼şËõ·Å
+                 << "sync=false "              // µÍÑÓ³ÙÄ£Ê½
+                 << "restore-crtc=false";      // ²»»Ö¸´CRTC£¬±£³ÖGBM¹ÜÀí
     }
     
-    std::cout << "?? æ„å»ºGBMå…±äº«DRMçš„KMSSinkç®¡é“: " << pipeline.str() << std::endl;
+    std::cout << "?? ¹¹½¨GBM¹²ÏíDRMµÄKMSSink¹ÜµÀ: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
-// æ–°å¢ï¼šæ„å»ºAppSinkè½¯ä»¶åˆæˆç®¡é“ - è§£å†³LVGL CRTCç‹¬å å†²çª
+// ĞÂÔö£º¹¹½¨AppSinkÈí¼şºÏ³É¹ÜµÀ - ½â¾öLVGL CRTC¶ÀÕ¼³åÍ»
 std::string DeepStreamManager::buildAppSinkPipeline(
     const DeepStreamConfig& config,
     int offset_x,
@@ -1434,26 +1434,26 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     
     std::ostringstream pipeline;
     
-    // ?? å…³é”®ä¿®å¤ï¼šä½¿ç”¨æ‘„åƒå¤´åŸç”Ÿåˆ†è¾¨ç‡ç„¶åç¼©æ”¾åˆ°ç›®æ ‡å°ºå¯¸
-    std::cout << "?? æ„å»ºåŸç”Ÿåˆ†è¾¨ç‡AppSinkç®¡é“ (ç¼©æ”¾åˆ° " << width << "x" << height << ")..." << std::endl;
+    // ?? ¹Ø¼üĞŞ¸´£ºÊ¹ÓÃÉãÏñÍ·Ô­Éú·Ö±æÂÊÈ»ºóËõ·Åµ½Ä¿±ê³ß´ç
+    std::cout << "?? ¹¹½¨Ô­Éú·Ö±æÂÊAppSink¹ÜµÀ (Ëõ·Åµ½ " << width << "x" << height << ")..." << std::endl;
     
     if (config.camera_source == CameraSourceMode::NVARGUSCAMERA ||
         config.camera_source == CameraSourceMode::V4L2SRC) {
         
-        // ?? ä¿®å¤ï¼šä½¿ç”¨ä¸¤æ­¥è½¬æ¢ï¼Œå…ˆnvvidconvè½¬åˆ°æ ‡å‡†å†…å­˜ï¼Œå†videoconvertè½¬BGRA
+        // ?? ĞŞ¸´£ºÊ¹ÓÃÁ½²½×ª»»£¬ÏÈnvvidconv×ªµ½±ê×¼ÄÚ´æ£¬ÔÙvideoconvert×ªBGRA
         pipeline << buildCameraSource(config) << " ! "
-                 << "nvvidconv ! "    // NVMM -> æ ‡å‡†å†…å­˜ï¼Œä¿æŒNV12æ ¼å¼
+                 << "nvvidconv ! "    // NVMM -> ±ê×¼ÄÚ´æ£¬±£³ÖNV12¸ñÊ½
                  << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
-                 << "videoconvert ! "  // NV12 -> BGRAæ ¼å¼è½¬æ¢ï¼ˆè½¯ä»¶ï¼‰
+                 << "videoconvert ! "  // NV12 -> BGRA¸ñÊ½×ª»»£¨Èí¼ş£©
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
         
-        std::cout << "?? æ„å»ºåŸç”Ÿåˆ†è¾¨ç‡AppSinkç®¡é“: " << pipeline.str() << std::endl;
+        std::cout << "?? ¹¹½¨Ô­Éú·Ö±æÂÊAppSink¹ÜµÀ: " << pipeline.str() << std::endl;
                  
     } else if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
-        // ? æµ‹è¯•æºç›´æ¥ä½¿ç”¨ç›®æ ‡åˆ†è¾¨ç‡
+        // ? ²âÊÔÔ´Ö±½ÓÊ¹ÓÃÄ¿±ê·Ö±æÂÊ
         pipeline << "videotestsrc pattern=18 is-live=true "
                  << "! video/x-raw,format=BGRA"
                  << ",width=" << width << ",height=" << height
@@ -1461,23 +1461,23 @@ std::string DeepStreamManager::buildAppSinkPipeline(
                  << "! appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=1 drop=false";
     } else {
-        // å…¶ä»–æºï¼ˆæ–‡ä»¶æºç­‰ï¼‰
+        // ÆäËûÔ´£¨ÎÄ¼şÔ´µÈ£©
         pipeline << buildCameraSource(config) << " ! "
-                 << "videoconvert ! "  // ç¡®ä¿æ ¼å¼å…¼å®¹
-                 << "videoscale ! "    // ç¼©æ”¾åˆ°ç›®æ ‡å°ºå¯¸
+                 << "videoconvert ! "  // È·±£¸ñÊ½¼æÈİ
+                 << "videoscale ! "    // Ëõ·Åµ½Ä¿±ê³ß´ç
                  << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
     }
     
-    std::cout << "?? æ„å»ºåŸç”Ÿåˆ†è¾¨ç‡AppSinkç®¡é“: " << pipeline.str() << std::endl;
+    std::cout << "?? ¹¹½¨Ô­Éú·Ö±æÂÊAppSink¹ÜµÀ: " << pipeline.str() << std::endl;
     return pipeline.str();
 }
 
 
 
-// è·å–æœ€æ–°åˆæˆå¸§ï¼ˆä¾›å¤–éƒ¨è®¿é—®ï¼‰
+// »ñÈ¡×îĞÂºÏ³ÉÖ¡£¨¹©Íâ²¿·ÃÎÊ£©
 bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
     std::lock_guard<std::mutex> lock(frame_mutex_);
     
@@ -1489,27 +1489,27 @@ bool DeepStreamManager::getLatestCompositeFrame(cv::Mat& frame) {
     return false;
 }
 
-// ? Canvasæ›´æ–°çº¿ç¨‹å·²ç§»é™¤ - ä½¿ç”¨ Wayland åˆæˆå™¨ GPU åˆæˆ
+// ? Canvas¸üĞÂÏß³ÌÒÑÒÆ³ı - Ê¹ÓÃ Wayland ºÏ³ÉÆ÷ GPU ºÏ³É
 void DeepStreamManager::startCanvasUpdateThread() {
-    // Wayland åˆæˆå™¨è‡ªåŠ¨åœ¨ GPU ä¸­åˆæˆè§†é¢‘å’Œ UIï¼Œä¸éœ€è¦æ‰‹åŠ¨ Canvas æ›´æ–°çº¿ç¨‹
-    std::cout << "?? [DeepStream] Canvasæ›´æ–°çº¿ç¨‹å·²è¢« Wayland Subsurface GPU åˆæˆæ›¿ä»£" << std::endl;
+    // Wayland ºÏ³ÉÆ÷×Ô¶¯ÔÚ GPU ÖĞºÏ³ÉÊÓÆµºÍ UI£¬²»ĞèÒªÊÖ¶¯ Canvas ¸üĞÂÏß³Ì
+    std::cout << "?? [DeepStream] Canvas¸üĞÂÏß³ÌÒÑ±» Wayland Subsurface GPU ºÏ³ÉÌæ´ú" << std::endl;
 }
 
 void DeepStreamManager::stopCanvasUpdateThread() {
-    // Canvasæ›´æ–°çº¿ç¨‹å·²è¢«GPUç¡¬ä»¶åˆæˆæ›¿ä»£
-    std::cout << "?? [DeepStream] åœæ­¢Canvasæ›´æ–°çº¿ç¨‹ï¼ˆGPUåˆæˆæ¨¡å¼ä¸‹ä¸ºç©ºæ“ä½œï¼‰" << std::endl;
+    // Canvas¸üĞÂÏß³ÌÒÑ±»GPUÓ²¼şºÏ³ÉÌæ´ú
+    std::cout << "?? [DeepStream] Í£Ö¹Canvas¸üĞÂÏß³Ì£¨GPUºÏ³ÉÄ£Ê½ÏÂÎª¿Õ²Ù×÷£©" << std::endl;
 }
 
 void DeepStreamManager::canvasUpdateLoop() {
-    std::cout << "Canvasæ›´æ–°å¾ªç¯å¼€å§‹è¿è¡Œ" << std::endl;
+    std::cout << "Canvas¸üĞÂÑ­»·¿ªÊ¼ÔËĞĞ" << std::endl;
     
-    // ?? ä¿®å¤ï¼šåœ¨Canvasæ›´æ–°å¾ªç¯ä¸­å¤„ç†GStreameräº‹ä»¶
+    // ?? ĞŞ¸´£ºÔÚCanvas¸üĞÂÑ­»·ÖĞ´¦ÀíGStreamerÊÂ¼ş
     GMainContext* context = g_main_context_default();
     auto last_update = std::chrono::steady_clock::now();
     const auto target_interval = std::chrono::milliseconds(33); // 30fps
     
     while (canvas_update_running_) {
-        // ?? å…³é”®ä¿®å¤ï¼šå¤„ç†GStreameræ¶ˆæ¯å’Œä¿¡å·
+        // ?? ¹Ø¼üĞŞ¸´£º´¦ÀíGStreamerÏûÏ¢ºÍĞÅºÅ
         if (context && g_main_context_pending(context)) {
             g_main_context_iteration(context, FALSE);
         }
@@ -1526,54 +1526,54 @@ void DeepStreamManager::canvasUpdateLoop() {
                 lv_obj_t* canvas = lvgl_if->getCameraCanvas();
                 
                 if (canvas) {
-                    // Canvaså¯¹è±¡è·å–æˆåŠŸï¼ˆé™é»˜æ¨¡å¼ï¼‰
+                    // Canvas¶ÔÏó»ñÈ¡³É¹¦£¨¾²Ä¬Ä£Ê½£©
                     
-                    // ?? ä¿®å¤1: ç¡®ä¿å¸§æ ¼å¼ç»Ÿä¸€ä¸ºBGRA
+                    // ?? ĞŞ¸´1: È·±£Ö¡¸ñÊ½Í³Ò»ÎªBGRA
                     cv::Mat display_frame;
                     if (latest_frame_.channels() == 4) {
-                        display_frame = latest_frame_.clone();  // å…‹éš†é¿å…å¼•ç”¨é—®é¢˜
+                        display_frame = latest_frame_.clone();  // ¿ËÂ¡±ÜÃâÒıÓÃÎÊÌâ
                     } else if (latest_frame_.channels() == 3) {
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_BGR2BGRA);
                     } else {
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_GRAY2BGRA);
                     }
                     
-                    // ?? ä¿®å¤2: è°ƒæ•´å°ºå¯¸å¹¶ç¡®ä¿æ•°æ®è¿ç»­
+                    // ?? ĞŞ¸´2: µ÷Õû³ß´ç²¢È·±£Êı¾İÁ¬Ğø
                     if (display_frame.cols != 960 || display_frame.rows != 640) {
                         cv::resize(display_frame, display_frame, cv::Size(960, 640), 
                                    0, 0, cv::INTER_LINEAR);
                     }
                     
-                    // ?? ä¿®å¤3: ç¡®ä¿æ•°æ®è¿ç»­æ€§
+                    // ?? ĞŞ¸´3: È·±£Êı¾İÁ¬ĞøĞÔ
                     if (!display_frame.isContinuous()) {
                         display_frame = display_frame.clone();
-                        // å¸§æ•°æ®ä¸è¿ç»­ï¼Œå·²å…‹éš†ï¼ˆé™é»˜æ¨¡å¼ï¼‰
+                        // Ö¡Êı¾İ²»Á¬Ğø£¬ÒÑ¿ËÂ¡£¨¾²Ä¬Ä£Ê½£©
                     }
                     
-                    // éªŒè¯æ•°æ®
+                    // ÑéÖ¤Êı¾İ
                     if (display_frame.channels() != 4 || 
                         display_frame.cols != 960 || 
                         display_frame.rows != 640) {
-                        // å¸§æ ¼å¼ä¸æ­£ç¡®ï¼ˆé™é»˜æ¨¡å¼ï¼‰
+                        // Ö¡¸ñÊ½²»ÕıÈ·£¨¾²Ä¬Ä£Ê½£©
                         continue;
                     }
                     
-                    // è°ƒè¯•ï¼šæ£€æŸ¥æºæ•°æ®
+                    // µ÷ÊÔ£º¼ì²éÔ´Êı¾İ
                     cv::Vec4b src_first = display_frame.at<cv::Vec4b>(0, 0);
                     cv::Vec4b src_center = display_frame.at<cv::Vec4b>(320, 480);
             
-                    // è·å–canvasç¼“å†²åŒº
+                    // »ñÈ¡canvas»º³åÇø
                     lv_img_dsc_t* canvas_dsc = lv_canvas_get_image(canvas);
                     if (canvas_dsc && canvas_dsc->data) {
-                        // Canvasç¼“å†²åŒºè·å–æˆåŠŸï¼ˆé™é»˜æ¨¡å¼ï¼‰
+                        // Canvas»º³åÇø»ñÈ¡³É¹¦£¨¾²Ä¬Ä£Ê½£©
                         
                         uint32_t* canvas_buffer = (uint32_t*)canvas_dsc->data;
                         const uint8_t* src_data = display_frame.data;
                         const size_t pixel_count = 960 * 640;
-                        const int step = display_frame.step[0];  // è¡Œæ­¥é•¿
+                        const int step = display_frame.step[0];  // ĞĞ²½³¤
                         
                         
-                        // ?? ä¿®å¤4: æ­£ç¡®å¤„ç†æ­¥é•¿çš„åƒç´ è½¬æ¢
+                        // ?? ĞŞ¸´4: ÕıÈ·´¦Àí²½³¤µÄÏñËØ×ª»»
                         for (int y = 0; y < 640; y++) {
                             const uint8_t* row_ptr = src_data + y * step;
                             uint32_t* canvas_row = canvas_buffer + y * 960;
@@ -1585,18 +1585,18 @@ void DeepStreamManager::canvasUpdateLoop() {
                                 uint8_t r = pixel[2];
                                 uint8_t a = pixel[3];
                                 
-                                // LVGL ARGB8888: Aåœ¨æœ€é«˜ä½
+                                // LVGL ARGB8888: AÔÚ×î¸ßÎ»
                                 canvas_row[x] = (a << 24) | (r << 16) | (g << 8) | b;
                             }
                         }
                         
                         
-                        // åˆ·æ–°æ˜¾ç¤º
+                        // Ë¢ĞÂÏÔÊ¾
                         lv_obj_invalidate(canvas);
                         lv_refr_now(NULL);
                     }
                 } else {
-                    std::cout << "é”™è¯¯ï¼šCanvaså¯¹è±¡è·å–å¤±è´¥" << std::endl;
+                    std::cout << "´íÎó£ºCanvas¶ÔÏó»ñÈ¡Ê§°Ü" << std::endl;
                 }
                 #endif
                 
@@ -1604,7 +1604,7 @@ void DeepStreamManager::canvasUpdateLoop() {
             }
         }
         
-        // å¸§ç‡æ§åˆ¶
+        // Ö¡ÂÊ¿ØÖÆ
         auto processing_time = std::chrono::steady_clock::now() - current_time;
         auto sleep_time = target_interval - processing_time;
         
@@ -1613,67 +1613,67 @@ void DeepStreamManager::canvasUpdateLoop() {
         }
     }
     
-    std::cout << "Canvasæ›´æ–°å¾ªç¯å·²é€€å‡º" << std::endl;
+    std::cout << "Canvas¸üĞÂÑ­»·ÒÑÍË³ö" << std::endl;
 }
 
-// æ£€æŸ¥Waylandç¯å¢ƒå¯ç”¨æ€§
+// ¼ì²éWayland»·¾³¿ÉÓÃĞÔ
 bool DeepStreamManager::checkWaylandEnvironment() {
-    std::cout << "?? [DeepStream] æ£€æŸ¥Waylandç¯å¢ƒ..." << std::endl;
+    std::cout << "?? [DeepStream] ¼ì²éWayland»·¾³..." << std::endl;
     
-    // æ£€æŸ¥WAYLAND_DISPLAYç¯å¢ƒå˜é‡
+    // ¼ì²éWAYLAND_DISPLAY»·¾³±äÁ¿
     const char* wayland_display = getenv("WAYLAND_DISPLAY");
     if (!wayland_display) {
         setenv("WAYLAND_DISPLAY", "wayland-0", 0);
         wayland_display = getenv("WAYLAND_DISPLAY");
-        std::cout << "[DeepStream] è®¾ç½®WAYLAND_DISPLAY=" << wayland_display << std::endl;
+        std::cout << "[DeepStream] ÉèÖÃWAYLAND_DISPLAY=" << wayland_display << std::endl;
     }
     
-    // æ£€æŸ¥ XDG_RUNTIME_DIRï¼šä¼˜å…ˆä½¿ç”¨å·²æœ‰å€¼ï¼Œå¦åˆ™åœ¨ Jetson + nvweston åœºæ™¯ä¸‹ä½¿ç”¨ /run/nvidia-wayland
+    // ¼ì²é XDG_RUNTIME_DIR£ºÓÅÏÈÊ¹ÓÃÒÑÓĞÖµ£¬·ñÔòÔÚ Jetson + nvweston ³¡¾°ÏÂÊ¹ÓÃ /run/nvidia-wayland
     const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
     if (!runtime_dir || runtime_dir[0] != '/') {
         setenv("XDG_RUNTIME_DIR", "/run/nvidia-wayland", 0);
         runtime_dir = getenv("XDG_RUNTIME_DIR");
-        std::cout << "[DeepStream] è®¾ç½®XDG_RUNTIME_DIR=" << runtime_dir << std::endl;
+        std::cout << "[DeepStream] ÉèÖÃXDG_RUNTIME_DIR=" << runtime_dir << std::endl;
     }
     
-    // éªŒè¯Wayland socketæ˜¯å¦å­˜åœ¨
+    // ÑéÖ¤Wayland socketÊÇ·ñ´æÔÚ
     std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
     if (access(socket_path.c_str(), F_OK) != 0) {
-        std::cout << "?? [DeepStream] Wayland socketä¸å­˜åœ¨: " << socket_path << std::endl;
+        std::cout << "?? [DeepStream] Wayland socket²»´æÔÚ: " << socket_path << std::endl;
         wayland_available_ = false;
         return false;
     }
     
     wayland_available_ = true;
-    std::cout << "? [DeepStream] Waylandç¯å¢ƒé…ç½®æˆåŠŸ" << std::endl;
+    std::cout << "? [DeepStream] Wayland»·¾³ÅäÖÃ³É¹¦" << std::endl;
     return true;
 }
 
 
-// æ–°å¢ï¼šç®€åŒ–çš„Waylandè§†é¢‘å¸ƒå±€è®¡ç®—ï¼ˆæ”¯æŒæ‘„åƒå¤´åˆ†è¾¨ç‡ç¼©æ”¾ï¼‰
+// ĞÂÔö£º¼ò»¯µÄWaylandÊÓÆµ²¼¾Ö¼ÆËã£¨Ö§³ÖÉãÏñÍ··Ö±æÂÊËõ·Å£©
 VideoLayout DeepStreamManager::calculateWaylandVideoLayout(const DeepStreamConfig& config) {
     VideoLayout layout;
     
-    std::cout << "[DeepStreamManager] è®¡ç®—Waylandè§†é¢‘å¸ƒå±€..." << std::endl;
-    std::cout << "  æ‘„åƒå¤´è¾“å…¥: " << config.camera_width << "x" << config.camera_height << std::endl;
+    std::cout << "[DeepStreamManager] ¼ÆËãWaylandÊÓÆµ²¼¾Ö..." << std::endl;
+    std::cout << "  ÉãÏñÍ·ÊäÈë: " << config.camera_width << "x" << config.camera_height << std::endl;
     
-    // ?? å…³é”®ä¿®å¤ï¼šä½¿ç”¨ subsurface çš„å®é™…å°ºå¯¸ï¼ˆä» initializeWithSubsurface ä¼ å…¥ï¼‰
-    // config.screen_width å’Œ config.screen_height å·²ç»æ˜¯ subsurface çš„å®é™…å°ºå¯¸
+    // ?? ¹Ø¼üĞŞ¸´£ºÊ¹ÓÃ subsurface µÄÊµ¼Ê³ß´ç£¨´Ó initializeWithSubsurface ´«Èë£©
+    // config.screen_width ºÍ config.screen_height ÒÑ¾­ÊÇ subsurface µÄÊµ¼Ê³ß´ç
     layout.width = config.screen_width;
     layout.height = config.screen_height;
     
-    // è®¡ç®—å¯ç”¨åŒºåŸŸï¼ˆç”¨äºæ˜¾ç¤ºï¼‰
+    // ¼ÆËã¿ÉÓÃÇøÓò£¨ÓÃÓÚÏÔÊ¾£©
     layout.available_width = config.screen_width;
     layout.available_height = config.screen_height;
     
-    // çª—å£ä½ç½®ï¼ˆä½¿ç”¨ subsurface çš„åç§»é‡ï¼Œè€Œä¸æ˜¯å›ºå®šçš„ header_heightï¼‰
-    layout.offset_x = 0;  // ç›¸å¯¹äº subsurface è‡ªèº«
-    layout.offset_y = 0;  // ç›¸å¯¹äº subsurface è‡ªèº«
+    // ´°¿ÚÎ»ÖÃ£¨Ê¹ÓÃ subsurface µÄÆ«ÒÆÁ¿£¬¶ø²»ÊÇ¹Ì¶¨µÄ header_height£©
+    layout.offset_x = 0;  // Ïà¶ÔÓÚ subsurface ×ÔÉí
+    layout.offset_y = 0;  // Ïà¶ÔÓÚ subsurface ×ÔÉí
     
-    std::cout << "[DeepStreamManager] å¸ƒå±€è®¡ç®—å®Œæˆ: "
+    std::cout << "[DeepStreamManager] ²¼¾Ö¼ÆËãÍê³É: "
               << layout.width << "x" << layout.height
               << " at (" << layout.offset_x << "," << layout.offset_y << ")" << std::endl;
-    std::cout << "  ç¼©æ”¾: " << config.camera_width << "x" << config.camera_height
+    std::cout << "  Ëõ·Å: " << config.camera_width << "x" << config.camera_height
               << " -> " << layout.width << "x" << layout.height << std::endl;
     
     return layout;

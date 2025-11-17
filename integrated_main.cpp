@@ -1097,6 +1097,205 @@ private:
         // 启用 Wayland 调试
         setenv("WAYLAND_DEBUG", "1", 1);
 
+Nov 17 14:07:46 bamboo_integrated[179016]: 🔍 [Wayland] 步骤1: 检查 Wayland 合成器...
+Nov 17 14:07:46 bamboo_integrated[179016]: ✅ Wayland合成器检测成功: wayland-0
+Nov 17 14:07:46 bamboo_integrated[179016]: ✅ [Wayland] Wayland 合成器运行正常
+Nov 17 14:07:46 bamboo_integrated[179016]: 🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面...
+Nov 17 14:07:46 bamboo_integrated[179016]: Initializing LVGL UI system with optimized interface...
+Nov 17 14:07:46 bamboo_integrated[179016]: ✅ Wayland合成器检测成功: wayland-0
+Nov 17 14:07:46 bamboo_integrated[179016]:    Socket路径: /run/nvidia-wayland/wayland-0
+Nov 17 14:07:46 bamboo_integrated[179016]: ⏳ 等待 Wayland 合成器完全稳定...
+Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  [Debug] 摄像头面板使用不透明模式 (BAMBOO_CAMERA_PANEL_OPAQUE=1)
+Nov 17 14:07:49 bamboo_integrated[179016]: 正在初始化LVGL Wayland界面...
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔍 检查Wayland环境...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ WAYLAND_DISPLAY = wayland-0
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Wayland socket存在: /run/nvidia-wayland/wayland-0
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [Jetson] 等待 Wayland 合成器完全初始化...
+Nov 17 14:07:49 bamboo_integrated[179016]: 正在初始化Wayland客户端...
+Nov 17 14:07:49 bamboo_integrated[179016]: 正在初始化Wayland客户端...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Wayland display连接成功
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定wl_compositor (v5, 服务器支持: v5)
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定wl_subcompositor
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定wl_shm
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定xdg_wm_base (v3)
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Registry同步完成
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 创建主 Surface...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 主 Surface 创建成功
+Nov 17 14:07:49 bamboo_integrated[179016]: 🎯 创建 XDG Surface...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ XDG Surface 创建成功
+Nov 17 14:07:49 bamboo_integrated[179016]: 🎯 创建 XDG Toplevel...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ XDG Toplevel 监听器已添加
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ XDG Toplevel 创建成功，已设置全屏
+Nov 17 14:07:49 bamboo_integrated[179016]: 📝 执行空 commit，触发 configure 事件...
+Nov 17 14:07:49 bamboo_integrated[179016]: ⏳ 等待 configure 事件...
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 窗口尺寸: 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔳 窗口模式: 全屏
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 收到首次 XDG surface 配置
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 收到 configure 事件
+Nov 17 14:07:49 bamboo_integrated[179016]: 🎨 创建初始 SHM buffer...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Buffer 已附加并提交: 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Wayland 客户端初始化完成
+Nov 17 14:07:49 bamboo_integrated[179016]: 📺 LVGL 使用 SHM 软件渲染（避免与 DeepStream 的 EGL 冲突）...
+Nov 17 14:07:49 bamboo_integrated[179016]: 🎯 DeepStream 将独占 EGL/DRM 硬件加速
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [DEBUG] 步骤1: 创建 LVGL 显示设备...
+Nov 17 14:07:49 bamboo_integrated[179016]:    屏幕尺寸: 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ [DEBUG] LVGL显示创建成功
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [DEBUG] 步骤2: 分配完整帧累积 buffer...
+Nov 17 14:07:49 bamboo_integrated[179016]:    完整帧 buffer 大小: 9000 KB
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ [DEBUG] 完整帧 buffer 已初始化
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [DEBUG] 步骤4: 使用 PARTIAL 模式（DIRECT 模式不稳定）...
+Nov 17 14:07:49 bamboo_integrated[179016]:    PARTIAL buffer 大小: 675 KB × 2
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ LVGL 使用 PARTIAL 渲染模式
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ flush 回调已注册
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ LVGL Wayland SHM 显示初始化成功（纯软件渲染）
+Nov 17 14:07:49 bamboo_integrated[179016]: 🚫 已跳过 EGL 初始化，避免与 DeepStream 冲突
+Nov 17 14:07:49 bamboo_integrated[179016]: 🎬 DeepStream 可以独占 EGL/DRM 硬件加速资源
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 主题已初始化（默认字体：Montserrat）
+Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  注意：中文字符可能显示为方框，需要自定义字体支持
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 主容器使用 Flex 布局，水平排列
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度，完全透明）
+Nov 17 14:07:49 bamboo_integrated[179016]: 📺 摄像头区域已设置为透明，DeepStream视频将显示在 subsurface
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 控制面板: flex_grow=1 (25% 宽度)
+Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 底部面板: 80px高度，Start/Pause/Stop/Emergency/Power按钮
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔍 [关键诊断] camera_panel 最终坐标: (5, 70) → (1429, 1109)
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔍 [关键诊断] camera_panel 尺寸: 1424x1039
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [Wayland] 清除 camera_panel 区域的 buffer（设为完全透明）...
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ [Wayland] camera_panel 区域已清除，subsurface 视频将可见
+Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  [关键] DeepStream subsurface 当前位置: (0, 60) 尺寸: 960x640
+Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  [关键] 如果两者不匹配，视频将显示在错误位置！
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ UI 创建完成，已标记所有面板需要刷新
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Jetson 系统监控已启动
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ UI 创建完成，启用正常渲染...
+Nov 17 14:07:49 bamboo_integrated[179016]: 🔄 强制刷新整个屏幕...
+Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #1 PARTIAL 更新 [0,0-1919,89] → 提交完整帧 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #2 PARTIAL 更新 [0,90-1919,179] → 提交完整帧 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #3 PARTIAL 更新 [0,180-1919,269] → 提交完整帧 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #4 PARTIAL 更新 [0,270-1919,359] → 提交完整帧 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #5 PARTIAL 更新 [0,360-1919,449] → 提交完整帧 1920x1200
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 初始刷新完成
+Nov 17 14:07:49 bamboo_integrated[179016]: ✅ PARTIAL 模式渲染就绪
+Nov 17 14:07:49 bamboo_integrated[179016]: LVGL Wayland界面初始化成功，正在启动界面线程...
+Nov 17 14:07:49 bamboo_integrated[179016]: 🚀 LVGL UI线程启动 (刷新率: 60fps)
+Nov 17 14:07:50 bamboo_integrated[179016]: LVGL Wayland界面线程启动完成
+Nov 17 14:07:50 bamboo_integrated[179016]: Wayland优化的LVGL界面创建成功
+Nov 17 14:07:50 bamboo_integrated[179016]: LVGL UI system initialization complete
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ [LVGL] LVGL Wayland界面初始化成功
+Nov 17 14:07:50 bamboo_integrated[179016]: 🎬 [DeepStream] 步骤3: 初始化DeepStream Wayland模式...
+Nov 17 14:07:50 bamboo_integrated[179016]: 🔗 [集成] LVGL Wayland界面指针已传递给推理工作线程
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ [推理系统] Wayland环境已配置: wayland-0
+Nov 17 14:07:50 bamboo_integrated[179016]: 🎯 [集成] DeepStream将使用waylandsink硬件渲染
+Nov 17 14:07:50 bamboo_integrated[179016]: 🔧 [推理系统] 初始化Wayland Subsurface架构...
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ 已获取LVGL Wayland父窗口对象（重试0次）
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ 已获取LVGL Wayland父窗口对象
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ 获取 camera_panel 实际坐标: (5, 70) 1424x1039
+Nov 17 14:07:50 bamboo_integrated[179016]: [77B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [57B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [30B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [43B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [79B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [80B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [69B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [33B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [36B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [52B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [51B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [49B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [82B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [27B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [44B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [61B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [56B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [61B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [55B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [48B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [48B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [34B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [34B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [38B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [42B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [22B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [52B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [29B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [36B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [18B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [21B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [45B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: [43B blob data]
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ [推理系统] Wayland Subsurface架构初始化完成
+Nov 17 14:07:50 bamboo_integrated[179016]: 📺 视频将由 Wayland 合成器自动合成到 LVGL 窗口
+Nov 17 14:07:50 bamboo_integrated[179016]: =================================
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ Wayland架构系统初始化完成
+Nov 17 14:07:50 bamboo_integrated[179016]: =================================
+Nov 17 14:07:50 bamboo_integrated[179016]: System initialized successfully, starting main loop...
+Nov 17 14:07:50 bamboo_integrated[179016]: Starting Wayland integrated system...
+Nov 17 14:07:50 bamboo_integrated[179016]: 🔧 等待LVGL Wayland界面完全启动和连接稳定...
+Nov 17 14:07:50 bamboo_integrated[179016]: ✅ LVGL Wayland已完全初始化
+Nov 17 14:07:50 bamboo_integrated[179016]: 🔄 额外等待Wayland display连接稳定...
+Nov 17 14:07:52 bamboo_integrated[179016]: 现在启动推理线程（独立waylandsink连接模式）...
+Nov 17 14:07:52 bamboo_integrated[179016]: 推理线程已启动，Wayland系统完全就绪
+Nov 17 14:07:52 bamboo_integrated[179016]: Press Ctrl+C to exit system
+Nov 17 14:07:52 bamboo_integrated[179016]: LVGL main loop started with optimized interface
+Nov 17 14:07:52 bamboo_integrated[179016]: Using Wayland优化的LVGL interface main loop
+Nov 17 14:07:52 bamboo_integrated[179016]: Inference worker thread started (延迟启动模式)
+Nov 17 14:07:52 bamboo_integrated[179016]: 工作线程中延迟启动DeepStream...
+Nov 17 14:07:52 bamboo_integrated[179016]: 等待LVGL Wayland完全初始化...
+Nov 17 14:07:52 bamboo_integrated[179016]: ✅ LVGL Wayland已完全初始化，继续启动DeepStream
+Nov 17 14:07:52 bamboo_integrated[179016]: 启动DeepStream管理器...
+Nov 17 14:07:52 bamboo_integrated[179016]: [23B blob data]
+Nov 17 14:07:52 bamboo_integrated[179016]: [11B blob data]
+Nov 17 14:07:52 bamboo_integrated[179016]: [21B blob data]
+Nov 17 14:07:52 bamboo_integrated[179016]: [42B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [217B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [23B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [23B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [24B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [52B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [21B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [32B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [45B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [19B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [33B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [20B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [34B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: [31B blob data]
+Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.321236546 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
+Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348188381 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
+Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348480749 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
+Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348604135 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
+Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348655716 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:569:gst_wayland_sink_set_caps:<video_sink> set caps video/x-raw, width=(int)1424, height=(int)1039, framerate=(fraction)30/1, format=(string)BGRx, pixel-aspect-ratio=(fraction)1039/801
+Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754079754 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:949:gst_wayland_sink_set_window_handle:<video_sink> Setting window handle 0xaaaaddc27460
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Creating output stream
+Nov 17 14:07:56 bamboo_integrated[179016]: CONSUMER: Waiting until producer is connected...
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Available Sensor modes :
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 3280 x 2464 FR = 21.000000 fps Duration = 47619048 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 3280 x 1848 FR = 28.000001 fps Duration = 35714284 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 1920 x 1080 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 1640 x 1232 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 1280 x 720 FR = 59.999999 fps Duration = 16666667 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Running with following settings:
+Nov 17 14:07:56 bamboo_integrated[179016]:    Camera index = 0
+Nov 17 14:07:56 bamboo_integrated[179016]:    Camera mode  = 4
+Nov 17 14:07:56 bamboo_integrated[179016]:    Output Stream W = 1280 H = 720
+Nov 17 14:07:56 bamboo_integrated[179016]:    seconds to Run    = 0
+Nov 17 14:07:56 bamboo_integrated[179016]:    Frame Rate = 59.999999
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Setup Complete, Starting captures for 0 seconds
+Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Starting repeat capture requests.
+Nov 17 14:07:56 bamboo_integrated[179016]: CONSUMER: Producer has connected; continuing.
+Nov 17 14:07:56 bamboo_integrated[179016]: [60B blob data]
+Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754220514 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:992:gst_wayland_sink_set_render_rectangle:<video_sink> window geometry changed to (0, 0) 1424 x 1039
+Nov 17 14:07:56 bamboo_integrated[179016]: [69B blob data]
+Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754306910 179016 0xffff540c9520 DEBUG            waylandsink wlshmallocator.c:235:gst_wl_shm_memory_construct_wl_buffer:<GstWlDisplay@0xffff540b61b0> Creating wl_buffer from SHM of size 5918144 (1424 x 1039, stride 5696), format BGRx
+Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754574799 179016 0xffff540c9520 DEBUG            waylandsink wlshmallocator.c:235:gst_wl_shm_memory_construct_wl_buffer:<GstWlDisplay@0xffff540b61b0> Creating wl_buffer from SHM of size 4 (1 x 1, stride 4), format BGRx
+Nov 17 14:07:56 bamboo_integrated[179016]: [21B blob data]
+Nov 17 14:07:56 bamboo_integrated[179016]: [55B blob data]
+Nov 17 14:07:56 bamboo_integrated[179016]: [78B blob data]
+Nov 17 14:07:56 bamboo_integrated[179016]: 启动Canvas更新线程...（从integrated_main）
+Nov 17 14:07:56 bamboo_integrated[179016]: [66B blob data]
+Nov 17 14:07:56 bamboo_integrated[179016]: DeepStream 管理器延迟启动成功
         // 确保正确的 runtime 目录（优先使用现有 XDG_RUNTIME_DIR）
         const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
         if (!runtime_dir || access(runtime_dir, W_OK) != 0) {
