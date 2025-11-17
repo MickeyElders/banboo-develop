@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file lvgl_wayland_interface.cpp
  * @brief LVGL Wayland接口实现 - 标准 Wayland 协议
  */
@@ -773,111 +773,54 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     int width = config_.screen_width;
     int height = config_.screen_height;
     
-    // 🔧 PARTIAL 模式：步骤1 - 累积更新到完整帧 buffer
+    // PARTIAL 模式步骤1: 将增量区域拷贝到完整帧 buffer
     int area_width = area->x2 - area->x1 + 1;
     int area_height = area->y2 - area->y1 + 1;
     
-    #if LV_COLOR_DEPTH == 32
-        // 逐行拷贝更新区域（修复：正确处理 LVGL 的 color_p 布局）
-        // LVGL 的 color_p 是连续的像素数据，直接对应更新区域
-        const uint32_t* src_pixels = reinterpret_cast<const uint32_t*>(color_p);
-        
-        for (int y = area->y1; y <= area->y2; y++) {
-            uint32_t* dst_row = full_frame_buffer_ + y * width + area->x1;
-            const uint32_t* src_row = src_pixels + (y - area->y1) * area_width;
-            memcpy(dst_row, src_row, area_width * sizeof(uint32_t));
-        }
-    #else
-        #error "Only LV_COLOR_DEPTH=32 is supported"
-    #endif
-
-    // Force camera panel region in full_frame_buffer_ to be fully transparent
-    // so that the DeepStream subsurface video is not covered by the parent UI.
-    if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {
-        int clip_x1 = std::max(0, camera_x1_);
-        int clip_y1 = std::max(0, camera_y1_);
-        int clip_x2 = std::min(width - 1, camera_x2_);
-        int clip_y2 = std::min(height - 1, camera_y2_);
-
-        for (int y = clip_y1; y <= clip_y2; ++y) {
-            uint32_t* row = full_frame_buffer_ + y * width;
-            for (int x = clip_x1; x <= clip_x2; ++x) {
-                row[x] = 0x00000000;  // ARGB: fully transparent
-            }
-        }
+#if LV_COLOR_DEPTH == 32
+    const uint32_t* src_pixels = reinterpret_cast<const uint32_t*>(color_p);
+    for (int y = area->y1; y <= area->y2; y++) {
+        uint32_t* dst_row = full_frame_buffer_ + y * width + area->x1;
+        const uint32_t* src_row = src_pixels + (y - area->y1) * area_width;
+        memcpy(dst_row, src_row, area_width * sizeof(uint32_t));
     }
+#else
+#error "Only LV_COLOR_DEPTH=32 is supported"
+#endif
     
-    // Step 2 - create a temporary SHM buffer and submit the full frame
+    // DEBUG: 暂时取消 camera_panel 透明/opaque/input region 优化，
+    // 使用完全不透明 UI，由 Subsurface 负责覆盖摄像头区域。
+    
+    // 步骤2: 创建临时 SHM buffer 并提交完整帧
     int stride = width * 4;
     size_t size = stride * height;
     
     int fd = createAnonymousFile(size);
     if (fd < 0) {
-        std::cerr << "❌ 创建SHM文件失败" << std::endl;
+        std::cerr << "创建 SHM 文件失败" << std::endl;
         return;
     }
     
     void* data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (data == MAP_FAILED) {
         close(fd);
-        std::cerr << "❌ mmap失败" << std::endl;
+        std::cerr << "mmap 失败" << std::endl;
         return;
     }
     
-    // 从完整帧 buffer 拷贝到 SHM
     memcpy(data, full_frame_buffer_, size);
     
-    // 创建 Wayland buffer
     struct wl_shm_pool* pool = wl_shm_create_pool(wl_shm_, fd, size);
     struct wl_buffer* buffer = wl_shm_pool_create_buffer(
         pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
     wl_shm_pool_destroy(pool);
     close(fd);
     
-    // 🔧 使用 wl_surface_damage_buffer (version 4+)
-    // 比 wl_surface_damage 更精确，直接标记 buffer 坐标系的损坏区域
     wl_surface_attach(wl_surface_, buffer, 0, 0);
-    
-    // 使用 buffer damage（buffer 坐标系）
     wl_surface_damage_buffer(wl_surface_, 0, 0, width, height);
-    
-    // 🔧 关键修复1：设置 opaque region，排除 camera_panel 区域
-    // 告诉 compositor："除了 camera_panel，其他区域都是不透明的"
-    // Compositor 会：
-    // - 在 opaque region：不渲染下层内容（优化）
-    // - 在非 opaque region（camera_panel）：alpha blend，让 subsurface 透过
-    if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {
-        struct wl_region* opaque_region = wl_compositor_create_region(wl_compositor_);
-        // UI 区域（不透明）：整个屏幕
-        wl_region_add(opaque_region, 0, 0, width, height);
-        // 减去 camera_panel（透明区域，让 subsurface 可见）
-        wl_region_subtract(opaque_region,
-                          camera_x1_, camera_y1_,
-                          camera_x2_ - camera_x1_ + 1,
-                          camera_y2_ - camera_y1_ + 1);
-        wl_surface_set_opaque_region(wl_surface_, opaque_region);
-        wl_region_destroy(opaque_region);
-        
-        // 🔧 关键修复2：设置 input region，排除 camera_panel 区域
-        // 告诉 compositor："camera_panel 不接收输入，传递给 subsurface"
-        struct wl_region* input_region = wl_compositor_create_region(wl_compositor_);
-        wl_region_add(input_region, 0, 0, width, height);
-        wl_region_subtract(input_region,
-                          camera_x1_, camera_y1_,
-                          camera_x2_ - camera_x1_ + 1,
-                          camera_y2_ - camera_y1_ + 1);
-        wl_surface_set_input_region(wl_surface_, input_region);
-        wl_region_destroy(input_region);
-    }
-    
     wl_surface_commit(wl_surface_);
-    
-    // 🔧 性能优化：只用 flush，不用 roundtrip
-    // roundtrip 会阻塞等待合成器响应，导致事件延迟（41-43ms）
-    // flush 是异步的，性能更好
     wl_display_flush(wl_display_);
     
-    // 设置 buffer 释放回调
     static const struct wl_buffer_listener buffer_listener = {
         [](void* data, struct wl_buffer* buffer) {
             wl_buffer_destroy(buffer);
@@ -885,15 +828,13 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     };
     wl_buffer_add_listener(buffer, &buffer_listener, nullptr);
     
-    // 释放 mmap
     munmap(data, size);
     
-    // 调试：前5次 flush 打印信息
     static int flush_count = 0;
     if (++flush_count <= 5) {
-        std::cout << "🖼️  LVGL flush #" << flush_count 
-                  << " PARTIAL 更新 [" << area->x1 << "," << area->y1 
-                  << "-" << area->x2 << "," << area->y2 
+        std::cout << "🖼️  LVGL flush #" << flush_count
+                  << " PARTIAL 更新 [" << area->x1 << "," << area->y1
+                  << "-" << area->x2 << "," << area->y2
                   << "] → 提交完整帧 " << width << "x" << height << std::endl;
     }
 }
