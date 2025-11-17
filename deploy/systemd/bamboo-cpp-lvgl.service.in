@@ -28,6 +28,7 @@ Environment="GDK_BACKEND=wayland"
 Environment="SDL_VIDEODRIVER=wayland"
 Environment="XDG_SESSION_TYPE=wayland"
 Environment="LIBINPUT_DEFAULT_TOUCH_ENABLED=1"
+Environment="GST_DEBUG=waylandsink:5,basesink:3"
 
 # 访问 GPU/输入设备需要的附加组
 SupplementaryGroups=input video render tty dialout
