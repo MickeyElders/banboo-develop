@@ -1,5 +1,5 @@
 /**
- * 竹子识别系统一体化主程序
+ * 竹子识别系统一体化主程�?
  * 真正整合现有的cpp_backend和lvgl_frontend代码
  */
 
@@ -19,11 +19,11 @@
 #include <cstdlib>      // for setenv()
 #include <fstream>      // for file operations
 #include <wayland-client.h>
-// OpenCV和图像处理
+// OpenCV和图像处�?
 #include <opencv2/opencv.hpp>
 
 
-// LVGL头文件包含 - 智能检测多种可能的路径
+// LVGL头文件包�?- 智能检测多种可能的路径
 #ifdef ENABLE_LVGL
 #if __has_include(<lvgl/lvgl.h>)
 #include <lvgl/lvgl.h>
@@ -39,7 +39,7 @@
 #endif
 #endif
 
-// 函数前向声明 - 在文件最早位置
+// 函数前向声明 - 在文件最早位�?
 void suppress_camera_debug();
 void suppress_all_debug_output();
 void redirect_output_to_log();
@@ -74,7 +74,7 @@ struct lv_timer_t {
     lv_timer_t() : user_data(nullptr), timer_cb(nullptr), period(0), last_run(0) {}
 };
 
-// LVGL函数占位符
+// LVGL函数占位�?
 inline void lv_init() {}
 inline void lv_timer_handler() {}
 inline void lv_port_tick_init() {}
@@ -89,19 +89,19 @@ inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
 }
 
-// LVGL DRM函数占位符
+// LVGL DRM函数占位�?
 inline lv_display_t* lv_linux_drm_create() {
     return nullptr; // 当LVGL未启用时返回nullptr
 }
 
-// 显示驱动相关占位符
+// 显示驱动相关占位�?
 inline void lv_disp_draw_buf_init(lv_disp_draw_buf_t* draw_buf, void* buf1, void* buf2, uint32_t size_in_px_cnt) {}
 inline void lv_disp_drv_init(lv_disp_drv_t* driver) {}
 inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return driver; }
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
 inline bool lvgl_display_init() {
-    // 纯LVGL显示系统初始化
+    // 纯LVGL显示系统初始�?
     try {
         std::cout << "Initializing pure LVGL display system..." << std::endl;
         
@@ -130,9 +130,9 @@ inline bool lvgl_display_init() {
     }
 }
 inline bool touch_driver_init() {
-    // Jetson Orin NX 触摸驱动初始化（自适应）
+    // Jetson Orin NX 触摸驱动初始化（自适应�?
     try {
-        // 检查触摸设备
+        // 检查触摸设�?
         const char* touch_devices[] = {"/dev/input/event0", "/dev/input/event1", "/dev/input/event2"};
         bool has_touch = false;
         
@@ -150,14 +150,14 @@ inline bool touch_driver_init() {
             std::cout << "Touch device not found, disabling touch functionality" << std::endl;
         }
         
-        return has_touch; // 返回实际检测结果
+        return has_touch; // 返回实际检测结�?
     } catch (...) {
         std::cout << "Touch driver initialization exception" << std::endl;
         return false;
     }
 }
 
-// 前端组件占位符 - 当LVGL未启用时
+// 前端组件占位�?- 当LVGL未启用时
 struct frame_info_t {
     uint64_t timestamp = 0;
     bool valid = false;
@@ -232,26 +232,26 @@ public:
 #include "bamboo_cut/deepstream/deepstream_manager.h"
 #include "bamboo_cut/ui/lvgl_wayland_interface.h"
 
-// 使用真实的命名空间
+// 使用真实的命名空�?
 using namespace bamboo_cut;
 
 // 全局关闭标志
 std::atomic<bool> g_shutdown_requested{false};
 std::chrono::steady_clock::time_point g_shutdown_start_time;
 
-// 静态输出重定向文件描述符
+// 静态输出重定向文件描述�?
 static int original_stdout = -1;
 static int original_stderr = -1;
 static int log_fd = -1;
 static std::string log_file_path = "/var/log/bamboo-cut/camera_debug.log";
 
-// 温和的调试信息抑制函数
+// 温和的调试信息抑制函�?
 void selective_debug_suppress() {
     // 只禁用特定的相机调试，保留显示相关的输出
     if (system("echo 0 > /sys/kernel/debug/tracing/events/camera/enable 2>/dev/null || true") != 0) {
-        // 忽略系统调用失败，继续执行
+        // 忽略系统调用失败，继续执�?
     }
-    // 不要禁用DRM相关的调试信息
+    // 不要禁用DRM相关的调试信�?
     
     // 设置环境变量抑制Tegra相机调试
     setenv("GST_DEBUG", "0", 1);
@@ -299,21 +299,21 @@ void suppress_all_debug_output() {
     setenv("NVCSI_LOG_LEVEL", "0", 1);
     setenv("NVCSI_DISABLE_LOG", "1", 1);
     
-    // 抑制内核日志输出到用户空间
+    // 抑制内核日志输出到用户空�?
     setenv("KERNEL_LOG_LEVEL", "0", 1);
     setenv("DMESG_RESTRICT", "1", 1);
     
     // 强制重定向内核消息到null
     if (system("echo 0 > /proc/sys/kernel/printk 2>/dev/null || true") != 0) {
-        // 忽略系统调用失败，继续执行
+        // 忽略系统调用失败，继续执�?
     }
     if (system("dmesg -n 0 2>/dev/null || true") != 0) {
-        // 忽略系统调用失败，继续执行
+        // 忽略系统调用失败，继续执�?
     }
     
     // 抑制systemd journal输出到console
     if (system("systemctl mask systemd-journald-dev-log.socket 2>/dev/null || true") != 0) {
-        // 忽略系统调用失败，继续执行
+        // 忽略系统调用失败，继续执�?
     }
     
     // 2. 设置GStreamer静默模式
@@ -321,12 +321,12 @@ void suppress_all_debug_output() {
     setenv("GST_REGISTRY_UPDATE", "no", 1);
     setenv("GST_REGISTRY_FORK", "no", 1);
     
-    // 3. 创建日志目录（如果不存在）
+    // 3. 创建日志目录（如果不存在�?
     if (system("mkdir -p /var/log/bamboo-cut") != 0) {
         std::cout << "Warning: Failed to create log directory" << std::endl;
     }
     
-    // 4. 创建日志文件用于重定向调试信息
+    // 4. 创建日志文件用于重定向调试信�?
     log_fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (log_fd == -1) {
         std::cout << "Warning: Cannot create log file " << log_file_path << ", using /dev/null instead" << std::endl;
@@ -339,7 +339,7 @@ void suppress_all_debug_output() {
         std::cout << "Camera debug output will be redirected to: " << log_file_path << std::endl;
     }
     
-    // 5. 保存原始文件描述符
+    // 5. 保存原始文件描述�?
     original_stdout = dup(STDOUT_FILENO);
     original_stderr = dup(STDERR_FILENO);
     
@@ -354,11 +354,11 @@ void suppress_all_debug_output() {
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
         std::string timestamp = std::ctime(&time_t);
-        timestamp.pop_back(); // 移除换行符
+        timestamp.pop_back(); // 移除换行�?
         
         std::string log_header = "\n=== Bamboo Cut Camera Debug Log - " + timestamp + " ===\n";
         if (write(log_fd, log_header.c_str(), log_header.length()) == -1) {
-            // 忽略写入失败，继续执行
+            // 忽略写入失败，继续执�?
         }
     }
     
@@ -368,14 +368,14 @@ void suppress_all_debug_output() {
 // 临时重定向输出（在摄像头初始化期间使用）
 void redirect_output_to_log() {
     if (log_fd >= 0) {
-        // 重定向stdout和stderr到日志文件
+        // 重定向stdout和stderr到日志文�?
         dup2(log_fd, STDOUT_FILENO);
         dup2(log_fd, STDERR_FILENO);
         
-        // 写入重定向开始标记
+        // 写入重定向开始标�?
         std::string start_msg = "[Camera Initialization Started]\n";
         if (write(log_fd, start_msg.c_str(), start_msg.length()) == -1) {
-            // 忽略写入失败，继续执行
+            // 忽略写入失败，继续执�?
         }
     }
 }
@@ -383,11 +383,11 @@ void redirect_output_to_log() {
 // 恢复原始输出
 void restore_output() {
     if (original_stdout >= 0 && original_stderr >= 0) {
-        // 写入重定向结束标记
+        // 写入重定向结束标�?
         if (log_fd >= 0) {
             std::string end_msg = "[Camera Initialization Completed]\n\n";
             if (write(log_fd, end_msg.c_str(), end_msg.length()) == -1) {
-                // 忽略写入失败，继续执行
+                // 忽略写入失败，继续执�?
             }
         }
         
@@ -397,7 +397,7 @@ void restore_output() {
     }
 }
 
-// 清理重定向资源
+// 清理重定向资�?
 void cleanup_output_redirection() {
     if (original_stdout >= 0) {
         close(original_stdout);
@@ -411,7 +411,7 @@ void cleanup_output_redirection() {
         // 写入日志文件结束标记
         std::string final_msg = "=== Log Session Ended ===\n\n";
         if (write(log_fd, final_msg.c_str(), final_msg.length()) == -1) {
-            // 忽略写入失败，继续执行
+            // 忽略写入失败，继续执�?
         }
         close(log_fd);
         log_fd = -1;
@@ -420,17 +420,17 @@ void cleanup_output_redirection() {
 
 // 信号处理
 void signal_handler(int sig) {
-    std::cout << "\n收到信号 " << sig << "，开始优雅关闭..." << std::endl;
+    std::cout << "\n收到信号 " << sig << "，开始优雅关�?.." << std::endl;
     g_shutdown_requested = true;
     g_shutdown_start_time = std::chrono::steady_clock::now();
     
-    // 清理输出重定向资源
+    // 清理输出重定向资�?
     cleanup_output_redirection();
 }
 
 /**
  * 线程安全的数据桥接器
- * 在推理线程和UI线程间传递数据
+ * 在推理线程和UI线程间传递数�?
  */
 class IntegratedDataBridge {
 public:
@@ -479,7 +479,7 @@ private:
     std::atomic<bool> new_detection_available_{false};
 
 public:
-    // 视频数据更新 (从推理线程调用)
+    // 视频数据更新 (从推理线程调�?
     void updateVideo(const cv::Mat& frame, uint64_t timestamp = 0) {
         std::lock_guard<std::mutex> lock(video_mutex_);
         if (!frame.empty()) {
@@ -501,13 +501,13 @@ public:
         }
     }
     
-    // 检测数据更新 (从推理线程调用)
+    // 检测数据更�?(从推理线程调�?
     void updateDetection(const core::DetectionResult& result) {
         std::lock_guard<std::mutex> lock(detection_mutex_);
         latest_detection_.cutting_points = result.cutting_points;
         latest_detection_.bboxes = result.bboxes;
         latest_detection_.confidences = result.confidences;
-        latest_detection_.processing_time_ms = 50.0f; // 简化实现
+        latest_detection_.processing_time_ms = 50.0f; // 简化实�?
         latest_detection_.has_detection = result.valid && !result.bboxes.empty();
         new_detection_available_ = true;
     }
@@ -518,7 +518,7 @@ public:
         latest_stats_ = stats;
     }
     
-    // 获取最新数据 (从UI线程调用)
+    // 获取最新数�?(从UI线程调用)
     bool getLatestVideo(VideoData& video) {
         std::lock_guard<std::mutex> lock(video_mutex_);
         if (latest_video_.valid) {
@@ -568,7 +568,7 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<bool> should_stop_{false};
     
-    // 使用真实的后端组件
+    // 使用真实的后端组�?
     std::unique_ptr<inference::BambooDetector> detector_;
     std::unique_ptr<deepstream::DeepStreamManager> deepstream_manager_;
     bool use_mock_data_ = false;
@@ -599,7 +599,7 @@ public:
             setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
         
-        std::cout << "✅ [推理系统] Wayland环境已配置: " << wayland_display << std::endl;
+        std::cout << "�?[推理系统] Wayland环境已配�? " << wayland_display << std::endl;
         wayland_available_ = true;
         return true;
     }
@@ -613,13 +613,13 @@ public:
         
         // 获取LVGL的Wayland对象
         if (!lvgl_interface_ptr_) {
-            std::cerr << "❌ LVGL接口未设置" << std::endl;
+            std::cerr << "�?LVGL接口未设�? << std::endl;
             return false;
         }
         
         auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
         
-        // 🔧 关键：等待LVGL的Wayland对象完全初始化
+        // 🔧 关键：等待LVGL的Wayland对象完全初始�?
         int retry_count = 0;
         const int MAX_RETRIES = 20;
         
@@ -635,23 +635,23 @@ public:
             parent_surface = lvgl_if->getWaylandSurface();
             
             if (parent_display && parent_compositor && parent_subcompositor && parent_surface) {
-                std::cout << "✅ 已获取LVGL Wayland父窗口对象（重试" << retry_count << "次）" << std::endl;
+                std::cout << "�?已获取LVGL Wayland父窗口对象（重试" << retry_count << "次）" << std::endl;
                 break;
             }
             
-            std::cout << "⏳ 等待LVGL Wayland对象初始化...（第" << (retry_count + 1) << "次尝试）" << std::endl;
+            std::cout << "�?等待LVGL Wayland对象初始�?..（第" << (retry_count + 1) << "次尝试）" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             retry_count++;
         }
         
         if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
-            std::cerr << "❌ 无法获取LVGL Wayland对象（已重试" << MAX_RETRIES << "次）" << std::endl;
+            std::cerr << "�?无法获取LVGL Wayland对象（已重试" << MAX_RETRIES << "次）" << std::endl;
             std::cerr << "🔄 DeepStream将使用AppSink软件合成模式" << std::endl;
             
             // 降级到AppSink模式
             deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
             
-            // 🔧 修复：创建默认配置
+            // 🔧 修复：创建默认配�?
             deepstream::DeepStreamConfig config;
             config.sink_mode = deepstream::VideoSinkMode::APPSINK;
             config.camera_width = 1280;
@@ -662,19 +662,19 @@ public:
             return deepstream_manager_->initialize(config);
         }
         
-        std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
+        std::cout << "�?已获取LVGL Wayland父窗口对�? << std::endl;
         
-        // 🔧 关键修复：获取 camera_panel 的实际坐标（在Flex布局完成后）
+        // 🔧 关键修复：获�?camera_panel 的实际坐标（在Flex布局完成后）
         int camera_x = 0, camera_y = 60, camera_width = 960, camera_height = 640;
         if (lvgl_if->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height)) {
-            std::cout << "✅ 获取 camera_panel 实际坐标: ("
+            std::cout << "�?获取 camera_panel 实际坐标: ("
                       << camera_x << ", " << camera_y << ") "
                       << camera_width << "x" << camera_height << std::endl;
         } else {
-            std::cout << "⚠️  无法获取 camera_panel 坐标，使用默认值" << std::endl;
+            std::cout << "⚠️  无法获取 camera_panel 坐标，使用默认�? << std::endl;
         }
         
-        // 创建DeepStream管理器（使用Subsurface）
+        // 创建DeepStream管理器（使用Subsurface�?
         deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         
         // 配置Subsurface（使用实际坐标）
@@ -683,20 +683,20 @@ public:
         subsurface_config.offset_y = camera_y;
         subsurface_config.width = camera_width;
         subsurface_config.height = camera_height;
-        subsurface_config.use_sync_mode = false;  // 异步模式，视频独立刷新
+        subsurface_config.use_sync_mode = false;  // 异步模式，视频独立刷�?
         
-        // 🔧 关键：使用Subsurface模式初始化
+        // 🔧 关键：使用Subsurface模式初始�?
         if (!deepstream_manager_->initializeWithSubsurface(
                 parent_display,
                 parent_compositor,
                 parent_subcompositor,
                 parent_surface,
                 subsurface_config)) {
-            std::cerr << "❌ DeepStream Subsurface初始化失败" << std::endl;
+            std::cerr << "�?DeepStream Subsurface初始化失�? << std::endl;
             return false;
         }
         
-        std::cout << "✅ [推理系统] Wayland Subsurface架构初始化完成" << std::endl;
+        std::cout << "�?[推理系统] Wayland Subsurface架构初始化完�? << std::endl;
         std::cout << "📺 视频将由 Wayland 合成器自动合成到 LVGL 窗口" << std::endl;
         
         return true;
@@ -725,7 +725,7 @@ private:
     void workerLoop() {
         std::cout << "Inference worker thread started (延迟启动模式)" << std::endl;
         
-        // 延迟启动DeepStream，确保LVGL完全初始化
+        // 延迟启动DeepStream，确保LVGL完全初始�?
         if (!use_mock_data_ && deepstream_manager_) {
             std::cout << "工作线程中延迟启动DeepStream..." << std::endl;
             if (!startDeepStreamManagerDelayed()) {
@@ -740,7 +740,7 @@ private:
         while (!should_stop_ && !g_shutdown_requested) {
             auto current_time = std::chrono::steady_clock::now();
             
-            // 处理一帧
+            // 处理一�?
             processFrame();
             
             // 更新性能统计
@@ -759,8 +759,8 @@ private:
     }
     
     void processFrame() {
-        // DeepStream 管理器处理实际的视频显示和 AI 推理
-        // integrated_main 只处理模拟数据用于测试
+        // DeepStream 管理器处理实际的视频显示�?AI 推理
+        // integrated_main 只处理模拟数据用于测�?
         if (use_mock_data_) {
             cv::Mat frame = cv::Mat::zeros(720, 1280, CV_8UC3);
             cv::putText(frame, "DEEPSTREAM MODE - Frame " + std::to_string(processed_frames_),
@@ -769,7 +769,7 @@ private:
                        static_cast<int>(deepstream_manager_->getCurrentMode()) : 0)),
                        cv::Point(50, 420), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 0), 2);
             
-            // 更新模拟视频到数据桥接
+            // 更新模拟视频到数据桥�?
             data_bridge_->updateVideo(frame);
             
             processed_frames_++;
@@ -799,7 +799,7 @@ private:
         }
     }
     
-    // === 初始化方法 (禁用TensorRT，避免与DeepStream nvinfer冲突) ===
+    // === 初始化方�?(禁用TensorRT，避免与DeepStream nvinfer冲突) ===
     bool initializeDetector() {
         std::cout << "🔧 [BambooDetector] 禁用TensorRT初始化，避免与DeepStream nvinfer冲突" << std::endl;
         
@@ -815,9 +815,9 @@ private:
         bool result = detector_->initialize();
         
         if (result) {
-            std::cout << "✅ [BambooDetector] 检测器初始化成功（OpenCV DNN模式，避免TensorRT冲突）" << std::endl;
+            std::cout << "�?[BambooDetector] 检测器初始化成功（OpenCV DNN模式，避免TensorRT冲突�? << std::endl;
         } else {
-            std::cout << "⚠️ [BambooDetector] 检测器初始化失败" << std::endl;
+            std::cout << "⚠️ [BambooDetector] 检测器初始化失�? << std::endl;
         }
         
         return result;
@@ -825,7 +825,7 @@ private:
     
     // === DeepStream 管理器初始化方法 ===
     bool initializeDeepStreamManager() {
-        std::cout << "🎬 [DeepStream] 初始化 DeepStream 管理器..." << std::endl;
+        std::cout << "🎬 [DeepStream] 初始�?DeepStream 管理�?.." << std::endl;
         
         try {
             // 创建 DeepStream 管理器实例（如果有LVGL界面指针则传入）
@@ -834,7 +834,7 @@ private:
                 std::cout << "🔗 [DeepStream] 管理器已连接LVGL界面" << std::endl;
             } else {
                 deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
-                std::cout << "⚠️  [DeepStream] 管理器创建（无LVGL界面连接）" << std::endl;
+                std::cout << "⚠️  [DeepStream] 管理器创建（无LVGL界面连接�? << std::endl;
             }
             
             // 配置 DeepStream 参数
@@ -860,18 +860,18 @@ private:
             // 检查Wayland环境并配置waylandsink
             if (checkWaylandEnvironment()) {
                 std::cout << "🎯 [DeepStream] 检测到Wayland环境，配置waylandsink渲染..." << std::endl;
-                std::cout << "✅ [DeepStream] Wayland配置已设置" << std::endl;
+                std::cout << "�?[DeepStream] Wayland配置已设�? << std::endl;
             } else {
                 std::cout << "📱 [DeepStream] 无Wayland环境，将使用AppSink软件合成" << std::endl;
             }
             
-            // 初始化 DeepStream 管理器 (但暂不启动)
+            // 初始�?DeepStream 管理�?(但暂不启�?
             if (!deepstream_manager_->initialize(config)) {
-                std::cout << "❌ [DeepStream] 管理器初始化失败" << std::endl;
+                std::cout << "�?[DeepStream] 管理器初始化失败" << std::endl;
                 return false;
             }
             
-            std::cout << "✅ [DeepStream] 管理器初始化完成 (延迟启动模式)" << std::endl;
+            std::cout << "�?[DeepStream] 管理器初始化完成 (延迟启动模式)" << std::endl;
             
             // 显示当前sink模式
             auto current_mode = deepstream_manager_->getCurrentSinkMode();
@@ -887,34 +887,34 @@ private:
             return true;
             
         } catch (const std::exception& e) {
-            std::cout << "❌ [DeepStream] 管理器初始化异常: " << e.what() << std::endl;
+            std::cout << "�?[DeepStream] 管理器初始化异常: " << e.what() << std::endl;
             return false;
         }
     }
     
-    // === 延迟启动DeepStream管理器 ===
+    // === 延迟启动DeepStream管理�?===
     bool startDeepStreamManagerDelayed() {
         if (!deepstream_manager_) {
             std::cout << "错误：DeepStream管理器尚未初始化" << std::endl;
             return false;
         }
         
-        // 使用新的LVGL Wayland接口初始化检查机制
-        std::cout << "等待LVGL Wayland完全初始化..." << std::endl;
+        // 使用新的LVGL Wayland接口初始化检查机�?
+        std::cout << "等待LVGL Wayland完全初始�?.." << std::endl;
         
         if (lvgl_interface_ptr_) {
             auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
             int wait_count = 0;
-            const int MAX_WAIT_SECONDS = 20;  // 最大等待20秒
+            const int MAX_WAIT_SECONDS = 20;  // 最大等�?0�?
             
             while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 wait_count++;
-                std::cout << "等待LVGL Wayland初始化完成... (InferenceWorker: " << (wait_count * 0.5) << "秒)" << std::endl;
+                std::cout << "等待LVGL Wayland初始化完�?.. (InferenceWorker: " << (wait_count * 0.5) << "�?" << std::endl;
             }
             
             if (lvgl_if->isFullyInitialized()) {
-                std::cout << "✅ LVGL Wayland已完全初始化，继续启动DeepStream" << std::endl;
+                std::cout << "�?LVGL Wayland已完全初始化，继续启动DeepStream" << std::endl;
             } else {
                 std::cout << "⚠️ 警告：LVGL Wayland初始化超时，继续启动DeepStream" << std::endl;
             }
@@ -923,28 +923,28 @@ private:
             std::this_thread::sleep_for(std::chrono::seconds(2));
         }
         
-        std::cout << "启动DeepStream管理器..." << std::endl;
+        std::cout << "启动DeepStream管理�?.." << std::endl;
         if (!deepstream_manager_->start()) {
-            std::cout << "DeepStream 管理器启动失败" << std::endl;
+            std::cout << "DeepStream 管理器启动失�? << std::endl;
             return false;
         }
         
         // 启动canvas更新线程 (如果支持LVGL界面集成)
         if (deepstream_manager_) {
-            std::cout << "启动Canvas更新线程...（从integrated_main）" << std::endl;
+            std::cout << "启动Canvas更新线程...（从integrated_main�? << std::endl;
             deepstream_manager_->startCanvasUpdateThread();
         }
         
-        std::cout << "DeepStream 管理器延迟启动成功" << std::endl;
+        std::cout << "DeepStream 管理器延迟启动成�? << std::endl;
         return true;
     }
     
-    float getCpuUsage() const { return 45.0f; } // 简化实现
-    float getMemoryUsage() const { return 1024.0f; } // 简化实现
+    float getCpuUsage() const { return 45.0f; } // 简化实�?
+    float getMemoryUsage() const { return 1024.0f; } // 简化实�?
 };
 
 /**
- * LVGL UI管理器
+ * LVGL UI管理�?
  * 使用优化的LVGL界面实现
  */
 class LVGLUIManager {
@@ -954,7 +954,7 @@ private:
     // 使用Wayland优化的LVGL界面实现
     std::unique_ptr<bamboo_cut::ui::LVGLWaylandInterface> lvgl_wayland_interface_;
     
-    // 兼容性方法映射
+    // 兼容性方法映�?
     bool initialized_ = false;
 
 public:
@@ -965,17 +965,17 @@ public:
         cleanup();
     }
 
-    // 兼容性方法：创建主界面
+    // 兼容性方法：创建主界�?
     bool create_main_screen() {
         return initialize();
     }
 
-    // 兼容性方法：更新系统状态
+    // 兼容性方法：更新系统状�?
     void update_system_status(const char* status, lv_color_t color) {
         std::cout << "System Status Updated: " << status << std::endl;
     }
 
-    // 兼容性方法：更新检测数量
+    // 兼容性方法：更新检测数�?
     void update_detection_count(int count) {
         std::cout << "Detection Count Updated: " << count << std::endl;
     }
@@ -985,7 +985,7 @@ public:
         std::cout << "FPS Updated: " << fps << std::endl;
     }
     
-    // 获取LVGL Wayland界面指针（用于传递给DeepStreamManager）
+    // 获取LVGL Wayland界面指针（用于传递给DeepStreamManager�?
     void* getLVGLInterface() {
         #ifdef ENABLE_LVGL
         return lvgl_wayland_interface_.get();
@@ -999,16 +999,16 @@ public:
         
         #ifdef ENABLE_LVGL
         try {
-            // 检查 Wayland 合成器是否运行
+            // 检�?Wayland 合成器是否运�?
             if (!checkWaylandCompositor()) {
                 std::cout << "错误: Wayland 合成器未运行，请先启动合成器" << std::endl;
                 return false;
             }
             
-            std::cout << "⏳ 等待 Wayland 合成器完全稳定..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(3));  // 等待合成器稳定
+            std::cout << "�?等待 Wayland 合成器完全稳�?.." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(3));  // 等待合成器稳�?
             
-            // 注意：如果需要，可以检查是否有其他 Wayland 客户端影响窗口创建
+            // 注意：如果需要，可以检查是否有其他 Wayland 客户端影响窗口创�?
             // 创建Wayland优化的LVGL界面实例
             lvgl_wayland_interface_ = std::make_unique<bamboo_cut::ui::LVGLWaylandInterface>();
             
@@ -1046,7 +1046,7 @@ public:
         #else
         std::cout << "LVGL not enabled, using placeholder UI" << std::endl;
         
-        // 占位符实现：模拟初始化成功
+        // 占位符实现：模拟初始化成�?
         std::cout << "Simulated LVGL UI initialization (LVGL disabled)" << std::endl;
         #endif
         
@@ -1063,7 +1063,7 @@ public:
         #ifdef ENABLE_LVGL
         if (lvgl_wayland_interface_ && lvgl_wayland_interface_->isRunning()) {
             std::cout << "Using Wayland优化的LVGL interface main loop" << std::endl;
-            // LVGL Wayland界面已经在自己的线程中运行，这里只需要等待
+            // LVGL Wayland界面已经在自己的线程中运行，这里只需要等�?
             while (!g_shutdown_requested && lvgl_wayland_interface_->isRunning()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
@@ -1092,219 +1092,20 @@ private:
     }
 
 private:
-    // 检查Wayland合成器状态
+    // 检查Wayland合成器状�?
     bool checkWaylandCompositor() {
         // 启用 Wayland 调试
         setenv("WAYLAND_DEBUG", "1", 1);
 
-Nov 17 14:07:46 bamboo_integrated[179016]: 🔍 [Wayland] 步骤1: 检查 Wayland 合成器...
-Nov 17 14:07:46 bamboo_integrated[179016]: ✅ Wayland合成器检测成功: wayland-0
-Nov 17 14:07:46 bamboo_integrated[179016]: ✅ [Wayland] Wayland 合成器运行正常
-Nov 17 14:07:46 bamboo_integrated[179016]: 🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面...
-Nov 17 14:07:46 bamboo_integrated[179016]: Initializing LVGL UI system with optimized interface...
-Nov 17 14:07:46 bamboo_integrated[179016]: ✅ Wayland合成器检测成功: wayland-0
-Nov 17 14:07:46 bamboo_integrated[179016]:    Socket路径: /run/nvidia-wayland/wayland-0
-Nov 17 14:07:46 bamboo_integrated[179016]: ⏳ 等待 Wayland 合成器完全稳定...
-Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  [Debug] 摄像头面板使用不透明模式 (BAMBOO_CAMERA_PANEL_OPAQUE=1)
-Nov 17 14:07:49 bamboo_integrated[179016]: 正在初始化LVGL Wayland界面...
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔍 检查Wayland环境...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ WAYLAND_DISPLAY = wayland-0
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Wayland socket存在: /run/nvidia-wayland/wayland-0
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [Jetson] 等待 Wayland 合成器完全初始化...
-Nov 17 14:07:49 bamboo_integrated[179016]: 正在初始化Wayland客户端...
-Nov 17 14:07:49 bamboo_integrated[179016]: 正在初始化Wayland客户端...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Wayland display连接成功
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定wl_compositor (v5, 服务器支持: v5)
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定wl_subcompositor
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定wl_shm
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 绑定xdg_wm_base (v3)
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Registry同步完成
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 创建主 Surface...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 主 Surface 创建成功
-Nov 17 14:07:49 bamboo_integrated[179016]: 🎯 创建 XDG Surface...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ XDG Surface 创建成功
-Nov 17 14:07:49 bamboo_integrated[179016]: 🎯 创建 XDG Toplevel...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ XDG Toplevel 监听器已添加
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ XDG Toplevel 创建成功，已设置全屏
-Nov 17 14:07:49 bamboo_integrated[179016]: 📝 执行空 commit，触发 configure 事件...
-Nov 17 14:07:49 bamboo_integrated[179016]: ⏳ 等待 configure 事件...
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 窗口尺寸: 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔳 窗口模式: 全屏
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 收到首次 XDG surface 配置
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 收到 configure 事件
-Nov 17 14:07:49 bamboo_integrated[179016]: 🎨 创建初始 SHM buffer...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Buffer 已附加并提交: 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Wayland 客户端初始化完成
-Nov 17 14:07:49 bamboo_integrated[179016]: 📺 LVGL 使用 SHM 软件渲染（避免与 DeepStream 的 EGL 冲突）...
-Nov 17 14:07:49 bamboo_integrated[179016]: 🎯 DeepStream 将独占 EGL/DRM 硬件加速
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [DEBUG] 步骤1: 创建 LVGL 显示设备...
-Nov 17 14:07:49 bamboo_integrated[179016]:    屏幕尺寸: 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ [DEBUG] LVGL显示创建成功
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [DEBUG] 步骤2: 分配完整帧累积 buffer...
-Nov 17 14:07:49 bamboo_integrated[179016]:    完整帧 buffer 大小: 9000 KB
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ [DEBUG] 完整帧 buffer 已初始化
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [DEBUG] 步骤4: 使用 PARTIAL 模式（DIRECT 模式不稳定）...
-Nov 17 14:07:49 bamboo_integrated[179016]:    PARTIAL buffer 大小: 675 KB × 2
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ LVGL 使用 PARTIAL 渲染模式
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ flush 回调已注册
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ LVGL Wayland SHM 显示初始化成功（纯软件渲染）
-Nov 17 14:07:49 bamboo_integrated[179016]: 🚫 已跳过 EGL 初始化，避免与 DeepStream 冲突
-Nov 17 14:07:49 bamboo_integrated[179016]: 🎬 DeepStream 可以独占 EGL/DRM 硬件加速资源
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 主题已初始化（默认字体：Montserrat）
-Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  注意：中文字符可能显示为方框，需要自定义字体支持
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 主容器使用 Flex 布局，水平排列
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 摄像头面板: flex_grow=3 (75% 宽度，完全透明）
-Nov 17 14:07:49 bamboo_integrated[179016]: 📺 摄像头区域已设置为透明，DeepStream视频将显示在 subsurface
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 控制面板: flex_grow=1 (25% 宽度)
-Nov 17 14:07:49 bamboo_integrated[179016]: 📐 [UI] 底部面板: 80px高度，Start/Pause/Stop/Emergency/Power按钮
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔍 [关键诊断] camera_panel 最终坐标: (5, 70) → (1429, 1109)
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔍 [关键诊断] camera_panel 尺寸: 1424x1039
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔧 [Wayland] 清除 camera_panel 区域的 buffer（设为完全透明）...
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ [Wayland] camera_panel 区域已清除，subsurface 视频将可见
-Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  [关键] DeepStream subsurface 当前位置: (0, 60) 尺寸: 960x640
-Nov 17 14:07:49 bamboo_integrated[179016]: ⚠️  [关键] 如果两者不匹配，视频将显示在错误位置！
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ UI 创建完成，已标记所有面板需要刷新
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ Jetson 系统监控已启动
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ UI 创建完成，启用正常渲染...
-Nov 17 14:07:49 bamboo_integrated[179016]: 🔄 强制刷新整个屏幕...
-Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #1 PARTIAL 更新 [0,0-1919,89] → 提交完整帧 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #2 PARTIAL 更新 [0,90-1919,179] → 提交完整帧 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #3 PARTIAL 更新 [0,180-1919,269] → 提交完整帧 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #4 PARTIAL 更新 [0,270-1919,359] → 提交完整帧 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: 🖼️  LVGL flush #5 PARTIAL 更新 [0,360-1919,449] → 提交完整帧 1920x1200
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ 初始刷新完成
-Nov 17 14:07:49 bamboo_integrated[179016]: ✅ PARTIAL 模式渲染就绪
-Nov 17 14:07:49 bamboo_integrated[179016]: LVGL Wayland界面初始化成功，正在启动界面线程...
-Nov 17 14:07:49 bamboo_integrated[179016]: 🚀 LVGL UI线程启动 (刷新率: 60fps)
-Nov 17 14:07:50 bamboo_integrated[179016]: LVGL Wayland界面线程启动完成
-Nov 17 14:07:50 bamboo_integrated[179016]: Wayland优化的LVGL界面创建成功
-Nov 17 14:07:50 bamboo_integrated[179016]: LVGL UI system initialization complete
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ [LVGL] LVGL Wayland界面初始化成功
-Nov 17 14:07:50 bamboo_integrated[179016]: 🎬 [DeepStream] 步骤3: 初始化DeepStream Wayland模式...
-Nov 17 14:07:50 bamboo_integrated[179016]: 🔗 [集成] LVGL Wayland界面指针已传递给推理工作线程
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ [推理系统] Wayland环境已配置: wayland-0
-Nov 17 14:07:50 bamboo_integrated[179016]: 🎯 [集成] DeepStream将使用waylandsink硬件渲染
-Nov 17 14:07:50 bamboo_integrated[179016]: 🔧 [推理系统] 初始化Wayland Subsurface架构...
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ 已获取LVGL Wayland父窗口对象（重试0次）
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ 已获取LVGL Wayland父窗口对象
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ 获取 camera_panel 实际坐标: (5, 70) 1424x1039
-Nov 17 14:07:50 bamboo_integrated[179016]: [77B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [57B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [30B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [43B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [79B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [80B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [69B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [33B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [36B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [52B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [51B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [49B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [82B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [27B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [44B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [61B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [56B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [61B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [55B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [48B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [48B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [34B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [34B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [38B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [39B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [42B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [22B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [52B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [29B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [36B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [18B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [21B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [45B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: [43B blob data]
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ [推理系统] Wayland Subsurface架构初始化完成
-Nov 17 14:07:50 bamboo_integrated[179016]: 📺 视频将由 Wayland 合成器自动合成到 LVGL 窗口
-Nov 17 14:07:50 bamboo_integrated[179016]: =================================
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ Wayland架构系统初始化完成
-Nov 17 14:07:50 bamboo_integrated[179016]: =================================
-Nov 17 14:07:50 bamboo_integrated[179016]: System initialized successfully, starting main loop...
-Nov 17 14:07:50 bamboo_integrated[179016]: Starting Wayland integrated system...
-Nov 17 14:07:50 bamboo_integrated[179016]: 🔧 等待LVGL Wayland界面完全启动和连接稳定...
-Nov 17 14:07:50 bamboo_integrated[179016]: ✅ LVGL Wayland已完全初始化
-Nov 17 14:07:50 bamboo_integrated[179016]: 🔄 额外等待Wayland display连接稳定...
-Nov 17 14:07:52 bamboo_integrated[179016]: 现在启动推理线程（独立waylandsink连接模式）...
-Nov 17 14:07:52 bamboo_integrated[179016]: 推理线程已启动，Wayland系统完全就绪
-Nov 17 14:07:52 bamboo_integrated[179016]: Press Ctrl+C to exit system
-Nov 17 14:07:52 bamboo_integrated[179016]: LVGL main loop started with optimized interface
-Nov 17 14:07:52 bamboo_integrated[179016]: Using Wayland优化的LVGL interface main loop
-Nov 17 14:07:52 bamboo_integrated[179016]: Inference worker thread started (延迟启动模式)
-Nov 17 14:07:52 bamboo_integrated[179016]: 工作线程中延迟启动DeepStream...
-Nov 17 14:07:52 bamboo_integrated[179016]: 等待LVGL Wayland完全初始化...
-Nov 17 14:07:52 bamboo_integrated[179016]: ✅ LVGL Wayland已完全初始化，继续启动DeepStream
-Nov 17 14:07:52 bamboo_integrated[179016]: 启动DeepStream管理器...
-Nov 17 14:07:52 bamboo_integrated[179016]: [23B blob data]
-Nov 17 14:07:52 bamboo_integrated[179016]: [11B blob data]
-Nov 17 14:07:52 bamboo_integrated[179016]: [21B blob data]
-Nov 17 14:07:52 bamboo_integrated[179016]: [42B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [217B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [23B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [23B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [24B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [52B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [21B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [32B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [45B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [19B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [33B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [20B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [34B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: [31B blob data]
-Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.321236546 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
-Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348188381 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
-Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348480749 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
-Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348604135 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:519:gst_wayland_sink_get_caps:<video_sink> display caps: video/x-raw, format=(string){ BGRA, BGRx, RGB16, I420, v308, NV12, YUY2, RGBA }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]; video/x-raw(memory:DMABuf), format=(string){ RGBA, RGBA, RGBx, RGBx, UYVY, UYVY, BGRA, BGRA, BGRx, BGRx, RGB16, RGB16, BGR16, BGR16, RGB, RGB, BGR, BGR, xBGR, xBGR, xRGB, xRGB, ABGR, ABGR, ARGB, ARGB, I420, I420, NV12, NV12, NV21, NV21, NV16, NV16 }, width=(int)[ 1, 2147483647 ], height=(int)[ 1, 2147483647 ], framerate=(fraction)[ 0/1, 2147483647/1 ]
-Nov 17 14:07:55 bamboo_integrated[179016]: 0:00:05.348655716 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:569:gst_wayland_sink_set_caps:<video_sink> set caps video/x-raw, width=(int)1424, height=(int)1039, framerate=(fraction)30/1, format=(string)BGRx, pixel-aspect-ratio=(fraction)1039/801
-Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754079754 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:949:gst_wayland_sink_set_window_handle:<video_sink> Setting window handle 0xaaaaddc27460
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Creating output stream
-Nov 17 14:07:56 bamboo_integrated[179016]: CONSUMER: Waiting until producer is connected...
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Available Sensor modes :
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 3280 x 2464 FR = 21.000000 fps Duration = 47619048 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 3280 x 1848 FR = 28.000001 fps Duration = 35714284 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 1920 x 1080 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 1640 x 1232 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: 1280 x 720 FR = 59.999999 fps Duration = 16666667 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Running with following settings:
-Nov 17 14:07:56 bamboo_integrated[179016]:    Camera index = 0
-Nov 17 14:07:56 bamboo_integrated[179016]:    Camera mode  = 4
-Nov 17 14:07:56 bamboo_integrated[179016]:    Output Stream W = 1280 H = 720
-Nov 17 14:07:56 bamboo_integrated[179016]:    seconds to Run    = 0
-Nov 17 14:07:56 bamboo_integrated[179016]:    Frame Rate = 59.999999
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Setup Complete, Starting captures for 0 seconds
-Nov 17 14:07:56 bamboo_integrated[179016]: GST_ARGUS: Starting repeat capture requests.
-Nov 17 14:07:56 bamboo_integrated[179016]: CONSUMER: Producer has connected; continuing.
-Nov 17 14:07:56 bamboo_integrated[179016]: [60B blob data]
-Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754220514 179016 0xffff540c9520 DEBUG            waylandsink gstwaylandsink.c:992:gst_wayland_sink_set_render_rectangle:<video_sink> window geometry changed to (0, 0) 1424 x 1039
-Nov 17 14:07:56 bamboo_integrated[179016]: [69B blob data]
-Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754306910 179016 0xffff540c9520 DEBUG            waylandsink wlshmallocator.c:235:gst_wl_shm_memory_construct_wl_buffer:<GstWlDisplay@0xffff540b61b0> Creating wl_buffer from SHM of size 5918144 (1424 x 1039, stride 5696), format BGRx
-Nov 17 14:07:56 bamboo_integrated[179016]: 0:00:05.754574799 179016 0xffff540c9520 DEBUG            waylandsink wlshmallocator.c:235:gst_wl_shm_memory_construct_wl_buffer:<GstWlDisplay@0xffff540b61b0> Creating wl_buffer from SHM of size 4 (1 x 1, stride 4), format BGRx
-Nov 17 14:07:56 bamboo_integrated[179016]: [21B blob data]
-Nov 17 14:07:56 bamboo_integrated[179016]: [55B blob data]
-Nov 17 14:07:56 bamboo_integrated[179016]: [78B blob data]
-Nov 17 14:07:56 bamboo_integrated[179016]: 启动Canvas更新线程...（从integrated_main）
-Nov 17 14:07:56 bamboo_integrated[179016]: [66B blob data]
-Nov 17 14:07:56 bamboo_integrated[179016]: DeepStream 管理器延迟启动成功
-        // 确保正确的 runtime 目录（优先使用现有 XDG_RUNTIME_DIR）
+        // 确保正确�?runtime 目录（优先使用现�?XDG_RUNTIME_DIR�?
         const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
         if (!runtime_dir || access(runtime_dir, W_OK) != 0) {
-            // Jetson + nvweston 场景：使用 /run/nvidia-wayland
-            std::cout << "⚠️ XDG_RUNTIME_DIR 不可写或未配置，设置为 /run/nvidia-wayland" << std::endl;
+            // Jetson + nvweston 场景：使�?/run/nvidia-wayland
+            std::cout << "⚠️ XDG_RUNTIME_DIR 不可写或未配置，设置�?/run/nvidia-wayland" << std::endl;
             setenv("XDG_RUNTIME_DIR", "/run/nvidia-wayland", 1);
             runtime_dir = getenv("XDG_RUNTIME_DIR");
         }
-        // 检查 WAYLAND_DISPLAY 环境变量
+        // 检�?WAYLAND_DISPLAY 环境变量
         const char* wayland_display = getenv("WAYLAND_DISPLAY");
         if (!wayland_display) {
             wayland_display = "wayland-0";
@@ -1314,14 +1115,14 @@ Nov 17 14:07:56 bamboo_integrated[179016]: DeepStream 管理器延迟启动成�
         // 构建 socket 路径
         std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
         
-        // 🔧 修复：使用access()检查socket文件（正确的方法）
+        // 🔧 修复：使用access()检查socket文件（正确的方法�?
         if (access(socket_path.c_str(), F_OK) != 0) {
-            std::cout << "Wayland socket不存在: " << socket_path << std::endl;
+            std::cout << "Wayland socket不存�? " << socket_path << std::endl;
             std::cout << "错误代码: " << strerror(errno) << std::endl;
             return false;
         }
         
-        std::cout << "✅ Wayland合成器检测成功: " << wayland_display << std::endl;
+        std::cout << "�?Wayland合成器检测成�? " << wayland_display << std::endl;
         std::cout << "   Socket路径: " << socket_path << std::endl;
         return true;
     }
@@ -1347,29 +1148,29 @@ public:
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // === 步骤1: 检查 Wayland 合成器状态 ===
-        std::cout << "\n🔍 [Wayland] 步骤1: 检查 Wayland 合成器..." << std::endl;
+        // === 步骤1: 检�?Wayland 合成器状�?===
+        std::cout << "\n🔍 [Wayland] 步骤1: 检�?Wayland 合成�?.." << std::endl;
         if (!checkWaylandCompositor()) {
-            std::cout << "❌ [Wayland] Wayland 合成器未运行，请先启动合成器" << std::endl;
-            std::cout << "请运行: sudo make start-sway 或 sudo systemctl start sway-wayland" << std::endl;
+            std::cout << "�?[Wayland] Wayland 合成器未运行，请先启动合成器" << std::endl;
+            std::cout << "请运�? sudo make start-sway �?sudo systemctl start sway-wayland" << std::endl;
             return false;
         }
-        std::cout << "✅ [Wayland] Wayland 合成器运行正常" << std::endl;
+        std::cout << "�?[Wayland] Wayland 合成器运行正�? << std::endl;
         
-        // === 步骤2: LVGL Wayland界面初始化 ===
+        // === 步骤2: LVGL Wayland界面初始�?===
         std::cout << "\n🎨 [LVGL] 步骤2: 初始化LVGL Wayland界面..." << std::endl;
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
-            std::cout << "❌ [LVGL] LVGL Wayland界面初始化失败" << std::endl;
+            std::cout << "�?[LVGL] LVGL Wayland界面初始化失�? << std::endl;
             return false;
         }
-        std::cout << "✅ [LVGL] LVGL Wayland界面初始化成功" << std::endl;
+        std::cout << "�?[LVGL] LVGL Wayland界面初始化成�? << std::endl;
         
         // === 步骤3: DeepStream Wayland配置 ===
         std::cout << "\n🎬 [DeepStream] 步骤3: 初始化DeepStream Wayland模式..." << std::endl;
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         
-        // 传递LVGL Wayland界面指针给推理工作线程
+        // 传递LVGL Wayland界面指针给推理工作线�?
         #ifdef ENABLE_LVGL
         if (ui_manager_ && ui_manager_->getLVGLInterface()) {
             inference_worker_->setLVGLInterface(ui_manager_->getLVGLInterface());
@@ -1385,12 +1186,12 @@ public:
         }
         
         if (!inference_worker_->initialize()) {
-            std::cout << "❌ [推理系统] Inference system initialization failed" << std::endl;
+            std::cout << "�?[推理系统] Inference system initialization failed" << std::endl;
             return false;
         }
         
         std::cout << "\n=================================" << std::endl;
-        std::cout << "✅ Wayland架构系统初始化完成" << std::endl;
+        std::cout << "�?Wayland架构系统初始化完�? << std::endl;
         std::cout << "=================================" << std::endl;
         return true;
     }
@@ -1399,7 +1200,7 @@ public:
         std::cout << "Starting Wayland integrated system..." << std::endl;
         
         // 🔧 关键修复：优化Wayland客户端启动顺序，避免xdg_positioner冲突
-        std::cout << "🔧 等待LVGL Wayland界面完全启动和连接稳定..." << std::endl;
+        std::cout << "🔧 等待LVGL Wayland界面完全启动和连接稳�?.." << std::endl;
         
         #ifdef ENABLE_LVGL
         if (ui_manager_ && ui_manager_->getLVGLInterface()) {
@@ -1410,13 +1211,13 @@ public:
             while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 wait_count++;
-                std::cout << "⏳ 等待LVGL Wayland完全初始化... (" << (wait_count * 0.5) << "秒)" << std::endl;
+                std::cout << "�?等待LVGL Wayland完全初始�?.. (" << (wait_count * 0.5) << "�?" << std::endl;
             }
             
             if (lvgl_if->isFullyInitialized()) {
-                std::cout << "✅ LVGL Wayland已完全初始化" << std::endl;
+                std::cout << "�?LVGL Wayland已完全初始化" << std::endl;
             } else {
-                std::cout << "⚠️ 警告：LVGL初始化超时，但继续启动" << std::endl;
+                std::cout << "⚠️ 警告：LVGL初始化超时，但继续启�? << std::endl;
             }
         } else
         #endif
@@ -1430,7 +1231,7 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         
         // 启动推理工作线程，GStreamer将使用独立的waylandsink连接
-        std::cout << "现在启动推理线程（独立waylandsink连接模式）..." << std::endl;
+        std::cout << "现在启动推理线程（独立waylandsink连接模式�?.." << std::endl;
         if (!inference_worker_->start()) {
             std::cout << "Inference thread startup failed" << std::endl;
             return;
@@ -1452,14 +1253,14 @@ public:
             inference_worker_->stop();
         }
         
-        // 清理输出重定向资源
+        // 清理输出重定向资�?
         cleanup_output_redirection();
         
         std::cout << "System shutdown complete" << std::endl;
     }
 
 private:
-    // 检查Wayland合成器状态
+    // 检查Wayland合成器状�?
     bool checkWaylandCompositor() {
         // 检查WAYLAND_DISPLAY环境变量
         const char* wayland_display = getenv("WAYLAND_DISPLAY");
@@ -1468,7 +1269,7 @@ private:
             setenv("WAYLAND_DISPLAY", wayland_display, 1);
         }
         
-        // 🔧 优先使用 XDG_RUNTIME_DIR（nvweston: /run/nvidia-wayland）
+        // 🔧 优先使用 XDG_RUNTIME_DIR（nvweston: /run/nvidia-wayland�?
         const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
         if (!runtime_dir || runtime_dir[0] != '/') {
             runtime_dir = "/run/nvidia-wayland";
@@ -1480,21 +1281,21 @@ private:
         
         // 🔧 修复：使用access()检查socket文件
         if (access(socket_path.c_str(), F_OK) != 0) {
-            std::cout << "Wayland socket不存在: " << socket_path << std::endl;
+            std::cout << "Wayland socket不存�? " << socket_path << std::endl;
             return false;
         }
         
-        std::cout << "✅ Wayland合成器检测成功: " << wayland_display << std::endl;
+        std::cout << "�?Wayland合成器检测成�? " << wayland_display << std::endl;
         return true;
     }
 };
 
 /**
- * 主函数入口
+ * 主函数入�?
  */
 int main(int argc, char* argv[]) {
     try {
-        // 检查是否为测试模式或调试模式
+        // 检查是否为测试模式或调试模�?
         bool verbose_mode = false;
         bool test_mode = false;
         
@@ -1520,7 +1321,7 @@ int main(int argc, char* argv[]) {
             // 临时恢复stdout显示错误信息
             if (!verbose_mode) {
                 if (freopen("/dev/tty", "w", stdout) == nullptr) {
-                    // 忽略恢复失败，继续执行
+                    // 忽略恢复失败，继续执�?
                 }
             }
             std::cout << "System initialization failed" << std::endl;
@@ -1537,7 +1338,7 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         // 临时恢复stdout显示异常信息
         if (freopen("/dev/tty", "w", stdout) == nullptr) {
-            // 忽略恢复失败，继续执行
+            // 忽略恢复失败，继续执�?
         }
         std::cout << "System exception: " << e.what() << std::endl;
         return -1;
