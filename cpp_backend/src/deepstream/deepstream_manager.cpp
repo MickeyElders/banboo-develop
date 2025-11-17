@@ -85,7 +85,6 @@ bool DeepStreamManager::initializeWithSubsurface(
     video_surface_ = wl_surface;
     
     // 配置基础参数
-    config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     config_.screen_width = width;
     config_.screen_height = height;
     
@@ -213,17 +212,29 @@ bool DeepStreamManager::initializeWithSubsurface(
     std::cout << "  4?? compositor 混合: 父 surface（LVGL UI，camera area 透明）+ subsurface（视频）" << std::endl;
     std::cout << "  ? 结果：UI + 视频同时可见\n" << std::endl;
     
-    // 测试阶段: 强制使用 videotestsrc 作为 Wayland Subsurface 的输入源
-    config_.camera_source = CameraSourceMode::VIDEOTESTSRC;
-    config_.test_pattern = 18;  // 默认使用 SMPTE 彩条
-    // 直接使用 Subsurface 配置的宽高作为测试图案尺寸
-    config_.camera_width = config.width;
-    config_.camera_height = config.height;
-    
-    // 关键: 将配置更新到 initialize() 调用
+    // 可选: 通过环境变量启用 Wayland 测试图案（默认使用真实摄像头）
+    if (const char* env = std::getenv("BAMBOO_WAYLAND_TEST_PATTERN")) {
+        config_.camera_source = CameraSourceMode::VIDEOTESTSRC;
+        config_.test_pattern = std::atoi(env);
+        if (config_.test_pattern < 0) config_.test_pattern = 0;
+
+        // 使用 Subsurface 尺寸作为测试图案尺寸
+        config_.camera_width = config.width;
+        config_.camera_height = config.height;
+
+        std::cout << "[DeepStreamManager] 使用 videotestsrc 测试模式, pattern="
+                  << config_.test_pattern << ", size="
+                  << config_.camera_width << "x" << config_.camera_height
+                  << std::endl;
+    }
+
+    // 将配置更新到 initialize() 调用
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     config_.screen_width = config.width;
     config_.screen_height = config.height;
+
+    
+    
     
     if (!initialize(config_)) {
         std::cerr << "? [DeepStream] DeepStream配置初始化失败" << std::endl;
@@ -246,7 +257,6 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     // 检查是否有可用的Subsurface配置
     if (video_subsurface_) {
         std::cout << "[DeepStreamManager] 检测到Subsurface配置，使用waylandsink模式" << std::endl;
-        config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     } else {
         std::cout << "[DeepStreamManager] 未配置Subsurface，回退到appsink模式" << std::endl;
         config_.sink_mode = VideoSinkMode::APPSINK;
