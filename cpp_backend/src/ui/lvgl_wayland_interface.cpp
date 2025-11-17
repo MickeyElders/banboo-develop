@@ -790,8 +790,24 @@ void LVGLWaylandInterface::Impl::flushDisplayViaSHM(const lv_area_t* area, lv_co
     #else
         #error "Only LV_COLOR_DEPTH=32 is supported"
     #endif
+
+    // Force camera panel region in full_frame_buffer_ to be fully transparent
+    // so that the DeepStream subsurface video is not covered by the parent UI.
+    if (camera_x2_ > camera_x1_ && camera_y2_ > camera_y1_) {
+        int clip_x1 = std::max(0, camera_x1_);
+        int clip_y1 = std::max(0, camera_y1_);
+        int clip_x2 = std::min(width - 1, camera_x2_);
+        int clip_y2 = std::min(height - 1, camera_y2_);
+
+        for (int y = clip_y1; y <= clip_y2; ++y) {
+            uint32_t* row = full_frame_buffer_ + y * width;
+            for (int x = clip_x1; x <= clip_x2; ++x) {
+                row[x] = 0x00000000;  // ARGB: fully transparent
+            }
+        }
+    }
     
-    // 🔧 步骤2 - 创建临时 SHM buffer，提交完整帧
+    // Step 2 - create a temporary SHM buffer and submit the full frame
     int stride = width * 4;
     size_t size = stride * height;
     
@@ -1079,6 +1095,11 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     // 🔧 摄像头区域标签（仅用于调试）
     lv_obj_t* video_label = lv_label_create(camera_panel_);
     lv_label_set_text(video_label, LV_SYMBOL_VIDEO " Camera Feed");
+    // Force camera panel fully transparent so subsurface video is visible
+    lv_obj_set_style_bg_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_opa(camera_panel_, LV_OPA_0, 0);
+    lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(camera_panel_, 0, 0);
     lv_obj_set_style_text_color(video_label, lv_color_hex(0x70A5DB), 0);
     lv_obj_set_style_text_font(video_label, &lv_font_montserrat_14, 0);
     lv_obj_align(video_label, LV_ALIGN_TOP_LEFT, 10, 10);
