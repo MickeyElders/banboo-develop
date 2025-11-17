@@ -240,12 +240,20 @@ public:
      * @brief 获取当前视频sink模式
      */
     VideoSinkMode getCurrentSinkMode() const { return config_.sink_mode; }
+<<<<<<< HEAD
+=======
+
+>>>>>>> b0d37ff8328b48b384d7d879b2c055285255500e
     // Wayland Subsurface 成员（使用 void* 避免直接依赖 Wayland 头文件）
     void* parent_wl_display_ = nullptr;  // 父 Wayland display（wl_display*）
     void* parent_wl_surface_ = nullptr;  // 父 wl_surface*（LVGL 主 surface）
     void* video_surface_     = nullptr;  // 视频 surface（wl_surface*）
     void* video_subsurface_  = nullptr;  // Subsurface（wl_subsurface*）
     SubsurfaceConfig subsurface_config_; // Subsurface 配置
+<<<<<<< HEAD
+=======
+    
+>>>>>>> b0d37ff8328b48b384d7d879b2c055285255500e
     bool configureDRMOverlay(const DRMOverlayConfig& overlay_config);
     
     
