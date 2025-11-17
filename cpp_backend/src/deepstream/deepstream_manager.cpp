@@ -184,15 +184,11 @@ bool DeepStreamManager::initializeWithSubsurface(
         std::cout << "? [DeepStream] 使用异步模式（独立刷新）" << std::endl;
     }
     
-    // ?? 关键步骤5：Z-order 说明
-    // ??  重要：Wayland subsurface 的 Z-order 规则
-    // - Subsurface **默认**在 parent surface 之上（不需要 place_above parent）
-    // - place_above/below 用于设置**兄弟 subsurface** 之间的顺序
-    // - 如果只有一个 subsurface，它自动在 parent 之上
-    // 
-    // 因此，我们的 subsurface（视频）会自动显示在 parent surface（LVGL UI）之上
-    // 只要 parent surface 的 camera_panel 区域是透明的，视频就能透过显示
-    std::cout << "?? [DeepStream] Subsurface Z-order: 自动位于父 surface 之上（Wayland 默认行为）" << std::endl;
+    // === 关键步骤5: Z-order 设置 ===
+    // 为确保视频始终位于 LVGL UI 之上，显式将 subsurface 放到父 surface 之上。
+    wl_subsurface_place_above(wl_subsurface, wl_parent_surface);
+    std::cout << "?? [DeepStream] Subsurface Z-order: 显式设置在父 surface 之上" << std::endl;
+    
     
     // ?? 关键步骤6：commit subsurface 和 parent surface
     // ??  注意：Wayland subsurface 机制
