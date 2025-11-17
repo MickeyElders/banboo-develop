@@ -215,7 +215,14 @@ bool DeepStreamManager::initializeWithSubsurface(
     std::cout << "  4?? compositor 混合: 父 surface（LVGL UI，camera area 透明）+ subsurface（视频）" << std::endl;
     std::cout << "  ? 结果：UI + 视频同时可见\n" << std::endl;
     
-    // ?? 关键修复：调用完整的initialize()流程
+    // 测试阶段: 强制使用 videotestsrc 作为 Wayland Subsurface 的输入源
+    config_.camera_source = CameraSourceMode::VIDEOTESTSRC;
+    config_.test_pattern = 18;  // 默认使用 SMPTE 彩条
+    // 直接使用 Subsurface 配置的宽高作为测试图案尺寸
+    config_.camera_width = config.width;
+    config_.camera_height = config.height;
+    
+    // 关键: 将配置更新到 initialize() 调用
     config_.sink_mode = VideoSinkMode::WAYLANDSINK;
     config_.screen_width = config.width;
     config_.screen_height = config.height;
@@ -1079,35 +1086,47 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
 }
 
 
-std::string DeepStreamManager::buildWaylandSinkPipeline(
-    const DeepStreamConfig& config,
-    int offset_x,
-    int offset_y,
-    int width,
-    int height) {
-    
-    std::ostringstream pipeline;
-    
-    // 摄像头源
-    pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-             << "! video/x-raw(memory:NVMM)"
-             << ",width=" << config.camera_width
-             << ",height=" << config.camera_height
-             << ",framerate=" << config.camera_fps << "/1 ";
-    
-    // 格式转换和缩放
-    pipeline << "! nvvidconv "
-             << "! video/x-raw,format=BGRx"
-             << ",width=" << width
-             << ",height=" << height << " ";
-    
-    // ?? 关键：waylandsink 不设置 display 参数
-    // waylandsink 会在启动时通过 g_object_set 绑定到我们的 subsurface
-    pipeline << "! waylandsink name=video_sink "
-             << "sync=false "
-             << "async=true ";
-    
-    return pipeline.str();
+ std::string DeepStreamManager::buildWaylandSinkPipeline(
+     const DeepStreamConfig& config,
+     int offset_x,
+     int offset_y,
+     int width,
+     int height) {
+     
+     std::ostringstream pipeline;
+     
+     // 摄像头源 / 测试源
+     if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
+         int pattern = config.test_pattern;
+         if (pattern < 0) pattern = 0;
+ 
+         pipeline << "videotestsrc pattern=" << pattern << " is-live=true "
+                  << "! video/x-raw"
+                  << ",width=" << width
+                  << ",height=" << height
+                  << ",framerate=" << config.camera_fps << "/1 "
+                  << "! videoconvert "
+                  << "! video/x-raw,format=BGRx"
+                  << ",width=" << width
+                  << ",height=" << height << " ";
+     } else {
+         pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
+                  << "! video/x-raw(memory:NVMM)"
+                  << ",width=" << config.camera_width
+                  << ",height=" << config.camera_height
+                  << ",framerate=" << config.camera_fps << "/1 "
+                  << "! nvvidconv "
+                  << "! video/x-raw,format=BGRx"
+                  << ",width=" << width
+                  << ",height=" << height << " ";
+     }
+     
+     // 关键: waylandsink 在 bus sync handler 中绑定到 subsurface
+     pipeline << "! waylandsink name=video_sink "
+              << "sync=false "
+              << "async=true ";
+     
+     return pipeline.str();
 }
 
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
