@@ -120,8 +120,10 @@ bool DeepStreamManager::initializeWithSubsurface(
     auto* wl_subcompositor = static_cast<struct wl_subcompositor*>(parent_subcompositor);
     auto* wl_parent_surface = static_cast<struct wl_surface*>(parent_surface);
     
-    // ?? 保存父窗口的 wl_display，用于传递给 waylandsink
+    // 记录父 wl_surface（LVGL 主 surface），后续可以将视频直接绑定到该 surface 调试
     parent_wl_display_ = parent_display;
+    parent_wl_surface_ = parent_surface;
+
     
     // ?? 新增：检查父display健康状态
     if (wl_display) {
@@ -476,11 +478,11 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
                                 if (GST_IS_VIDEO_OVERLAY(sink)) {
-                                    // 1?? 设置窗口句柄（将 wl_surface 指针传递给 waylandsink）
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        reinterpret_cast<guintptr>(self->video_surface_)
+                                        reinterpret_cast<guintptr>(self->parent_wl_surface_)
                                     );
+                                     
                                     
                                     std::cout << "? [DeepStream] 已将 subsurface 设置为 waylandsink 的窗口句柄" << std::endl;
                                     

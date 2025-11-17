@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file deepstream_manager.h
  * @brief DeepStream AI推理和视频显示管理器
  * 实现动态布局计算、AI推理和硬件加速显示，支持双摄像头
@@ -243,11 +243,13 @@ public:
      */
     VideoSinkMode getCurrentSinkMode() const { return config_.sink_mode; }
 
-    /**
-     * @brief 配置DRM叠加平面
-     * @param overlay_config 叠加平面配置
-     * @return 是否成功
-     */
+    // Wayland Subsurface 成员（使用 void* 避免直接依赖 Wayland 头文件）
+    void* parent_wl_display_ = nullptr;  // 父 Wayland display（wl_display*）
+    void* parent_wl_surface_ = nullptr;  // 父 wl_surface*（LVGL 主 surface）
+    void* video_surface_     = nullptr;  // 视频 surface（wl_surface*）
+    void* video_subsurface_  = nullptr;  // Subsurface（wl_subsurface*）
+    SubsurfaceConfig subsurface_config_; // Subsurface 配置
+    
     bool configureDRMOverlay(const DRMOverlayConfig& overlay_config);
 
     /**
