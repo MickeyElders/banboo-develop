@@ -31,7 +31,6 @@ enum class DualCameraMode {
 };
 
 /**
- * @brief Wayland Subsurface配置结构
  * 用于创建DeepStream视频的子表面，附加到LVGL父窗口
  */
 struct SubsurfaceConfig {
@@ -178,7 +177,6 @@ public:
     bool initialize(const DeepStreamConfig& config);
 
     /**
-     * @brief 使用Wayland Subsurface模式初始化
      * @param parent_display LVGL的Wayland Display对象
      * @param parent_compositor LVGL的Wayland Compositor对象
      * @param parent_subcompositor LVGL的Wayland Subcompositor对象
@@ -242,15 +240,15 @@ public:
      * @brief 获取当前视频sink模式
      */
     VideoSinkMode getCurrentSinkMode() const { return config_.sink_mode; }
-
     // Wayland Subsurface 成员（使用 void* 避免直接依赖 Wayland 头文件）
     void* parent_wl_display_ = nullptr;  // 父 Wayland display（wl_display*）
     void* parent_wl_surface_ = nullptr;  // 父 wl_surface*（LVGL 主 surface）
     void* video_surface_     = nullptr;  // 视频 surface（wl_surface*）
     void* video_subsurface_  = nullptr;  // Subsurface（wl_subsurface*）
     SubsurfaceConfig subsurface_config_; // Subsurface 配置
-    
     bool configureDRMOverlay(const DRMOverlayConfig& overlay_config);
+    
+    
 
     /**
      * @brief 自动检测可用的DRM叠加平面
@@ -409,7 +407,6 @@ private:
     void cleanup();
 
     /**
-     * @brief 清理 Wayland subsurface 资源（仅在完全停止时调用）
      */
     void cleanupSubsurface();
 
@@ -438,10 +435,6 @@ private:
     std::thread canvas_update_thread_;          // Canvas更新线程
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
     
-    // 🆕 Wayland Subsurface成员变量（使用void*避免类型冲突）
-    void* parent_wl_display_ = nullptr;  // 父窗口的 Wayland display（wl_display*）
-    void* video_surface_ = nullptr;      // 视频子表面（wl_surface*）
-    void* video_subsurface_ = nullptr;   // Subsurface对象（wl_subsurface*）
     SubsurfaceConfig subsurface_config_; // Subsurface配置
     
     // 🔧 线程安全保护
