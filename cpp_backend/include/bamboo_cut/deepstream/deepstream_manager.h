@@ -98,6 +98,9 @@ struct DeepStreamConfig {
     int camera_id;              // 主摄像头ID
     int camera_id_2;            // 副摄像头ID（双摄模式）
     std::string nvinfer_config; // nvinfer配置文件路径
+    bool enable_inference;      // DeepStream nvinfer
+    int infer_width;            // 推理输入宽度
+    int infer_height;           // 推理输入高度
     
     // 双摄配置
     DualCameraMode dual_mode;   // 双摄模式
@@ -129,6 +132,9 @@ struct DeepStreamConfig {
         , camera_id(0)
         , camera_id_2(1)
         , nvinfer_config("config/nvinfer_config.txt")
+        , enable_inference(true)
+        , infer_width(640)
+        , infer_height(640)
         , dual_mode(DualCameraMode::SINGLE_CAMERA)
         , camera_width(1280)
         , camera_height(720)
@@ -376,6 +382,9 @@ private:
      * @brief 构建立体视觉管道
      */
     std::string buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
+    std::string buildInferenceChain(const DeepStreamConfig& config, int display_width, int display_height, int batch_size, bool wayland_sink_mode);
+    std::string resolveFilePath(const std::string& path) const;
+    void logInferenceAssets(const std::string& config_path);
 
     /**
      * @brief 构建GStreamer管道
@@ -435,6 +444,8 @@ private:
     void* lvgl_interface_;      // LVGL界面实例指针
     std::thread canvas_update_thread_;          // Canvas更新线程
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
+    bool inference_available_ = false;
+    std::string resolved_nvinfer_config_;
     
     SubsurfaceConfig subsurface_config_; // Subsurface配置
     

@@ -13,12 +13,15 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
+#include <filesystem>
+#include <algorithm>
 // Wayland架构下移除DRM头文件依赖
 // #include <xf86drm.h>
 // #include <xf86drmMode.h>
 #include <thread>
 #include <chrono>
 #include <set>
+#include <vector>
 #include <gst/app/gstappsink.h>
 
 // ?? 新增：Wayland头文件包含
@@ -27,6 +30,8 @@
 #ifdef ENABLE_LVGL
 #include <lvgl/lvgl.h>
 #endif
+
+namespace fs = std::filesystem;
 
 namespace bamboo_cut {
 namespace deepstream {
@@ -249,6 +254,22 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     std::cout << "[DeepStreamManager] 初始化Wayland视频系统..." << std::endl;
     
     config_ = config;
+    inference_available_ = false;
+    resolved_nvinfer_config_.clear();
+    
+    if (config_.enable_inference) {
+        resolved_nvinfer_config_ = resolveFilePath(config_.nvinfer_config);
+        if (!resolved_nvinfer_config_.empty()) {
+            config_.nvinfer_config = resolved_nvinfer_config_;
+            inference_available_ = true;
+            std::cout << "[DeepStreamManager] ✅ 检测到 nvinfer 配置: " << resolved_nvinfer_config_ << std::endl;
+            logInferenceAssets(resolved_nvinfer_config_);
+        } else {
+            std::cout << "[DeepStreamManager] ⚠️  未找到 nvinfer 配置文件: " << config_.nvinfer_config << std::endl;
+        }
+    } else {
+        std::cout << "[DeepStreamManager] ⚠️  推理被显式禁用，将跳过 nvinfer 初始化" << std::endl;
+    }
     
     // ?? 架构重构：使用Wayland Subsurface模式替代appsink
     std::cout << "[DeepStreamManager] ?? 架构重构：迁移到Wayland Subsurface模式" << std::endl;
@@ -1095,108 +1116,195 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
 
 
  std::string DeepStreamManager::buildWaylandSinkPipeline(
-     const DeepStreamConfig& config,
-     int offset_x,
-     int offset_y,
-     int width,
-     int height) {
-     
-     std::ostringstream pipeline;
-     
-     // 摄像头源 / 测试源
-     if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
-         int pattern = config.test_pattern;
-         if (pattern < 0) pattern = 0;
- 
-         pipeline << "videotestsrc pattern=" << pattern << " is-live=true "
-                  << "! video/x-raw"
-                  << ",width=" << width
-                  << ",height=" << height
-                  << ",framerate=" << config.camera_fps << "/1 "
-                  << "! videoconvert "
-                  << "! video/x-raw,format=BGRx"
-                  << ",width=" << width
-                  << ",height=" << height << " ";
-     } else {
-         pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " "
-                  << "! video/x-raw(memory:NVMM)"
-                  << ",width=" << config.camera_width
-                  << ",height=" << config.camera_height
-                  << ",framerate=" << config.camera_fps << "/1 "
-                  << "! nvvidconv "
-                  << "! video/x-raw,format=BGRx"
-                  << ",width=" << width
-                  << ",height=" << height << " ";
-     }
-     
-     // 关键: waylandsink 在 bus sync handler 中绑定到 subsurface
-     pipeline << "! waylandsink name=video_sink "
-              << "sync=false "
-              << "async=true ";
-     
-     return pipeline.str();
+    const DeepStreamConfig& config,
+    int offset_x,
+    int offset_y,
+    int width,
+    int height) {
+    
+    std::ostringstream pipeline;
+    
+    pipeline << buildCameraSource(config) << " ! "
+             << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
+             << buildInferenceChain(config, width, height, 1, true)
+             << "waylandsink name=video_sink sync=false async=true ";
+    
+    return pipeline.str();
 }
 
 std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout) {
     std::ostringstream pipeline;
+    const int batch_size = (config.dual_mode == DualCameraMode::STEREO_VISION) ? 2 : 1;
+    const bool is_wayland = (config.sink_mode == VideoSinkMode::WAYLANDSINK);
+    const int mux_width = (config.enable_inference && inference_available_) ? std::max(config.infer_width, 1) : layout.width;
+    const int mux_height = (config.enable_inference && inference_available_) ? std::max(config.infer_height, 1) : layout.height;
     
-    // 双摄立体视觉 - 使用 nvstreammux 合并两路流
     pipeline << "nvarguscamerasrc sensor-id=" << config.camera_id << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "m.sink_0 "  // 连接到 mux 的第一个输入
-             
+             << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
+             << "m.sink_0 "
              << "nvarguscamerasrc sensor-id=" << config.camera_id_2 << " ! "
              << "video/x-raw(memory:NVMM),width=" << config.camera_width
              << ",height=" << config.camera_height
              << ",framerate=" << config.camera_fps << "/1,format=NV12 ! "
-             << "m.sink_1 "  // 连接到 mux 的第二个输入
-             
-             << "nvstreammux name=m batch-size=1 width=" << config.camera_width
-             << " height=" << config.camera_height << " ! "
-             << "nvvideoconvert ! ";
-             
+             << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
+             << "m.sink_1 "
+             << "nvstreammux name=m batch-size=" << batch_size
+             << " width=" << mux_width
+             << " height=" << mux_height
+             << " live-source=1 batched-push-timeout=40000 ! "
+             << buildInferenceChain(config, layout.width, layout.height, batch_size, is_wayland);
+    
     switch (config.sink_mode) {
         case VideoSinkMode::NVDRMVIDEOSINK:
-        pipeline << "video/x-raw(memory:NVMM),format=RGBA ! "
-                << "nvdrmvideosink "
-                << "offset-x=" << layout.offset_x << " "
-                << "offset-y=" << layout.offset_y << " "
-                << "set-mode=false "
-                << "sync=false";
-        break;
-        case VideoSinkMode::WAYLANDSINK:
-            pipeline << "video/x-raw,format=RGBA ! "
-                     << "waylandsink "
+            pipeline << "nvdrmvideosink "
+                     << "offset-x=" << layout.offset_x << " "
+                     << "offset-y=" << layout.offset_y << " "
+                     << "set-mode=false "
                      << "sync=false";
             break;
+        case VideoSinkMode::WAYLANDSINK:
+            pipeline << "waylandsink name=video_sink sync=false";
+            break;
         case VideoSinkMode::KMSSINK:
-            pipeline << "videoconvert ! "
-                     << "videoscale ! "
-                     << "video/x-raw,format=BGRA,width=" << layout.width
-                     << ",height=" << layout.height << " ! "
-                     << "queue max-size-buffers=4 max-size-time=0 leaky=downstream ! "
-                     << "kmssink "
+            pipeline << "kmssink "
                      << "connector-id=-1 plane-id=-1 "
                      << "force-modesetting=false can-scale=true "
                      << "sync=false restore-crtc=true";
             break;
         case VideoSinkMode::APPSINK:
         default:
-            pipeline << "videoconvert ! "
-                     << "videoscale ! "
-                     << "video/x-raw,format=BGRA,width=" << layout.width
-                     << ",height=" << layout.height << " ! "
-                     << "queue max-size-buffers=2 max-size-time=0 leaky=downstream ! "
-                     << "appsink name=video_appsink "
-                     << "emit-signals=true sync=false "
+            pipeline << "appsink name=video_appsink emit-signals=true sync=false "
                      << "caps=video/x-raw,format=BGRA,width=" << layout.width
                      << ",height=" << layout.height;
             break;
     }
     
     return pipeline.str();
+}
+
+std::string DeepStreamManager::buildInferenceChain(
+    const DeepStreamConfig& config,
+    int display_width,
+    int display_height,
+    int batch_size,
+    bool wayland_sink_mode) {
+    
+    std::ostringstream chain;
+    const bool enable_infer = config.enable_inference && inference_available_;
+    const int safe_display_width = display_width > 0 ? display_width : config.camera_width;
+    const int safe_display_height = display_height > 0 ? display_height : config.camera_height;
+    const int safe_infer_width = enable_infer ? std::max(config.infer_width, 1) : safe_display_width;
+    const int safe_infer_height = enable_infer ? std::max(config.infer_height, 1) : safe_display_height;
+    const char* final_format = wayland_sink_mode ? "BGRx" : "BGRA";
+    
+    if (enable_infer) {
+        chain << "nvvideoconvert ! "
+              << "video/x-raw(memory:NVMM),format=NV12,width=" << safe_infer_width
+              << ",height=" << safe_infer_height << " ! "
+              << "nvinfer name=primary_gie config-file-path=" << config.nvinfer_config
+              << " batch-size=" << std::max(batch_size, 1)
+              << " unique-id=1 process-mode=1 interval=0 ! "
+              << "nvdsosd name=osd display-text=1 process-mode=0 gpu-id=0 ! ";
+    }
+    
+    chain << "nvvideoconvert ! "
+          << "video/x-raw,format=" << final_format
+          << ",width=" << safe_display_width
+          << ",height=" << safe_display_height << " ! ";
+    
+    return chain.str();
+}
+
+std::string DeepStreamManager::resolveFilePath(const std::string& path) const {
+    if (path.empty()) {
+        return {};
+    }
+    
+    fs::path candidate(path);
+    std::vector<fs::path> search_paths;
+    
+    if (candidate.is_absolute()) {
+        search_paths.push_back(candidate);
+    } else {
+        search_paths.push_back(candidate);
+        search_paths.push_back(fs::path("config") / candidate);
+        search_paths.push_back(fs::path("/opt/bamboo-cut") / candidate);
+        search_paths.push_back(fs::path("/opt/bamboo-cut/config") / candidate.filename());
+    }
+    
+    for (const auto& option : search_paths) {
+        if (option.empty()) continue;
+        std::error_code ec;
+        fs::path normalized = option;
+        if (fs::exists(normalized, ec)) {
+            fs::path resolved = fs::weakly_canonical(normalized, ec);
+            if (!ec) {
+                return resolved.string();
+            }
+            return normalized.string();
+        }
+    }
+    
+    return {};
+}
+
+void DeepStreamManager::logInferenceAssets(const std::string& config_path) {
+    std::ifstream file(config_path);
+    if (!file.is_open()) {
+        std::cout << "[DeepStreamManager] ⚠️  无法读取 nvinfer 配置: " << config_path << std::endl;
+        return;
+    }
+    
+    auto trim_value = [](std::string value) -> std::string {
+        const std::string whitespace = " \t\"";
+        const auto start = value.find_first_not_of(whitespace);
+        if (start == std::string::npos) return {};
+        const auto end = value.find_last_not_of(whitespace);
+        return value.substr(start, end - start + 1);
+    };
+    
+    std::string onnx_path;
+    std::string engine_path;
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        auto pos = line.find('=');
+        if (pos == std::string::npos) continue;
+        
+        std::string key = line.substr(0, pos);
+        std::string value = trim_value(line.substr(pos + 1));
+        
+        if (key.find("onnx-file") != std::string::npos) {
+            onnx_path = value;
+        } else if (key.find("model-engine-file") != std::string::npos) {
+            engine_path = value;
+        }
+    }
+    
+    if (!onnx_path.empty()) {
+        auto resolved = resolveFilePath(onnx_path);
+        if (!resolved.empty()) {
+            std::cout << "[DeepStreamManager] ✅ ONNX 模型: " << resolved << std::endl;
+        } else {
+            std::cout << "[DeepStreamManager] ⚠️  无法解析 ONNX 路径: " << onnx_path << std::endl;
+        }
+    } else {
+        std::cout << "[DeepStreamManager] ⚠️  nvinfer 配置中缺少 onnx-file 项" << std::endl;
+    }
+    
+    if (!engine_path.empty()) {
+        auto resolved = resolveFilePath(engine_path);
+        if (!resolved.empty()) {
+            std::cout << "[DeepStreamManager] ✅ TensorRT 引擎: " << resolved << std::endl;
+        } else {
+            std::cout << "[DeepStreamManager] ⚠️  无法解析引擎路径: " << engine_path << std::endl;
+        }
+    } else {
+        std::cout << "[DeepStreamManager] ⚠️  nvinfer 配置中缺少 model-engine-file 项" << std::endl;
+    }
 }
 
 gboolean DeepStreamManager::busCallback(GstBus* bus, GstMessage* msg, gpointer data) {

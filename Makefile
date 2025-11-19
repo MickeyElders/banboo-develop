@@ -9,7 +9,7 @@
         start-mutter stop-mutter mutter-status mutter-logs check-mutter setup-mutter \
         start-weston stop-weston weston-status auto-setup-environment \
         check-weston-version backup-current-weston uninstall-current-weston \
-        build-debug test-system backup
+        build-debug test-system backup convert-model verify-inference
 
 # === 系统配置 ===
 PROJECT_NAME := bamboo-recognition-system
@@ -29,6 +29,17 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DENABLE_LVGL=ON \
                -DENABLE_CPP_INFERENCE=ON \
                -DENABLE_HARDWARE_ACCELERATION=ON
+
+# === 模型转换配置 ===
+PYTHON ?= python3
+MODEL_SRC := models/best.pt
+MODEL_CONVERTER := models/convert_model.py
+MODEL_BUILD_DIR := $(BUILD_DIR)/models
+MODEL_ONNX_TMP := $(MODEL_BUILD_DIR)/bamboo_detector.onnx
+MODEL_TRT_TMP := $(MODEL_BUILD_DIR)/bamboo_detector.trt
+MODEL_ONNX := $(MODEL_BUILD_DIR)/bamboo_detection.onnx
+MODEL_ENGINE := $(MODEL_BUILD_DIR)/bamboo_detection.onnx_b1_gpu0_fp16.engine
+MODEL_DEPLOY_DIR := $(INSTALL_DIR)/models
 
 # === 颜色定义 ===
 RED := \033[0;31m
@@ -849,7 +860,7 @@ compile-yolo-lib:
 	@echo "$(GREEN)[SUCCESS]$(NC) 自定义 YOLO 解析库已部署"
 
 # === 系统安装 ===
-install-system: compile-yolo-lib
+install-system: convert-model compile-yolo-lib
 	@echo "$(BLUE)[INFO]$(NC) 安装 C++ LVGL 系统到 $(INSTALL_DIR)..."
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
 		echo "$(RED)[ERROR]$(NC) 构建目录不存在，请先运行 make build-system"; \
@@ -871,9 +882,62 @@ install-system: compile-yolo-lib
 		sudo cp config/labels.txt $(INSTALL_DIR)/config/; \
 		echo "$(GREEN)[SUCCESS]$(NC) 标签文件已复制"; \
 	fi
+	@echo "$(BLUE)[INFO]$(NC) 部署优化后的模型文件..."
+	@sudo mkdir -p $(MODEL_DEPLOY_DIR)
+	@if [ -f "$(MODEL_ONNX)" ]; then \
+		sudo cp $(MODEL_ONNX) $(MODEL_DEPLOY_DIR)/; \
+		echo "$(GREEN)[SUCCESS]$(NC) ONNX 模型已部署 -> $(MODEL_DEPLOY_DIR)"; \
+	else \
+		echo "$(YELLOW)[WARN]$(NC) 未找到 $(MODEL_ONNX)，请先运行 make convert-model"; \
+	fi
+	@if [ -f "$(MODEL_ENGINE)" ]; then \
+		sudo cp $(MODEL_ENGINE) $(MODEL_DEPLOY_DIR)/; \
+		echo "$(GREEN)[SUCCESS]$(NC) TensorRT 引擎已部署 -> $(MODEL_DEPLOY_DIR)"; \
+	else \
+		echo "$(YELLOW)[WARN]$(NC) 未找到 $(MODEL_ENGINE)，请先运行 make convert-model"; \
+	fi
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/logs
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/backup
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统安装完成"
+
+# === 模型转换 ===
+convert-model:
+	@echo "$(BLUE)[INFO]$(NC) 检查 PyTorch 模型: $(MODEL_SRC)"
+	@if [ ! -f "$(MODEL_SRC)" ]; then \
+		echo "$(RED)[ERROR]$(NC) 未找到 $(MODEL_SRC)，无法转换模型"; \
+		exit 1; \
+	fi
+	@mkdir -p $(MODEL_BUILD_DIR)
+	@echo "$(BLUE)[INFO]$(NC) 运行模型转换脚本..."
+	@$(PYTHON) $(MODEL_CONVERTER) \
+		--model_path $(MODEL_SRC) \
+		--output_dir $(MODEL_BUILD_DIR) \
+		--formats onnx tensorrt \
+		--optimize \
+		--verify
+	@if [ ! -f "$(MODEL_ONNX_TMP)" ]; then \
+		echo "$(RED)[ERROR]$(NC) 未生成 ONNX 文件: $(MODEL_ONNX_TMP)"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(MODEL_TRT_TMP)" ]; then \
+		echo "$(RED)[ERROR]$(NC) 未生成 TensorRT 引擎: $(MODEL_TRT_TMP)"; \
+		exit 1; \
+	fi
+	@cp $(MODEL_ONNX_TMP) $(MODEL_ONNX)
+	@cp $(MODEL_TRT_TMP) $(MODEL_ENGINE)
+	@mkdir -p models
+	@cp $(MODEL_ONNX) models/bamboo_detection.onnx
+	@cp $(MODEL_ENGINE) models/bamboo_detection.onnx_b1_gpu0_fp16.engine
+	@echo "$(GREEN)[SUCCESS]$(NC) 模型转换完成，产物保存在 $(MODEL_BUILD_DIR)"
+
+# === 推理自检 ===
+verify-inference: convert-model
+	@echo "$(BLUE)[INFO]$(NC) 校验 nvinfer 插件可用性..."
+	@gst-inspect-1.0 nvinfer >/dev/null 2>&1 || { echo "$(RED)[ERROR]$(NC) 找不到 nvinfer 插件"; exit 1; }
+	@echo "$(BLUE)[INFO]$(NC) 确认模型文件..."
+	@test -f "$(MODEL_ONNX)" || { echo "$(RED)[ERROR]$(NC) 缺少 $(MODEL_ONNX)"; exit 1; }
+	@test -f "$(MODEL_ENGINE)" || { echo "$(RED)[ERROR]$(NC) 缺少 $(MODEL_ENGINE)"; exit 1; }
+	@echo "$(GREEN)[SUCCESS]$(NC) 推理资产准备完毕，可以启动 DeepStream 管道"
 
 # === 閰嶇疆璁剧疆 ===
 setup-config:
