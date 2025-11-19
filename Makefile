@@ -32,6 +32,14 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
 
 # === 模型转换配置 ===
 PYTHON ?= python3
+PIP ?= pip3
+NGC_PYTORCH_INDEX ?= https://pypi.ngc.nvidia.com
+# 在 Jetson/JetPack 6 上验证过的 PyTorch wheel 版本，可在部署时覆盖
+PYTORCH_PACKAGES ?= torch==2.1.0+nv24.05 torchvision==0.16.1+nv24.05 torchaudio==2.1.0+nv24.05
+PYTHON_EXTRA_PACKAGES ?= onnx onnxruntime packaging
+PYCUDA_PACKAGE ?= pycuda
+PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
+
 MODEL_SRC := models/best.pt
 MODEL_CONVERTER := models/convert_model.py
 MODEL_BUILD_DIR := $(BUILD_DIR)/models
@@ -901,7 +909,20 @@ install-system: convert-model compile-yolo-lib
 	@echo "$(GREEN)[SUCCESS]$(NC) 系统安装完成"
 
 # === 模型转换 ===
-convert-model:
+prepare-ai-env: $(PYTHON_DEPS_SENTINEL)
+
+$(PYTHON_DEPS_SENTINEL):
+	@echo "$(BLUE)[INFO]$(NC) 准备 PyTorch/ONNX 推理依赖..."
+	@sudo mkdir -p $(BUILD_DIR)
+	@sudo apt-get update
+	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev
+	@$(PIP) install --upgrade pip
+	@$(PIP) install --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
+	@$(PIP) install --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
+	@touch $(PYTHON_DEPS_SENTINEL)
+	@echo "$(GREEN)[SUCCESS]$(NC) Python AI 推理依赖准备完成"
+
+convert-model: prepare-ai-env
 	@echo "$(BLUE)[INFO]$(NC) 检查 PyTorch 模型: $(MODEL_SRC)"
 	@if [ ! -f "$(MODEL_SRC)" ]; then \
 		echo "$(RED)[ERROR]$(NC) 未找到 $(MODEL_SRC)，无法转换模型"; \
