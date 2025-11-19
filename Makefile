@@ -33,6 +33,7 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
 # === 模型转换配置 ===
 PYTHON ?= python3
 PIP ?= pip3
+PIP_VERSION ?= 24.0
 NGC_PYTORCH_INDEX ?= https://pypi.ngc.nvidia.com
 PIP_INSTALL_FLAGS ?= --timeout 300 --retries 5 --no-cache-dir
 # Jetson (JetPack 6) validated wheel versions; override as needed per release
@@ -917,7 +918,7 @@ $(PYTHON_DEPS_SENTINEL):
 	@sudo mkdir -p $(BUILD_DIR)
 	@sudo apt-get update
 	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev
-	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade pip
+	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade "pip==$(PIP_VERSION)"
 	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
 	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
 	@touch $(PYTHON_DEPS_SENTINEL)
