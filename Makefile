@@ -34,7 +34,8 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
 PYTHON ?= python3
 PIP ?= pip3
 NGC_PYTORCH_INDEX ?= https://pypi.ngc.nvidia.com
-# 在 Jetson/JetPack 6 上验证过的 PyTorch wheel 版本，可在部署时覆盖
+PIP_INSTALL_FLAGS ?= --timeout 300 --retries 5 --no-cache-dir
+# Jetson (JetPack 6) validated wheel versions; override as needed per release
 PYTORCH_PACKAGES ?= torch==2.1.0+nv24.05 torchvision==0.16.1+nv24.05 torchaudio==2.1.0+nv24.05
 PYTHON_EXTRA_PACKAGES ?= onnx onnxruntime packaging
 PYCUDA_PACKAGE ?= pycuda
@@ -916,9 +917,9 @@ $(PYTHON_DEPS_SENTINEL):
 	@sudo mkdir -p $(BUILD_DIR)
 	@sudo apt-get update
 	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev
-	@$(PIP) install --upgrade pip
-	@$(PIP) install --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
-	@$(PIP) install --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
+	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade pip
+	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
+	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
 	@touch $(PYTHON_DEPS_SENTINEL)
 	@echo "$(GREEN)[SUCCESS]$(NC) Python AI 推理依赖准备完成"
 
