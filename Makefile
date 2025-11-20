@@ -37,7 +37,7 @@ PIP_VERSION ?= 24.0
 NGC_PYTORCH_INDEX ?= https://pypi.ngc.nvidia.com
 PIP_INSTALL_FLAGS ?= --timeout 300 --retries 5 --no-cache-dir
 # Jetson (JetPack 6) validated wheel versions; override as needed per release
-PYTORCH_PACKAGES ?= torch==2.1.0+nv24.05 torchvision==0.16.1+nv24.05 torchaudio==2.1.0+nv24.05
+PYTORCH_PACKAGES ?= torch==2.1.1 torchvision==0.16.1 torchaudio==2.1.1
 PYTHON_EXTRA_PACKAGES ?= onnx onnxruntime packaging
 # Prefer apt package on Jetson; if不可用则自动回退 pip
 PYCUDA_PKG ?= python3-pycuda
