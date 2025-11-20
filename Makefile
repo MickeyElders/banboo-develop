@@ -39,7 +39,7 @@ PIP_INSTALL_FLAGS ?= --timeout 300 --retries 5 --no-cache-dir
 # Jetson (JetPack 6) validated wheel versions; override as needed per release
 PYTORCH_PACKAGES ?= torch==2.1.0+nv24.05 torchvision==0.16.1+nv24.05 torchaudio==2.1.0+nv24.05
 PYTHON_EXTRA_PACKAGES ?= onnx onnxruntime packaging
-PYCUDA_PACKAGE ?= pycuda
+PYCUDA_PKG ?= python3-pycuda   # Prefer apt package on Jetson to avoid building from source
 PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
 CUDA_HOME ?= /usr/local/cuda
 CUDA_INCLUDE ?= $(CUDA_HOME)/include
@@ -920,13 +920,13 @@ $(PYTHON_DEPS_SENTINEL):
 	@echo "$(BLUE)[INFO]$(NC) 准备 PyTorch/ONNX 推理依赖..."
 	@sudo mkdir -p $(BUILD_DIR)
 	@sudo apt-get update
-	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev
+	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev $(PYCUDA_PKG)
 	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
 	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade "pip==$(PIP_VERSION)"
 	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
 	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
 	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
-	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
+	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYTHON_EXTRA_PACKAGES)
 	@touch $(PYTHON_DEPS_SENTINEL)
 	@echo "$(GREEN)[SUCCESS]$(NC) Python AI 推理依赖准备完成"
 
