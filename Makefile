@@ -41,6 +41,9 @@ PYTORCH_PACKAGES ?= torch==2.1.0+nv24.05 torchvision==0.16.1+nv24.05 torchaudio=
 PYTHON_EXTRA_PACKAGES ?= onnx onnxruntime packaging
 PYCUDA_PACKAGE ?= pycuda
 PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
+CUDA_HOME ?= /usr/local/cuda
+CUDA_INCLUDE ?= $(CUDA_HOME)/include
+CUDA_LIB ?= $(CUDA_HOME)/lib64
 
 MODEL_SRC := models/best.pt
 MODEL_CONVERTER := models/convert_model.py
@@ -918,9 +921,12 @@ $(PYTHON_DEPS_SENTINEL):
 	@sudo mkdir -p $(BUILD_DIR)
 	@sudo apt-get update
 	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev
-	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade "pip==$(PIP_VERSION)"
-	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
-	@$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
+	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
+	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade "pip==$(PIP_VERSION)"
+	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
+	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade --extra-index-url $(NGC_PYTORCH_INDEX) $(PYTORCH_PACKAGES)
+	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
+	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYTHON_EXTRA_PACKAGES) $(PYCUDA_PACKAGE)
 	@touch $(PYTHON_DEPS_SENTINEL)
 	@echo "$(GREEN)[SUCCESS]$(NC) Python AI 推理依赖准备完成"
 
