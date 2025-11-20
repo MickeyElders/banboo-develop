@@ -576,7 +576,11 @@ def main():
                 # 提取模型权重
                 state_dict = model.get('model', model)
                 model = OptimizedBambooDetector(converter.config)
-                model.load_state_dict(state_dict)
+                missing, unexpected = model.load_state_dict(state_dict, strict=False)
+                if missing:
+                    logger.warning(f"state_dict 缺少 {len(missing)} 个键，将跳过：{missing[:5]}{'...' if len(missing) > 5 else ''}")
+                if unexpected:
+                    logger.warning(f"state_dict 包含 {len(unexpected)} 个未使用的键，将忽略：{unexpected[:5]}{'...' if len(unexpected) > 5 else ''}")
         else:
             # 创建新模型
             model = OptimizedBambooDetector(converter.config)
