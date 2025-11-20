@@ -39,7 +39,9 @@ PIP_INSTALL_FLAGS ?= --timeout 300 --retries 5 --no-cache-dir
 # Jetson (JetPack 6) validated wheel versions; override as needed per release
 PYTORCH_PACKAGES ?= torch==2.1.0+nv24.05 torchvision==0.16.1+nv24.05 torchaudio==2.1.0+nv24.05
 PYTHON_EXTRA_PACKAGES ?= onnx onnxruntime packaging
-PYCUDA_PKG ?= python3-pycuda   # Prefer apt package on Jetson to avoid building from source
+# Prefer apt package on Jetson; if不可用则自动回退 pip
+PYCUDA_PKG ?= python3-pycuda
+PYCUDA_FALLBACK ?= pycuda
 PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
 CUDA_HOME ?= /usr/local/cuda
 CUDA_INCLUDE ?= $(CUDA_HOME)/include
@@ -920,7 +922,15 @@ $(PYTHON_DEPS_SENTINEL):
 	@echo "$(BLUE)[INFO]$(NC) 准备 PyTorch/ONNX 推理依赖..."
 	@sudo mkdir -p $(BUILD_DIR)
 	@sudo apt-get update
-	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev $(PYCUDA_PKG)
+	@sudo apt-get install -y python3-pip python3-dev python3-numpy libopenblas-dev liblapack-dev libffi-dev
+	@echo "$(BLUE)[INFO]$(NC) 安装 pycuda（优先 apt，失败则 pip 编译）..."
+	@if sudo apt-get install -y $(PYCUDA_PKG); then \
+		echo "$(GREEN)[SUCCESS]$(NC) 使用 apt 安装 pycuda 完成"; \
+	else \
+		echo "$(YELLOW)[WARN]$(NC) apt 未找到 $(PYCUDA_PKG)，回退 pip 安装 $(PYCUDA_FALLBACK)"; \
+		CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
+		$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYCUDA_FALLBACK); \
+	fi
 	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
 	$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade "pip==$(PIP_VERSION)"
 	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
