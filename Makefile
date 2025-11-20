@@ -46,6 +46,9 @@ PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
 CUDA_HOME ?= /usr/local/cuda
 CUDA_INCLUDE ?= $(CUDA_HOME)/include
 CUDA_LIB ?= $(CUDA_HOME)/lib64
+CUDA_BIN ?= $(CUDA_HOME)/bin
+CUDA_CPATH ?= $(CUDA_INCLUDE)
+CUDA_LIBRARY_PATH ?= $(CUDA_LIB)
 
 MODEL_SRC := models/best.pt
 MODEL_CONVERTER := models/convert_model.py
@@ -928,7 +931,10 @@ $(PYTHON_DEPS_SENTINEL):
 		echo "$(GREEN)[SUCCESS]$(NC) 使用 apt 安装 pycuda 完成"; \
 	else \
 		echo "$(YELLOW)[WARN]$(NC) apt 未找到 $(PYCUDA_PKG)，回退 pip 安装 $(PYCUDA_FALLBACK)"; \
-		CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
+		CUDA_HOME=$(CUDA_HOME) CUDA_ROOT=$(CUDA_HOME) CUDA_PATH=$(CUDA_HOME) \
+		PATH=$(CUDA_BIN):$$PATH \
+		CPATH=$(CUDA_CPATH) LIBRARY_PATH=$(CUDA_LIBRARY_PATH) \
+		CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
 		$(PIP) install $(PIP_INSTALL_FLAGS) --upgrade $(PYCUDA_FALLBACK); \
 	fi
 	@CUDA_HOME=$(CUDA_HOME) CFLAGS="-I$(CUDA_INCLUDE)" LDFLAGS="-L$(CUDA_LIB)" \
