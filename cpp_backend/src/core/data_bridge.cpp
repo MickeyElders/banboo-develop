@@ -1,6 +1,6 @@
 /**
  * @file data_bridge.cpp
- * @brief C++ LVGL一体化系统数据桥接层实现
+ * @brief Thread-safe data bridge implementation.
  */
 
 #include "bamboo_cut/core/data_bridge.h"
@@ -10,7 +10,7 @@ namespace bamboo_cut {
 namespace core {
 
 DataBridge::DataBridge() {
-    // 初始化显示帧缓冲区
+    // Initialize display frame buffer
     display_frame_ = cv::Mat::zeros(480, 640, CV_8UC3);
 }
 
@@ -20,7 +20,6 @@ void DataBridge::updateFrame(const cv::Mat& frame) {
     std::lock_guard<std::mutex> lock(frame_mutex_);
     if (!frame.empty()) {
         frame.copyTo(latest_frame_);
-        // 为显示准备缩放后的帧
         cv::resize(frame, display_frame_, cv::Size(640, 480));
         new_frame_available_.store(true);
         frame_cv_.notify_one();
@@ -83,10 +82,29 @@ ModbusRegisters DataBridge::getModbusRegisters() const {
     return modbus_registers_;
 }
 
+void DataBridge::setPLCCommandValue(uint16_t command) {
+    std::lock_guard<std::mutex> lock(modbus_mutex_);
+    modbus_registers_.plc_command = command;
+}
+
+void DataBridge::setProcessMode(uint16_t mode) {
+    std::lock_guard<std::mutex> lock(modbus_mutex_);
+    modbus_registers_.process_mode = mode;
+}
+
+void DataBridge::setFeedSpeedGear(uint16_t gear) {
+    std::lock_guard<std::mutex> lock(modbus_mutex_);
+    modbus_registers_.feed_speed_gear = gear;
+}
+
+void DataBridge::setPLCAlarmCode(uint16_t alarm) {
+    std::lock_guard<std::mutex> lock(modbus_mutex_);
+    modbus_registers_.plc_ext_alarm = alarm;
+}
+
 void DataBridge::setSystemRunning(bool running) {
     system_running_.store(running);
     
-    // 更新Modbus寄存器
     std::lock_guard<std::mutex> lock(modbus_mutex_);
     modbus_registers_.system_status = running ? 1 : 0;
 }
@@ -101,7 +119,7 @@ void DataBridge::setEmergencyStop(bool stop) {
     if (stop) {
         setSystemRunning(false);
         std::lock_guard<std::mutex> lock(modbus_mutex_);
-        modbus_registers_.plc_command = 6; // 紧急停止命令
+        modbus_registers_.system_status = 4; // emergency stop
     }
 }
 
@@ -111,29 +129,6 @@ bool DataBridge::isEmergencyStop() const {
 
 void DataBridge::setCurrentStep(int step) {
     current_step_.store(step);
-    
-    // 更新PLC命令基于当前步骤
-    std::lock_guard<std::mutex> lock(modbus_mutex_);
-    switch (step) {
-        case 1: // Feed Detection
-            modbus_registers_.plc_command = 1;
-            break;
-        case 2: // Vision Recognition
-            modbus_registers_.plc_command = 0;
-            break;
-        case 3: // Coordinate Transfer
-            modbus_registers_.plc_command = 0;
-            break;
-        case 4: // Cut Prepare
-            modbus_registers_.plc_command = 2;
-            break;
-        case 5: // Execute Cut
-            modbus_registers_.plc_command = 3;
-            break;
-        default:
-            modbus_registers_.plc_command = 0;
-            break;
-    }
 }
 
 int DataBridge::getCurrentStep() const {
@@ -143,12 +138,10 @@ int DataBridge::getCurrentStep() const {
 void DataBridge::updateHeartbeat() {
     uint32_t current = heartbeat_counter_.fetch_add(1);
     
-    // 防止溢出，重置为0
     if (current > 4294967290U) {
         heartbeat_counter_.store(0);
     }
     
-    // 更新Modbus寄存器
     std::lock_guard<std::mutex> lock(modbus_mutex_);
     modbus_registers_.heartbeat = heartbeat_counter_.load();
 }
@@ -159,3 +152,4 @@ uint32_t DataBridge::getHeartbeat() const {
 
 } // namespace core
 } // namespace bamboo_cut
+

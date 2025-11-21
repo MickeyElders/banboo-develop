@@ -11,6 +11,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <cstdint>
 #include <opencv2/opencv.hpp>
 
 namespace bamboo_cut {
@@ -141,18 +142,28 @@ struct SystemStats {
  * @brief Modbus寄存器数据
  */
 struct ModbusRegisters {
-    uint16_t system_status;     // 40001 - 系统状态
-    uint16_t plc_command;       // 40002 - PLC命令
-    uint16_t coord_ready;       // 40003 - 坐标就绪
-    uint32_t x_coordinate;      // 40004 - X坐标(高低位)
-    uint16_t cut_quality;       // 40006 - 切割质量
-    uint32_t heartbeat;         // 40007 - 心跳计数器
-    uint16_t blade_number;      // 40009 - 刀具编号
-    uint16_t health_status;     // 40010 - 健康状态
+    uint16_t system_status;      // 40001 - 系统状态（视觉写）
+    uint16_t plc_command;        // 40002 - PLC命令（PLC写）
+    uint16_t coord_ready;        // 40003 - 坐标就绪（视觉写）
+    uint32_t x_coordinate;       // 40004 - X坐标（高低位，视觉写）
+    uint16_t cut_quality;        // 40006 - 切割质量（视觉写）
+    uint32_t heartbeat;          // 40007 - 心跳计数器（视觉写）
+    uint16_t blade_number;       // 40009 - 刀具编号（视觉写）
+    uint16_t health_status;      // 40010 - 健康状态（视觉写）
+    uint16_t tail_status;        // 40011 - 尾料检测状态（视觉写）
+    uint16_t plc_ext_alarm;      // 40012 - PLC扩展/报警（PLC写）
+    uint16_t rail_direction;     // 40014 - 导轨方向建议（视觉写）
+    uint32_t remaining_length;   // 40015 - 剩余长度（视觉写，高低位）
+    uint16_t coverage;           // 40017 - 覆盖率（视觉写）
+    uint16_t feed_speed_gear;    // 40018 - 进料/速度档位（PLC写）
+    uint16_t process_mode;       // 40019 - 处理模式（PLC写）
     
-    ModbusRegisters() : system_status(0), plc_command(0), coord_ready(0),
-                       x_coordinate(0), cut_quality(0), heartbeat(0),
-                       blade_number(3), health_status(0) {}
+    ModbusRegisters()
+        : system_status(0), plc_command(0), coord_ready(0),
+          x_coordinate(0), cut_quality(0), heartbeat(0),
+          blade_number(0), health_status(0), tail_status(0),
+          plc_ext_alarm(0), rail_direction(0), remaining_length(0),
+          coverage(0), feed_speed_gear(0), process_mode(0) {}
 };
 
 /**
@@ -180,6 +191,10 @@ public:
     // Modbus寄存器数据更新和获取
     void updateModbusRegisters(const ModbusRegisters& registers);
     ModbusRegisters getModbusRegisters() const;
+    void setPLCCommandValue(uint16_t command);
+    void setProcessMode(uint16_t mode);
+    void setFeedSpeedGear(uint16_t gear);
+    void setPLCAlarmCode(uint16_t alarm);
     
     // 系统控制信号
     void setSystemRunning(bool running);

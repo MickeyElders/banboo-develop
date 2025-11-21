@@ -298,60 +298,119 @@ bool updateModbusStatus(
         
         // 40001: 系统状态
         if (widgets.modbus_system_status_label && lv_obj_is_valid(widgets.modbus_system_status_label)) {
-            const char* status_names[] = {"停止", "运行", "错误", "暂停", "紧急停止"};
+            const char* status_names[] = {"STOP", "RUN", "ERROR", "PAUSE", "EMERGENCY", "MAINT"};
             uint16_t system_status = modbus_registers.system_status;
-            const char* status_str = (system_status < 5) ? status_names[system_status] : "未知";
+            const char* status_str = (system_status < 6) ? status_names[system_status] : "UNKNOWN";
             std::string system_status_text = "40001 系统状态: " + std::string(status_str);
             lv_label_set_text(widgets.modbus_system_status_label, system_status_text.c_str());
         }
         
         // 40002: PLC命令
         if (widgets.modbus_plc_command_label && lv_obj_is_valid(widgets.modbus_plc_command_label)) {
-            const char* command_names[] = {"无", "进料检测", "切割准备", "切割完成", "启动送料",
-                                           "停止送料", "复位系统", "保持", "刀片选择"};
+            const char* command_names[] = {"IDLE", "FEED_DETECT", "CUT_PREP", "CUT_DONE", "START_FEED",
+                                           "PAUSE", "EMERGENCY_STOP", "RESUME", "RECHECK", "TAIL_PROCESS"};
             uint16_t plc_command = modbus_registers.plc_command;
-            const char* command_str = (plc_command < 9) ? command_names[plc_command] : "未知命令";
+            const char* command_str = (plc_command < 10) ? command_names[plc_command] : "UNKNOWN";
             std::string plc_command_text = "40002 PLC命令: " + std::string(command_str);
             lv_label_set_text(widgets.modbus_plc_command_label, plc_command_text.c_str());
         }
         
-        // 40003: 坐标就绪标志
+        // 40003: 坐标就绪
         if (widgets.modbus_coord_ready_label && lv_obj_is_valid(widgets.modbus_coord_ready_label)) {
             uint16_t coord_ready = modbus_registers.coord_ready;
-            const char* ready_str = coord_ready ? "是" : "否";
+            const char* ready_str = coord_ready ? "YES" : "NO";
             std::string coord_ready_text = "40003 坐标就绪: " + std::string(ready_str);
             lv_label_set_text(widgets.modbus_coord_ready_label, coord_ready_text.c_str());
         }
         
-        // 40004-40005: X坐标 (32位，0.1mm精度)
+        // 40004-40005: X坐标 (0.1mm)
         if (widgets.modbus_x_coordinate_label && lv_obj_is_valid(widgets.modbus_x_coordinate_label)) {
             uint32_t x_coord_raw = modbus_registers.x_coordinate;
-            float x_coord_mm = static_cast<float>(x_coord_raw) * 0.1f; // 0.1mm精度
+            float x_coord_mm = static_cast<float>(x_coord_raw) * 0.1f;
             std::string x_coord_text = "40004 X坐标: " + std::to_string(static_cast<int>(x_coord_mm * 10) / 10.0) + "mm";
             lv_label_set_text(widgets.modbus_x_coordinate_label, x_coord_text.c_str());
         }
         
         // 40006: 切割质量
         if (widgets.modbus_cut_quality_label && lv_obj_is_valid(widgets.modbus_cut_quality_label)) {
-            const char* quality_names[] = {"正常", "异常"};
+            const char* quality_names[] = {"OK", "NG"};
             uint16_t cut_quality = modbus_registers.cut_quality;
-            const char* quality_str = (cut_quality < 2) ? quality_names[cut_quality] : "未知";
+            const char* quality_str = (cut_quality < 2) ? quality_names[cut_quality] : "UNKNOWN";
             std::string cut_quality_text = "40006 切割质量: " + std::string(quality_str);
             lv_label_set_text(widgets.modbus_cut_quality_label, cut_quality_text.c_str());
         }
         
-        // 40007: 刀片编号
+        // 40009: 刀片编号
         if (widgets.modbus_blade_number_label && lv_obj_is_valid(widgets.modbus_blade_number_label)) {
+            const char* blade_names[] = {"NONE", "BLADE1", "BLADE2", "DUAL"};
             uint16_t blade_number = modbus_registers.blade_number;
-            std::string blade_number_text = "40007 刀片编号: " + std::to_string(blade_number);
+            const char* blade_str = (blade_number < 4) ? blade_names[blade_number] : "UNKNOWN";
+            std::string blade_number_text = "40009 刀片编号: " + std::string(blade_str);
             lv_label_set_text(widgets.modbus_blade_number_label, blade_number_text.c_str());
         }
         
-        // 40008: 健康状态
+        // 40010: 健康状态
         if (widgets.modbus_health_status_label && lv_obj_is_valid(widgets.modbus_health_status_label)) {
+            const char* health_names[] = {"OK", "WARN", "ERROR", "CRITICAL"};
             uint16_t health_status = modbus_registers.health_status;
-            std::string health_status_text = "40008 健康状态: " + std::to_string(health_status) + "%";
+            const char* health_str = (health_status < 4) ? health_names[health_status] : "UNKNOWN";
+            std::string health_status_text = "40010 健康状态: " + std::string(health_str);
             lv_label_set_text(widgets.modbus_health_status_label, health_status_text.c_str());
+        }
+        
+        // 40011: 尾料状态
+        if (widgets.modbus_tail_status_label && lv_obj_is_valid(widgets.modbus_tail_status_label)) {
+            const char* tail_names[] = {"IDLE", "PROCESSING", "DONE", "RECHECK", "", "", "", "", "", "TAIL", "EJECTED"};
+            uint16_t tail_status = modbus_registers.tail_status;
+            const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != ' ') ? tail_names[tail_status] : "UNKNOWN";
+            std::string tail_text = "40011 尾料: " + std::string(tail_str);
+            lv_label_set_text(widgets.modbus_tail_status_label, tail_text.c_str());
+        }
+        
+        // 40012: PLC报警/扩展
+        if (widgets.modbus_plc_alarm_label && lv_obj_is_valid(widgets.modbus_plc_alarm_label)) {
+            uint16_t alarm = modbus_registers.plc_ext_alarm;
+            std::string alarm_text = "40012 报警: " + std::to_string(alarm);
+            lv_label_set_text(widgets.modbus_plc_alarm_label, alarm_text.c_str());
+        }
+        
+        // 40014: 导轨方向
+        if (widgets.modbus_rail_direction_label && lv_obj_is_valid(widgets.modbus_rail_direction_label)) {
+            const char* dir_names[] = {"FWD", "REV"};
+            uint16_t dir = modbus_registers.rail_direction;
+            const char* dir_str = (dir < 2) ? dir_names[dir] : "UNKNOWN";
+            std::string dir_text = "40014 导轨方向: " + std::string(dir_str);
+            lv_label_set_text(widgets.modbus_rail_direction_label, dir_text.c_str());
+        }
+        
+        // 40015-40016: 剩余长度 (0.1mm)
+        if (widgets.modbus_remaining_length_label && lv_obj_is_valid(widgets.modbus_remaining_length_label)) {
+            float remain_mm = static_cast<float>(modbus_registers.remaining_length) * 0.1f;
+            std::string remain_text = "40015 剩余: " + std::to_string(static_cast<int>(remain_mm * 10) / 10.0) + "mm";
+            lv_label_set_text(widgets.modbus_remaining_length_label, remain_text.c_str());
+        }
+        
+        // 40017: 覆盖率
+        if (widgets.modbus_coverage_label && lv_obj_is_valid(widgets.modbus_coverage_label)) {
+            uint16_t coverage = modbus_registers.coverage;
+            std::string coverage_text = "40017 覆盖率: " + std::to_string(coverage) + "%";
+            lv_label_set_text(widgets.modbus_coverage_label, coverage_text.c_str());
+        }
+        
+        // 40018: 速度档
+        if (widgets.modbus_feed_speed_label && lv_obj_is_valid(widgets.modbus_feed_speed_label)) {
+            uint16_t speed = modbus_registers.feed_speed_gear;
+            std::string speed_text = "40018 速度档: " + std::to_string(speed);
+            lv_label_set_text(widgets.modbus_feed_speed_label, speed_text.c_str());
+        }
+        
+        // 40019: 处理模式
+        if (widgets.modbus_process_mode_label && lv_obj_is_valid(widgets.modbus_process_mode_label)) {
+            const char* mode_names[] = {"AUTO", "MANUAL", "MAINT"};
+            uint16_t mode = modbus_registers.process_mode;
+            const char* mode_str = (mode < 3) ? mode_names[mode] : "UNKNOWN";
+            std::string mode_text = "40019 模式: " + std::string(mode_str);
+            lv_label_set_text(widgets.modbus_process_mode_label, mode_text.c_str());
         }
         
         return true;

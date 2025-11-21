@@ -70,27 +70,33 @@ struct LVGLControlWidgets {
     
     // === Modbus 通信组件 ===
     lv_obj_t* modbus_connection_label = nullptr;
-    lv_obj_t* modbus_address_label = nullptr;      // 🆕 Modbus地址
+    lv_obj_t* modbus_address_label = nullptr;      // Modbus地址
     lv_obj_t* modbus_latency_label = nullptr;
-    lv_obj_t* modbus_last_success_label = nullptr; // 🆕 最后通讯时间
+    lv_obj_t* modbus_last_success_label = nullptr; // 最后通讯时间
     lv_obj_t* modbus_error_count_label = nullptr;
-    lv_obj_t* modbus_message_count_label = nullptr; // 🆕 消息计数
-    lv_obj_t* modbus_packets_label = nullptr;       // 🆕 数据包
-    lv_obj_t* modbus_errors_label = nullptr;        // 🆕 错误率
-    lv_obj_t* modbus_heartbeat_label = nullptr;     // 🆕 心跳状态
-    lv_obj_t* modbus_read_count_label = nullptr;    // 🆕 读取计数
-    lv_obj_t* modbus_write_count_label = nullptr;   // 🆕 写入计数
-    lv_obj_t* modbus_slave_status_label = nullptr;  // 🆕 从站状态
-    
+    lv_obj_t* modbus_message_count_label = nullptr; // 消息计数
+    lv_obj_t* modbus_packets_label = nullptr;       // 数据包
+    lv_obj_t* modbus_errors_label = nullptr;        // 错误率
+    lv_obj_t* modbus_heartbeat_label = nullptr;     // 心跳状态
+    lv_obj_t* modbus_read_count_label = nullptr;    // 读取计数
+    lv_obj_t* modbus_write_count_label = nullptr;   // 写入计数
+    lv_obj_t* modbus_slave_status_label = nullptr;  // 从站状态
     // === Modbus 寄存器状态 ===
-    lv_obj_t* modbus_system_status_label = nullptr;   // 🆕 40001 系统状态
-    lv_obj_t* modbus_plc_command_label = nullptr;     // 🆕 40002 PLC命令
-    lv_obj_t* modbus_coord_ready_label = nullptr;     // 🆕 40003 坐标就绪
-    lv_obj_t* modbus_x_coordinate_label = nullptr;    // 🆕 40004 X坐标
-    lv_obj_t* modbus_cut_quality_label = nullptr;     // 🆕 40006 切割质量
-    lv_obj_t* modbus_blade_number_label = nullptr;    // 🆕 40007 刀片编号
-    lv_obj_t* modbus_health_status_label = nullptr;   // 🆕 40008 健康状态
-    
+    lv_obj_t* modbus_system_status_label = nullptr;    // 40001 系统状态
+    lv_obj_t* modbus_plc_command_label = nullptr;      // 40002 PLC命令
+    lv_obj_t* modbus_coord_ready_label = nullptr;      // 40003 坐标就绪
+    lv_obj_t* modbus_x_coordinate_label = nullptr;     // 40004 X坐标
+    lv_obj_t* modbus_cut_quality_label = nullptr;      // 40006 切割质量
+    lv_obj_t* modbus_blade_number_label = nullptr;     // 40009 刀片编号
+    lv_obj_t* modbus_health_status_label = nullptr;    // 40010 健康状态
+    lv_obj_t* modbus_tail_status_label = nullptr;      // 40011 尾料状态
+    lv_obj_t* modbus_plc_alarm_label = nullptr;        // 40012 PLC扩展/报警
+    lv_obj_t* modbus_rail_direction_label = nullptr;   // 40014 导轨方向
+    lv_obj_t* modbus_remaining_length_label = nullptr; // 40015 剩余长度
+    lv_obj_t* modbus_coverage_label = nullptr;         // 40017 覆盖率
+    lv_obj_t* modbus_feed_speed_label = nullptr;       // 40018 速度档
+    lv_obj_t* modbus_process_mode_label = nullptr;     // 40019 处理模式
+
     // === 工作流程状态 ===
     std::vector<lv_obj_t*> workflow_buttons;       // 🆕 工作流步骤按钮（用于状态指示）
     lv_obj_t* workflow_state_label = nullptr;      // 🆕 工作流状态

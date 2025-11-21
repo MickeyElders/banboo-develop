@@ -360,125 +360,182 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
 #ifdef ENABLE_LVGL
     // 40001: 系统状态
     if (control_widgets_.modbus_system_status_label) {
-        const char* status_names[] = {"停止", "运行", "错误", "暂停", "紧急停止"};
+        const char* status_names[] = {"停止", "运行", "错误", "暂停", "紧急停机", "维护"};
         uint16_t system_status = modbus_registers.system_status;
-        const char* status_str = (system_status < 5) ? status_names[system_status] : "未知";
-        
+        const char* status_str = (system_status < 6) ? status_names[system_status] : "未知";
+
         std::string system_status_text = "40001 系统状态: " + std::string(status_str);
         lv_label_set_text(control_widgets_.modbus_system_status_label, system_status_text.c_str());
-        
-        // 根据状态设置颜色
-        if (system_status == 1) { // 运行
+
+        if (system_status == 1) {
             lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_success_, 0);
-        } else if (system_status == 2 || system_status == 4) { // 错误或紧急停止
+        } else if (system_status == 2 || system_status == 4) {
             lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_error_, 0);
-        } else if (system_status == 3) { // 暂停
+        } else if (system_status == 3 || system_status == 5) {
             lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, color_warning_, 0);
-        } else { // 停止或未知
+        } else {
             lv_obj_set_style_text_color(control_widgets_.modbus_system_status_label, lv_color_hex(0xB0B8C1), 0);
         }
     }
-    
+
     // 40002: PLC命令
     if (control_widgets_.modbus_plc_command_label) {
-        const char* command_names[] = {"无", "进料检测", "切割准备", "切割完成", "启动送料",
-                                       "停止送料", "复位系统", "保持", "刀片选择"};
+        const char* command_names[] = {
+            "空闲", "进料检测", "切割准备", "切割完成", "启动送料",
+            "暂停", "紧急停机", "恢复运行", "重复检测", "尾料处理"};
         uint16_t plc_command = modbus_registers.plc_command;
-        const char* command_str = (plc_command < 9) ? command_names[plc_command] : "未知命令";
-        
+        const char* command_str = (plc_command < 10) ? command_names[plc_command] : "未知命令";
+
         std::string plc_command_text = "40002 PLC命令: " + std::string(command_str);
         lv_label_set_text(control_widgets_.modbus_plc_command_label, plc_command_text.c_str());
-        
-        // 根据命令类型设置颜色
-        if (plc_command >= 1 && plc_command <= 5) { // 正常操作命令
+
+        if (plc_command >= 1 && plc_command <= 5) {
             lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, color_primary_, 0);
-        } else if (plc_command == 6) { // 复位系统
+        } else if (plc_command == 6) {
+            lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, color_error_, 0);
+        } else if (plc_command == 7 || plc_command == 8 || plc_command == 9) {
             lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, color_warning_, 0);
-        } else { // 无命令或其他
+        } else {
             lv_obj_set_style_text_color(control_widgets_.modbus_plc_command_label, lv_color_hex(0xB0B8C1), 0);
         }
     }
-    
+
     // 40003: 坐标就绪标志
     if (control_widgets_.modbus_coord_ready_label) {
         uint16_t coord_ready = modbus_registers.coord_ready;
         const char* ready_str = coord_ready ? "是" : "否";
-        
+
         std::string coord_ready_text = "40003 坐标就绪: " + std::string(ready_str);
         lv_label_set_text(control_widgets_.modbus_coord_ready_label, coord_ready_text.c_str());
-        
+
         lv_obj_set_style_text_color(control_widgets_.modbus_coord_ready_label,
             coord_ready ? color_success_ : color_warning_, 0);
     }
-    
-    // 40004-40005: X坐标 (32位，0.1mm精度)
+
+    // 40004-40005: X坐标 (0.1mm 精度)
     if (control_widgets_.modbus_x_coordinate_label) {
         uint32_t x_coord_raw = modbus_registers.x_coordinate;
-        float x_coord_mm = static_cast<float>(x_coord_raw) * 0.1f; // 0.1mm精度
-        
+        float x_coord_mm = static_cast<float>(x_coord_raw) * 0.1f;
+
         std::string x_coord_text = "40004 X坐标: " + std::to_string(static_cast<int>(x_coord_mm * 10) / 10.0) + "mm";
         lv_label_set_text(control_widgets_.modbus_x_coordinate_label, x_coord_text.c_str());
-        
-        // 根据坐标值设置颜色（假设有效范围是0-1000mm）
+
         if (x_coord_mm >= 0.0f && x_coord_mm <= 1000.0f) {
             lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, color_primary_, 0);
         } else {
             lv_obj_set_style_text_color(control_widgets_.modbus_x_coordinate_label, color_warning_, 0);
         }
     }
-    
+
     // 40006: 切割质量
     if (control_widgets_.modbus_cut_quality_label) {
         const char* quality_names[] = {"正常", "异常"};
         uint16_t cut_quality = modbus_registers.cut_quality;
         const char* quality_str = (cut_quality < 2) ? quality_names[cut_quality] : "未知";
-        
+
         std::string cut_quality_text = "40006 切割质量: " + std::string(quality_str);
         lv_label_set_text(control_widgets_.modbus_cut_quality_label, cut_quality_text.c_str());
-        
+
         lv_obj_set_style_text_color(control_widgets_.modbus_cut_quality_label,
             (cut_quality == 0) ? color_success_ : color_error_, 0);
     }
-    
+
     // 40009: 刀片编号
     if (control_widgets_.modbus_blade_number_label) {
-        const char* blade_names[] = {"无", "刀片1", "刀片2", "双刀片"};
+        const char* blade_names[] = {"未指定", "刀1", "刀2", "双刀"};
         uint16_t blade_number = modbus_registers.blade_number;
         const char* blade_str = (blade_number < 4) ? blade_names[blade_number] : "未知刀片";
-        
+
         std::string blade_number_text = "40009 刀片编号: " + std::string(blade_str);
         lv_label_set_text(control_widgets_.modbus_blade_number_label, blade_number_text.c_str());
-        
-        // 根据刀片状态设置颜色
-        if (blade_number >= 1 && blade_number <= 3) { // 有刀片
+
+        if (blade_number >= 1 && blade_number <= 3) {
             lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, color_success_, 0);
-        } else { // 无刀片或未知
+        } else {
             lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, color_warning_, 0);
         }
     }
-    
+
     // 40010: 健康状态
     if (control_widgets_.modbus_health_status_label) {
-        const char* health_names[] = {"正常", "警告", "错误", "严重"};
+        const char* health_names[] = {"正常", "警告", "错误", "严重错误"};
         uint16_t health_status = modbus_registers.health_status;
         const char* health_str = (health_status < 4) ? health_names[health_status] : "未知";
-        
+
         std::string health_status_text = "40010 健康状态: " + std::string(health_str);
         lv_label_set_text(control_widgets_.modbus_health_status_label, health_status_text.c_str());
-        
-        // 根据健康状态设置颜色
-        if (health_status == 0) { // 正常
+
+        if (health_status == 0) {
             lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_success_, 0);
-        } else if (health_status == 1) { // 警告
+        } else if (health_status == 1) {
             lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_warning_, 0);
-        } else if (health_status >= 2) { // 错误或严重
+        } else {
             lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, color_error_, 0);
-        } else { // 未知
-            lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, lv_color_hex(0xB0B8C1), 0);
         }
+    }
+
+    // 40011: 尾料状态
+    if (control_widgets_.modbus_tail_status_label) {
+        const char* tail_names[] = {"空闲", "检测中", "完成", "重检", "", "", "", "", "", "尾料", "已推出"};
+        uint16_t tail_status = modbus_registers.tail_status;
+        const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != ' ') ? tail_names[tail_status] : "未知";
+
+        std::string tail_text = "40011 尾料: " + std::string(tail_str);
+        lv_label_set_text(control_widgets_.modbus_tail_status_label, tail_text.c_str());
+    }
+
+    // 40012: PLC报警/扩展
+    if (control_widgets_.modbus_plc_alarm_label) {
+        uint16_t alarm = modbus_registers.plc_ext_alarm;
+        std::string alarm_text = "40012 报警: " + std::to_string(alarm);
+        lv_label_set_text(control_widgets_.modbus_plc_alarm_label, alarm_text.c_str());
+    }
+
+    // 40014: 导轨方向
+    if (control_widgets_.modbus_rail_direction_label) {
+        const char* dir_names[] = {"正向", "反向"};
+        uint16_t dir = modbus_registers.rail_direction;
+        const char* dir_str = (dir < 2) ? dir_names[dir] : "未知";
+
+        std::string dir_text = "40014 导轨方向: " + std::string(dir_str);
+        lv_label_set_text(control_widgets_.modbus_rail_direction_label, dir_text.c_str());
+    }
+
+    // 40015-40016: 剩余长度 (0.1mm)
+    if (control_widgets_.modbus_remaining_length_label) {
+        float remain_mm = static_cast<float>(modbus_registers.remaining_length) * 0.1f;
+        std::string remain_text = "40015 剩余: " + std::to_string(static_cast<int>(remain_mm * 10) / 10.0) + "mm";
+        lv_label_set_text(control_widgets_.modbus_remaining_length_label, remain_text.c_str());
+    }
+
+    // 40017: 覆盖率
+    if (control_widgets_.modbus_coverage_label) {
+        uint16_t coverage = modbus_registers.coverage;
+        std::string coverage_text = "40017 覆盖率: " + std::to_string(coverage) + "%";
+        lv_label_set_text(control_widgets_.modbus_coverage_label, coverage_text.c_str());
+    }
+
+    // 40018: 速度档
+    if (control_widgets_.modbus_feed_speed_label) {
+        uint16_t speed = modbus_registers.feed_speed_gear;
+        std::string speed_text = "40018 速度档: " + std::to_string(speed);
+        lv_label_set_text(control_widgets_.modbus_feed_speed_label, speed_text.c_str());
+    }
+
+    // 40019: 处理模式
+    if (control_widgets_.modbus_process_mode_label) {
+        const char* mode_names[] = {"自动", "手动", "维护"};
+        uint16_t mode = modbus_registers.process_mode;
+        const char* mode_str = (mode < 3) ? mode_names[mode] : "未知";
+
+        std::string mode_text = "40019 模式: " + std::string(mode_str);
+        lv_label_set_text(control_widgets_.modbus_process_mode_label, mode_text.c_str());
     }
 #endif
 }
+
+
+
 
 void LVGLInterface::drawDetectionResults(const core::DetectionResult& result) {
 #ifdef ENABLE_LVGL

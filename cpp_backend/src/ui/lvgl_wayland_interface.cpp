@@ -1385,14 +1385,49 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_obj_set_style_text_font(control_widgets_.modbus_cut_quality_label, &lv_font_montserrat_12, 0);
 
     control_widgets_.modbus_blade_number_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_blade_number_label, "40007 Blade: --");
+    lv_label_set_text(control_widgets_.modbus_blade_number_label, "40009 Blade: --");
     lv_obj_set_style_text_color(control_widgets_.modbus_blade_number_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_blade_number_label, &lv_font_montserrat_12, 0);
 
     control_widgets_.modbus_health_status_label = lv_label_create(modbus_section);
-    lv_label_set_text(control_widgets_.modbus_health_status_label, "40008 Health: --%");
+    lv_label_set_text(control_widgets_.modbus_health_status_label, "40010 Health: --");
     lv_obj_set_style_text_color(control_widgets_.modbus_health_status_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.modbus_health_status_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_tail_status_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_tail_status_label, "40011 Tail: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_tail_status_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_tail_status_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_plc_alarm_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_plc_alarm_label, "40012 PLC Alarm: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_plc_alarm_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_plc_alarm_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_rail_direction_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_rail_direction_label, "40014 Rail Dir: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_rail_direction_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_rail_direction_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_remaining_length_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_remaining_length_label, "40015 Remain: -- mm");
+    lv_obj_set_style_text_color(control_widgets_.modbus_remaining_length_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_remaining_length_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_coverage_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_coverage_label, "40017 Coverage: --%");
+    lv_obj_set_style_text_color(control_widgets_.modbus_coverage_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_coverage_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_feed_speed_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_feed_speed_label, "40018 Speed Gear: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_feed_speed_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_feed_speed_label, &lv_font_montserrat_12, 0);
+
+    control_widgets_.modbus_process_mode_label = lv_label_create(modbus_section);
+    lv_label_set_text(control_widgets_.modbus_process_mode_label, "40019 Mode: --");
+    lv_obj_set_style_text_color(control_widgets_.modbus_process_mode_label, lv_color_hex(0xB0B8C1), 0);
+    lv_obj_set_style_text_font(control_widgets_.modbus_process_mode_label, &lv_font_montserrat_12, 0);
 
     footer_panel_ = lv_obj_create(main_screen_);
     lv_obj_set_width(footer_panel_, lv_pct(100));
