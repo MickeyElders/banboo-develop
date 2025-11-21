@@ -137,6 +137,7 @@ private:
      * @brief 解析tegrastats输出
      */
     SystemStats parseTegrastatsOutput(const std::string& output);
+    std::string readSysfsStats();
     
     /**
      * @brief 解析CPU信息

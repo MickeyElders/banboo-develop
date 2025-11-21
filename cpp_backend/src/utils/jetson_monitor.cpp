@@ -10,6 +10,7 @@
 #include <regex>
 #include <cstdio>
 #include <memory>
+#include <fstream>
 
 namespace bamboo_cut {
 namespace utils {
@@ -120,10 +121,67 @@ std::string JetsonMonitor::executeTegrastats() {
             result = buffer;
         }
         
+        if (result.empty()) {
+            return readSysfsStats();
+        }
         return result;
         
     } catch (const std::exception& e) {
         // 静默处理tegrastats执行异常，避免干扰推理日志
+        return readSysfsStats();
+    }
+}
+
+std::string JetsonMonitor::readSysfsStats() {
+    // 轻量回退：从 /proc/stat 和 /proc/meminfo 获取 CPU/Mem（GPU 置 0）
+    try {
+        auto read_cpu_line = []() {
+            std::ifstream f("/proc/stat");
+            std::string line;
+            if (std::getline(f, line)) return line;
+            return std::string();
+        };
+        auto parse_cpu = [](const std::string& l) {
+            std::istringstream iss(l);
+            std::string cpu;
+            long user, nice, sys, idle, iowait, irq, softirq, steal, guest, guest_nice;
+            iss >> cpu >> user >> nice >> sys >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
+            long idle_all = idle + iowait;
+            long non_idle = user + nice + sys + irq + softirq + steal;
+            long total = idle_all + non_idle;
+            return std::make_pair(total, idle_all);
+        };
+
+        auto l1 = read_cpu_line();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        auto l2 = read_cpu_line();
+        int cpu_percent = 0;
+        if (!l1.empty() && !l2.empty()) {
+            auto pair1 = parse_cpu(l1);
+            auto pair2 = parse_cpu(l2);
+            long totald = pair2.first - pair1.first;
+            long idled = pair2.second - pair1.second;
+            if (totald > 0) cpu_percent = int((totald - idled) * 100 / totald);
+        }
+
+        std::ifstream mf("/proc/meminfo");
+        long mem_total = 0, mem_avail = 0;
+        if (mf) {
+            std::string key, unit;
+            long val;
+            while (mf >> key >> val >> unit) {
+                if (key == "MemTotal:") mem_total = val / 1024;
+                else if (key == "MemAvailable:") mem_avail = val / 1024;
+            }
+        }
+        long mem_used = mem_total - mem_avail;
+
+        std::ostringstream oss;
+        oss << "RAM " << mem_used << "/" << mem_total << "MB (lfb 0x0MB) "
+            << "SWAP 0/0MB (cached 0MB) CPU [" << cpu_percent << "%@0] "
+            << "GR3D_FREQ 0% EMC_FREQ 0%@0 VIC 0%@0";
+        return oss.str();
+    } catch (...) {
         return "";
     }
 }
