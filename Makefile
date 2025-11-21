@@ -43,7 +43,7 @@ PYTHON_EXTRA_PACKAGES ?= "numpy<2" onnx onnxruntime packaging
 PYCUDA_PKG ?= python3-pycuda
 PYCUDA_FALLBACK ?= pycuda
 PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
-SKIP_CONVERT ?= 0
+SKIP_CONVERT ?= 1
 CUDA_HOME ?= /usr/local/cuda
 CUDA_INCLUDE ?= $(CUDA_HOME)/include
 CUDA_LIB ?= $(CUDA_HOME)/lib64
@@ -879,7 +879,11 @@ compile-yolo-lib:
 	@echo "$(GREEN)[SUCCESS]$(NC) 自定义 YOLO 解析库已部署"
 
 # === 系统安装 ===
+ifeq ($(SKIP_CONVERT),1)
+install-system: compile-yolo-lib
+else
 install-system: convert-model compile-yolo-lib
+endif
 	@echo "$(BLUE)[INFO]$(NC) 安装 C++ LVGL 系统到 $(INSTALL_DIR)..."
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
 		echo "$(RED)[ERROR]$(NC) 构建目录不存在，请先运行 make build-system"; \
