@@ -43,6 +43,7 @@ PYTHON_EXTRA_PACKAGES ?= "numpy<2" onnx onnxruntime packaging
 PYCUDA_PKG ?= python3-pycuda
 PYCUDA_FALLBACK ?= pycuda
 PYTHON_DEPS_SENTINEL := $(BUILD_DIR)/.python_ai_env_ready
+SKIP_CONVERT ?= 0
 CUDA_HOME ?= /usr/local/cuda
 CUDA_INCLUDE ?= $(CUDA_HOME)/include
 CUDA_LIB ?= $(CUDA_HOME)/lib64
@@ -947,6 +948,10 @@ $(PYTHON_DEPS_SENTINEL):
 	@echo "$(GREEN)[SUCCESS]$(NC) Python AI 推理依赖准备完成"
 
 convert-model: prepare-ai-env
+	@if [ "$(SKIP_CONVERT)" = "1" ]; then \
+		echo "$(YELLOW)[WARN]$(NC) 已设置 SKIP_CONVERT=1，跳过模型转换"; \
+		exit 0; \
+	fi
 	@echo "$(BLUE)[INFO]$(NC) 检查 PyTorch 模型: $(MODEL_SRC)"
 	@if [ ! -f "$(MODEL_SRC)" ]; then \
 		echo "$(RED)[ERROR]$(NC) 未找到 $(MODEL_SRC)，无法转换模型"; \
