@@ -384,7 +384,7 @@ private:
     std::string buildStereoVisionPipeline(const DeepStreamConfig& config, const VideoLayout& layout);
     std::string buildInferenceChain(const DeepStreamConfig& config, int display_width, int display_height, int batch_size, bool wayland_sink_mode);
     std::string resolveFilePath(const std::string& path) const;
-    void logInferenceAssets(const std::string& config_path);
+    bool logInferenceAssets(const std::string& config_path);
 
     /**
      * @brief 构建GStreamer管道

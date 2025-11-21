@@ -260,12 +260,20 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     if (config_.enable_inference) {
         resolved_nvinfer_config_ = resolveFilePath(config_.nvinfer_config);
         if (!resolved_nvinfer_config_.empty()) {
-            config_.nvinfer_config = resolved_nvinfer_config_;
-            inference_available_ = true;
-            std::cout << "[DeepStreamManager] ✅ 检测到 nvinfer 配置: " << resolved_nvinfer_config_ << std::endl;
-            logInferenceAssets(resolved_nvinfer_config_);
+            bool assets_ok = logInferenceAssets(resolved_nvinfer_config_);
+            if (assets_ok) {
+                config_.nvinfer_config = resolved_nvinfer_config_;
+                inference_available_ = true;
+                std::cout << "[DeepStreamManager] ✅ 推理资产完整，启用 nvinfer: " << resolved_nvinfer_config_ << std::endl;
+            } else {
+                inference_available_ = false;
+                config_.enable_inference = false;
+                std::cout << "[DeepStreamManager] ⚠️  推理资产缺失，已自动禁用 nvinfer，继续仅显示视频" << std::endl;
+            }
         } else {
-            std::cout << "[DeepStreamManager] ⚠️  未找到 nvinfer 配置文件: " << config_.nvinfer_config << std::endl;
+            std::cout << "[DeepStreamManager] ⚠️  未找到 nvinfer 配置文件: " << config_.nvinfer_config << "，将禁用推理" << std::endl;
+            config_.enable_inference = false;
+            inference_available_ = false;
         }
     } else {
         std::cout << "[DeepStreamManager] ⚠️  推理被显式禁用，将跳过 nvinfer 初始化" << std::endl;
@@ -1251,11 +1259,11 @@ std::string DeepStreamManager::resolveFilePath(const std::string& path) const {
     return {};
 }
 
-void DeepStreamManager::logInferenceAssets(const std::string& config_path) {
+bool DeepStreamManager::logInferenceAssets(const std::string& config_path) {
     std::ifstream file(config_path);
     if (!file.is_open()) {
         std::cout << "[DeepStreamManager] ⚠️  无法读取 nvinfer 配置: " << config_path << std::endl;
-        return;
+        return false;
     }
     
     auto trim_value = [](std::string value) -> std::string {
@@ -1284,15 +1292,19 @@ void DeepStreamManager::logInferenceAssets(const std::string& config_path) {
         }
     }
     
+    bool ok = true;
+
     if (!onnx_path.empty()) {
         auto resolved = resolveFilePath(onnx_path);
         if (!resolved.empty()) {
             std::cout << "[DeepStreamManager] ✅ ONNX 模型: " << resolved << std::endl;
         } else {
             std::cout << "[DeepStreamManager] ⚠️  无法解析 ONNX 路径: " << onnx_path << std::endl;
+            ok = false;
         }
     } else {
         std::cout << "[DeepStreamManager] ⚠️  nvinfer 配置中缺少 onnx-file 项" << std::endl;
+        ok = false;
     }
     
     if (!engine_path.empty()) {
@@ -1301,10 +1313,14 @@ void DeepStreamManager::logInferenceAssets(const std::string& config_path) {
             std::cout << "[DeepStreamManager] ✅ TensorRT 引擎: " << resolved << std::endl;
         } else {
             std::cout << "[DeepStreamManager] ⚠️  无法解析引擎路径: " << engine_path << std::endl;
+            ok = false;
         }
     } else {
         std::cout << "[DeepStreamManager] ⚠️  nvinfer 配置中缺少 model-engine-file 项" << std::endl;
+        ok = false;
     }
+
+    return ok;
 }
 
 gboolean DeepStreamManager::busCallback(GstBus* bus, GstMessage* msg, gpointer data) {
