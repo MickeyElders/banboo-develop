@@ -98,41 +98,7 @@ void JetsonMonitor::monitorLoop() {
     // 静默结束监控循环
 }
 
-std::string JetsonMonitor::executeTegrastats() {
-    try {
-        // 使用popen执行tegrastats --interval 1000并读取一次输出
-        std::unique_ptr<FILE, decltype(&pclose)> pipe(
-            popen("timeout 3s tegrastats --interval 1000", "r"), pclose);
-        
-        if (!pipe) {
-            // 保留关键错误信息，但不频繁输出
-            static int cmd_error_count = 0;
-            if (++cmd_error_count % 20 == 1) { // 每20次错误只输出一次
-                std::cerr << "[JetsonMonitor] 无法执行tegrastats命令" << std::endl;
-            }
-            return "";
-        }
-        
-        std::string result;
-        char buffer[1024];
-        
-        // 只读取第一行输出（最新状态）
-        if (fgets(buffer, sizeof(buffer), pipe.get()) != nullptr) {
-            result = buffer;
-        }
-        
-        if (result.empty()) {
-            return readSysfsStats();
-        }
-        return result;
-        
-    } catch (const std::exception& e) {
-        // 静默处理tegrastats执行异常，避免干扰推理日志
-        return readSysfsStats();
-    }
-}
-
-std::string JetsonMonitor::readSysfsStats() {
+std::string Jestd::string JetsonMonitor::readSysfsStats() {
     // 轻量回退：从 /proc/stat 和 /proc/meminfo 获取 CPU/Mem（GPU 置 0）
     try {
         auto read_cpu_line = []() {
