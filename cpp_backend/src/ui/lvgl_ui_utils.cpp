@@ -362,7 +362,7 @@ bool updateModbusStatus(
         if (widgets.modbus_tail_status_label && lv_obj_is_valid(widgets.modbus_tail_status_label)) {
             const char* tail_names[] = {"IDLE", "PROCESSING", "DONE", "RECHECK", "", "", "", "", "", "TAIL", "EJECTED"};
             uint16_t tail_status = modbus_registers.tail_status;
-            const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != ' ') ? tail_names[tail_status] : "UNKNOWN";
+            const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != '\0') ? tail_names[tail_status] : "UNKNOWN";
             std::string tail_text = "40011 尾料: " + std::string(tail_str);
             lv_label_set_text(widgets.modbus_tail_status_label, tail_text.c_str());
         }

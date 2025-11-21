@@ -478,7 +478,7 @@ void LVGLInterface::updateModbusRegisters(const core::ModbusRegisters& modbus_re
     if (control_widgets_.modbus_tail_status_label) {
         const char* tail_names[] = {"空闲", "检测中", "完成", "重检", "", "", "", "", "", "尾料", "已推出"};
         uint16_t tail_status = modbus_registers.tail_status;
-        const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != ' ') ? tail_names[tail_status] : "未知";
+        const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != '\0') ? tail_names[tail_status] : "未知";
 
         std::string tail_text = "40011 尾料: " + std::string(tail_str);
         lv_label_set_text(control_widgets_.modbus_tail_status_label, tail_text.c_str());

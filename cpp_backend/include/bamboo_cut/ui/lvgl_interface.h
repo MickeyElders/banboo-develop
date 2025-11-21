@@ -526,6 +526,13 @@ private:
         lv_obj_t* modbus_cut_quality_label;        // 40006: 切割质量
         lv_obj_t* modbus_blade_number_label;       // 40009: 刀片编号
         lv_obj_t* modbus_health_status_label;      // 40010: 健康状态
+        lv_obj_t* modbus_tail_status_label;        // 40011: 尾料状态
+        lv_obj_t* modbus_plc_alarm_label;          // 40012: PLC扩展/报警
+        lv_obj_t* modbus_rail_direction_label;     // 40014: 导轨方向
+        lv_obj_t* modbus_remaining_length_label;   // 40015-16: 剩余长度
+        lv_obj_t* modbus_coverage_label;           // 40017: 覆盖率
+        lv_obj_t* modbus_feed_speed_label;         // 40018: 速度档
+        lv_obj_t* modbus_process_mode_label;       // 40019: 处理模式
         
         // 原有组件
         lv_obj_t* modbus_table;
