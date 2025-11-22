@@ -215,19 +215,26 @@ SystemStats JetsonMonitor::parseTegrastatsOutput(const std::string& output) {
             stats.cpu_cores = parseCPUInfo(cpu_match[1]);
         }
 
-        // 瑙ｆ瀽GPU淇℃伅
+        // 瑙ｆ瀽GPU淇℃伅（GR3D_FREQ 12%@[305] / GR3D 61%@624）
+        std::regex gr3d_freq_with_clock_regex(R"(GR3D_FREQ\s+(\d+)%@\[?(\d+)\]?)");
         std::regex gr3d_regex(R"(GR3D_FREQ\s+(\d+)%)");
         std::regex gr3d_detail_regex(R"(GR3D\s+(\d+)%@(\d+))");
-        std::smatch gr3d_match, gr3d_detail_match;
+        std::smatch gr3d_freq_clk_match, gr3d_match, gr3d_detail_match;
         
         std::string gpu_str, gr3d_str;
-        if (std::regex_search(output, gr3d_match, gr3d_regex)) {
-            gr3d_str = gr3d_match[0];
+        if (std::regex_search(output, gr3d_freq_clk_match, gr3d_freq_with_clock_regex)) {
+            stats.gpu.usage_percent = std::stoi(gr3d_freq_clk_match[1]);
+            stats.gpu.frequency_mhz = std::stoi(gr3d_freq_clk_match[2]);
+            stats.gpu.gr3d_freq_percent = stats.gpu.usage_percent;
+        } else {
+            if (std::regex_search(output, gr3d_match, gr3d_regex)) {
+                gr3d_str = gr3d_match[0];
+            }
+            if (std::regex_search(output, gr3d_detail_match, gr3d_detail_regex)) {
+                gpu_str = gr3d_detail_match[0];
+            }
+            stats.gpu = parseGPUInfo(gpu_str, gr3d_str);
         }
-        if (std::regex_search(output, gr3d_detail_match, gr3d_detail_regex)) {
-            gpu_str = gr3d_detail_match[0];
-        }
-        stats.gpu = parseGPUInfo(gpu_str, gr3d_str);
 
         // 瑙ｆ瀽EMC淇℃伅
         std::regex emc_regex(R"(EMC_FREQ\s+(\d+)%@(\d+))");
