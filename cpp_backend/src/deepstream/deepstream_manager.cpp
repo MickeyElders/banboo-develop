@@ -1139,7 +1139,7 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     pipeline << buildCameraSource(config) << " ! "
              << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
              << buildInferenceChain(config, width, height, 1, true)
-             << "waylandsink name=video_sink sync=false async=true ";
+             << "waylandsink name=video_sink sync=false async=true use-dmabuf=true ";
     
     return pipeline.str();
 }
@@ -1226,7 +1226,7 @@ std::string DeepStreamManager::buildInferenceChain(
     }
     
     chain << "nvvideoconvert ! "
-          << "video/x-raw,format=" << final_format
+          << "video/x-raw(memory:NVMM),format=" << final_format
           << ",width=" << aligned_display_width
           << ",height=" << aligned_display_height << " ! ";
     
