@@ -70,6 +70,17 @@ void JetsonMonitor::monitorLoop() {
                 // 瑙ｆ瀽杈撳嚭
                 SystemStats stats = parseTegrastatsOutput(output);
                 stats.timestamp = std::chrono::system_clock::now();
+
+                // 避免用空解析结果覆盖上一帧
+                bool stats_valid = !stats.cpu_cores.empty() || stats.memory.ram_total_mb > 0;
+                if (!stats_valid) {
+                    static int warn_count = 0;
+                    if (warn_count++ < 5) {
+                        std::cerr << "[JetsonMonitor] 解析结果为空，跳过更新，raw: "
+                                  << output.substr(0, 120) << "..." << std::endl;
+                    }
+                    continue;
+                }
                 
                 // 鏇存柊鏈€鏂扮姸鎬?
                 {
@@ -287,7 +298,7 @@ SystemStats JetsonMonitor::parseTegrastatsOutput(const std::string& output) {
         }
 
         // 瑙ｆ瀽娓╁害淇℃伅
-        std::regex temp_regex(R"((CPU@[\d\.]+C|GPU@[\d\.]+C|thermal@[\d\.]+C|CV\d@[\d\.-]+C|AO@[\d\.]+C))");
+        std::regex temp_regex(R"((CPU@[\d\.]+C|cpu@[\d\.]+C|GPU@[\d\.]+C|gpu@[\d\.]+C|thermal@[\d\.]+C|CV\d@[\d\.-]+C|cv\d@[\d\.-]+C|AO@[\d\.]+C|ao@[\d\.]+C))");
         std::sregex_iterator temp_iter(output.begin(), output.end(), temp_regex);
         std::sregex_iterator temp_end;
         
