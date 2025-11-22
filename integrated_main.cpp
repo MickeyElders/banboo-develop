@@ -670,6 +670,14 @@ public:
             std::cout << "鉁?鑾峰彇 camera_panel 瀹為檯鍧愭爣: ("
                       << camera_x << ", " << camera_y << ") "
                       << camera_width << "x" << camera_height << std::endl;
+            // 对齐到偶数，避免下游硬件转换在奇数尺寸上失败
+            if (camera_width % 2 != 0) {
+                camera_width -= 1;
+            }
+            if (camera_height % 2 != 0) {
+                camera_height -= 1;
+            }
+            std::cout << "🎯 对齐后尺寸: " << camera_width << "x" << camera_height << std::endl;
         } else {
             std::cout << "⚠️  无法获取 camera_panel 坐标，使用默认值" << std::endl;
         }
