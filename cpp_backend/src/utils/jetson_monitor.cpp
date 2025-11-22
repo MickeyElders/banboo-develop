@@ -104,20 +104,42 @@ std::string JetsonMonitor::executeTegrastats() {
         std::unique_ptr<FILE, decltype(&pclose)> pipe(
             popen("timeout 3s tegrastats --interval 1000", "r"), pclose);
         if (!pipe) {
+            static int warn_count = 0;
+            if (warn_count++ < 5) {
+                std::cerr << "[JetsonMonitor] tegrastats popen 失败，使用 sysfs 兜底" << std::endl;
+            }
             return readSysfsStats();
         }
 
         char buffer[1024] = {0};
         if (fgets(buffer, sizeof(buffer), pipe.get()) == nullptr) {
+            static int warn_count = 0;
+            if (warn_count++ < 5) {
+                std::cerr << "[JetsonMonitor] tegrastats 无输出，使用 sysfs 兜底" << std::endl;
+            }
             return readSysfsStats();
         }
 
         std::string result(buffer);
         if (result.empty()) {
+            static int warn_count = 0;
+            if (warn_count++ < 5) {
+                std::cerr << "[JetsonMonitor] tegrastats 输出为空，使用 sysfs 兜底" << std::endl;
+            }
             return readSysfsStats();
+        }
+
+        // 调试输出：仅打印前 200 个字符
+        static int log_count = 0;
+        if (log_count++ < 5) {
+            std::cerr << "[JetsonMonitor] tegrastats raw: " << result.substr(0, 200) << "..." << std::endl;
         }
         return result;
     } catch (...) {
+        static int warn_count = 0;
+        if (warn_count++ < 5) {
+            std::cerr << "[JetsonMonitor] tegrastats 捕获异常，使用 sysfs 兜底" << std::endl;
+        }
         return readSysfsStats();
     }
 }
@@ -213,6 +235,11 @@ SystemStats JetsonMonitor::parseTegrastatsOutput(const std::string& output) {
         std::smatch cpu_match;
         if (std::regex_search(output, cpu_match, cpu_regex)) {
             stats.cpu_cores = parseCPUInfo(cpu_match[1]);
+        } else {
+            static int warn_count = 0;
+            if (warn_count++ < 5) {
+                std::cerr << "[JetsonMonitor] 未匹配到 CPU 栏位，原始行: " << output.substr(0, 120) << "..." << std::endl;
+            }
         }
 
         // 瑙ｆ瀽GPU淇℃伅（GR3D_FREQ 12%@[305] / GR3D 61%@624）
