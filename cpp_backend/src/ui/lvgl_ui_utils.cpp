@@ -10,6 +10,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <chrono>
 
 namespace bamboo_cut {
 namespace ui {
@@ -140,42 +141,63 @@ bool updateAIModelStats(
     }
     
     try {
-        // 获取 AI 模型统计数据
-        // 注意：这些方法需要在 DataBridge 中实现
-        
+        bamboo_cut::core::SystemStats stats = data_bridge->getStats();
+        const auto& ai = stats.ai_model;
+
         // === 更新 FPS ===
         if (widgets.ai_fps_label) {
-            // TODO: 从 DataBridge 获取实际 FPS
-            static int simulated_fps = 0;
-            simulated_fps = (simulated_fps + 1) % 60 + 20;  // 模拟 20-80 fps
-            
+            float fps = (stats.inference_fps > 0.0f) ? stats.inference_fps : stats.camera_fps;
             std::ostringstream fps_text;
-            fps_text << "FPS: " << simulated_fps << " fps";
+            fps_text << "FPS: " << std::fixed << std::setprecision(1) << fps;
             lv_label_set_text(widgets.ai_fps_label, fps_text.str().c_str());
-        }
-        
-        // === 更新检测数量 ===
-        if (widgets.ai_total_detections_label) {
-            // TODO: 从 DataBridge 获取实际检测数量
-            static int detection_count = 0;
-            detection_count++;
-            
-            std::ostringstream detect_text;
-            detect_text << "Detected: " << detection_count << " objects";
-            lv_label_set_text(widgets.ai_total_detections_label, detect_text.str().c_str());
         }
         
         // === 更新推理时间 ===
         if (widgets.ai_inference_time_label) {
-            // TODO: 从 DataBridge 获取实际推理时间
-            static int inference_ms = 0;
-            inference_ms = (inference_ms + 1) % 30 + 10;  // 模拟 10-40ms
-            
+            float inference_ms = ai.inference_time_ms;
+            if (inference_ms <= 0.0f && stats.inference_fps > 0.0f) {
+                inference_ms = 1000.0f / stats.inference_fps;  // 根据 FPS 估算
+            }
+
             std::ostringstream time_text;
-            time_text << "Inference: " << inference_ms << "ms";
+            if (inference_ms > 0.0f) {
+                time_text << "Inference: " << std::fixed << std::setprecision(1) << inference_ms << "ms";
+            } else {
+                time_text << "Inference: --ms";
+            }
             lv_label_set_text(widgets.ai_inference_time_label, time_text.str().c_str());
         }
         
+        // === 更新检测数量 ===
+        if (widgets.ai_total_detections_label) {
+            int total = ai.total_detections > 0 ? ai.total_detections : stats.total_detections;
+            std::ostringstream detect_text;
+            detect_text << "Detected: " << total << " objects";
+            lv_label_set_text(widgets.ai_total_detections_label, detect_text.str().c_str());
+        }
+        
+        // === 更新置信度 ===
+        if (widgets.ai_confidence_label) {
+            float avg_conf = ai.average_confidence;
+            if (avg_conf > 0.0f && avg_conf <= 1.0f) {
+                avg_conf *= 100.0f;  // 兼容 0-1 区间输入
+            }
+
+            std::ostringstream conf_text;
+            if (avg_conf > 0.0f) {
+                conf_text << "Confidence: " << std::fixed << std::setprecision(1) << avg_conf << "%";
+            } else {
+                conf_text << "Confidence: --";
+            }
+            lv_label_set_text(widgets.ai_confidence_label, conf_text.str().c_str());
+        }
+
+        // === 模型名称 ===
+        if (widgets.ai_model_name_label && !ai.model_version.empty()) {
+            std::string model_text = "Model: " + ai.model_version;
+            lv_label_set_text(widgets.ai_model_name_label, model_text.c_str());
+        }
+
         return true;
         
     } catch (const std::exception& e) {
@@ -183,6 +205,7 @@ bool updateAIModelStats(
         return false;
     }
 }
+
 
 // ==================== 摄像头状态更新 ====================
 
@@ -195,16 +218,68 @@ bool updateCameraStatus(
     }
     
     try {
-        // === 更新摄像头状态 ===
+        bamboo_cut::core::SystemStats stats = data_bridge->getStats();
+        const auto& cam_system = stats.ai_model.camera_system;
+
+        const bamboo_cut::core::CameraStatus* active_cam = nullptr;
+        if (cam_system.camera1.is_online) {
+            active_cam = &cam_system.camera1;
+        } else if (cam_system.camera2.is_online) {
+            active_cam = &cam_system.camera2;
+        }
+
+        bool online = cam_system.system_ready || (active_cam && active_cam->is_online);
+        if (!online && stats.camera_fps > 0.0f) {
+            online = true;
+        }
+
         if (widgets.camera_status_label) {
-            lv_label_set_text(widgets.camera_status_label, "Camera: Online");
+            lv_label_set_text(widgets.camera_status_label, online ? "Status: Online" : "Status: Offline");
         }
-        
-        // === 更新摄像头 FPS ===
+
         if (widgets.camera_fps_label) {
-            lv_label_set_text(widgets.camera_fps_label, "30 fps");
+            float fps = stats.camera_fps;
+            if (fps <= 0.0f && active_cam) {
+                fps = active_cam->fps;
+            }
+            std::ostringstream fps_text;
+            fps_text << "FPS: ";
+            if (fps > 0.0f) {
+                fps_text << std::fixed << std::setprecision(1) << fps;
+            } else {
+                fps_text << "--";
+            }
+            lv_label_set_text(widgets.camera_fps_label, fps_text.str().c_str());
         }
-        
+
+        if (widgets.camera_resolution_label) {
+            int width = 0;
+            int height = 0;
+            if (active_cam) {
+                width = active_cam->width;
+                height = active_cam->height;
+            }
+            if (width > 0 && height > 0) {
+                std::ostringstream res_text;
+                res_text << "Resolution: " << width << "x" << height;
+                lv_label_set_text(widgets.camera_resolution_label, res_text.str().c_str());
+            } else {
+                lv_label_set_text(widgets.camera_resolution_label, "Resolution: --");
+            }
+        }
+
+        if (widgets.camera_format_label) {
+            if (active_cam && !active_cam->device_path.empty()) {
+                std::string format_text = "Device: " + active_cam->device_path;
+                lv_label_set_text(widgets.camera_format_label, format_text.c_str());
+            } else if (active_cam) {
+                std::string format_text = "Mode: " + active_cam->exposure_mode + " | Light: " + active_cam->lighting_quality;
+                lv_label_set_text(widgets.camera_format_label, format_text.c_str());
+            } else {
+                lv_label_set_text(widgets.camera_format_label, "Format: --");
+            }
+        }
+
         return true;
         
     } catch (const std::exception& e) {
@@ -224,76 +299,78 @@ bool updateModbusStatus(
     }
     
     try {
-        // 从 DataBridge 获取真实的 Modbus 寄存器数据
         core::ModbusRegisters modbus_registers = data_bridge->getModbusRegisters();
-        
+
+        static uint32_t last_heartbeat = 0;
+        static std::chrono::steady_clock::time_point last_update_time = std::chrono::steady_clock::now();
+        if (modbus_registers.heartbeat != last_heartbeat) {
+            last_heartbeat = modbus_registers.heartbeat;
+            last_update_time = std::chrono::steady_clock::now();
+        }
+
         // === 更新连接状态信息 ===
         if (widgets.modbus_connection_label && lv_obj_is_valid(widgets.modbus_connection_label)) {
             bool is_connected = (modbus_registers.heartbeat > 0);
-            std::string connection_text = "PLC连接: " + std::string(is_connected ? "在线 ✓" : "离线 ✗");
+            std::string connection_text = "PLC连接: " + std::string(is_connected ? "在线" : "离线");
             lv_label_set_text(widgets.modbus_connection_label, connection_text.c_str());
-            // 注意：颜色需要从 theme_colors 传入，这里暂用默认
         }
-        
+
         // === 更新 Modbus 地址信息 ===
         if (widgets.modbus_address_label && lv_obj_is_valid(widgets.modbus_address_label)) {
-            lv_label_set_text(widgets.modbus_address_label, "地址: 192.168.1.100:502");
+            lv_label_set_text(widgets.modbus_address_label, "地址: --");
         }
-        
+
         // === 更新通讯延迟 ===
         if (widgets.modbus_latency_label && lv_obj_is_valid(widgets.modbus_latency_label)) {
-            static int latency_ms = 8;
-            latency_ms = 5 + (rand() % 10);  // 模拟 5-15ms 延迟
-            std::string latency_text = "通讯延迟: " + std::to_string(latency_ms) + "ms";
+            std::string latency_text = "通讯延迟: --ms";
             lv_label_set_text(widgets.modbus_latency_label, latency_text.c_str());
         }
-        
+
         // === 更新最后通讯时间 ===
         if (widgets.modbus_last_success_label && lv_obj_is_valid(widgets.modbus_last_success_label)) {
-            static int last_comm_seconds = 2;
-            last_comm_seconds = (rand() % 5) + 1;  // 模拟 1-5 秒前
-            std::string last_success_text = "最后通讯: " + std::to_string(last_comm_seconds) + "秒前";
+            auto seconds_since_last = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - last_update_time).count();
+            std::string last_success_text = "最后通讯: ";
+            if (last_heartbeat == 0) {
+                last_success_text += "--";
+            } else {
+                last_success_text += std::to_string(seconds_since_last) + "秒前";
+            }
             lv_label_set_text(widgets.modbus_last_success_label, last_success_text.c_str());
         }
-        
+
         // === 更新错误计数 ===
         if (widgets.modbus_error_count_label && lv_obj_is_valid(widgets.modbus_error_count_label)) {
-            static int error_count = 0;
-            if (rand() % 100 == 0) error_count++;  // 偶尔增加错误计数
-            std::string error_count_text = "错误计数: " + std::to_string(error_count);
+            std::string error_count_text = "错误计数: --";
             lv_label_set_text(widgets.modbus_error_count_label, error_count_text.c_str());
         }
-        
+
         // === 更新消息计数 ===
         if (widgets.modbus_message_count_label && lv_obj_is_valid(widgets.modbus_message_count_label)) {
-            static int message_count = 1523;
-            message_count += 1 + (rand() % 3);  // 模拟消息增长
-            std::string message_count_text = "今日消息: " + std::to_string(message_count);
+            std::string message_count_text = "今日消息: --";
             lv_label_set_text(widgets.modbus_message_count_label, message_count_text.c_str());
         }
-        
+
         // === 更新数据包计数 ===
         if (widgets.modbus_packets_label && lv_obj_is_valid(widgets.modbus_packets_label)) {
-            static int packets = 1247;
-            packets += 1 + (rand() % 3);  // 模拟数据包增长
-            std::string packets_text = "数据包: " + std::to_string(packets);
+            std::string packets_text = "数据包: --";
             lv_label_set_text(widgets.modbus_packets_label, packets_text.c_str());
         }
-        
+
         // === 更新错误率 ===
         if (widgets.modbus_errors_label && lv_obj_is_valid(widgets.modbus_errors_label)) {
-            static float error_rate = 0.02f;
-            error_rate = (rand() % 10) / 1000.0f;  // 模拟 0.000-0.010% 错误率
-            std::string error_rate_text = "错误率: " + std::to_string(static_cast<int>(error_rate * 1000) / 1000.0) + "%";
-            lv_label_set_text(widgets.modbus_errors_label, error_rate_text.c_str());
+            lv_label_set_text(widgets.modbus_errors_label, "错误率: --");
         }
-        
+
         // === 更新心跳状态 ===
         if (widgets.modbus_heartbeat_label && lv_obj_is_valid(widgets.modbus_heartbeat_label)) {
             bool heartbeat_ok = (modbus_registers.heartbeat > 0);
-            lv_label_set_text(widgets.modbus_heartbeat_label, heartbeat_ok ? "心跳: OK" : "心跳: 超时");
+            std::ostringstream heartbeat_text;
+            heartbeat_text << "心跳: " << (heartbeat_ok ? "OK (" : "超时 (")
+                           << modbus_registers.heartbeat << ")";
+            lv_label_set_text(widgets.modbus_heartbeat_label, heartbeat_text.str().c_str());
         }
-        
+
         // === 更新 Modbus 寄存器状态信息 ===
         
         // 40001: 系统状态
@@ -362,7 +439,7 @@ bool updateModbusStatus(
         if (widgets.modbus_tail_status_label && lv_obj_is_valid(widgets.modbus_tail_status_label)) {
             const char* tail_names[] = {"IDLE", "PROCESSING", "DONE", "RECHECK", "", "", "", "", "", "TAIL", "EJECTED"};
             uint16_t tail_status = modbus_registers.tail_status;
-            const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != '\0') ? tail_names[tail_status] : "UNKNOWN";
+            const char* tail_str = (tail_status < 11 && tail_names[tail_status][0] != 0) ? tail_names[tail_status] : "UNKNOWN";
             std::string tail_text = "40011 尾料: " + std::string(tail_str);
             lv_label_set_text(widgets.modbus_tail_status_label, tail_text.c_str());
         }

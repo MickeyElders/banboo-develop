@@ -398,6 +398,26 @@ void InferenceThread::updateSystemStats() {
         stats.inference_fps = fps;
         stats.total_detections = total_detections_;
         stats.system_status = "运行中";
+
+        // 为 UI 填充更详细的 AI/摄像头状态
+        stats.ai_model.inference_time_ms = inference_time;
+        stats.ai_model.total_detections = total_detections_;
+
+        core::DetectionResult detection;
+        if (data_bridge_->getDetectionResult(detection) && !detection.confidences.empty()) {
+            float sum_conf = 0.0f;
+            for (float c : detection.confidences) {
+                sum_conf += c;
+            }
+            stats.ai_model.average_confidence = sum_conf / detection.confidences.size();
+        }
+
+        stats.ai_model.camera_system.system_ready = camera_.isOpened();
+        auto& cam1 = stats.ai_model.camera_system.camera1;
+        cam1.is_online = camera_.isOpened();
+        cam1.fps = (fps > 0.0f) ? fps : static_cast<float>(camera_.get(cv::CAP_PROP_FPS));
+        cam1.width = static_cast<int>(camera_.get(cv::CAP_PROP_FRAME_WIDTH));
+        cam1.height = static_cast<int>(camera_.get(cv::CAP_PROP_FRAME_HEIGHT));
         
         data_bridge_->updateStats(stats);
         last_stats_update_ = now;
