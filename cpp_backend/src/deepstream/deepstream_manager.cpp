@@ -1026,9 +1026,9 @@ VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& conf
     layout.available_width = config.screen_width;
     layout.available_height = config.screen_height - config.header_height - config.footer_height;
     
-    // 计算视频区域尺寸（按比例）
-    layout.width = static_cast<int>(layout.available_width * config.video_width_ratio);
-    layout.height = static_cast<int>(layout.available_height * config.video_height_ratio);
+    // 计算视频区域尺寸（暂时固定为摄像头原始分辨率，避免奇数尺寸缩放导致的 mem copy 失败）
+    layout.width = config.camera_width;
+    layout.height = config.camera_height;
 
     // 对齐到偶数，避免下游硬件拷贝在奇数尺寸上失败
     if (layout.width % 2 != 0) layout.width -= 1;
