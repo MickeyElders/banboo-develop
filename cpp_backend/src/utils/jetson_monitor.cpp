@@ -67,22 +67,21 @@ void JetsonMonitor::monitorLoop() {
             // 鑾峰彇tegrastats杈撳嚭
             std::string output = executeTegrastats();
             if (!output.empty()) {
-                // 瑙ｆ瀽杈撳嚭
+                // 解析输出
                 SystemStats stats = parseTegrastatsOutput(output);
                 stats.timestamp = std::chrono::system_clock::now();
 
-                // 避免用空解析结果覆盖上一帧
-                bool stats_valid = !stats.cpu_cores.empty() || stats.memory.ram_total_mb > 0;
-                if (!stats_valid) {
+                // 避免用空解析结果覆盖上一帧（必须解析到 CPU 核心）
+                if (stats.cpu_cores.empty()) {
                     static int warn_count = 0;
                     if (warn_count++ < 5) {
-                        std::cerr << "[JetsonMonitor] 解析结果为空，跳过更新，raw: "
+                        std::cerr << "[JetsonMonitor] CPU 栏位解析为空，跳过更新，raw: "
                                   << output.substr(0, 120) << "..." << std::endl;
                     }
                     continue;
                 }
                 
-                // 鏇存柊鏈€鏂扮姸鎬?
+                // 更新最新状态
                 {
                     std::lock_guard<std::mutex> lock(stats_mutex_);
                     latest_stats_ = stats;
@@ -250,6 +249,13 @@ SystemStats JetsonMonitor::parseTegrastatsOutput(const std::string& output) {
             static int warn_count = 0;
             if (warn_count++ < 5) {
                 std::cerr << "[JetsonMonitor] 未匹配到 CPU 栏位，原始行: " << output.substr(0, 120) << "..." << std::endl;
+            }
+            // 回退：尝试直接截取 '[' 和 ']' 之间内容再解析
+            auto start_pos = output.find('[');
+            auto end_pos = output.find(']');
+            if (start_pos != std::string::npos && end_pos != std::string::npos && end_pos > start_pos) {
+                std::string cpu_block = output.substr(start_pos + 1, end_pos - start_pos - 1);
+                stats.cpu_cores = parseCPUInfo(cpu_block);
             }
         }
 
