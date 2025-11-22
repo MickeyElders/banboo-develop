@@ -23,6 +23,13 @@ bool updateJetsonMonitoring(
     const LVGLThemeColors& colors) {
     
     if (!jetson_monitor || !jetson_monitor->isRunning()) {
+        static int warn_count = 0;
+        if (warn_count++ < 5) {
+            std::cerr << "[lvgl_ui_utils] JetsonMonitor not ready (ptr="
+                      << (jetson_monitor ? "set" : "null")
+                      << ", running=" << (jetson_monitor ? jetson_monitor->isRunning() : false)
+                      << "), fallback to N/A" << std::endl;
+        }
         // 降级：显示 "Not Available"
         if (widgets.cpu_label) {
             lv_label_set_text(widgets.cpu_label, "CPU: N/A");
@@ -38,6 +45,22 @@ bool updateJetsonMonitoring(
     
     try {
         bamboo_cut::utils::SystemStats stats = jetson_monitor->getLatestStats();
+        static int log_count = 0;
+        if (log_count++ < 8) {
+            std::cerr << "[lvgl_ui_utils] Jetson stats snapshot: cores=" << stats.cpu_cores.size()
+                      << " gpu=" << stats.gpu.usage_percent << "%@" << stats.gpu.frequency_mhz
+                      << "MHz ram=" << stats.memory.ram_used_mb << "/" << stats.memory.ram_total_mb
+                      << "MB cpu_temp=" << stats.temperature.cpu_temp
+                      << " gpu_temp=" << stats.temperature.gpu_temp
+                      << std::endl;
+            if (!stats.cpu_cores.empty()) {
+                const auto& c = stats.cpu_cores.front();
+                std::cerr << "[lvgl_ui_utils] first core usage=" << c.usage_percent
+                          << "% freq=" << c.frequency_mhz << "MHz" << std::endl;
+            } else {
+                std::cerr << "[lvgl_ui_utils] cpu_cores is empty, CPU% will stay --" << std::endl;
+            }
+        }
         
         // === 更新 CPU 信息 ===
         if (widgets.cpu_bar && widgets.cpu_label && !stats.cpu_cores.empty()) {
