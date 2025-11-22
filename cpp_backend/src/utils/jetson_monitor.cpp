@@ -95,10 +95,32 @@ void JetsonMonitor::monitorLoop() {
         std::this_thread::sleep_for(std::chrono::seconds(MONITOR_INTERVAL_SEC));
     }
     
-    // 静默结束监控循环
+// 静默结束监控循环
 }
 
-std::string Jestd::string JetsonMonitor::readSysfsStats() {
+std::string JetsonMonitor::executeTegrastats() {
+    try {
+        // 优先使用 tegrastats，失败或无输出则回退 sysfs
+        std::unique_ptr<FILE, decltype(&pclose)> pipe(
+            popen("timeout 3s tegrastats --interval 1000", "r"), pclose);
+        if (!pipe) {
+            return readSysfsStats();
+        }
+        std::string result;
+        char buffer[1024];
+        if (fgets(buffer, sizeof(buffer), pipe.get()) != nullptr) {
+            result = buffer;
+        }
+        if (result.empty()) {
+            return readSysfsStats();
+        }
+        return result;
+    } catch (const std::exception&) {
+        return readSysfsStats();
+    }
+}
+
+std::string JetsonMonitor::readSysfsStats() {
     // 轻量回退：从 /proc/stat 和 /proc/meminfo 获取 CPU/Mem（GPU 置 0）
     try {
         auto read_cpu_line = []() {
