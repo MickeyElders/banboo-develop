@@ -1029,6 +1029,10 @@ VideoLayout DeepStreamManager::calculateVideoLayout(const DeepStreamConfig& conf
     // 计算视频区域尺寸（按比例）
     layout.width = static_cast<int>(layout.available_width * config.video_width_ratio);
     layout.height = static_cast<int>(layout.available_height * config.video_height_ratio);
+
+    // 对齐到偶数，避免下游硬件拷贝在奇数尺寸上失败
+    if (layout.width % 2 != 0) layout.width -= 1;
+    if (layout.height % 2 != 0) layout.height -= 1;
     
     // 计算偏移量（居左上，但考虑顶部栏）
     layout.offset_x = 0;  // 左对齐
@@ -1204,8 +1208,11 @@ std::string DeepStreamManager::buildInferenceChain(
     const bool enable_infer = config.enable_inference && inference_available_;
     const int safe_display_width = display_width > 0 ? display_width : config.camera_width;
     const int safe_display_height = display_height > 0 ? display_height : config.camera_height;
-    const int safe_infer_width = enable_infer ? std::max(config.infer_width, 1) : safe_display_width;
-    const int safe_infer_height = enable_infer ? std::max(config.infer_height, 1) : safe_display_height;
+    // 显示/推理尺寸对齐到偶数，避免 nvvideoconvert 在非对齐尺寸上 mem copy 失败
+    const int aligned_display_width = std::max(2, safe_display_width - (safe_display_width % 2));
+    const int aligned_display_height = std::max(2, safe_display_height - (safe_display_height % 2));
+    const int safe_infer_width = enable_infer ? std::max(config.infer_width, 1) : aligned_display_width;
+    const int safe_infer_height = enable_infer ? std::max(config.infer_height, 1) : aligned_display_height;
     const char* final_format = wayland_sink_mode ? "BGRx" : "BGRA";
     
     if (enable_infer) {
@@ -1220,8 +1227,8 @@ std::string DeepStreamManager::buildInferenceChain(
     
     chain << "nvvideoconvert ! "
           << "video/x-raw,format=" << final_format
-          << ",width=" << safe_display_width
-          << ",height=" << safe_display_height << " ! ";
+          << ",width=" << aligned_display_width
+          << ",height=" << aligned_display_height << " ! ";
     
     return chain.str();
 }
