@@ -1139,7 +1139,7 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     pipeline << buildCameraSource(config) << " ! "
              << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
              << buildInferenceChain(config, width, height, 1, true)
-             << "waylandsink name=video_sink sync=false async=true use-dmabuf=true ";
+             << "waylandsink name=video_sink sync=false async=true ";
     
     return pipeline.str();
 }
@@ -1225,8 +1225,9 @@ std::string DeepStreamManager::buildInferenceChain(
               << "nvdsosd name=osd display-text=1 process-mode=0 gpu-id=0 ! ";
     }
     
+    // 最终输出给 waylandsink：使用 CPU 内存平面，减少兼容性问题
     chain << "nvvideoconvert ! "
-          << "video/x-raw(memory:NVMM),format=" << final_format
+          << "video/x-raw,format=" << final_format
           << ",width=" << aligned_display_width
           << ",height=" << aligned_display_height << " ! ";
     
