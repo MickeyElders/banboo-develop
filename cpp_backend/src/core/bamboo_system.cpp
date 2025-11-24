@@ -15,6 +15,9 @@
 #include <chrono>
 #include <signal.h>
 #include <fstream>
+#include <sstream>
+#include <regex>
+#include <cctype>
 
 namespace bamboo_cut {
 namespace core {
@@ -306,7 +309,7 @@ bool BambooSystem::initializeSubsystems() {
     try {
         // 初始化推理线程
         if (config_.system_params.enable_ai_inference) {
-            inference_thread_ = std::make_unique<inference::InferenceThread>(data_bridge_);
+            inference_thread_ = std::make_unique<inference::InferenceThread>(data_bridge_, config_.detector_config, 0);
             system_info_.ai_inference_active = true;
             std::cout << "[BambooSystem] AI推理模块已初始化" << std::endl;
         }
@@ -557,27 +560,166 @@ void BambooSystem::signalHandler(int signal) {
 
 // 系统配置实现
 bool SystemConfig::loadFromFile(const std::string& config_file) {
-    try {
-        utils::ConfigLoader loader;
-        if (!loader.loadFromFile(config_file)) {
-            return false;
-        }
-        
-        // TODO: 解析配置文件并设置参数
-        
-        return true;
-    } catch (const std::exception& e) {
+    std::ifstream file(config_file);
+    if (!file.is_open()) {
+        std::cerr << "[SystemConfig] 无法打开配置文件: " << config_file << std::endl;
         return false;
     }
+
+    // 简单的YAML解析器（键值/一级section），覆盖默认值
+    auto trim = [](std::string s) {
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char c){ return !std::isspace(c); }));
+        s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char c){ return !std::isspace(c); }).base(), s.end());
+        return s;
+    };
+    auto to_bool = [](const std::string& v, bool def) {
+        std::string lower = v;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower == "true" || lower == "1" || lower == "on" || lower == "yes") return true;
+        if (lower == "false" || lower == "0" || lower == "off" || lower == "no") return false;
+        return def;
+    };
+    auto to_int = [](const std::string& v, int def) {
+        try { return std::stoi(v); } catch (...) { return def; }
+    };
+    auto to_float = [](const std::string& v, float def) {
+        try { return std::stof(v); } catch (...) { return def; }
+    };
+
+    std::string current_section;
+    std::string line;
+    while (std::getline(file, line)) {
+        auto comment_pos = line.find('#');
+        if (comment_pos != std::string::npos) {
+            line = line.substr(0, comment_pos);
+        }
+        line = trim(line);
+        if (line.empty()) continue;
+
+        if (line.back() == ':') {
+            current_section = trim(line.substr(0, line.size() - 1));
+            continue;
+        }
+
+        auto colon_pos = line.find(':');
+        if (colon_pos == std::string::npos) continue;
+
+        std::string key = trim(line.substr(0, colon_pos));
+        std::string value = trim(line.substr(colon_pos + 1));
+        if (!current_section.empty()) {
+            key = current_section + "." + key;
+        }
+
+        // 处理输入尺寸格式 [640, 640]
+        auto parse_size = [&](const std::string& v) {
+            std::regex size_re(R"(\[?\s*([0-9]+)\s*,\s*([0-9]+)\s*\]?)");
+            std::smatch m;
+            if (std::regex_search(v, m, size_re) && m.size() == 3) {
+                return cv::Size(to_int(m[1], 640), to_int(m[2], 640));
+            }
+            return cv::Size(640, 640);
+        };
+
+        if (key == "detector.model_path") {
+            detector_config.model_path = value;
+        } else if (key == "detector.confidence_threshold") {
+            detector_config.confidence_threshold = to_float(value, detector_config.confidence_threshold);
+        } else if (key == "detector.nms_threshold") {
+            detector_config.nms_threshold = to_float(value, detector_config.nms_threshold);
+        } else if (key == "detector.input_size") {
+            detector_config.input_size = parse_size(value);
+        } else if (key == "detector.use_gpu") {
+            detector_config.use_gpu = to_bool(value, detector_config.use_gpu);
+        } else if (key == "detector.use_tensorrt") {
+            detector_config.use_tensorrt = to_bool(value, detector_config.use_tensorrt);
+        } else if (key == "ui.screen_width") {
+            ui_config.screen_width = to_int(value, ui_config.screen_width);
+        } else if (key == "ui.screen_height") {
+            ui_config.screen_height = to_int(value, ui_config.screen_height);
+        } else if (key == "ui.refresh_rate") {
+            ui_config.refresh_rate = to_int(value, ui_config.refresh_rate);
+        } else if (key == "ui.enable_touch") {
+            ui_config.enable_touch = to_bool(value, ui_config.enable_touch);
+        } else if (key == "ui.touch_device") {
+            ui_config.touch_device = value;
+        } else if (key == "ui.display_device" || key == "ui.wayland_display") {
+            ui_config.wayland_display = value;
+        } else if (key == "modbus.server_ip") {
+            modbus_config.server_ip = value;
+        } else if (key == "modbus.server_port") {
+            modbus_config.server_port = to_int(value, modbus_config.server_port);
+        } else if (key == "modbus.slave_id") {
+            modbus_config.slave_id = to_int(value, modbus_config.slave_id);
+        } else if (key == "modbus.timeout_ms") {
+            modbus_config.timeout_ms = to_int(value, modbus_config.timeout_ms);
+        } else if (key == "modbus.reconnect_interval") {
+            modbus_config.reconnect_interval = to_int(value, modbus_config.reconnect_interval);
+        } else if (key == "modbus.auto_reconnect") {
+            modbus_config.auto_reconnect = to_bool(value, modbus_config.auto_reconnect);
+        } else if (key == "system_params.enable_ai_inference") {
+            system_params.enable_ai_inference = to_bool(value, system_params.enable_ai_inference);
+        } else if (key == "system_params.enable_ui_interface") {
+            system_params.enable_ui_interface = to_bool(value, system_params.enable_ui_interface);
+        } else if (key == "system_params.enable_modbus_communication") {
+            system_params.enable_modbus_communication = to_bool(value, system_params.enable_modbus_communication);
+        } else if (key == "system_params.enable_auto_start") {
+            system_params.enable_auto_start = to_bool(value, system_params.enable_auto_start);
+        } else if (key == "system_params.main_loop_interval_ms") {
+            system_params.main_loop_interval_ms = to_int(value, system_params.main_loop_interval_ms);
+        } else if (key == "system_params.stats_update_interval_ms") {
+            system_params.stats_update_interval_ms = to_int(value, system_params.stats_update_interval_ms);
+        } else if (key == "system_params.workflow_step_timeout_ms") {
+            system_params.workflow_step_timeout_ms = to_int(value, system_params.workflow_step_timeout_ms);
+        }
+    }
+
+    std::cout << "[SystemConfig] 已加载配置: " << config_file << std::endl;
+    return true;
 }
 
 bool SystemConfig::saveToFile(const std::string& config_file) const {
-    try {
-        // TODO: 保存配置到文件
-        return true;
-    } catch (const std::exception& e) {
+    std::ofstream ofs(config_file);
+    if (!ofs.is_open()) {
+        std::cerr << "[SystemConfig] 无法写入配置文件: " << config_file << std::endl;
         return false;
     }
+
+    ofs << "# 竹子识别系统配置（自动生成）\n";
+    ofs << "detector:\n";
+    ofs << "  model_path: " << detector_config.model_path << "\n";
+    ofs << "  confidence_threshold: " << detector_config.confidence_threshold << "\n";
+    ofs << "  nms_threshold: " << detector_config.nms_threshold << "\n";
+    ofs << "  input_size: [" << detector_config.input_size.width << ", " << detector_config.input_size.height << "]\n";
+    ofs << "  use_gpu: " << (detector_config.use_gpu ? "true" : "false") << "\n";
+    ofs << "  use_tensorrt: " << (detector_config.use_tensorrt ? "true" : "false") << "\n\n";
+
+    ofs << "ui:\n";
+    ofs << "  screen_width: " << ui_config.screen_width << "\n";
+    ofs << "  screen_height: " << ui_config.screen_height << "\n";
+    ofs << "  refresh_rate: " << ui_config.refresh_rate << "\n";
+    ofs << "  enable_touch: " << (ui_config.enable_touch ? "true" : "false") << "\n";
+    ofs << "  touch_device: " << ui_config.touch_device << "\n";
+    ofs << "  wayland_display: " << ui_config.wayland_display << "\n\n";
+
+    ofs << "modbus:\n";
+    ofs << "  server_ip: " << modbus_config.server_ip << "\n";
+    ofs << "  server_port: " << modbus_config.server_port << "\n";
+    ofs << "  slave_id: " << modbus_config.slave_id << "\n";
+    ofs << "  timeout_ms: " << modbus_config.timeout_ms << "\n";
+    ofs << "  reconnect_interval: " << modbus_config.reconnect_interval << "\n";
+    ofs << "  auto_reconnect: " << (modbus_config.auto_reconnect ? "true" : "false") << "\n\n";
+
+    ofs << "system_params:\n";
+    ofs << "  enable_ai_inference: " << (system_params.enable_ai_inference ? "true" : "false") << "\n";
+    ofs << "  enable_ui_interface: " << (system_params.enable_ui_interface ? "true" : "false") << "\n";
+    ofs << "  enable_modbus_communication: " << (system_params.enable_modbus_communication ? "true" : "false") << "\n";
+    ofs << "  enable_auto_start: " << (system_params.enable_auto_start ? "true" : "false") << "\n";
+    ofs << "  main_loop_interval_ms: " << system_params.main_loop_interval_ms << "\n";
+    ofs << "  stats_update_interval_ms: " << system_params.stats_update_interval_ms << "\n";
+    ofs << "  workflow_step_timeout_ms: " << system_params.workflow_step_timeout_ms << "\n";
+
+    std::cout << "[SystemConfig] 配置已保存到: " << config_file << std::endl;
+    return true;
 }
 
 // WorkflowManager实现
@@ -596,6 +738,9 @@ void WorkflowManager::startWorkflow() {
     
     should_stop_ = false;
     workflow_running_ = true;
+    current_step_ = 1;
+    step_start_time_ = std::chrono::high_resolution_clock::now();
+    data_bridge_->setCurrentStep(current_step_);
     workflow_thread_ = std::thread(&WorkflowManager::workflowLoop, this);
     
     std::cout << "[WorkflowManager] 工作流程已启动" << std::endl;
@@ -645,20 +790,55 @@ void WorkflowManager::workflowLoop() {
 }
 
 void WorkflowManager::executeWorkflowStep(int step) {
-    data_bridge_->setCurrentStep(step);
-    
-    // TODO: 实现具体的工作流程步骤
+    auto now = std::chrono::high_resolution_clock::now();
+    auto regs = data_bridge_->getModbusRegisters();
+
     switch (step) {
         case 1: // 进料检测
+            if (regs.plc_command == 1) {
+                current_step_ = 2;
+                step_start_time_ = now;
+            }
             break;
         case 2: // 视觉识别
+            if (regs.coord_ready == 1) {
+                current_step_ = 3;
+                step_start_time_ = now;
+            }
             break;
         case 3: // 坐标传输
+            if (regs.plc_command == 2) {
+                current_step_ = 4;
+                step_start_time_ = now;
+            } else if (regs.plc_command == 3) {
+                current_step_ = 5;
+                step_start_time_ = now;
+            }
             break;
         case 4: // 切割准备
+            if (regs.plc_command == 3) {
+                current_step_ = 5;
+                step_start_time_ = now;
+            }
             break;
         case 5: // 执行切割
+            if (regs.plc_command == 0) {
+                data_bridge_->clearCoordinateReady();
+                current_step_ = 1;
+                step_start_time_ = now;
+            }
             break;
+        default:
+            current_step_ = 1;
+            step_start_time_ = now;
+            break;
+    }
+
+    data_bridge_->setCurrentStep(current_step_);
+
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - step_start_time_).count();
+    if (elapsed_ms > step_timeout_ms_) {
+        handleStepTimeout(step);
     }
 }
 
@@ -668,7 +848,11 @@ bool WorkflowManager::isStepCompleted(int step) {
 }
 
 void WorkflowManager::handleStepTimeout(int step) {
-    std::cerr << "[WorkflowManager] 步骤 " << step << " 超时" << std::endl;
+    std::cerr << "[WorkflowManager] 步骤 " << step << " 超时，重置工作流程" << std::endl;
+    data_bridge_->setEmergencyStop(true);
+    data_bridge_->clearCoordinateReady();
+    current_step_ = 1;
+    step_start_time_ = std::chrono::high_resolution_clock::now();
 }
 
 // 辅助函数实现

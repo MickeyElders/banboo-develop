@@ -13,6 +13,7 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <algorithm>
 
 #ifdef ENABLE_TENSORRT
 #include <NvInfer.h>
@@ -280,14 +281,16 @@ bool BambooDetector::tensorRTInference(const cv::Mat& input, std::vector<cv::Mat
 #endif
 
 // InferenceThread实现
-InferenceThread::InferenceThread(std::shared_ptr<core::DataBridge> data_bridge)
-    : data_bridge_(data_bridge)
-    , camera_index_(0)
+InferenceThread::InferenceThread(std::shared_ptr<core::DataBridge> data_bridge,
+                                 const DetectorConfig& config,
+                                 int camera_index)
+    : data_bridge_(std::move(data_bridge))
+    , detector_config_(config)
+    , camera_index_(camera_index)
     , total_frames_(0)
     , total_detections_(0) {
     
-    DetectorConfig config;
-    detector_ = std::make_unique<BambooDetector>(config);
+    detector_ = std::make_unique<BambooDetector>(detector_config_);
     last_stats_update_ = std::chrono::high_resolution_clock::now();
 }
 
@@ -358,6 +361,14 @@ void InferenceThread::inferenceLoop() {
         if (detector_->detect(frame, result)) {
             total_detections_ += result.bboxes.size();
             data_bridge_->updateDetection(result);
+
+            // 将首个切割点映射到Modbus寄存器
+            if (!result.cutting_points.empty() && !result.confidences.empty()) {
+                float x_coord_mm = result.cutting_points.front().x; // 未做标定，暂用像素作为毫米占位
+                uint16_t coverage = static_cast<uint16_t>(
+                    std::min(100.0f, result.confidences.front() * 100.0f));
+                data_bridge_->publishCuttingPoint(x_coord_mm, coverage, /*quality*/0, /*blade*/1, /*tail_status*/0);
+            }
         }
         
         total_frames_++;

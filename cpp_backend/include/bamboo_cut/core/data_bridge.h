@@ -207,6 +207,11 @@ public:
     void setCurrentStep(int step);
     int getCurrentStep() const;
     
+    // Modbus寄存器快捷操作
+    void publishCuttingPoint(float x_mm, uint16_t coverage = 0, uint16_t quality = 0,
+                             uint16_t blade = 1, uint16_t tail_status = 0);
+    void clearCoordinateReady();
+    
     // 心跳更新
     void updateHeartbeat();
     uint32_t getHeartbeat() const;

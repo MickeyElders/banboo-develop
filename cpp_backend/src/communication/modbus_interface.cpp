@@ -383,6 +383,7 @@ void ModbusInterface::processPLCCommand(uint16_t command) {
             break;
         case 3: // cut complete
             data_bridge_->setCurrentStep(3);
+            data_bridge_->clearCoordinateReady();
             break;
         case 4: // start feeding
             data_bridge_->setCurrentStep(4);
@@ -402,6 +403,7 @@ void ModbusInterface::processPLCCommand(uint16_t command) {
             break;
         case 9: // tail handling
             data_bridge_->setCurrentStep(5);
+            data_bridge_->clearCoordinateReady();
             break;
         default:
             std::cout << "[ModbusInterface] unknown PLC command: " << command << std::endl;

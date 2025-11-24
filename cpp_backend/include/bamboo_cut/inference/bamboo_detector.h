@@ -38,7 +38,7 @@ struct DetectorConfig {
     bool use_tensorrt;             // 使用TensorRT优化
     
     DetectorConfig()
-        : model_path("/opt/bamboo-cut/models/bamboo_detection.onnx")
+        : model_path("./models/best.onnx")
         , confidence_threshold(0.85f)
         , nms_threshold(0.45f)
         , input_size(640, 640)
@@ -153,7 +153,9 @@ private:
  */
 class InferenceThread {
 public:
-    InferenceThread(std::shared_ptr<core::DataBridge> data_bridge);
+    InferenceThread(std::shared_ptr<core::DataBridge> data_bridge,
+                    const DetectorConfig& config = DetectorConfig(),
+                    int camera_index = 0);
     ~InferenceThread();
 
     /**
@@ -190,6 +192,7 @@ private:
 private:
     std::shared_ptr<core::DataBridge> data_bridge_;
     std::unique_ptr<BambooDetector> detector_;
+    DetectorConfig detector_config_;
     
     std::thread inference_thread_;
     std::atomic<bool> running_{false};

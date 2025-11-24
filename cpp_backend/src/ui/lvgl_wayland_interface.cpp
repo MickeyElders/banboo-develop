@@ -1260,6 +1260,48 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
     lv_label_set_text(control_widgets_.build_time_label, "Build: " __DATE__ " " __TIME__);
     lv_obj_set_style_text_color(control_widgets_.build_time_label, lv_color_hex(0xB0B8C1), 0);
     lv_obj_set_style_text_font(control_widgets_.build_time_label, &lv_font_montserrat_12, 0);
+
+    // === 系统控制（无X11场景下的基础操作） ===
+    lv_obj_t* system_section = lv_obj_create(control_panel_);
+    lv_obj_set_width(system_section, lv_pct(100));
+    lv_obj_set_height(system_section, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(system_section, lv_color_hex(0x1A1F26), 0);
+    lv_obj_set_style_radius(system_section, 8, 0);
+    lv_obj_set_style_border_width(system_section, 1, 0);
+    lv_obj_set_style_border_color(system_section, lv_color_hex(0x3A4451), 0);
+    lv_obj_set_style_pad_all(system_section, 10, 0);
+    lv_obj_set_flex_flow(system_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(system_section, 6, 0);
+    lv_obj_clear_flag(system_section, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* system_title = lv_label_create(system_section);
+    lv_label_set_text(system_title, LV_SYMBOL_SETTINGS " System Control");
+    lv_obj_set_style_text_color(system_title, lv_color_hex(0x7FB069), 0);
+    lv_obj_set_style_text_font(system_title, &lv_font_montserrat_14, 0);
+
+    auto create_action_btn = [&](const char* text, const char* action_cmd) {
+        lv_obj_t* btn = lv_btn_create(system_section);
+        lv_obj_set_width(btn, lv_pct(100));
+        lv_obj_set_height(btn, 36);
+        lv_obj_add_event_cb(btn, [](lv_event_t* e) {
+            if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+            const char* cmd = static_cast<const char*>(lv_event_get_user_data(e));
+            if (cmd) {
+                std::cout << "[UI] 系统操作: " << cmd << std::endl;
+                std::system(cmd);
+            }
+        }, LV_EVENT_CLICKED, (void*)action_cmd);
+
+        lv_obj_t* label = lv_label_create(btn);
+        lv_label_set_text(label, text);
+        lv_obj_center(label);
+        return btn;
+    };
+
+    create_action_btn(LV_SYMBOL_POWER " Shutdown", "/usr/bin/systemctl poweroff");
+    create_action_btn(LV_SYMBOL_REFRESH " Reboot", "/usr/bin/systemctl reboot");
+    create_action_btn(LV_SYMBOL_WIFI " Restart Network", "/usr/bin/systemctl restart NetworkManager");
+    create_action_btn(LV_SYMBOL_HOME " Restart Service", "/usr/bin/systemctl restart bamboo-cpp-lvgl");
     
     // === 摄像头状态区域 ===
     lv_obj_t* camera_section = lv_obj_create(control_panel_);

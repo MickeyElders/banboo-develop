@@ -5,6 +5,7 @@
 
 #include "bamboo_cut/core/data_bridge.h"
 #include <chrono>
+#include <algorithm>
 
 namespace bamboo_cut {
 namespace core {
@@ -150,6 +151,30 @@ uint32_t DataBridge::getHeartbeat() const {
     return heartbeat_counter_.load();
 }
 
+void DataBridge::publishCuttingPoint(float x_mm, uint16_t coverage, uint16_t quality,
+                                     uint16_t blade, uint16_t tail_status) {
+    std::lock_guard<std::mutex> lock(modbus_mutex_);
+    
+    if (x_mm < 0.0f) {
+        x_mm = 0.0f;
+    }
+    // 协议约定 0.1mm，缺少标定时按毫米直写
+    modbus_registers_.x_coordinate = static_cast<uint32_t>(x_mm * 10.0f);
+    modbus_registers_.coverage = coverage;
+    modbus_registers_.cut_quality = quality;
+    modbus_registers_.blade_number = blade;
+    modbus_registers_.tail_status = tail_status;
+    modbus_registers_.coord_ready = 1;
+}
+
+void DataBridge::clearCoordinateReady() {
+    std::lock_guard<std::mutex> lock(modbus_mutex_);
+    modbus_registers_.coord_ready = 0;
+    modbus_registers_.x_coordinate = 0;
+    modbus_registers_.coverage = 0;
+    modbus_registers_.tail_status = 0;
+    modbus_registers_.cut_quality = 0;
+}
+
 } // namespace core
 } // namespace bamboo_cut
-
