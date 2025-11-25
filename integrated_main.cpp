@@ -18,6 +18,7 @@
 #include <sys/types.h>  // for system types
 #include <cstdlib>      // for setenv()
 #include <fstream>      // for file operations
+#include <algorithm>    // for std::max
 #include <wayland-client.h>
 // OpenCV鍜屽浘鍍忓鐞?
 #include <opencv2/opencv.hpp>
@@ -672,14 +673,25 @@ public:
                   << (got_cam_panel ? "" : "(fallback) ")
                   << "(" << camera_x << ", " << camera_y << ") "
                   << camera_width << "x" << camera_height << std::endl;
+
+        // 内边距，防止视频顶边贴合
+        const int padding = 10;
+        if (camera_width > padding * 2 && camera_height > padding * 2) {
+            camera_x += padding;
+            camera_y += padding;
+            camera_width -= padding * 2;
+            camera_height -= padding * 2;
+        }
+
         if (camera_width % 2 != 0) {
             camera_width -= 1;
         }
         if (camera_height % 2 != 0) {
             camera_height -= 1;
         }
-        std::cout << "[DeepStream] aligned camera region: (" << camera_x << ", " << camera_y
-                  << ") " << camera_width << "x" << camera_height << std::endl;
+        std::cout << "[DeepStream] aligned camera region with padding: ("
+                  << camera_x << ", " << camera_y << ") "
+                  << camera_width << "x" << camera_height << std::endl;
 
 deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         
