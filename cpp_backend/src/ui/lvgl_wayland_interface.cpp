@@ -265,7 +265,8 @@ LVGLWaylandInterface::createSubsurface(int x, int y, int width, int height) {
     
     // 🔧 修复：显式将视频subsurface放置在父surface之上（避免被LVGL遮挡）
     // 这确保点击 LVGL UI 后视频仍然可见
-    wl_subsurface_place_above(wl_subsurface, pImpl_->wl_surface_);
+    // 将视频放在父 surface 之下，利用 camera_panel 的透明区域完成嵌入，避免浮在 UI 之上
+    wl_subsurface_place_below(wl_subsurface, pImpl_->wl_surface_);
     
     // 提交更改到视频 surface
     wl_surface_commit(wl_surface);
