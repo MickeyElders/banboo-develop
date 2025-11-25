@@ -1108,9 +1108,9 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
              << "nvvidconv ! "  // NVMM -> RGBA格式转换和缩放（硬件加速）
              << "video/x-raw(memory:NVMM),format=RGBA,width=" << width << ",height=" << height << " ! "
              << "nvvidconv ! "     // NVMM -> 标准内存转换
-             << "video/x-raw,format=RGBA,width=" << width << ",height=" << height << " ! "
+             << "video/x-raw(memory:NVMM),format=RGBA,width=" << width << ",height=" << height << " ! "
              << "videoconvert ! "  // RGBA -> BGRA格式转换（AR24对应BGRA）
-             << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "  // 使用AR24/BGRA格式
+             << "video/x-raw(memory:NVMM),format=BGRA,width=" << width << ",height=" << height << " ! "  // 使用AR24/BGRA格式
              << "kmssink "
              << "driver-name=nvidia-drm "     // 使用 nvidia-drm 驱动
              << "plane-id=44 "                // 用户指定的overlay plane，支持AR24
@@ -1186,7 +1186,7 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
         case VideoSinkMode::APPSINK:
         default:
             pipeline << "appsink name=video_appsink emit-signals=true sync=false "
-                     << "caps=video/x-raw,format=BGRA,width=" << layout.width
+                     << "caps=video/x-raw(memory:NVMM),format=BGRA,width=" << layout.width
                      << ",height=" << layout.height;
             break;
     }
@@ -1210,7 +1210,7 @@ std::string DeepStreamManager::buildInferenceChain(
     const int aligned_display_height = std::max(2, safe_display_height - (safe_display_height % 2));
     const int safe_infer_width = enable_infer ? std::max(config.infer_width, 1) : aligned_display_width;
     const int safe_infer_height = enable_infer ? std::max(config.infer_height, 1) : aligned_display_height;
-    const char* final_format = wayland_sink_mode ? "BGRx" : "BGRA";
+    const char* final_format = "NV12"; // enforce NVMM/NV12 for waylandsink
     
     if (enable_infer) {
         chain << "nvvideoconvert ! "
@@ -1224,7 +1224,7 @@ std::string DeepStreamManager::buildInferenceChain(
     
     // 最终输出给 waylandsink：使用 CPU 内存平面，减少兼容性问题
     chain << "nvvideoconvert ! "
-          << "video/x-raw,format=" << final_format
+          << "video/x-raw(memory:NVMM),format=" << final_format
           << ",width=" << aligned_display_width
           << ",height=" << aligned_display_height << " ! ";
     
@@ -1547,7 +1547,7 @@ std::string DeepStreamManager::buildKMSSinkPipeline(
     
     // 让GStreamer自动协商从NVMM到标准内存的转换，保持NV12格式
     pipeline << "nvvidconv ! "  // NVMM到标准内存转换，保持NV12格式
-             << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
+             << "video/x-raw(memory:NVMM),format=NV12,width=" << width << ",height=" << height << " ! "
              << "queue "
              << "max-size-buffers=4 "      // 适中的缓冲区深度
              << "max-size-time=0 "
@@ -1599,9 +1599,9 @@ std::string DeepStreamManager::buildAppSinkPipeline(
         // ?? 修复：使用两步转换，先nvvidconv转到标准内存，再videoconvert转BGRA
         pipeline << buildCameraSource(config) << " ! "
                  << "nvvidconv ! "    // NVMM -> 标准内存，保持NV12格式
-                 << "video/x-raw,format=NV12,width=" << width << ",height=" << height << " ! "
+                 << "video/x-raw(memory:NVMM),format=NV12,width=" << width << ",height=" << height << " ! "
                  << "videoconvert ! "  // NV12 -> BGRA格式转换（软件）
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+                 << "video/x-raw(memory:NVMM),format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
@@ -1611,7 +1611,7 @@ std::string DeepStreamManager::buildAppSinkPipeline(
     } else if (config.camera_source == CameraSourceMode::VIDEOTESTSRC) {
         // ? 测试源直接使用目标分辨率
         pipeline << "videotestsrc pattern=18 is-live=true "
-                 << "! video/x-raw,format=BGRA"
+                 << "! video/x-raw(memory:NVMM),format=BGRA"
                  << ",width=" << width << ",height=" << height
                  << ",framerate=30/1 "
                  << "! appsink name=video_appsink "
@@ -1621,7 +1621,7 @@ std::string DeepStreamManager::buildAppSinkPipeline(
         pipeline << buildCameraSource(config) << " ! "
                  << "videoconvert ! "  // 确保格式兼容
                  << "videoscale ! "    // 缩放到目标尺寸
-                 << "video/x-raw,format=BGRA,width=" << width << ",height=" << height << " ! "
+                 << "video/x-raw(memory:NVMM),format=BGRA,width=" << width << ",height=" << height << " ! "
                  << "queue max-size-buffers=2 leaky=downstream ! "
                  << "appsink name=video_appsink "
                  << "emit-signals=true sync=false max-buffers=2 drop=true";
