@@ -683,12 +683,16 @@ public:
             camera_height -= padding * 2;
         }
 
-        if (camera_width % 2 != 0) {
-            camera_width -= 1;
-        }
-        if (camera_height % 2 != 0) {
-            camera_height -= 1;
-        }
+        // 对齐到偶数并向下32对齐，兼容 NVMM/硬件拷贝
+        auto align32 = [](int v) {
+            v = (v / 2) * 2;
+            return (v / 32) * 32;
+        };
+        int aligned_w = align32(camera_width);
+        int aligned_h = align32(camera_height);
+        if (aligned_w >= 64) camera_width = aligned_w;
+        if (aligned_h >= 64) camera_height = aligned_h;
+
         std::cout << "[DeepStream] camera region with padding: ("
                   << camera_x << ", " << camera_y << ") "
                   << camera_width << "x" << camera_height << std::endl;
