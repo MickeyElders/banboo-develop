@@ -665,25 +665,23 @@ public:
         std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
         
         // 馃敡 鍏抽敭淇锛氳幏鍙?camera_panel 鐨勫疄闄呭潗鏍囷紙鍦‵lex甯冨眬瀹屾垚鍚庯級
+                // ?? camera_panel ???Flex ??????
         int camera_x = 0, camera_y = 60, camera_width = 960, camera_height = 640;
-        if (lvgl_if->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height)) {
-            std::cout << "鉁?鑾峰彇 camera_panel 瀹為檯鍧愭爣: ("
-                      << camera_x << ", " << camera_y << ") "
-                      << camera_width << "x" << camera_height << std::endl;
-            // 对齐到偶数，避免下游硬件转换在奇数尺寸上失败
-            if (camera_width % 2 != 0) {
-                camera_width -= 1;
-            }
-            if (camera_height % 2 != 0) {
-                camera_height -= 1;
-            }
-            std::cout << "🎯 对齐后尺寸: " << camera_width << "x" << camera_height << std::endl;
-        } else {
-            std::cout << "⚠️  无法获取 camera_panel 坐标，使用默认值" << std::endl;
+        bool got_cam_panel = lvgl_if->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height);
+        std::cout << "[DeepStream] camera panel coords "
+                  << (got_cam_panel ? "" : "(fallback) ")
+                  << "(" << camera_x << ", " << camera_y << ") "
+                  << camera_width << "x" << camera_height << std::endl;
+        if (camera_width % 2 != 0) {
+            camera_width -= 1;
         }
-        
-        // 鍒涘缓DeepStream绠＄悊鍣紙浣跨敤Subsurface锛?
-        deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+        if (camera_height % 2 != 0) {
+            camera_height -= 1;
+        }
+        std::cout << "[DeepStream] aligned camera region: (" << camera_x << ", " << camera_y
+                  << ") " << camera_width << "x" << camera_height << std::endl;
+
+deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         
         // 閰嶇疆Subsurface锛堜娇鐢ㄥ疄闄呭潗鏍囷級
         deepstream::SubsurfaceConfig subsurface_config;

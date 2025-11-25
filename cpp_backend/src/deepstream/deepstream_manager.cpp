@@ -192,8 +192,8 @@ bool DeepStreamManager::initializeWithSubsurface(
     
     // === 关键步骤5: Z-order 设置 ===
     // 为确保视频始终位于 LVGL UI 之上，显式将 subsurface 放到父 surface 之上。
-    wl_subsurface_place_below(wl_subsurface, wl_parent_surface);
-    std::cout << "[DeepStream] Subsurface Z-order: below parent surface (camera panel embed)" << std::endl;
+    wl_subsurface_place_above(wl_subsurface, wl_parent_surface);
+    std::cout << "[DeepStream] Subsurface Z-order: above parent surface (camera panel overlay)" << std::endl;
     
     
     // ?? 关键步骤6：commit subsurface 和 parent surface
