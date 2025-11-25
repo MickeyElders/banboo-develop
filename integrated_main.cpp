@@ -689,7 +689,7 @@ public:
         if (camera_height % 2 != 0) {
             camera_height -= 1;
         }
-        std::cout << "[DeepStream] aligned camera region with padding: ("
+        std::cout << "[DeepStream] camera region with padding: ("
                   << camera_x << ", " << camera_y << ") "
                   << camera_width << "x" << camera_height << std::endl;
 

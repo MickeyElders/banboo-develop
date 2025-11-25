@@ -516,24 +516,24 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 // waylandsink 请求窗口句柄，传递我们的 subsurface
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
-                                                                if (GST_IS_VIDEO_OVERLAY(sink)) {
-                                    // ??? surface ?? window handle?render_rectangle ??????
+                                if (GST_IS_VIDEO_OVERLAY(sink)) {
+                                    // 使用视频 subsurface 作为窗口句柄，偏移由 subsurface 决定
+                                    void* target_surface = self->video_surface_ ? self->video_surface_ : self->parent_wl_surface_;
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        reinterpret_cast<guintptr>(self->parent_wl_surface_)
+                                        reinterpret_cast<guintptr>(target_surface)
                                     );
 
+                                    // 在 subsurface 内部全幅渲染
                                     gst_video_overlay_set_render_rectangle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        self->subsurface_config_.offset_x,
-                                        self->subsurface_config_.offset_y,
+                                        0,
+                                        0,
                                         self->subsurface_config_.width,
                                         self->subsurface_config_.height
                                     );
 
-                                    std::cout << "[DeepStream] window handle=parent surface, render rect: ("
-                                              << self->subsurface_config_.offset_x << ", "
-                                              << self->subsurface_config_.offset_y << ") "
+                                    std::cout << "[DeepStream] window handle=subsurface, render rect: (0, 0) "
                                               << self->subsurface_config_.width << "x"
                                               << self->subsurface_config_.height << std::endl;
 
