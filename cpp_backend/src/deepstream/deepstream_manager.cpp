@@ -1210,7 +1210,7 @@ std::string DeepStreamManager::buildInferenceChain(
     const int aligned_display_height = std::max(2, safe_display_height - (safe_display_height % 2));
     const int safe_infer_width = enable_infer ? std::max(config.infer_width, 1) : aligned_display_width;
     const int safe_infer_height = enable_infer ? std::max(config.infer_height, 1) : aligned_display_height;
-    const char* final_format = "NV12"; // enforce NVMM/NV12 for waylandsink
+    const char* final_format = "BGRx"; // waylandsink 接受的系统内存格式
     
     if (enable_infer) {
         chain << "nvvideoconvert ! "
@@ -1224,7 +1224,7 @@ std::string DeepStreamManager::buildInferenceChain(
     
     // 最终输出给 waylandsink：使用 CPU 内存平面，减少兼容性问题
     chain << "nvvideoconvert ! "
-          << "video/x-raw(memory:NVMM),format=" << final_format
+          << "video/x-raw,format=" << final_format
           << ",width=" << aligned_display_width
           << ",height=" << aligned_display_height << " ! ";
     
