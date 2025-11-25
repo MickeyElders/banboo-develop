@@ -516,35 +516,30 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 // waylandsink 请求窗口句柄，传递我们的 subsurface
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
-                                if (GST_IS_VIDEO_OVERLAY(sink)) {
-                                    // 关键：将 window handle 绑定到视频 subsurface，而不是父 surface
-                                    void* target_surface = self->video_surface_ ? self->video_surface_ : self->parent_wl_surface_;
+                                                                if (GST_IS_VIDEO_OVERLAY(sink)) {
+                                    // ??? surface ?? window handle?render_rectangle ??????
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        reinterpret_cast<guintptr>(target_surface)
+                                        reinterpret_cast<guintptr>(self->parent_wl_surface_)
                                     );
-                                     
-                                    
-                                    std::cout << "? [DeepStream] 已将 subsurface 设置为 waylandsink 的窗口句柄" << std::endl;
-                                    
-                                    // 2?? 设置渲染矩形（位置和大小）
-                                    // ?? 关键：render_rectangle 的坐标是相对于 subsurface 自身的，不是相对于主 surface
-                                    // subsurface 的位置通过 wl_subsurface_set_position 设置（在 createSubsurface 中）
-                                    // 这里应该填充整个 subsurface，所以是 (0, 0, width, height)
+
                                     gst_video_overlay_set_render_rectangle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        0,
-                                        0,
+                                        self->subsurface_config_.offset_x,
+                                        self->subsurface_config_.offset_y,
                                         self->subsurface_config_.width,
                                         self->subsurface_config_.height
                                     );
-                                    
-                                    std::cout << "? [DeepStream] 已设置渲染矩形: (0, 0) "
-                                              << self->video_layout_.width << "x" << self->video_layout_.height 
-                                              << " (填充整个 subsurface)" << std::endl;
-                                    
+
+                                    std::cout << "[DeepStream] window handle=parent surface, render rect: ("
+                                              << self->subsurface_config_.offset_x << ", "
+                                              << self->subsurface_config_.offset_y << ") "
+                                              << self->subsurface_config_.width << "x"
+                                              << self->subsurface_config_.height << std::endl;
+
                                     return GST_BUS_DROP;
                                 }
+
                             }
                         }
                         
