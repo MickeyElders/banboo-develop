@@ -517,9 +517,11 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
                                 if (GST_IS_VIDEO_OVERLAY(sink)) {
+                                    // 关键：将 window handle 绑定到视频 subsurface，而不是父 surface
+                                    void* target_surface = self->video_surface_ ? self->video_surface_ : self->parent_wl_surface_;
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
-                                        reinterpret_cast<guintptr>(self->parent_wl_surface_)
+                                        reinterpret_cast<guintptr>(target_surface)
                                     );
                                      
                                     
