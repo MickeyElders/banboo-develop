@@ -322,14 +322,8 @@ LVGLWaylandInterface::LVGLWaylandInterface(std::shared_ptr<bamboo_cut::core::Dat
     pImpl_->theme_colors_ = ui::LVGLThemeColors();
 
     // 🧪 调试：允许通过环境变量让摄像头面板保持不透明，方便诊断
-    if (const char* env_value = std::getenv("BAMBOO_CAMERA_PANEL_OPAQUE")) {
-        std::string value = env_value;
-        std::transform(value.begin(), value.end(), value.begin(), ::tolower);
-        if (value == "1" || value == "true" || value == "yes" || value == "on" || value == "debug") {
-            pImpl_->debug_camera_panel_opaque_ = true;
-            std::cout << "⚠️  [Debug] 摄像头面板使用不透明模式 (BAMBOO_CAMERA_PANEL_OPAQUE=" << env_value << ")" << std::endl;
-        }
-    }
+    // 强制透明摄像头面板，避免视频被遮挡
+    pImpl_->debug_camera_panel_opaque_ = false;
 }
 
 LVGLWaylandInterface::~LVGLWaylandInterface() {
