@@ -517,7 +517,7 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 GstElement* sink = GST_ELEMENT(GST_MESSAGE_SRC(message));
                                 
                                 if (GST_IS_VIDEO_OVERLAY(sink)) {
-                                    // 将窗口句柄绑定到视频 subsurface（位置由 subsurface 决定）
+                                    // 窗口句柄绑定到视频 subsurface（如不可用则回退父 surface）
                                     void* target_surface = self->video_surface_ ? self->video_surface_ : self->parent_wl_surface_;
                                     gst_video_overlay_set_window_handle(
                                         GST_VIDEO_OVERLAY(sink),
@@ -1136,7 +1136,7 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     pipeline << buildCameraSource(config) << " ! "
              << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
              << buildInferenceChain(config, width, height, 1, true)
-             << "waylandsink name=video_sink sync=false async=true use-dmabuf=false ";
+             << "waylandsink name=video_sink sync=false async=true ";
     
     return pipeline.str();
 }

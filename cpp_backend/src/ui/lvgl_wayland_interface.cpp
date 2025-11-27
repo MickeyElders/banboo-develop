@@ -1016,7 +1016,8 @@ void LVGLWaylandInterface::Impl::createMainInterface() {
         lv_obj_set_style_border_opa(camera_panel_, LV_OPA_TRANSP, 0);  // 🔧 透明边框
     }
 
-    lv_obj_set_style_pad_all(camera_panel_, 0, 0);
+    // 给摄像头面板增加内边距，避免视频贴边
+    lv_obj_set_style_pad_all(camera_panel_, 10, 0);
     lv_obj_set_style_radius(camera_panel_, 8, 0);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(camera_panel_, LV_OBJ_FLAG_CLICKABLE);  // 禁用点击响应
