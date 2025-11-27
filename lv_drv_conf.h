@@ -110,8 +110,9 @@
 #define WAYLAND_WINDOW_WIDTH    1920
 #define WAYLAND_WINDOW_HEIGHT   1200
 
-/* Use shared memory for buffer (recommended) */
-#define WAYLAND_USE_SHM         1
+/* Use shared memory for buffer (recommended)
+ * 设置为0以便优先使用EGL/DMABUF路径，减少与DeepStream的冲突 */
+#define WAYLAND_USE_SHM         0
 
 /* DPI scaling factor */
 #define WAYLAND_DPI_SCALE       1
