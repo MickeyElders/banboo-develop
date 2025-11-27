@@ -191,7 +191,7 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
     primary_context_.surface = eglCreateWindowSurface(
         primary_context_.display,
         primary_context_.config,
-        primary_context_.gbm_surf,
+        reinterpret_cast<EGLNativeWindowType>(primary_context_.gbm_surf),
         nullptr);
 
     if (primary_context_.surface == EGL_NO_SURFACE) {
