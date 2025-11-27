@@ -91,8 +91,8 @@ bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surfa
 
     primary_context_.width = width;
     primary_context_.height = height;
-    primary_context_.wl_display = wl_display;
-    primary_context_.wl_surface = wl_surface;
+    primary_context_.wl_display_handle = wl_display;
+    primary_context_.wl_surface_handle = wl_surface;
     primary_context_.is_initialized = true;
 
     std::cout << "[EGL] Shared display/context/stream initialized" << std::endl;
@@ -147,14 +147,14 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
     // 优先使用 Wayland surface；若为空则回退到 DRM/GBM surface
 #if defined(ENABLE_WAYLAND)
     if (wl_surface) {
-        primary_context_.wl_window = wl_egl_window_create(wl_surface, width, height);
-        if (!primary_context_.wl_window) {
+        primary_context_.wl_window_handle = wl_egl_window_create(wl_surface, width, height);
+        if (!primary_context_.wl_window_handle) {
             std::cerr << "[EGL] wl_egl_window_create failed" << std::endl;
             return false;
         }
 
         primary_context_.surface =
-            eglCreateWindowSurface(primary_context_.display, primary_context_.config, primary_context_.wl_window, nullptr);
+            eglCreateWindowSurface(primary_context_.display, primary_context_.config, primary_context_.wl_window_handle, nullptr);
         if (primary_context_.surface == EGL_NO_SURFACE) {
             std::cerr << "[EGL] eglCreateWindowSurface failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
             return false;
@@ -263,7 +263,7 @@ EGLStreamKHR EGLContextManager::getStream() const {
 
 wl_egl_window* EGLContextManager::getWlEglWindow() const {
     std::lock_guard<std::mutex> lock(context_mutex_);
-    return primary_context_.wl_window;
+    return primary_context_.wl_window_handle;
 }
 
 void EGLContextManager::cleanupLocked() {
@@ -288,8 +288,8 @@ void EGLContextManager::cleanupLocked() {
     }
 
 #if defined(ENABLE_WAYLAND)
-    if (primary_context_.wl_window) {
-        wl_egl_window_destroy(primary_context_.wl_window);
+    if (primary_context_.wl_window_handle) {
+        wl_egl_window_destroy(primary_context_.wl_window_handle);
     }
 #endif
 

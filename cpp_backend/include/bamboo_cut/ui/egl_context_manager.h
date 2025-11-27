@@ -24,9 +24,9 @@ struct EGLContextConfig {
     EGLSurface surface;
     EGLConfig config;
     EGLStreamKHR stream;
-    wl_display* wl_display;
-    wl_surface* wl_surface;
-    wl_egl_window* wl_window;
+    wl_display* wl_display_handle;
+    wl_surface* wl_surface_handle;
+    wl_egl_window* wl_window_handle;
     int drm_fd;
     gbm_device* gbm_dev;
     gbm_surface* gbm_surf;
@@ -40,9 +40,9 @@ struct EGLContextConfig {
         , surface(EGL_NO_SURFACE)
         , config(nullptr)
         , stream(EGL_NO_STREAM_KHR)
-        , wl_display(nullptr)
-        , wl_surface(nullptr)
-        , wl_window(nullptr)
+        , wl_display_handle(nullptr)
+        , wl_surface_handle(nullptr)
+        , wl_window_handle(nullptr)
         , drm_fd(-1)
         , gbm_dev(nullptr)
         , gbm_surf(nullptr)
