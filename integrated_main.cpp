@@ -19,9 +19,12 @@
 #include <cstdlib>      // for setenv()
 #include <fstream>      // for file operations
 #include <algorithm>    // for std::max
-#include <wayland-client.h>
 // OpenCV鍜屽浘鍍忓鐞?
 #include <opencv2/opencv.hpp>
+
+#ifdef ENABLE_WAYLAND
+#include <wayland-client.h>
+#endif
 
 
 // LVGL澶存枃浠跺寘鍚?- 鏅鸿兘妫€娴嬪绉嶅彲鑳界殑璺緞
@@ -594,6 +597,10 @@ public:
     
     // 妫€鏌ayland鐜
     bool checkWaylandEnvironment() {
+#ifndef ENABLE_WAYLAND
+        wayland_available_ = false;
+        return false;
+#endif
         const char* wayland_display = getenv("WAYLAND_DISPLAY");
         if (!wayland_display) {
             wayland_display = "wayland-0";
@@ -612,6 +619,14 @@ public:
     bool initialize() {
         std::cout << "馃敡 [鎺ㄧ悊绯荤粺] 鍒濆鍖朩ayland Subsurface鏋舵瀯..." << std::endl;
         
+#ifndef ENABLE_WAYLAND
+        std::cout << "[推理系统] Wayland 未启用，直接使用 DRM/EGL 流水线" << std::endl;
+        deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
+        deepstream::DeepStreamConfig config;
+        return deepstream_manager_->initialize(config);
+#endif
+
+#ifdef ENABLE_WAYLAND
         // 鑾峰彇LVGL鐨刉ayland瀵硅薄
         if (!lvgl_interface_ptr_) {
             std::cerr << "❌ [推理系统] LVGL接口未设置" << std::endl;
@@ -722,6 +737,7 @@ deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         std::cout << "馃摵 瑙嗛灏嗙敱 Wayland 鍚堟垚鍣ㄨ嚜鍔ㄥ悎鎴愬埌 LVGL 绐楀彛" << std::endl;
         
         return true;
+#endif
     }
     
     bool start() {

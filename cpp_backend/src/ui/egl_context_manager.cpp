@@ -1,0 +1,319 @@
+#include "bamboo_cut/ui/egl_context_manager.h"
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#ifdef ENABLE_WAYLAND
+#include <wayland-client.h>
+#include <wayland-egl.h>
+#endif
+#include <gbm.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <iostream>
+
+#ifndef EGL_NO_STREAM_KHR
+#define EGL_NO_STREAM_KHR reinterpret_cast<EGLStreamKHR>(0)
+#endif
+
+namespace bamboo_cut {
+namespace ui {
+
+namespace {
+constexpr EGLint kEglConfigAttrs[] = {
+    EGL_SURFACE_TYPE, EGL_WINDOW_BIT | EGL_STREAM_BIT_KHR,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+    EGL_RED_SIZE, 8,
+    EGL_GREEN_SIZE, 8,
+    EGL_BLUE_SIZE, 8,
+    EGL_ALPHA_SIZE, 8,
+    EGL_NONE};
+
+constexpr EGLint kEglContextAttrs[] = {
+    EGL_CONTEXT_CLIENT_VERSION, 2,
+    EGL_NONE};
+}  // namespace
+
+EGLContextManager& EGLContextManager::getInstance() {
+    static EGLContextManager instance;
+    return instance;
+}
+
+bool EGLContextManager::ensureInitialized(wl_display* wl_display, wl_surface* wl_surface, int width, int height) {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    if (primary_context_.is_initialized) {
+        return true;
+    }
+    return initializeSharedContext(wl_display, wl_surface, width, height);
+}
+
+bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surface* wl_surface, int width, int height) {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+
+    if (primary_context_.is_initialized) {
+        return true;
+    }
+
+    if (!createDisplay(wl_display)) {
+        std::cerr << "[EGL] Failed to create display" << std::endl;
+        return false;
+    }
+
+    if (!chooseConfig()) {
+        std::cerr << "[EGL] Failed to choose config" << std::endl;
+        cleanupLocked();
+        return false;
+    }
+
+    if (!createContext()) {
+        std::cerr << "[EGL] Failed to create context" << std::endl;
+        cleanupLocked();
+        return false;
+    }
+
+    if (!createSurface(wl_surface, width, height)) {
+        std::cerr << "[EGL] Failed to create Wayland EGL surface" << std::endl;
+        cleanupLocked();
+        return false;
+    }
+
+    if (!createStream()) {
+        std::cerr << "[EGL] Failed to create EGLStream" << std::endl;
+        cleanupLocked();
+        return false;
+    }
+
+    if (eglMakeCurrent(primary_context_.display, primary_context_.surface, primary_context_.surface,
+                       primary_context_.context) != EGL_TRUE) {
+        std::cerr << "[EGL] eglMakeCurrent failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        cleanupLocked();
+        return false;
+    }
+
+    primary_context_.width = width;
+    primary_context_.height = height;
+    primary_context_.wl_display = wl_display;
+    primary_context_.wl_surface = wl_surface;
+    primary_context_.is_initialized = true;
+
+    std::cout << "[EGL] Shared display/context/stream initialized" << std::endl;
+    return true;
+}
+
+bool EGLContextManager::createDisplay(wl_display* wl_display) {
+    primary_context_.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (primary_context_.display == EGL_NO_DISPLAY) {
+        std::cerr << "[EGL] eglGetDisplay returned NO_DISPLAY" << std::endl;
+        return false;
+    }
+
+    EGLint major = 0;
+    EGLint minor = 0;
+    if (eglInitialize(primary_context_.display, &major, &minor) != EGL_TRUE) {
+        std::cerr << "[EGL] eglInitialize failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        return false;
+    }
+
+    if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE) {
+        std::cerr << "[EGL] eglBindAPI failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        return false;
+    }
+
+    std::cout << "[EGL] Initialized display (ES) version " << major << "." << minor << std::endl;
+    (void)wl_display;  // kept for signature symmetry; EGL_DEFAULT_DISPLAY already uses Wayland connection.
+    return true;
+}
+
+bool EGLContextManager::chooseConfig() {
+    EGLint num_configs = 0;
+    if (eglChooseConfig(primary_context_.display, kEglConfigAttrs, &primary_context_.config, 1, &num_configs) != EGL_TRUE ||
+        num_configs == 0) {
+        std::cerr << "[EGL] eglChooseConfig failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool EGLContextManager::createContext() {
+    primary_context_.context =
+        eglCreateContext(primary_context_.display, primary_context_.config, EGL_NO_CONTEXT, kEglContextAttrs);
+    if (primary_context_.context == EGL_NO_CONTEXT) {
+        std::cerr << "[EGL] eglCreateContext failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int height) {
+    // 优先使用 Wayland surface；若为空则回退到 DRM/GBM surface
+#if defined(ENABLE_WAYLAND)
+    if (wl_surface) {
+        primary_context_.wl_window = wl_egl_window_create(wl_surface, width, height);
+        if (!primary_context_.wl_window) {
+            std::cerr << "[EGL] wl_egl_window_create failed" << std::endl;
+            return false;
+        }
+
+        primary_context_.surface =
+            eglCreateWindowSurface(primary_context_.display, primary_context_.config, primary_context_.wl_window, nullptr);
+        if (primary_context_.surface == EGL_NO_SURFACE) {
+            std::cerr << "[EGL] eglCreateWindowSurface failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+            return false;
+        }
+        return true;
+    }
+#endif
+
+    // DRM/GBM 回退路径
+    primary_context_.drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (primary_context_.drm_fd < 0) {
+        std::cerr << "[EGL] Failed to open /dev/dri/card0" << std::endl;
+        return false;
+    }
+
+    primary_context_.gbm_dev = gbm_create_device(primary_context_.drm_fd);
+    if (!primary_context_.gbm_dev) {
+        std::cerr << "[EGL] gbm_create_device failed" << std::endl;
+        return false;
+    }
+
+    primary_context_.gbm_surf = gbm_surface_create(
+        primary_context_.gbm_dev,
+        width,
+        height,
+        GBM_FORMAT_XRGB8888,
+        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+
+    if (!primary_context_.gbm_surf) {
+        std::cerr << "[EGL] gbm_surface_create failed" << std::endl;
+        return false;
+    }
+
+    primary_context_.surface = eglCreateWindowSurface(
+        primary_context_.display,
+        primary_context_.config,
+        primary_context_.gbm_surf,
+        nullptr);
+
+    if (primary_context_.surface == EGL_NO_SURFACE) {
+        std::cerr << "[EGL] eglCreateWindowSurface failed (GBM): 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool EGLContextManager::createStream() {
+    eglCreateStreamKHR_ =
+        reinterpret_cast<PFNEGLCREATESTREAMKHRPROC>(eglGetProcAddress("eglCreateStreamKHR"));
+    eglDestroyStreamKHR_ =
+        reinterpret_cast<PFNEGLDESTROYSTREAMKHRPROC>(eglGetProcAddress("eglDestroyStreamKHR"));
+
+    if (!eglCreateStreamKHR_) {
+        std::cerr << "[EGL] eglCreateStreamKHR not available" << std::endl;
+        return false;
+    }
+
+    const EGLint stream_attribs[] = {
+        EGL_STREAM_FIFO_LENGTH_KHR, 2,
+        EGL_CONSUMER_LATENCY_USEC_KHR, 16000,
+        EGL_NONE};
+
+    primary_context_.stream = eglCreateStreamKHR_(primary_context_.display, stream_attribs);
+    if (primary_context_.stream == EGL_NO_STREAM_KHR) {
+        std::cerr << "[EGL] eglCreateStreamKHR failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool EGLContextManager::makeCurrent() {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    if (!primary_context_.is_initialized) {
+        return false;
+    }
+    return eglMakeCurrent(primary_context_.display, primary_context_.surface, primary_context_.surface,
+                          primary_context_.context) == EGL_TRUE;
+}
+
+EGLDisplay EGLContextManager::getDisplay() const {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    return primary_context_.display;
+}
+
+EGLContext EGLContextManager::getContext() const {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    return primary_context_.context;
+}
+
+EGLSurface EGLContextManager::getSurface() const {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    return primary_context_.surface;
+}
+
+EGLConfig EGLContextManager::getConfig() const {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    return primary_context_.config;
+}
+
+EGLStreamKHR EGLContextManager::getStream() const {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    return primary_context_.stream;
+}
+
+wl_egl_window* EGLContextManager::getWlEglWindow() const {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    return primary_context_.wl_window;
+}
+
+void EGLContextManager::cleanupLocked() {
+    if (primary_context_.display != EGL_NO_DISPLAY) {
+        eglMakeCurrent(primary_context_.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    }
+
+    if (primary_context_.surface != EGL_NO_SURFACE) {
+        eglDestroySurface(primary_context_.display, primary_context_.surface);
+    }
+
+    if (primary_context_.context != EGL_NO_CONTEXT) {
+        eglDestroyContext(primary_context_.display, primary_context_.context);
+    }
+
+    if (primary_context_.stream != EGL_NO_STREAM_KHR && eglDestroyStreamKHR_) {
+        eglDestroyStreamKHR_(primary_context_.display, primary_context_.stream);
+    }
+
+    if (primary_context_.display != EGL_NO_DISPLAY) {
+        eglTerminate(primary_context_.display);
+    }
+
+#if defined(ENABLE_WAYLAND)
+    if (primary_context_.wl_window) {
+        wl_egl_window_destroy(primary_context_.wl_window);
+    }
+#endif
+
+    if (primary_context_.gbm_surf) {
+        gbm_surface_destroy(primary_context_.gbm_surf);
+    }
+    if (primary_context_.gbm_dev) {
+        gbm_device_destroy(primary_context_.gbm_dev);
+    }
+    if (primary_context_.drm_fd >= 0) {
+        close(primary_context_.drm_fd);
+    }
+
+    primary_context_ = EGLContextConfig();
+}
+
+void EGLContextManager::cleanup() {
+    std::lock_guard<std::mutex> lock(context_mutex_);
+    cleanupLocked();
+}
+
+EGLContextManager::~EGLContextManager() {
+    cleanup();
+}
+
+}  // namespace ui
+}  // namespace bamboo_cut

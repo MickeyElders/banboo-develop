@@ -14,7 +14,7 @@
  *==================*/
 
 /* Wayland display driver */
-#define USE_WAYLAND       1
+#define USE_WAYLAND       0   /* 关闭Wayland，改走DRM/GBM直连 */
 
 #if USE_WAYLAND
 # define WAYLAND_HOR_RES    1920
@@ -26,13 +26,13 @@
  *==================*/
 
 /* Wayland mouse/pointer input */
-#define USE_WAYLAND_POINTER     1
+#define USE_WAYLAND_POINTER     0
 
 /* Wayland keyboard input */  
-#define USE_WAYLAND_KEYBOARD    1
+#define USE_WAYLAND_KEYBOARD    0
 
 /* Wayland touch input */
-#define USE_WAYLAND_TOUCH       1
+#define USE_WAYLAND_TOUCH       0
 
 /*==================
  * DISPLAY DRIVERS
@@ -42,7 +42,7 @@
 #define USE_FBDEV           0
 
 /* DRM/KMS 直接访问 - 已禁用，使用Wayland合成器 */
-#define USE_DRM             0
+#define USE_DRM             1
 
 /* SDL display driver - 可选，主要用于开发测试 */
 #define USE_SDL             0
@@ -61,10 +61,10 @@
  *==================*/
 
 /* libinput-based drivers for Wayland */
-#define USE_LIBINPUT_GENERIC    1
+#define USE_LIBINPUT_GENERIC    0
 
 /* XKB keyboard (Linux) - Wayland需要 */
-#define USE_XKB                 1
+#define USE_XKB                 0
 
 /* Touchpad as mouse (libinput) */
 #define USE_LIBINPUT_TOUCHPAD   0
@@ -78,8 +78,8 @@
 /* FreeBSD touchscreen (/dev/input/eventX) - 已禁用，使用Wayland输入 */
 #define USE_BSD_TOUCHPAD        0
 
-/* EVDEV based drivers (libinput/evdev) - 已禁用，使用Wayland输入 */
-#define USE_EVDEV               0
+/* EVDEV based drivers (libinput/evdev) - 无合成器时启用 */
+#define USE_EVDEV               1
 
 /* Mouse wheel encoder */
 #define USE_MOUSEWHEEL          1
@@ -151,9 +151,9 @@
 
 /* 为了向后兼容，保留一些老的定义但设为禁用 */
 #define USE_FBDEV               0
-#define USE_DRM                 0  
-#define USE_GBM                 0
-#define USE_EVDEV               0
+#define USE_DRM                 1  
+#define USE_GBM                 1
+#define USE_EVDEV               1
 
 /* Jetson专用优化 */
 #ifdef JETSON_ORIN_NX

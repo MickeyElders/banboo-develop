@@ -42,6 +42,7 @@ endif()
 # ================================
 # 查找依赖库
 # ================================
+option(ENABLE_WAYLAND "Enable Wayland client/compositor support" OFF)
 
 # 查找PkgConfig
 find_package(PkgConfig REQUIRED)
@@ -344,23 +345,25 @@ else()
     set(ENABLE_JSON OFF)
 endif()
 
-# Wayland - 标准Wayland Compositor架构 (替代DRM直接访问)
-pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
-pkg_check_modules(WAYLAND_EGL REQUIRED wayland-egl)
-pkg_check_modules(WAYLAND_PROTOCOLS QUIET wayland-protocols)
+# Wayland - 标准Wayland Compositor架构 (可选，默认关闭以支持无合成器)
+if(ENABLE_WAYLAND)
+    pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
+    pkg_check_modules(WAYLAND_EGL QUIET wayland-egl)
+    pkg_check_modules(WAYLAND_PROTOCOLS QUIET wayland-protocols)
 
-if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND)
-    message(STATUS "Found Wayland client: ${WAYLAND_CLIENT_VERSION}")
-    message(STATUS "Found Wayland EGL: ${WAYLAND_EGL_VERSION}")
-    set(ENABLE_WAYLAND ON)
-    include_directories(${WAYLAND_CLIENT_INCLUDE_DIRS} ${WAYLAND_EGL_INCLUDE_DIRS})
-    link_directories(${WAYLAND_CLIENT_LIBRARY_DIRS} ${WAYLAND_EGL_LIBRARY_DIRS})
-    
-    if(WAYLAND_PROTOCOLS_FOUND)
-        message(STATUS "Found Wayland protocols: ${WAYLAND_PROTOCOLS_VERSION}")
+    if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND)
+        message(STATUS "Found Wayland client: ${WAYLAND_CLIENT_VERSION}")
+        message(STATUS "Found Wayland EGL: ${WAYLAND_EGL_VERSION}")
+        include_directories(${WAYLAND_CLIENT_INCLUDE_DIRS} ${WAYLAND_EGL_INCLUDE_DIRS})
+        link_directories(${WAYLAND_CLIENT_LIBRARY_DIRS} ${WAYLAND_EGL_LIBRARY_DIRS})
+        
+        if(WAYLAND_PROTOCOLS_FOUND)
+            message(STATUS "Found Wayland protocols: ${WAYLAND_PROTOCOLS_VERSION}")
+        endif()
+    else()
+        message(WARNING "Wayland client libraries not found - Wayland support disabled")
+        set(ENABLE_WAYLAND OFF)
     endif()
-else()
-    message(FATAL_ERROR "Wayland client libraries not found - 请先安装 libwayland-dev")
 endif()
 
 # 查找EGL库 (Wayland需要EGL支持)
@@ -578,8 +581,9 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/inference/bamboo_detector.cpp
     cpp_backend/src/inference/ghost_conv.cpp
     cpp_backend/src/deepstream/deepstream_manager.cpp
-    cpp_backend/src/ui/lvgl_wayland_interface.cpp
     cpp_backend/src/ui/lvgl_ui_utils.cpp
+    cpp_backend/src/ui/ui_components.cpp
+    cpp_backend/src/ui/ui_updaters.cpp
     # 🔧 注意：以下 panel 文件仅用于 DRM 版本（LVGLInterface）
     # Wayland 版本（LVGLWaylandInterface）使用内联面板创建
     # cpp_backend/src/ui/lvgl_panels/header_panel.cpp
@@ -590,90 +594,98 @@ set(CPP_BACKEND_SOURCES
     cpp_backend/src/utils/config_loader.cpp
     cpp_backend/src/utils/system_monitor.cpp
     cpp_backend/src/utils/jetson_monitor.cpp
+    cpp_backend/src/ui/egl_context_manager.cpp
 )
+
+# 选择接口实现：Wayland 或 DRM
+if(ENABLE_WAYLAND)
+    list(APPEND CPP_BACKEND_SOURCES cpp_backend/src/ui/lvgl_wayland_interface.cpp)
+else()
+    list(APPEND CPP_BACKEND_SOURCES cpp_backend/src/ui/lvgl_drm_interface.cpp)
+endif()
 
 
 # 🔧 修复：在构建时从系统 wayland-protocols 生成 xdg-shell 协议文件
-# 确保与系统 Weston 版本完全兼容
+if(ENABLE_WAYLAND)
+    # 查找 wayland-scanner
+    find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
 
-# 查找 wayland-scanner
-find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
-
-# 查找系统的 xdg-shell.xml
-execute_process(
-    COMMAND pkg-config --variable=pkgdatadir wayland-protocols
-    OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-set(XDG_SHELL_XML "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
-
-if(NOT EXISTS "${XDG_SHELL_XML}")
-    message(FATAL_ERROR "找不到 xdg-shell.xml: ${XDG_SHELL_XML}")
-endif()
-
-message(STATUS "Found xdg-shell.xml: ${XDG_SHELL_XML}")
-
-# 生成协议文件的输出目录
-set(WAYLAND_PROTOCOLS_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/wayland-protocols")
-file(MAKE_DIRECTORY ${WAYLAND_PROTOCOLS_GEN_DIR})
-
-# 生成 xdg-shell 客户端头文件
-set(XDG_SHELL_CLIENT_HEADER "${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h")
-add_custom_command(
-    OUTPUT ${XDG_SHELL_CLIENT_HEADER}
-    COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} ${XDG_SHELL_CLIENT_HEADER}
-    DEPENDS ${XDG_SHELL_XML}
-    COMMENT "Generating xdg-shell client header"
-    VERBATIM
-)
-
-# 生成 xdg-shell 协议实现代码
-set(XDG_SHELL_PROTOCOL_CODE "${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c")
-add_custom_command(
-    OUTPUT ${XDG_SHELL_PROTOCOL_CODE}
-    COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} ${XDG_SHELL_PROTOCOL_CODE}
-    DEPENDS ${XDG_SHELL_XML}
-    COMMENT "Generating xdg-shell protocol code"
-    VERBATIM
-)
-
-# 创建自定义目标确保协议文件在编译前生成
-add_custom_target(generate_wayland_protocols
-    DEPENDS ${XDG_SHELL_CLIENT_HEADER} ${XDG_SHELL_PROTOCOL_CODE}
-)
-
-# 将生成的协议实现添加到源文件列表
-list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE})
-
-# 添加生成文件的包含目录
-include_directories(${WAYLAND_PROTOCOLS_GEN_DIR})
-
-message(STATUS "Wayland protocols will be generated at build time")
-
-# 添加lv_drivers Wayland源文件 (如果存在)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers")
-    set(LV_DRIVERS_WAYLAND_SOURCES
-        third_party/lv_drivers/wayland/wayland.c
-        third_party/lv_drivers/indev/wayland_pointer.c
-        third_party/lv_drivers/indev/wayland_pointeraxis.c
-        third_party/lv_drivers/indev/wayland_keyboard.c
-        third_party/lv_drivers/indev/wayland_touch.c
+    # 查找系统的 xdg-shell.xml
+    execute_process(
+        COMMAND pkg-config --variable=pkgdatadir wayland-protocols
+        OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-    
-    # 过滤存在的lv_drivers源文件
-    set(VALID_LV_DRIVERS_SOURCES)
-    foreach(src ${LV_DRIVERS_WAYLAND_SOURCES})
-        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
-            list(APPEND VALID_LV_DRIVERS_SOURCES ${src})
-            message(STATUS "Found lv_drivers source: ${src}")
+
+    set(XDG_SHELL_XML "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
+
+    if(NOT EXISTS "${XDG_SHELL_XML}")
+        message(FATAL_ERROR "找不到 xdg-shell.xml: ${XDG_SHELL_XML}")
+    endif()
+
+    message(STATUS "Found xdg-shell.xml: ${XDG_SHELL_XML}")
+
+    # 生成协议文件的输出目录
+    set(WAYLAND_PROTOCOLS_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/wayland-protocols")
+    file(MAKE_DIRECTORY ${WAYLAND_PROTOCOLS_GEN_DIR})
+
+    # 生成 xdg-shell 客户端头文件
+    set(XDG_SHELL_CLIENT_HEADER "${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-client-protocol.h")
+    add_custom_command(
+        OUTPUT ${XDG_SHELL_CLIENT_HEADER}
+        COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} ${XDG_SHELL_CLIENT_HEADER}
+        DEPENDS ${XDG_SHELL_XML}
+        COMMENT "Generating xdg-shell client header"
+        VERBATIM
+    )
+
+    # 生成 xdg-shell 协议实现代码
+    set(XDG_SHELL_PROTOCOL_CODE "${WAYLAND_PROTOCOLS_GEN_DIR}/xdg-shell-protocol.c")
+    add_custom_command(
+        OUTPUT ${XDG_SHELL_PROTOCOL_CODE}
+        COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} ${XDG_SHELL_PROTOCOL_CODE}
+        DEPENDS ${XDG_SHELL_XML}
+        COMMENT "Generating xdg-shell protocol code"
+        VERBATIM
+    )
+
+    # 创建自定义目标确保协议文件在编译前生成
+    add_custom_target(generate_wayland_protocols
+        DEPENDS ${XDG_SHELL_CLIENT_HEADER} ${XDG_SHELL_PROTOCOL_CODE}
+    )
+
+    # 将生成的协议实现添加到源文件列表
+    list(APPEND CPP_BACKEND_SOURCES ${XDG_SHELL_PROTOCOL_CODE})
+
+    # 添加生成文件的包含目录
+    include_directories(${WAYLAND_PROTOCOLS_GEN_DIR})
+
+    message(STATUS "Wayland protocols will be generated at build time")
+
+    # 添加lv_drivers Wayland源文件 (如果存在)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers")
+        set(LV_DRIVERS_WAYLAND_SOURCES
+            third_party/lv_drivers/wayland/wayland.c
+            third_party/lv_drivers/indev/wayland_pointer.c
+            third_party/lv_drivers/indev/wayland_pointeraxis.c
+            third_party/lv_drivers/indev/wayland_keyboard.c
+            third_party/lv_drivers/indev/wayland_touch.c
+        )
+        
+        # 过滤存在的lv_drivers源文件
+        set(VALID_LV_DRIVERS_SOURCES)
+        foreach(src ${LV_DRIVERS_WAYLAND_SOURCES})
+            if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${src})
+                list(APPEND VALID_LV_DRIVERS_SOURCES ${src})
+                message(STATUS "Found lv_drivers source: ${src}")
+            endif()
+        endforeach()
+        
+        if(VALID_LV_DRIVERS_SOURCES)
+            list(APPEND CPP_BACKEND_SOURCES ${VALID_LV_DRIVERS_SOURCES})
+            include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers)
+            message(STATUS "Added lv_drivers Wayland sources: ${VALID_LV_DRIVERS_SOURCES}")
         endif()
-    endforeach()
-    
-    if(VALID_LV_DRIVERS_SOURCES)
-        list(APPEND CPP_BACKEND_SOURCES ${VALID_LV_DRIVERS_SOURCES})
-        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv_drivers)
-        message(STATUS "Added lv_drivers Wayland sources: ${VALID_LV_DRIVERS_SOURCES}")
     endif()
 endif()
 
@@ -776,8 +788,10 @@ add_executable(bamboo_integrated
     ${VALID_SOURCES}
 )
 
-# 确保协议文件在编译前生成
-add_dependencies(bamboo_integrated generate_wayland_protocols)
+if(ENABLE_WAYLAND)
+    # 确保协议文件在编译前生成
+    add_dependencies(bamboo_integrated generate_wayland_protocols)
+endif()
 
 # 确保只有我们的主程序是默认构建目标
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bamboo_integrated)
@@ -786,9 +800,9 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT b
 target_compile_definitions(bamboo_integrated PRIVATE
     INTEGRATED_BUILD=1
     LV_CONF_INCLUDE_SIMPLE=1
-    USE_WAYLAND=1
-    LV_USE_WAYLAND=1
-    ENABLE_WAYLAND=1
+    $<$<BOOL:${ENABLE_WAYLAND}>:USE_WAYLAND=1>
+    $<$<BOOL:${ENABLE_WAYLAND}>:LV_USE_WAYLAND=1>
+    $<$<BOOL:${ENABLE_WAYLAND}>:ENABLE_WAYLAND=1>
     HAS_DRM_EGL_BACKEND=1
     $<$<BOOL:${ENABLE_CUDA}>:ENABLE_CUDA>
     $<$<BOOL:${ENABLE_TENSORRT}>:ENABLE_TENSORRT>

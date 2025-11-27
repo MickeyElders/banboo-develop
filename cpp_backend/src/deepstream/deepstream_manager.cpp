@@ -5,6 +5,7 @@
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
 #include "bamboo_cut/ui/lvgl_wayland_interface.h"
+#include "bamboo_cut/ui/egl_context_manager.h"
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
@@ -25,10 +26,18 @@
 #include <gst/app/gstappsink.h>
 
 // ?? 新增：Wayland头文件包含
+#ifdef ENABLE_WAYLAND
 #include <wayland-client.h>
+#endif
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 #ifdef ENABLE_LVGL
 #include <lvgl/lvgl.h>
+#endif
+
+#ifndef EGL_NO_STREAM_KHR
+#define EGL_NO_STREAM_KHR reinterpret_cast<EGLStreamKHR>(0)
 #endif
 
 namespace fs = std::filesystem;
@@ -78,6 +87,7 @@ DeepStreamManager::~DeepStreamManager() {
     cleanup();
 }
 
+#ifdef ENABLE_WAYLAND
 bool DeepStreamManager::initializeWithSubsurface(
     void* wl_display,
     void* wl_surface,
@@ -202,7 +212,7 @@ bool DeepStreamManager::initializeWithSubsurface(
     // - subsurface 自己的 buffer 在 subsurface commit 时生效
     // - 在 desync 模式下，subsurface 可以独立 commit，不需要与 parent 同步
     wl_surface_commit(wl_surface);
-    std::cout << "? [DeepStream] Subsurface 已 commit（空 commit，等待 waylandsink attach buffer）" << std::endl;
+    std::cout << "? [DeepStream] Subsurface 已 commit（空 commit，等待 nveglstreamsink 连接 EGLStream）" << std::endl;
     
     wl_surface_commit(wl_parent_surface);
     std::cout << "? [DeepStream] 父 surface 已 commit（应用 subsurface 位置和 Z-order）" << std::endl;
@@ -210,11 +220,11 @@ bool DeepStreamManager::initializeWithSubsurface(
     wl_display_flush(wl_display);
     std::cout << "? [DeepStream] Display flush 完成" << std::endl;
     
-    std::cout << "\n?? [架构诊断] Waylandsink 预期行为：" << std::endl;
-    std::cout << "  1?? waylandsink 接收 subsurface 作为 window_handle" << std::endl;
-    std::cout << "  2?? waylandsink attach video buffer 到 subsurface" << std::endl;
-    std::cout << "  3?? waylandsink commit subsurface（显示视频帧）" << std::endl;
-    std::cout << "  4?? compositor 混合: 父 surface（LVGL UI，camera area 透明）+ subsurface（视频）" << std::endl;
+    std::cout << "\n?? [架构诊断] EGLStream 预期行为：" << std::endl;
+    std::cout << "  1?? nveglstreamsink 绑定共享 EGLDisplay/EGLStream" << std::endl;
+    std::cout << "  2?? 视频帧作为 EGLImage 进入 EGLStream" << std::endl;
+    std::cout << "  3?? LVGL 在同一 EGLSurface 叠加 UI（共享上下文）" << std::endl;
+    std::cout << "  4?? compositor 只处理一个 surface，避免 SHM/覆盖冲突" << std::endl;
     std::cout << "  ? 结果：UI + 视频同时可见\n" << std::endl;
     
     // 可选: 通过环境变量启用 Wayland 测试图案（默认使用真实摄像头）
@@ -249,6 +259,26 @@ bool DeepStreamManager::initializeWithSubsurface(
     std::cout << "? [DeepStream] Wayland Subsurface初始化完成" << std::endl;
     return true;
 }
+#else
+bool DeepStreamManager::initializeWithSubsurface(
+    void*,
+    void*,
+    int,
+    int) {
+    std::cout << "[DeepStream] Wayland 支持未启用，跳过 subsurface 初始化" << std::endl;
+    return false;
+}
+
+bool DeepStreamManager::initializeWithSubsurface(
+    void*,
+    void*,
+    void*,
+    void*,
+    const SubsurfaceConfig&) {
+    std::cout << "[DeepStream] Wayland 支持未启用，跳过 subsurface 初始化" << std::endl;
+    return false;
+}
+#endif
 
 bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     std::cout << "[DeepStreamManager] 初始化Wayland视频系统..." << std::endl;
@@ -256,6 +286,13 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     config_ = config;
     inference_available_ = false;
     resolved_nvinfer_config_.clear();
+
+#ifndef ENABLE_WAYLAND
+    if (config_.sink_mode == VideoSinkMode::WAYLANDSINK) {
+        std::cout << "[DeepStreamManager] Wayland 未启用，自动切换为 nvdrmvideosink" << std::endl;
+        config_.sink_mode = VideoSinkMode::NVDRMVIDEOSINK;
+    }
+#endif
     
     if (config_.enable_inference) {
         resolved_nvinfer_config_ = resolveFilePath(config_.nvinfer_config);
@@ -285,7 +322,7 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     
     // 检查是否有可用的Subsurface配置
     if (video_subsurface_) {
-        std::cout << "[DeepStreamManager] 检测到Subsurface配置，使用waylandsink模式" << std::endl;
+        std::cout << "[DeepStreamManager] 检测到Subsurface配置，使用 nveglstreamsink (EGLStream) 模式" << std::endl;
     } else {
         std::cout << "[DeepStreamManager] 未配置Subsurface，回退到appsink模式" << std::endl;
         config_.sink_mode = VideoSinkMode::APPSINK;
@@ -329,7 +366,7 @@ bool DeepStreamManager::initialize(const DeepStreamConfig& config) {
     }
     
     // 设置EGL共享环境变量，解决NVMM缓冲区到EGLImage转换问题
-    std::cout << "[DeepStreamManager] 配置EGL共享环境..." << std::endl;
+    std::cout << "[DeepStreamManager] 配置EGL共享环境（无合成器，DRM/EGLStream）..." << std::endl;
     setenv("EGL_PLATFORM", "drm", 1);
     setenv("__EGL_VENDOR_LIBRARY_DIRS", "/usr/lib/aarch64-linux-gnu/tegra-egl", 1);
     setenv("EGL_EXTENSIONS", "EGL_EXT_image_dma_buf_import,EGL_EXT_image_dma_buf_import_modifiers", 1);
@@ -444,7 +481,29 @@ bool DeepStreamManager::startSinglePipelineMode() {
                 if (retry < MAX_RETRIES - 1) continue;
                 return false;
             }
-            
+
+            // 共享 EGL display/stream 给 nveglstreamsink
+            {
+                GstElement* sink = gst_bin_get_by_name(GST_BIN(pipeline_), "video_sink");
+                if (sink) {
+                    auto& egl_manager = bamboo_cut::ui::EGLContextManager::getInstance();
+                    if (egl_manager.isInitialized()) {
+                        EGLDisplay egl_display = egl_manager.getDisplay();
+                        EGLStreamKHR egl_stream = egl_manager.getStream();
+                        g_object_set(G_OBJECT(sink), "egl-display", egl_display, NULL);
+                        if (egl_stream != EGL_NO_STREAM_KHR) {
+                            g_object_set(G_OBJECT(sink), "eglstream", egl_stream, NULL);
+                        }
+                        std::cout << "✅ [DeepStream] 已传递 EGL display/stream 给 nveglstreamsink" << std::endl;
+                    } else {
+                        std::cout << "⚠️ [DeepStream] EGL 管理器未初始化，nveglstreamsink 使用默认显示" << std::endl;
+                    }
+                    gst_object_unref(sink);
+                } else {
+                    std::cout << "⚠️ [DeepStream] 未找到 video_sink（nveglstreamsink）元素" << std::endl;
+                }
+            }
+
             // 检查NVMM缓冲区可用性
             if (!checkNVMMBufferAvailability()) {
                 std::cout << "NVMM缓冲区检查失败，等待释放..." << std::endl;
@@ -477,15 +536,14 @@ bool DeepStreamManager::startSinglePipelineMode() {
             }
             bus_watch_id_ = gst_bus_add_watch(bus_, busCallback, this);
             
-            // ?? 修复：通过 GstVideoOverlay 接口传递 subsurface 给 waylandsink
-            // waylandsink 实现了 GstVideoOverlay 接口，支持外部窗口句柄
-            if (video_surface_) {
+            // 仅在 sink 为 waylandsink 且提供 subsurface 句柄时传递 window_handle
+            if (config_.sink_mode == VideoSinkMode::WAYLANDSINK && video_surface_) {
                 // 设置同步消息处理器，处理 Wayland display context 和 window handle
-                gst_bus_set_sync_handler(bus_, 
+                gst_bus_set_sync_handler(bus_,
                     [](GstBus* bus, GstMessage* message, gpointer user_data) -> GstBusSyncReply {
                         DeepStreamManager* self = static_cast<DeepStreamManager*>(user_data);
                         
-                        // 处理 Wayland display context 请求
+                        // 处理 Wayland display context 请求（nveglstreamsink 不需要）
                         if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_NEED_CONTEXT) {
                             const gchar* context_type;
                             gst_message_parse_context_type(message, &context_type);
@@ -661,8 +719,8 @@ bool DeepStreamManager::startSinglePipelineMode() {
                                 std::cout << "?? 检测到Wayland相关错误，可能是surface未就绪..." << std::endl;
                             } else if (strstr(debug_info, "NVMM") || strstr(debug_info, "nvarguscamerasrc")) {
                                 std::cout << "?? 检测到NVMM/摄像头错误，可能是资源冲突..." << std::endl;
-                            } else if (strstr(debug_info, "waylandsink")) {
-                                std::cout << "?? 检测到waylandsink错误，可能是display连接问题..." << std::endl;
+                            } else if (strstr(debug_info, "nveglstreamsink")) {
+                                std::cout << "?? 检测到 nveglstreamsink 错误，可能是 EGL display/stream 连接问题..." << std::endl;
                             }
                             g_free(debug_info);
                         }
@@ -686,10 +744,10 @@ bool DeepStreamManager::startSinglePipelineMode() {
         }
         
         running_ = true;
-        const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
+        const char* mode_names[] = {"nvdrmvideosink", "nveglstreamsink", "kmssink", "appsink"};
         const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
         std::cout << "?? DeepStream 管道启动成功 (" << mode_name << " Subsurface架构)" << std::endl;
-        std::cout << "?? 数据流: nvarguscamerasrc → nvinfer → waylandsink → subsurface → GPU合成" << std::endl;
+        std::cout << "?? 数据流: nvarguscamerasrc → nvinfer → nveglstreamsink → EGLStream → GPU合成" << std::endl;
         
         // ? AppSink回调已移除 - 使用Subsurface硬件合成
         // if (config_.sink_mode == VideoSinkMode::APPSINK) {
@@ -828,7 +886,7 @@ bool DeepStreamManager::startSplitScreenMode() {
     }
     
     running_ = true;
-    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
+    const char* mode_names[] = {"nvdrmvideosink", "nveglstreamsink", "kmssink", "appsink"};
     const char* mode_name = mode_names[static_cast<int>(config_.sink_mode)];
     std::cout << "双摄像头并排显示管道启动成功 (" << mode_name << ")" << std::endl;
     
@@ -910,7 +968,7 @@ bool DeepStreamManager::updateLayout(int screen_width, int screen_height) {
 }
 
 bool DeepStreamManager::switchSinkMode(VideoSinkMode sink_mode) {
-    const char* mode_names[] = {"nvdrmvideosink", "waylandsink", "kmssink", "appsink"};
+    const char* mode_names[] = {"nvdrmvideosink", "nveglstreamsink", "kmssink", "appsink"};
     std::cout << "切换sink模式: " << mode_names[static_cast<int>(config_.sink_mode)]
               << " -> " << mode_names[static_cast<int>(sink_mode)] << std::endl;
     
@@ -952,15 +1010,15 @@ DRMOverlayConfig DeepStreamManager::detectAvailableOverlayPlane() {
     DRMOverlayConfig config;
     
     // Wayland架构下不再需要DRM设备检测
-    std::cout << "?? Wayland架构：跳过DRM设备检测，使用waylandsink硬件渲染" << std::endl;
-    
+    std::cout << "?? Wayland架构：跳过DRM设备检测，使用nveglstreamsink硬件渲染" << std::endl;
+
     // 返回默认配置，表示不支持DRM overlay
-    std::cout << "?? 建议使用waylandsink替代nvdrmvideosink" << std::endl;
+    std::cout << "?? 建议使用nveglstreamsink替代nvdrmvideosink" << std::endl;
     return config;
-    
+
     // Wayland架构下不再进行DRM plane检测
     std::cout << "?? Wayland架构：跳过DRM plane检测和资源管理" << std::endl;
-    std::cout << "?? 建议使用waylandsink进行视频显示" << std::endl;
+    std::cout << "?? 建议使用nveglstreamsink进行视频显示" << std::endl;
     
     return config;
 }
@@ -1010,7 +1068,7 @@ bool DeepStreamManager::verifyMultiLayerDisplaySetup() {
     std::cout << "? Wayland合成器自动处理多层显示管理" << std::endl;
     
     // 在Wayland架构下，合成器负责所有窗口层次管理
-    // LVGL作为Wayland客户端，DeepStream使用waylandsink
+    // LVGL作为Wayland客户端，DeepStream使用nveglstreamsink
     // 不需要手动管理DRM plane
     
     return true;  // Wayland架构下总是返回成功
@@ -1130,14 +1188,14 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     int offset_y,
     int width,
     int height) {
-    
+
     std::ostringstream pipeline;
-    
+
     pipeline << buildCameraSource(config) << " ! "
              << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
              << buildInferenceChain(config, width, height, 1, true)
-             << "waylandsink name=video_sink sync=false async=true ";
-    
+             << "nveglstreamsink name=video_sink sync=false async=false qos=false enable-last-sample=false ";
+
     return pipeline.str();
 }
 
@@ -1175,7 +1233,7 @@ std::string DeepStreamManager::buildStereoVisionPipeline(const DeepStreamConfig&
                      << "sync=false";
             break;
         case VideoSinkMode::WAYLANDSINK:
-            pipeline << "waylandsink name=video_sink sync=false";
+            pipeline << "nveglstreamsink name=video_sink sync=false async=false qos=false enable-last-sample=false";
             break;
         case VideoSinkMode::KMSSINK:
             pipeline << "kmssink "
@@ -1210,7 +1268,9 @@ std::string DeepStreamManager::buildInferenceChain(
     const int aligned_display_height = std::max(2, safe_display_height - (safe_display_height % 2));
     const int safe_infer_width = enable_infer ? std::max(config.infer_width, 1) : aligned_display_width;
     const int safe_infer_height = enable_infer ? std::max(config.infer_height, 1) : aligned_display_height;
-    const char* final_format = "BGRx"; // waylandsink 接受的系统内存格式
+    const bool use_nvmm_output = wayland_sink_mode;
+    const char* final_format = use_nvmm_output ? "RGBA" : "BGRx"; // nveglstreamsink 需要 NVMM RGBA
+    const char* memory_caps = use_nvmm_output ? "video/x-raw(memory:NVMM)," : "video/x-raw,";
     
     if (enable_infer) {
         chain << "nvvideoconvert ! "
@@ -1222,9 +1282,9 @@ std::string DeepStreamManager::buildInferenceChain(
               << "nvdsosd name=osd display-text=1 process-mode=0 gpu-id=0 ! ";
     }
     
-    // 最终输出给 waylandsink：使用 CPU 内存平面，减少兼容性问题
+    // 最终输出：Wayland 路径使用 NVMM RGBA 直接进入 EGLStream
     chain << "nvvideoconvert ! "
-          << "video/x-raw,format=" << final_format
+          << memory_caps << "format=" << final_format
           << ",width=" << aligned_display_width
           << ",height=" << aligned_display_height << " ! ";
     
@@ -1443,6 +1503,7 @@ void DeepStreamManager::cleanup() {
 }
 
 // ?? 新增：专门清理 subsurface 资源（仅在完全停止时调用）
+#ifdef ENABLE_WAYLAND
 void DeepStreamManager::cleanupSubsurface() {
     if (video_subsurface_) {
         auto* wl_subsurface = static_cast<struct wl_subsurface*>(video_subsurface_);
@@ -1458,6 +1519,12 @@ void DeepStreamManager::cleanupSubsurface() {
         std::cout << "? [DeepStream] 已清理video_surface_" << std::endl;
     }
 }
+#else
+void DeepStreamManager::cleanupSubsurface() {
+    video_subsurface_ = nullptr;
+    video_surface_ = nullptr;
+}
+#endif
 
 // 新增：构建摄像头源字符串
 // ?? 修复：回到使用nvarguscamerasrc，因为GBM共享DRM资源后不再有冲突
@@ -1774,34 +1841,8 @@ void DeepStreamManager::canvasUpdateLoop() {
 
 // 检查Wayland环境可用性
 bool DeepStreamManager::checkWaylandEnvironment() {
-    std::cout << "?? [DeepStream] 检查Wayland环境..." << std::endl;
-    
-    // 检查WAYLAND_DISPLAY环境变量
-    const char* wayland_display = getenv("WAYLAND_DISPLAY");
-    if (!wayland_display) {
-        setenv("WAYLAND_DISPLAY", "wayland-0", 0);
-        wayland_display = getenv("WAYLAND_DISPLAY");
-        std::cout << "[DeepStream] 设置WAYLAND_DISPLAY=" << wayland_display << std::endl;
-    }
-    
-    // 检查 XDG_RUNTIME_DIR：优先使用已有值，否则在 Jetson + nvweston 场景下使用 /run/nvidia-wayland
-    const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
-    if (!runtime_dir || runtime_dir[0] != '/') {
-        setenv("XDG_RUNTIME_DIR", "/run/nvidia-wayland", 0);
-        runtime_dir = getenv("XDG_RUNTIME_DIR");
-        std::cout << "[DeepStream] 设置XDG_RUNTIME_DIR=" << runtime_dir << std::endl;
-    }
-    
-    // 验证Wayland socket是否存在
-    std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
-    if (access(socket_path.c_str(), F_OK) != 0) {
-        std::cout << "?? [DeepStream] Wayland socket不存在: " << socket_path << std::endl;
-        wayland_available_ = false;
-        return false;
-    }
-    
-    wayland_available_ = true;
-    std::cout << "? [DeepStream] Wayland环境配置成功" << std::endl;
+    std::cout << "?? [DeepStream] 跳过 Wayland 检查，按无合成器（DRM/EGLStream）路径运行" << std::endl;
+    wayland_available_ = false;
     return true;
 }
 

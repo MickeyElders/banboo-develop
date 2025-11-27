@@ -139,7 +139,7 @@ struct DeepStreamConfig {
         , camera_width(1280)
         , camera_height(720)
         , camera_fps(30)
-        , sink_mode(VideoSinkMode::APPSINK)  // 默认使用appsink软件合成模式（稳定可靠）
+        , sink_mode(VideoSinkMode::NVDRMVIDEOSINK)  // 无合成器默认直连DRM/EGLStream
         , overlay()  // 使用默认叠加平面配置
         , camera_source(CameraSourceMode::NVARGUSCAMERA)  // 默认使用真实摄像头
         , test_pattern(0)  // 默认测试图案
