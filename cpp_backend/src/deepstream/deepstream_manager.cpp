@@ -1136,7 +1136,7 @@ std::string DeepStreamManager::buildNVDRMVideoSinkPipeline(
     pipeline << buildCameraSource(config) << " ! "
              << "queue max-size-buffers=6 max-size-time=0 leaky=downstream ! "
              << buildInferenceChain(config, width, height, 1, true)
-             << "waylandsink name=video_sink sync=false async=true ";
+             << "waylandsink name=video_sink sync=false async=true use-dmabuf=false ";
     
     return pipeline.str();
 }
