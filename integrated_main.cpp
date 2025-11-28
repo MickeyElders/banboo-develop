@@ -597,19 +597,9 @@ public:
     
     // 妫€鏌ayland鐜
     bool checkWaylandEnvironment() {
-#ifndef ENABLE_WAYLAND
+        // 强制走 DRM/GBM 路径，不再依赖合成器
         wayland_available_ = false;
         return false;
-#endif
-        const char* wayland_display = getenv("WAYLAND_DISPLAY");
-        if (!wayland_display) {
-            wayland_display = "wayland-0";
-            setenv("WAYLAND_DISPLAY", wayland_display, 1);
-        }
-        
-        std::cout << "鉁?[鎺ㄧ悊绯荤粺] Wayland鐜宸查厤缃? " << wayland_display << std::endl;
-        wayland_available_ = true;
-        return true;
     }
     
     ~InferenceWorkerThread() {
@@ -617,14 +607,11 @@ public:
     }
     
     bool initialize() {
-        std::cout << "馃敡 [鎺ㄧ悊绯荤粺] 鍒濆鍖朩ayland Subsurface鏋舵瀯..." << std::endl;
-        
-#ifndef ENABLE_WAYLAND
-        std::cout << "[推理系统] Wayland 未启用，直接使用 DRM/EGL 流水线" << std::endl;
+        std::cout << "[推理系统] 初始化 DRM/GBM 流水线..." << std::endl;
+
         deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         deepstream::DeepStreamConfig config;
         return deepstream_manager_->initialize(config);
-#endif
 
 #ifdef ENABLE_WAYLAND
         // 鑾峰彇LVGL鐨刉ayland瀵硅薄
@@ -1179,7 +1166,7 @@ public:
     bool initialize() {
         std::cout << "=================================" << std::endl;
         std::cout << "Bamboo Recognition System" << std::endl;
-        std::cout << "Wayland鏋舵瀯妯″紡" << std::endl;
+        std::cout << "DRM/GBM 模式" << std::endl;
         std::cout << "=================================" << std::endl;
         
         // 璁剧疆淇″彿澶勭悊
@@ -1187,16 +1174,16 @@ public:
         signal(SIGTERM, signal_handler);
         
         // === 姝ラ1: 妫€鏌?Wayland 鍚堟垚鍣ㄧ姸鎬?===
-        std::cout << "\n馃攳 [Wayland] 姝ラ1: 妫€鏌?Wayland 鍚堟垚鍣?.." << std::endl;
+        std::cout << "\n[Display] Step1: Skip Wayland, using DRM/GBM" << std::endl;
         if (!checkWaylandCompositor()) {
             std::cout << "鉂?[Wayland] Wayland 鍚堟垚鍣ㄦ湭杩愯锛岃鍏堝惎鍔ㄥ悎鎴愬櫒" << std::endl;
             std::cout << "璇疯繍琛? sudo make start-sway 鎴?sudo systemctl start sway-wayland" << std::endl;
             return false;
         }
-        std::cout << "✅[Wayland] Wayland 合成器运行正常" << std::endl;
+        std::cout << "[Display] Wayland skipped; DRM/GBM active" << std::endl;
         
         // === 姝ラ2: LVGL Wayland鐣岄潰鍒濆鍖?===
-        std::cout << "\n馃帹 [LVGL] 姝ラ2: 鍒濆鍖朙VGL Wayland鐣岄潰..." << std::endl;
+        std::cout << "\n[LVGL] Step2: 初始化 DRM/GBM LVGL 界面..." << std::endl;
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
             std::cout << "❌[LVGL] LVGL Wayland界面初始化失败" << std::endl;
@@ -1298,34 +1285,8 @@ public:
     }
 
 private:
-    // 妫€鏌ayland鍚堟垚鍣ㄧ姸鎬?
-    bool checkWaylandCompositor() {
-        // 妫€鏌AYLAND_DISPLAY鐜鍙橀噺
-        const char* wayland_display = getenv("WAYLAND_DISPLAY");
-        if (!wayland_display) {
-            wayland_display = "wayland-0";
-            setenv("WAYLAND_DISPLAY", wayland_display, 1);
-        }
-        
-        // 馃敡 浼樺厛浣跨敤 XDG_RUNTIME_DIR锛坣vweston: /run/nvidia-wayland锛?
-        const char* runtime_dir = getenv("XDG_RUNTIME_DIR");
-        if (!runtime_dir || runtime_dir[0] != '/') {
-            runtime_dir = "/run/nvidia-wayland";
-            setenv("XDG_RUNTIME_DIR", runtime_dir, 1);
-        }
-        
-        // 鏋勫缓 socket 璺緞
-        std::string socket_path = std::string(runtime_dir) + "/" + wayland_display;
-        
-        // 馃敡 淇锛氫娇鐢╝ccess()妫€鏌ocket鏂囦欢
-        if (access(socket_path.c_str(), F_OK) != 0) {
-            std::cout << "Wayland socket涓嶅瓨鍦? " << socket_path << std::endl;
-            return false;
-        }
-        
-        std::cout << "鉁?Wayland鍚堟垚鍣ㄦ娴嬫垚鍔? " << wayland_display << std::endl;
-        return true;
-    }
+    // Wayland compositor check is disabled; always use DRM/GBM path
+    bool checkWaylandCompositor() { return false; }
 };
 
 /**
