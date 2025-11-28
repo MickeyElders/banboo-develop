@@ -1024,20 +1024,11 @@ public:
         
         #ifdef ENABLE_LVGL
         try {
-            // 妫€鏌?Wayland 鍚堟垚鍣ㄦ槸鍚﹁繍琛?
-            if (!checkWaylandCompositor()) {
-                std::cout << "閿欒: Wayland 鍚堟垚鍣ㄦ湭杩愯锛岃鍏堝惎鍔ㄥ悎鎴愬櫒" << std::endl;
-                return false;
-            }
-            
-            std::cout << "鈴?绛夊緟 Wayland 鍚堟垚鍣ㄥ畬鍏ㄧǔ瀹?.." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(3));  // 绛夊緟鍚堟垚鍣ㄧǔ瀹?
-            
-            // 娉ㄦ剰锛氬鏋滈渶瑕侊紝鍙互妫€鏌ユ槸鍚︽湁鍏朵粬 Wayland 瀹㈡埛绔奖鍝嶇獥鍙ｅ垱寤?
-            // 鍒涘缓Wayland浼樺寲鐨凩VGL鐣岄潰瀹炰緥
+            // DRM/GBM 路径，不依赖 Wayland
+            std::cout << "[Display] Using DRM/GBM LVGL interface (Wayland disabled)" << std::endl;
             lvgl_wayland_interface_ = std::make_unique<bamboo_cut::ui::LVGLWaylandInterface>();
             
-            // 閰嶇疆LVGL Wayland
+            // 配置 LVGL（DRM/GBM 参数沿用屏幕尺寸）
             bamboo_cut::ui::LVGLWaylandConfig config;
             config.screen_width = 1280;
             config.screen_height = 800;
@@ -1046,13 +1037,13 @@ public:
             config.touch_device = "/dev/input/event0";
             config.wayland_display = "wayland-0";
             
-            std::cout << "姝ｅ湪鍒濆鍖朙VGL Wayland鐣岄潰..." << std::endl;
+            std::cout << "初始化 LVGL DRM/GBM 界面..." << std::endl;
             if (!lvgl_wayland_interface_->initialize(config)) {
-                std::cout << "LVGL Wayland interface initialization failed" << std::endl;
+                std::cout << "LVGL DRM/GBM interface initialization failed" << std::endl;
                 return false;
             }
             
-            std::cout << "LVGL Wayland鐣岄潰鍒濆鍖栨垚鍔燂紝姝ｅ湪鍚姩鐣岄潰绾跨▼..." << std::endl;
+            std::cout << "LVGL DRM/GBM 界面初始化完成，启动界面线程..." << std::endl;
             // 鍚姩鐣岄潰绾跨▼
             if (!lvgl_wayland_interface_->start()) {
                 std::cout << "LVGL Wayland interface start failed" << std::endl;
@@ -1173,26 +1164,21 @@ public:
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        // === 姝ラ1: 妫€鏌?Wayland 鍚堟垚鍣ㄧ姸鎬?===
-        std::cout << "\n[Display] Step1: Skip Wayland, using DRM/GBM" << std::endl;
-        if (!checkWaylandCompositor()) {
-            std::cout << "鉂?[Wayland] Wayland 鍚堟垚鍣ㄦ湭杩愯锛岃鍏堝惎鍔ㄥ悎鎴愬櫒" << std::endl;
-            std::cout << "璇疯繍琛? sudo make start-sway 鎴?sudo systemctl start sway-wayland" << std::endl;
-            return false;
-        }
+        // === Step1: DRM/GBM 路径（禁用 Wayland） ===
+        std::cout << "\n[Display] Step1: DRM/GBM mode (Wayland disabled)" << std::endl;
         std::cout << "[Display] Wayland skipped; DRM/GBM active" << std::endl;
         
-        // === 姝ラ2: LVGL Wayland鐣岄潰鍒濆鍖?===
+        // === Step2: 初始化 LVGL DRM/GBM 界面 ===
         std::cout << "\n[LVGL] Step2: 初始化 DRM/GBM LVGL 界面..." << std::endl;
         ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
         if (!ui_manager_->initialize()) {
-            std::cout << "❌[LVGL] LVGL Wayland界面初始化失败" << std::endl;
+            std::cout << "❌[LVGL] LVGL DRM/GBM 界面初始化失败" << std::endl;
             return false;
         }
-        std::cout << "✅[LVGL] LVGL Wayland界面初始化成功" << std::endl;
+        std::cout << "✅[LVGL] LVGL DRM/GBM 界面初始化成功" << std::endl;
         
-        // === 姝ラ3: DeepStream Wayland閰嶇疆 ===
-        std::cout << "\n馃幀 [DeepStream] 姝ラ3: 鍒濆鍖朌eepStream Wayland妯″紡..." << std::endl;
+        // === Step3: 初始化 DeepStream DRM 流水线 ===
+        std::cout << "\n[DeepStream] Step3: 初始化 DeepStream DRM/GBM 模式..." << std::endl;
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         
         // 浼犻€扡VGL Wayland鐣岄潰鎸囬拡缁欐帹鐞嗗伐浣滅嚎绋?
