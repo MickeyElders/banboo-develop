@@ -227,18 +227,39 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
         }
 
         auto try_surface = [&](uint32_t fmt, uint32_t flags) -> gbm_surface* {
-            return gbm_surface_create(gbm_dev, width, height, fmt, flags);
+            auto* surf = gbm_surface_create(gbm_dev, width, height, fmt, flags);
+            if (!surf) {
+                std::cerr << "[EGL] gbm_surface_create failed on " << drm_path
+                          << " fmt=0x" << std::hex << fmt << std::dec
+                          << " flags=" << flags << std::endl;
+            }
+            return surf;
         };
 
-        uint32_t flags = GBM_BO_USE_RENDERING | (is_render_node ? 0 : GBM_BO_USE_SCANOUT);
-        gbm_surface* gbm_surf = try_surface(GBM_FORMAT_XRGB8888, flags);
-        if (!gbm_surf) {
-            gbm_surf = try_surface(GBM_FORMAT_ARGB8888, flags);
+        // 逐步降低要求：优先 SCANOUT+RENDERING，再仅 RENDERING，再 LINEAR+RENDERING
+        std::vector<uint32_t> flag_list;
+        flag_list.push_back(GBM_BO_USE_RENDERING | (is_render_node ? 0 : GBM_BO_USE_SCANOUT));
+        flag_list.push_back(GBM_BO_USE_RENDERING);
+        flag_list.push_back(GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+
+        gbm_surface* gbm_surf = nullptr;
+        uint32_t chosen_flags = 0;
+        uint32_t chosen_fmt = 0;
+
+        for (auto flags : flag_list) {
+            gbm_surf = try_surface(GBM_FORMAT_XRGB8888, flags);
+            chosen_fmt = GBM_FORMAT_XRGB8888;
+            if (!gbm_surf) {
+                gbm_surf = try_surface(GBM_FORMAT_ARGB8888, flags);
+                chosen_fmt = GBM_FORMAT_ARGB8888;
+            }
+            if (gbm_surf) {
+                chosen_flags = flags;
+                break;
+            }
         }
 
         if (!gbm_surf) {
-            std::cerr << "[EGL] gbm_surface_create failed on " << drm_path
-                      << " flags=" << flags << std::endl;
             gbm_device_destroy(gbm_dev);
             if (!is_render_node) drmDropMaster(fd);
             close(fd);
@@ -270,7 +291,8 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
                   << " fd=" << primary_context_.drm_fd
                   << " gbm_dev=" << primary_context_.gbm_dev
                   << " gbm_surf=" << primary_context_.gbm_surf
-                  << " flags=" << flags << std::endl;
+                  << " fmt=0x" << std::hex << chosen_fmt << std::dec
+                  << " flags=" << chosen_flags << std::endl;
         return true;
     }
 
