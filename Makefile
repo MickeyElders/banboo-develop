@@ -1,4 +1,4 @@
-# AI竹子识别系统 - C++ LVGL 一体化构建与部署脚本
+﻿# AI竹子识别系统 - C++ LVGL 一体化构建与部署脚本
 # 版本: 5.0.0 (C++ LVGL Integrated Architecture)
 # 组件: C++ 推理后端 + LVGL 界面 + Modbus 通信的一体化系统
 
@@ -170,67 +170,9 @@ install-deps: install-system-deps install-lvgl9-auto
 # === 鑷姩鐜閰嶇疆 ===
 # 浣跨敤 Weston 12锛堟帹鑽愮敤浜?Jetson + Nvidia锛?
 auto-setup-environment:
-	@echo "$(BLUE)[INFO]$(NC) 鑷姩妫€鏌ュ拰閰嶇疆Wayland鐜锛堜娇鐢ㄧ郴缁?Weston锛?.."
-	@# 1. 妫€鏌?Weston 鏄惁宸插畨瑁?
-	@if ! command -v weston >/dev/null 2>&1; then \
-		echo "$(RED)[ERROR]$(NC) Weston 鏈畨瑁咃紝璇峰厛瀹夎: sudo apt-get install weston"; \
-		exit 1; \
-	fi
-	@WESTON_VERSION=$$(weston --version 2>&1 | grep -oP 'weston \K[\d.]+' | head -1 || echo "unknown"); \
-	echo "$(GREEN)[SUCCESS]$(NC) 妫€娴嬪埌绯荤粺 Weston $$WESTON_VERSION"
-	@# 2. 閰嶇疆 Nvidia DRM 妯″潡锛圝etson 蹇呴渶锛?
-	@echo "$(BLUE)[INFO]$(NC) 閰嶇疆 Nvidia DRM 妯″潡..."
-	@sudo modprobe nvidia-drm modeset=1 2>/dev/null || true
-	@if ! grep -q "options nvidia-drm modeset=1" /etc/modprobe.d/nvidia-drm.conf 2>/dev/null; then \
-		echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia-drm.conf >/dev/null; \
-		echo "$(GREEN)[SUCCESS]$(NC) Nvidia DRM 妯″潡閰嶇疆宸蹭繚瀛?"; \
-	fi
-	@# 3. 閰嶇疆鐢ㄦ埛鏉冮檺
-	@echo "$(BLUE)[INFO]$(NC) 閰嶇疆 DRM 璁惧鏉冮檺..."
-	@sudo usermod -a -G video,render,input root 2>/dev/null || true
-	@# 4. 閰嶇疆 Weston 鏈嶅姟
-	@if [ ! -f "/etc/systemd/system/weston.service" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston 鏈嶅姟鏈厤缃紝姝ｅ湪閰嶇疆..."; \
-		$(MAKE) setup-weston-service; \
-	fi
-	@# 5. 停止其他 Wayland 合成器，避免占用 DRM/TTY
-	@if systemctl is-active --quiet weston12.service 2>/dev/null; then \
-		echo "$(BLUE)[INFO]$(NC) 停止 Weston 12 服务..."; \
-		sudo systemctl stop weston12.service; \
-	fi
-	@if systemctl is-active --quiet sway-wayland.service 2>/dev/null; then \
-		echo "$(BLUE)[INFO]$(NC) 停止 Sway 服务..."; \
-		sudo systemctl stop sway-wayland.service; \
-	fi
-	@# 6. 鍚姩 Weston
-	@WESTON_RUNNING=false; \
-	if pgrep -x weston >/dev/null 2>&1; then \
-		echo "$(GREEN)[INFO]$(NC) 妫€娴嬪埌 Weston 杩涚▼姝ｅ湪杩愯"; \
-		WESTON_RUNNING=true; \
-	elif systemctl is-active --quiet weston.service 2>/dev/null; then \
-		echo "$(GREEN)[INFO]$(NC) 妫€娴嬪埌 Weston 鏈嶅姟姝ｅ湪杩愯"; \
-		WESTON_RUNNING=true; \
-	fi; \
-	if [ "$$WESTON_RUNNING" = "false" ]; then \
-		echo "$(YELLOW)[WARNING]$(NC) Weston 鏈繍琛岋紝姝ｅ湪鍚姩..."; \
-		sudo systemctl enable weston.service; \
-		sudo systemctl start weston.service; \
-		sleep 3; \
-	else \
-		echo "$(GREEN)[SUCCESS]$(NC) Weston 宸插湪杩愯锛岃烦杩囧惎鍔?"; \
-	fi
-	@# 7. 楠岃瘉 Wayland 鐜
-	@if ! ls /run/user/0/wayland-* >/dev/null 2>&1; then \
-		echo "$(YELLOW)[WARNING]$(NC) Wayland socket 涓嶅瓨鍦紝绛夊緟 Weston 瀹屽叏鍚姩..."; \
-		sleep 5; \
-	@sudo apt-get install -y \
-		xwayland \
-		libinput-tools \
-		libwayland-dev \
-		libwayland-egl1 \
-		wayland-protocols \
-		libxkbcommon-dev
-	@echo "$(GREEN)[SUCCESS]$(NC) Wayland渚濊禆瀹夎瀹屾垚锛圫way锛?"
+	@echo "$(BLUE)[INFO]$(NC) 跳过 Wayland/Weston 自动配置，使用 DRM/GBM 直连模式"
+	@echo "$(BLUE)[INFO]$(NC) 不再创建或启动 weston/nvweston 服务，确保 /dev/dri 被应用独占"
+
 
 # 妫€鏌?Mutter 鏄惁宸插畨瑁?
 check-mutter:
