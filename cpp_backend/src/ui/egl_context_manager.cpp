@@ -14,6 +14,7 @@
 #include <array>
 #include <vector>
 #include <cstdlib>
+#include <xf86drm.h>
 
 #ifndef EGL_NO_STREAM_KHR
 #define EGL_NO_STREAM_KHR reinterpret_cast<EGLStreamKHR>(0)
@@ -194,7 +195,9 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
         candidates.emplace_back(env);
     }
     candidates.emplace_back("/dev/dri/card1");
+    candidates.emplace_back("/dev/dri/renderD129");
     candidates.emplace_back("/dev/dri/card0");
+    candidates.emplace_back("/dev/dri/renderD128");
 
     for (const auto& drm_path : candidates) {
         int fd = open(drm_path.c_str(), O_RDWR | O_CLOEXEC);
@@ -204,26 +207,40 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
         }
         std::cout << "[EGL] Using DRM device: " << drm_path << " fd=" << fd << std::endl;
 
+        const bool is_render_node = drm_path.find("renderD") != std::string::npos;
+
+        // 尝试获取 DRM master 权限（仅主节点）
+        if (!is_render_node) {
+            if (drmSetMaster(fd) != 0) {
+                std::cerr << "[EGL] drmSetMaster failed on " << drm_path << ", errno=" << errno << std::endl;
+                close(fd);
+                continue;
+            }
+        }
+
         gbm_device* gbm_dev = gbm_create_device(fd);
         if (!gbm_dev) {
             std::cerr << "[EGL] gbm_create_device failed on " << drm_path << std::endl;
+            if (!is_render_node) drmDropMaster(fd);
             close(fd);
             continue;
         }
 
-        auto try_surface = [&](uint32_t fmt) -> gbm_surface* {
-            return gbm_surface_create(gbm_dev, width, height, fmt,
-                                      GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+        auto try_surface = [&](uint32_t fmt, uint32_t flags) -> gbm_surface* {
+            return gbm_surface_create(gbm_dev, width, height, fmt, flags);
         };
 
-        gbm_surface* gbm_surf = try_surface(GBM_FORMAT_XRGB8888);
+        uint32_t flags = GBM_BO_USE_RENDERING | (is_render_node ? 0 : GBM_BO_USE_SCANOUT);
+        gbm_surface* gbm_surf = try_surface(GBM_FORMAT_XRGB8888, flags);
         if (!gbm_surf) {
-            gbm_surf = try_surface(GBM_FORMAT_ARGB8888);
+            gbm_surf = try_surface(GBM_FORMAT_ARGB8888, flags);
         }
 
         if (!gbm_surf) {
-            std::cerr << "[EGL] gbm_surface_create failed on " << drm_path << std::endl;
+            std::cerr << "[EGL] gbm_surface_create failed on " << drm_path
+                      << " flags=" << flags << std::endl;
             gbm_device_destroy(gbm_dev);
+            if (!is_render_node) drmDropMaster(fd);
             close(fd);
             continue;
         }
@@ -239,6 +256,7 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
                       << ": 0x" << std::hex << eglGetError() << std::dec << std::endl;
             gbm_surface_destroy(gbm_surf);
             gbm_device_destroy(gbm_dev);
+            if (!is_render_node) drmDropMaster(fd);
             close(fd);
             continue;
         }
@@ -251,7 +269,8 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
         std::cout << "[EGL] GBM surface created: device=" << drm_path
                   << " fd=" << primary_context_.drm_fd
                   << " gbm_dev=" << primary_context_.gbm_dev
-                  << " gbm_surf=" << primary_context_.gbm_surf << std::endl;
+                  << " gbm_surf=" << primary_context_.gbm_surf
+                  << " flags=" << flags << std::endl;
         return true;
     }
 
