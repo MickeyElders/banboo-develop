@@ -1,4 +1,4 @@
-#include "bamboo_cut/ui/egl_context_manager.h"
+﻿#include "bamboo_cut/ui/egl_context_manager.h"
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -42,10 +42,7 @@ EGLContextManager& EGLContextManager::getInstance() {
 }
 
 bool EGLContextManager::ensureInitialized(wl_display* wl_display, wl_surface* wl_surface, int width, int height) {
-    std::lock_guard<std::mutex> lock(context_mutex_);
-    if (primary_context_.is_initialized) {
-        return true;
-    }
+    
     // 强制走 DRM 平台，避免残留的 Wayland 环境影响
     setenv("EGL_PLATFORM", "drm", 1);
     unsetenv("WAYLAND_DISPLAY");
@@ -59,11 +56,7 @@ bool EGLContextManager::ensureInitialized(wl_display* wl_display, wl_surface* wl
 }
 
 bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surface* wl_surface, int width, int height) {
-    std::lock_guard<std::mutex> lock(context_mutex_);
-
-    if (primary_context_.is_initialized) {
-        return true;
-    }
+    
 
     std::cout << "[EGL] initializeSharedContext begin: w=" << width << " h=" << height << std::endl;
 
@@ -369,3 +362,4 @@ EGLContextManager::~EGLContextManager() {
 
 }  // namespace ui
 }  // namespace bamboo_cut
+

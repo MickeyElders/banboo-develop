@@ -52,6 +52,7 @@ ExecStartPre=/bin/bash -c 'systemctl stop nvweston.service weston.service seatd.
 ExecStartPre=/bin/bash -c 'systemctl disable nvweston.service weston.service seatd.service 2>/dev/null || true'
 ExecStartPre=/bin/bash -c 'systemctl mask nvweston.service weston.service seatd.service 2>/dev/null || true'
 ExecStartPre=/bin/bash -c 'pkill -9 weston 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'for dev in /dev/dri/card0 /dev/dri/card1 /dev/dri/renderD128 /dev/dri/renderD129; do [ -e "$dev" ] && fuser -k "$dev" 2>/dev/null || true; done'
 ExecStartPre=/bin/sleep 1
 
 # 自定义停止逻辑
