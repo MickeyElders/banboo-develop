@@ -1037,7 +1037,7 @@ backup:
 	echo "$(GREEN)[SUCCESS]$(NC) 澶囦唤宸插垱寤? /opt/backup/$$BACKUP_NAME.tar.gz"
 
 # 蹇€熼噸鏂伴儴缃诧紙璺宠繃渚濊禆妫€鏌ワ級
-redeploy: stop clean build-system install-system restart
+redeploy: stop clean build-system install-system install-service restart
 	@echo "$(GREEN)[SUCCESS]$(NC) 绯荤粺閲嶆柊閮ㄧ讲瀹屾垚锛?"
 
 # 瀹屾暣閲嶆柊閮ㄧ讲锛堝寘鎷緷璧栨鏌ワ級
@@ -1252,5 +1252,9 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 .DEFAULT_GOAL := help
+
+
+
+
 
 
