@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 绔瑰瓙璇嗗埆绯荤粺涓€浣撳寲涓荤▼搴?
  * 鐪熸鏁村悎鐜版湁鐨刢pp_backend鍜宭vgl_frontend浠ｇ爜
  */
@@ -917,49 +917,22 @@ private:
         }
     }
     
-    // === 寤惰繜鍚姩DeepStream绠＄悊鍣?===
     bool startDeepStreamManagerDelayed() {
         if (!deepstream_manager_) {
-            std::cout << "閿欒锛欴eepStream绠＄悊鍣ㄥ皻鏈垵濮嬪寲" << std::endl;
+            std::cout << "错误：DeepStream管理器尚未初始化" << std::endl;
             return false;
         }
-        
-        // 浣跨敤鏂扮殑LVGL Wayland鎺ュ彛鍒濆鍖栨鏌ユ満鍒?
-        std::cout << "绛夊緟LVGL Wayland瀹屽叏鍒濆鍖?.." << std::endl;
-        
-        if (lvgl_interface_ptr_) {
-            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
-            int wait_count = 0;
-            const int MAX_WAIT_SECONDS = 20;  // 鏈€澶х瓑寰?0绉?
-            
-            while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                wait_count++;
-                std::cout << "绛夊緟LVGL Wayland鍒濆鍖栧畬鎴?.. (InferenceWorker: " << (wait_count * 0.5) << "绉?" << std::endl;
-            }
-            
-            if (lvgl_if->isFullyInitialized()) {
-                std::cout << "鉁?LVGL Wayland宸插畬鍏ㄥ垵濮嬪寲锛岀户缁惎鍔―eepStream" << std::endl;
-            } else {
-                std::cout << "鈿狅笍 璀﹀憡锛歀VGL Wayland鍒濆鍖栬秴鏃讹紝缁х画鍚姩DeepStream" << std::endl;
-            }
-        } else {
-            std::cout << "璀﹀憡锛歀VGL Wayland鎺ュ彛涓嶅彲鐢紝浣跨敤鍥哄畾寤惰繜" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-        }
-        
-        std::cout << "鍚姩DeepStream绠＄悊鍣?.." << std::endl;
+        // DRM/GBM 路径：直接启动 DeepStream 管理器
+        std::cout << "启动DeepStream管理器（DRM/GBM）..." << std::endl;
         if (!deepstream_manager_->start()) {
             std::cout << "❌ DeepStream 管理器启动失败" << std::endl;
             return false;
         }
-        
-        // 鍚姩canvas鏇存柊绾跨▼ (濡傛灉鏀寔LVGL鐣岄潰闆嗘垚)
+        // 启动canvas更新线程 (如果支持LVGL界面集成)
         if (deepstream_manager_) {
-            std::cout << "启动Canvas更新线程...（从integrated_main）" << std::endl;
+            std::cout << "启动Canvas更新线程...（DRM/GBM）" << std::endl;
             deepstream_manager_->startCanvasUpdateThread();
         }
-        
         std::cout << "✅ DeepStream 管理器延迟启动成功" << std::endl;
         return true;
     }
