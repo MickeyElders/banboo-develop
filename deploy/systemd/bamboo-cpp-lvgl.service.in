@@ -1,5 +1,5 @@
 [Unit]
-Description=AI Bamboo Recognition System - C++ LVGL Wayland Edition
+Description=AI Bamboo Recognition System - C++ LVGL DRM/GBM Edition
 Documentation=https://github.com/bamboo-industries/bamboo-recognition
 After=network.target multi-user.target
 Wants=multi-user.target
@@ -15,20 +15,22 @@ ExecReload=/bin/kill -USR1 $MAINPID
 # 基础环境变量
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu"
-Environment="XDG_RUNTIME_DIR=/run/nvidia-wayland"
+Environment="XDG_RUNTIME_DIR=/tmp"
 Environment="HOME=/root"
 EnvironmentFile=-@CMAKE_INSTALL_PREFIX@/etc/bamboo/bamboo-env
 
-# Wayland 设置：连接 NVIDIA nvweston（socket 位于 /run/nvidia-wayland/wayland-0）
-Environment="WAYLAND_DISPLAY=wayland-0"
+# DRM/GBM 设置：禁用 Wayland，直接使用 DRM
+Environment="EGL_PLATFORM=drm"
+# 可选：强制指定 DRM 设备，留空则由程序内部选择
+# Environment="EGL_DRM_DEVICE_FILE=/dev/dri/card1"
+# 清空 Wayland 相关变量
+Environment="WAYLAND_DISPLAY="
 Environment="WAYLAND_DEBUG=0"
-Environment="EGL_PLATFORM=wayland"
-Environment="QT_QPA_PLATFORM=wayland"
-Environment="GDK_BACKEND=wayland"
-Environment="SDL_VIDEODRIVER=wayland"
-Environment="XDG_SESSION_TYPE=wayland"
+Environment="QT_QPA_PLATFORM=eglfs"
+Environment="GDK_BACKEND=x11"
+Environment="SDL_VIDEODRIVER=offscreen"
+Environment="XDG_SESSION_TYPE=tty"
 Environment="LIBINPUT_DEFAULT_TOUCH_ENABLED=1"
-Environment="GST_DEBUG=waylandsink:5,basesink:3"
 
 # 访问 GPU/输入设备需要的附加组
 SupplementaryGroups=input video render tty dialout
@@ -45,16 +47,17 @@ ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video0 2>/dev/null); do kill 
 ExecStartPre=/bin/bash -c 'for p in $(lsof -t /dev/video1 2>/dev/null); do kill -9 $p; done || true'
 ExecStartPre=/bin/bash -c 'systemctl restart nvargus-daemon'
 
-# 确保 nvweston 已经启动并提供 /run/nvidia-wayland/wayland-0
-ExecStartPre=/bin/bash -c 'systemctl is-active --quiet nvweston.service || systemctl start nvweston.service'
-ExecStartPre=/bin/bash -c 'timeout 30 bash -c "while [ ! -S /run/nvidia-wayland/wayland-0 ]; do sleep 1; done" || echo \"[WARN] nvweston socket 未就绪，将以降级模式继续\"'
+# 停止并屏蔽 weston/nvweston/seatd，避免占用 /dev/dri
+ExecStartPre=/bin/bash -c 'systemctl stop nvweston.service weston.service seatd.service 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'systemctl disable nvweston.service weston.service seatd.service 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'systemctl mask nvweston.service weston.service seatd.service 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'pkill -9 weston 2>/dev/null || true'
 ExecStartPre=/bin/sleep 1
 
 # 自定义停止逻辑
 ExecStop=/bin/bash -c 'kill -TERM $MAINPID; sleep 2; pkill -9 -g $MAINPID bamboo_integrated || true'
 
 # 重启与停止行为
-TimeoutStopSec=10
 KillMode=control-group
 SendSIGKILL=yes
 Restart=always
