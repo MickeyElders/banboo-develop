@@ -182,6 +182,7 @@ bool LVGLWaylandInterface::getCameraPanelCoords(int& x, int& y, int& width, int&
 
 // Impl methods
 bool LVGLWaylandInterface::Impl::initializeDrmDisplay() {
+    std::cout << "[LVGL DRM] Creating LVGL display: " << config_.screen_width << "x" << config_.screen_height << std::endl;
     display_ = lv_display_create(config_.screen_width, config_.screen_height);
     if (!display_) return false;
 
@@ -189,11 +190,13 @@ bool LVGLWaylandInterface::Impl::initializeDrmDisplay() {
     full_frame_buffer_ = static_cast<uint32_t*>(malloc(full_frame_size));
     if (!full_frame_buffer_) return false;
     memset(full_frame_buffer_, 0x1A, full_frame_size);
+    std::cout << "[LVGL DRM] Allocated full frame buffer size=" << full_frame_size << " bytes" << std::endl;
 
     size_t partial_buffer_size = (config_.screen_width * config_.screen_height / 10) * sizeof(lv_color_t);
     front_buffer_ = static_cast<lv_color_t*>(malloc(partial_buffer_size));
     back_buffer_ = static_cast<lv_color_t*>(malloc(partial_buffer_size));
     if (!front_buffer_ || !back_buffer_) return false;
+    std::cout << "[LVGL DRM] Allocated partial buffers size=" << partial_buffer_size << " bytes each" << std::endl;
 
     lv_display_set_buffers(display_, front_buffer_, back_buffer_,
                            partial_buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -222,6 +225,7 @@ bool LVGLWaylandInterface::Impl::initializeDrmDisplay() {
         std::cerr << "[LVGL DRM] eglMakeCurrent 失败: 0x" << std::hex << eglGetError() << std::dec << std::endl;
         return false;
     }
+    std::cout << "[LVGL DRM] EGL current: display=" << egl_display_ << " surface=" << egl_surface_ << " context=" << egl_context_ << std::endl;
 
     glViewport(0, 0, config_.screen_width, config_.screen_height);
     glClearColor(0.11f, 0.12f, 0.14f, 1.0f);

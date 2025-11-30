@@ -43,6 +43,8 @@ bool EGLContextManager::ensureInitialized(wl_display* wl_display, wl_surface* wl
     if (primary_context_.is_initialized) {
         return true;
     }
+    std::cout << "[EGL] ensureInitialized: width=" << width << " height=" << height
+              << " wl_display=" << wl_display << " wl_surface=" << wl_surface << std::endl;
     return initializeSharedContext(wl_display, wl_surface, width, height);
 }
 
@@ -88,6 +90,12 @@ bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surfa
         cleanupLocked();
         return false;
     }
+
+    std::cout << "[EGL] Shared display/context/stream initialized" << std::endl;
+    std::cout << "[EGL] egl_display=" << primary_context_.display
+              << " surface=" << primary_context_.surface
+              << " context=" << primary_context_.context
+              << " stream=" << primary_context_.stream << std::endl;
 
     primary_context_.width = width;
     primary_context_.height = height;
@@ -164,6 +172,7 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
 #endif
 
     // DRM/GBM 回退路径
+    std::cout << "[EGL] Creating GBM surface for DRM" << std::endl;
     primary_context_.drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
     if (primary_context_.drm_fd < 0) {
         std::cerr << "[EGL] Failed to open /dev/dri/card0" << std::endl;
@@ -198,6 +207,10 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
         std::cerr << "[EGL] eglCreateWindowSurface failed (GBM): 0x" << std::hex << eglGetError() << std::dec << std::endl;
         return false;
     }
+
+    std::cout << "[EGL] GBM surface created: fd=" << primary_context_.drm_fd
+              << " gbm_dev=" << primary_context_.gbm_dev
+              << " gbm_surf=" << primary_context_.gbm_surf << std::endl;
 
     return true;
 }
