@@ -10,6 +10,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <iostream>
+#include <string>
+#include <array>
+#include <cstdlib>
 
 #ifndef EGL_NO_STREAM_KHR
 #define EGL_NO_STREAM_KHR reinterpret_cast<EGLStreamKHR>(0)
@@ -182,9 +185,26 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
 
     // DRM/GBM 回退路径
     std::cout << "[EGL] Creating GBM surface for DRM" << std::endl;
-    primary_context_.drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+
+    std::string drm_path = "/dev/dri/card0";
+    if (const char* env = getenv("EGL_DRM_DEVICE_FILE")) {
+        drm_path = env;
+    } else {
+        std::array<std::string, 2> candidates{"/dev/dri/card1", "/dev/dri/card0"};
+        for (const auto& cand : candidates) {
+            int fd = open(cand.c_str(), O_RDWR | O_CLOEXEC);
+            if (fd >= 0) {
+                drm_path = cand;
+                close(fd);
+                break;
+            }
+        }
+    }
+    std::cout << "[EGL] Using DRM device: " << drm_path << std::endl;
+
+    primary_context_.drm_fd = open(drm_path.c_str(), O_RDWR | O_CLOEXEC);
     if (primary_context_.drm_fd < 0) {
-        std::cerr << "[EGL] Failed to open /dev/dri/card0, errno=" << errno << std::endl;
+        std::cerr << "[EGL] Failed to open " << drm_path << ", errno=" << errno << std::endl;
         return false;
     }
 
