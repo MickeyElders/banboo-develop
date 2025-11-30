@@ -1,58 +1,54 @@
-// main.c  —— 直接保存为 main.c
-#include <gst/gst.h>
+// main_v9.c —— LVGL v9 + DeepStream 7.1 + CSI + renderD129
 #include <lvgl/lvgl.h>
-#include <lv_drivers/display/drm.h>
-#include <unistd.h>
+#include <lvgl/drivers/display/linux_drm.h>  // v9 内置头文件
+#include <gst/gst.h>
 #include <pthread.h>
-#include <signal.h>
+#include <unistd.h>
 
-static lv_disp_t *disp;
+static lv_display_t *disp;
+static lv_image_descriptor_t video_dsc = {0};  // v9 用 lv_image_descriptor_t
 static lv_obj_t *video_img;
-static lv_img_dsc_t video_dsc = {0};
 
 static GstElement *pipeline;
 static GMainLoop *loop;
 
-// 每来一帧就直接扔给 LVGL（零拷贝）
-static GstFlowReturn new_sample(GstAppSink *sink, gpointer user_data)
-{
-    GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
-    GstBuffer *buffer = gst_sample_get_buffer(sample);
-    GstCaps *caps = gst_sample_get_caps(sample);
-    GstStructure *s = gst_caps_get_structure(caps, 0);
+// v9 flush 回调（直接写到 DRM/GBM 缓冲区）
+static void drm_flush(lv_layer_t *layer) {
+    lv_draw_ctx_t *draw_ctx = lv_display_get_draw_ctx(disp);
+    // GBM/EGL 自动处理（v9 内置）
+    lv_draw_sw_flush(layer, draw_ctx);
+    lv_display_flush_ready(disp);  // v9 API
+}
 
-    // 获取宽高（只在第一帧执行一次）
-    if (!video_dsc.data) {
-        gst_structure_get_int(s, "width", (gint*)&video_dsc.header.w);
-        gst_structure_get_int(s, "height", (gint*)&video_dsc.header.h);
-        video_dsc.header.cf = LV_IMG_CF_TRUE_COLOR;  // nvargus 给的是 RGBA
-        video_dsc.header.always_zero = 0;
-    }
-
+// appsink 回调：DeepStream 帧 → LVGL 图像（零拷贝）
+static GstFlowReturn new_sample(GstAppSink *sink, gpointer user_data) {
+    GstSample *sample = gst_app_sink_pull_sample(sink);
+    GstBuffer *buf = gst_sample_get_buffer(sample);
     GstMapInfo map;
-    if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-        video_dsc.data = (void*)map.data;
+    if (gst_buffer_map(buf, &map, GST_MAP_READ)) {
+        video_dsc.header.w = 1920;  // 你的 CSI 分辨率
+        video_dsc.header.h = 1080;
+        video_dsc.header.format = LV_COLOR_FORMAT_NATIVE;  // RGBA/NV12 适配
         video_dsc.data_size = map.size;
-        lv_img_set_src(video_img, &video_dsc);
-        lv_obj_invalidate(video_img);
-        gst_buffer_unmap(buffer, &map);
+        video_dsc.data = map.data;
+        lv_image_set_src(video_img, &video_dsc);  // v9 API
+        lv_obj_mark_layout_as_dirty(video_img);
+        gst_buffer_unmap(buf, &map);
     }
     gst_sample_unref(sample);
     return GST_FLOW_OK;
 }
 
-static void *lvgl_timer_thread(void *arg)
-{
-    while(1) {
+static void *lv_timer_thread(void *arg) {
+    while (1) {
         lv_timer_handler();
-        usleep(5000);  // 5ms
+        usleep(5000);
     }
     return NULL;
 }
 
-int main(int argc, char *argv[])
-{
-    // 强制使用你机器上真正的 NVIDIA render node
+int main(int argc, char *argv[]) {
+    // 强制 renderD129
     setenv("GBM_DEVICE", "/dev/dri/renderD129", 1);
     setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
     setenv("__EGL_VENDOR_LIBRARY_NAME", "nvidia", 1);
@@ -60,55 +56,43 @@ int main(int argc, char *argv[])
     gst_init(&argc, &argv);
     lv_init();
 
-    // LVGL 使用 DRM (自动走 renderD129)
-    lv_drm_init();
-    disp = lv_drm_create();
-    lv_disp_set_default(disp);
+    // v9 DRM 创建（自动 GBM/EGL）
+    disp = lv_linux_drm_create();  // v9 内置函数
+    lv_display_set_resolution(disp, 1920, 1080);  // 你的分辨率
+    static lv_color_t buf[1920 * 10];  // 部分缓冲区（v9 推荐）
+    lv_display_set_buffers(disp, buf, NULL, sizeof(buf) / sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(disp, drm_flush);
 
-    // 全屏视频背景
-    video_img = lv_img_create(lv_scr_act());
-    lv_obj_set_size(video_img, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
+    // 全屏视频
+    video_img = lv_image_create(lv_screen_active());  // v9 用 lv_screen_active()
+    lv_obj_set_size(video_img, 1920, 1080);
     lv_obj_center(video_img);
 
-    // 加一个半透明按钮证明 UI 在最上层
-    lv_obj_t *btn = lv_btn_create(lv_scr_act());
+    // 半透明按钮
+    lv_obj_t *btn = lv_button_create(lv_screen_active());
     lv_obj_set_size(btn, 300, 100);
     lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, -50);
     lv_obj_set_style_bg_opa(btn, LV_OPA_60, 0);
     lv_obj_set_style_bg_color(btn, lv_color_hex(0x0066ff), 0);
     lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, "CSI Camera + LVGL");
+    lv_label_set_text(label, "CSI + LVGL v9");
 
-    // === DeepStream / GStreamer 管道：原生 CSI 摄像头 ===
-    const char *pipeline_str = 
-        "nvarguscamerasrc sensor-id=0 ! "
-        "video/x-raw(memory:NVMM),width=1920,height=1080,format=NV12,framerate=30/1 ! "
-        "nvvidconv ! video/x-raw,format=RGBA ! "
-        "appsink name=sink emit-signals=true max-buffers=1 drop=true sync=false";
-
+    // CSI 管道
+    const char *pipeline_str = "nvarguscamerasrc sensor-id=0 ! video/x-raw(memory:NVMM),width=1920,height=1080,format=NV12,framerate=30/1 ! nvvidconv ! video/x-raw,format=RGBA ! appsink name=sink emit-signals=true max-buffers=1 drop=true sync=false";
     GError *error = NULL;
     pipeline = gst_parse_launch(pipeline_str, &error);
-    if (!pipeline || error) {
-        g_printerr("Pipeline 创建失败: %s\n", error ? error->message : "unknown");
-        return -1;
-    }
-
+    if (!pipeline) { g_printerr("Pipeline 失败: %s\n", error->message); return -1; }
     GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
-    g_object_set(appsink, "emit-signals", TRUE, NULL);
     g_signal_connect(appsink, "new-sample", G_CALLBACK(new_sample), NULL);
     gst_object_unref(appsink);
-
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
-    // 启动 LVGL 刷新线程
+    // LVGL 线程
     pthread_t tid;
-    pthread_create(&tid, NULL, lvgl_timer_thread, NULL);
-
-    printf("Jetson 原生 CSI 摄像头 + LVGL 完美融合 Demo 启动成功！\n");
-    printf("分辨率自动适配，按 Ctrl+C 退出\n");
+    pthread_create(&tid, NULL, lv_timer_thread, NULL);
 
     loop = g_main_loop_new(NULL, FALSE);
+    printf("LVGL v9 + DeepStream CSI Demo 启动！\n");
     g_main_loop_run(loop);
-
     return 0;
 }
