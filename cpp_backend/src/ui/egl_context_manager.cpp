@@ -65,6 +65,8 @@ bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surfa
         return true;
     }
 
+    std::cout << "[EGL] initializeSharedContext begin: w=" << width << " h=" << height << std::endl;
+
     if (!createDisplay(wl_display)) {
         std::cerr << "[EGL] Failed to create display" << std::endl;
         return false;
@@ -87,6 +89,12 @@ bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surfa
         cleanupLocked();
         return false;
     }
+
+    std::cout << "[EGL] Shared display/context/stream initialized" << std::endl;
+    std::cout << "[EGL] egl_display=" << primary_context_.display
+              << " surface=" << primary_context_.surface
+              << " context=" << primary_context_.context
+              << " stream=" << primary_context_.stream << std::endl;
 
     if (!createStream()) {
         std::cerr << "[EGL] Failed to create EGLStream" << std::endl;
@@ -138,7 +146,8 @@ bool EGLContextManager::createDisplay(wl_display* wl_display) {
         return false;
     }
 
-    std::cout << "[EGL] Initialized display (ES) version " << major << "." << minor << std::endl;
+    std::cout << "[EGL] Initialized display (ES) version " << major << "." << minor
+              << " display=" << primary_context_.display << std::endl;
     (void)wl_display;  // kept for signature symmetry; EGL_DEFAULT_DISPLAY already uses Wayland connection.
     return true;
 }
@@ -207,6 +216,7 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
         std::cerr << "[EGL] Failed to open " << drm_path << ", errno=" << errno << std::endl;
         return false;
     }
+    std::cout << "[EGL] DRM fd opened: " << primary_context_.drm_fd << std::endl;
 
     primary_context_.gbm_dev = gbm_create_device(primary_context_.drm_fd);
     if (!primary_context_.gbm_dev) {
