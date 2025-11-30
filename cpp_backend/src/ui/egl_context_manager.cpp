@@ -12,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include <array>
+#include <vector>
 #include <cstdlib>
 
 #ifndef EGL_NO_STREAM_KHR
@@ -188,63 +189,74 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
     // DRM/GBM 回退路径
     std::cout << "[EGL] Creating GBM surface for DRM" << std::endl;
 
-    std::string drm_path = "/dev/dri/card0";
+    std::vector<std::string> candidates;
     if (const char* env = getenv("EGL_DRM_DEVICE_FILE")) {
-        drm_path = env;
-    } else {
-        std::array<std::string, 2> candidates{"/dev/dri/card1", "/dev/dri/card0"};
-        for (const auto& cand : candidates) {
-            int fd = open(cand.c_str(), O_RDWR | O_CLOEXEC);
-            if (fd >= 0) {
-                drm_path = cand;
-                close(fd);
-                break;
-            }
+        candidates.emplace_back(env);
+    }
+    candidates.emplace_back("/dev/dri/card1");
+    candidates.emplace_back("/dev/dri/card0");
+
+    for (const auto& drm_path : candidates) {
+        int fd = open(drm_path.c_str(), O_RDWR | O_CLOEXEC);
+        if (fd < 0) {
+            std::cerr << "[EGL] Failed to open " << drm_path << ", errno=" << errno << std::endl;
+            continue;
         }
+        std::cout << "[EGL] Using DRM device: " << drm_path << " fd=" << fd << std::endl;
+
+        gbm_device* gbm_dev = gbm_create_device(fd);
+        if (!gbm_dev) {
+            std::cerr << "[EGL] gbm_create_device failed on " << drm_path << std::endl;
+            close(fd);
+            continue;
+        }
+
+        auto try_surface = [&](uint32_t fmt) -> gbm_surface* {
+            return gbm_surface_create(gbm_dev, width, height, fmt,
+                                      GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+        };
+
+        gbm_surface* gbm_surf = try_surface(GBM_FORMAT_XRGB8888);
+        if (!gbm_surf) {
+            gbm_surf = try_surface(GBM_FORMAT_ARGB8888);
+        }
+
+        if (!gbm_surf) {
+            std::cerr << "[EGL] gbm_surface_create failed on " << drm_path << std::endl;
+            gbm_device_destroy(gbm_dev);
+            close(fd);
+            continue;
+        }
+
+        EGLSurface surface = eglCreateWindowSurface(
+            primary_context_.display,
+            primary_context_.config,
+            reinterpret_cast<EGLNativeWindowType>(gbm_surf),
+            nullptr);
+
+        if (surface == EGL_NO_SURFACE) {
+            std::cerr << "[EGL] eglCreateWindowSurface failed (GBM) on " << drm_path
+                      << ": 0x" << std::hex << eglGetError() << std::dec << std::endl;
+            gbm_surface_destroy(gbm_surf);
+            gbm_device_destroy(gbm_dev);
+            close(fd);
+            continue;
+        }
+
+        primary_context_.drm_fd = fd;
+        primary_context_.gbm_dev = gbm_dev;
+        primary_context_.gbm_surf = gbm_surf;
+        primary_context_.surface = surface;
+
+        std::cout << "[EGL] GBM surface created: device=" << drm_path
+                  << " fd=" << primary_context_.drm_fd
+                  << " gbm_dev=" << primary_context_.gbm_dev
+                  << " gbm_surf=" << primary_context_.gbm_surf << std::endl;
+        return true;
     }
-    std::cout << "[EGL] Using DRM device: " << drm_path << std::endl;
 
-    primary_context_.drm_fd = open(drm_path.c_str(), O_RDWR | O_CLOEXEC);
-    if (primary_context_.drm_fd < 0) {
-        std::cerr << "[EGL] Failed to open " << drm_path << ", errno=" << errno << std::endl;
-        return false;
-    }
-    std::cout << "[EGL] DRM fd opened: " << primary_context_.drm_fd << std::endl;
-
-    primary_context_.gbm_dev = gbm_create_device(primary_context_.drm_fd);
-    if (!primary_context_.gbm_dev) {
-        std::cerr << "[EGL] gbm_create_device failed" << std::endl;
-        return false;
-    }
-
-    primary_context_.gbm_surf = gbm_surface_create(
-        primary_context_.gbm_dev,
-        width,
-        height,
-        GBM_FORMAT_XRGB8888,
-        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
-
-    if (!primary_context_.gbm_surf) {
-        std::cerr << "[EGL] gbm_surface_create failed" << std::endl;
-        return false;
-    }
-
-    primary_context_.surface = eglCreateWindowSurface(
-        primary_context_.display,
-        primary_context_.config,
-        reinterpret_cast<EGLNativeWindowType>(primary_context_.gbm_surf),
-        nullptr);
-
-    if (primary_context_.surface == EGL_NO_SURFACE) {
-        std::cerr << "[EGL] eglCreateWindowSurface failed (GBM): 0x" << std::hex << eglGetError() << std::dec << std::endl;
-        return false;
-    }
-
-    std::cout << "[EGL] GBM surface created: fd=" << primary_context_.drm_fd
-              << " gbm_dev=" << primary_context_.gbm_dev
-              << " gbm_surf=" << primary_context_.gbm_surf << std::endl;
-
-    return true;
+    std::cerr << "[EGL] Failed to create GBM surface on all DRM devices" << std::endl;
+    return false;
 }
 
 bool EGLContextManager::createStream() {
