@@ -43,6 +43,13 @@ bool EGLContextManager::ensureInitialized(wl_display* wl_display, wl_surface* wl
     if (primary_context_.is_initialized) {
         return true;
     }
+    // 强制走 DRM 平台，避免残留的 Wayland 环境影响
+    setenv("EGL_PLATFORM", "drm", 1);
+    unsetenv("WAYLAND_DISPLAY");
+    if (!getenv("XDG_RUNTIME_DIR")) {
+        setenv("XDG_RUNTIME_DIR", "/tmp", 1);
+    }
+
     std::cout << "[EGL] ensureInitialized: width=" << width << " height=" << height
               << " wl_display=" << wl_display << " wl_surface=" << wl_surface << std::endl;
     return initializeSharedContext(wl_display, wl_surface, width, height);
@@ -108,6 +115,7 @@ bool EGLContextManager::initializeSharedContext(wl_display* wl_display, wl_surfa
 }
 
 bool EGLContextManager::createDisplay(wl_display* wl_display) {
+    std::cout << "[EGL] eglGetDisplay(EGL_DEFAULT_DISPLAY) ..." << std::endl;
     primary_context_.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (primary_context_.display == EGL_NO_DISPLAY) {
         std::cerr << "[EGL] eglGetDisplay returned NO_DISPLAY" << std::endl;
@@ -116,6 +124,7 @@ bool EGLContextManager::createDisplay(wl_display* wl_display) {
 
     EGLint major = 0;
     EGLint minor = 0;
+    std::cout << "[EGL] eglInitialize..." << std::endl;
     if (eglInitialize(primary_context_.display, &major, &minor) != EGL_TRUE) {
         std::cerr << "[EGL] eglInitialize failed: 0x" << std::hex << eglGetError() << std::dec << std::endl;
         return false;
@@ -175,7 +184,7 @@ bool EGLContextManager::createSurface(wl_surface* wl_surface, int width, int hei
     std::cout << "[EGL] Creating GBM surface for DRM" << std::endl;
     primary_context_.drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
     if (primary_context_.drm_fd < 0) {
-        std::cerr << "[EGL] Failed to open /dev/dri/card0" << std::endl;
+        std::cerr << "[EGL] Failed to open /dev/dri/card0, errno=" << errno << std::endl;
         return false;
     }
 
