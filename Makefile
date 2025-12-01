@@ -2,12 +2,25 @@ PREFIX ?= /opt/bamboo-qt
 BUILD_DIR ?= build
 SERVICE_NAME ?= bamboo-qt-ui.service
 CMAKE_FLAGS ?= -DCMAKE_BUILD_TYPE=Release -DENABLE_GSTREAMER=ON -DENABLE_MODBUS=ON
+DEB_DEPS ?= libmodbus-dev gstreamer1.0-rtsp-server gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools qtbase5-dev qtdeclarative5-dev qml-module-qtquick-controls2 qml-module-qtquick-layouts qtmultimedia5-dev
 
-.PHONY: all configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
+.PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
 all: build
 
-configure:
+deps:
+	@missing=""; \
+	for pkg in $(DEB_DEPS); do \
+		dpkg -s $$pkg >/dev/null 2>&1 || missing="$$missing $$pkg"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "Installing missing packages:$$missing"; \
+		sudo apt-get update && sudo apt-get install -y $$missing; \
+	else \
+		echo "All Debian dependencies already installed."; \
+	fi
+
+configure: deps
 	@if [ ! -d "$(BUILD_DIR)" ]; then mkdir -p "$(BUILD_DIR)"; fi
 	cd "$(BUILD_DIR)" && cmake $(CMAKE_FLAGS) ..
 

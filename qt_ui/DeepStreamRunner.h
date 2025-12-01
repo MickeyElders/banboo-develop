@@ -5,12 +5,14 @@
 #include <thread>
 #include <mutex>
 
-extern "C" {
 #ifdef ENABLE_GSTREAMER
+extern "C" {
 #include <gst/gst.h>
+#ifdef ENABLE_RTSP
 #include <gst/rtsp-server/rtsp-server.h>
 #endif
 }
+#endif
 
 class DeepStreamRunner : public QObject {
     Q_OBJECT
@@ -32,6 +34,7 @@ Q_SIGNALS:
 private:
 #ifdef ENABLE_GSTREAMER
     bool ensureGstInited();
+#ifdef ENABLE_RTSP
     bool buildServer(const std::string &launch);
     void runLoop();
 
@@ -40,6 +43,7 @@ private:
     GMainLoop *m_loop{nullptr};
     std::thread m_thread;
     std::once_flag m_gstOnce;
+#endif
 #endif
     QString m_sourceUrl{"rtsp://127.0.0.1:8554/deepstream"};
     std::mutex m_mutex;

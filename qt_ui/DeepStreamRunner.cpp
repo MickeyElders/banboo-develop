@@ -2,7 +2,7 @@
 #include <iostream>
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {
-#ifdef ENABLE_GSTREAMER
+#if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
     start({});
 #endif
 }
@@ -12,8 +12,9 @@ DeepStreamRunner::~DeepStreamRunner() {
 }
 
 bool DeepStreamRunner::start(const QString &pipeline) {
-#ifndef ENABLE_GSTREAMER
+#if !defined(ENABLE_GSTREAMER) || !defined(ENABLE_RTSP)
     Q_UNUSED(pipeline);
+    emit errorChanged(QStringLiteral("RTSP server unavailable (missing gstreamer-rtsp-server)"));
     return false;
 #else
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -43,7 +44,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 }
 
 void DeepStreamRunner::stop() {
-#ifdef ENABLE_GSTREAMER
+#if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
     std::lock_guard<std::mutex> lock(m_mutex);
 
     if (m_loop) {
@@ -67,7 +68,7 @@ void DeepStreamRunner::stop() {
 #endif
 }
 
-#ifdef ENABLE_GSTREAMER
+#if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
 bool DeepStreamRunner::ensureGstInited() {
     std::call_once(m_gstOnce, []() {
         gst_init(nullptr, nullptr);

@@ -30,7 +30,14 @@ if(ENABLE_GSTREAMER)
     pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
     pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
     pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
-    pkg_check_modules(GSTREAMER_RTSP QUIET gstrtspserver-1.0)
+    pkg_check_modules(GSTREAMER_RTSP QUIET gstreamer-rtsp-server-1.0)
+    if(GSTREAMER_RTSP_FOUND)
+        set(ENABLE_RTSP TRUE)
+        message(STATUS "Found gstreamer-rtsp-server: ${GSTREAMER_RTSP_VERSION}")
+    else()
+        set(ENABLE_RTSP FALSE)
+        message(WARNING "gstreamer-rtsp-server not found; RTSP server fallback disabled")
+    endif()
 endif()
 
 set(CMAKE_AUTOMOC ON)
@@ -80,14 +87,17 @@ if(ENABLE_GSTREAMER)
         ${GSTREAMER_INCLUDE_DIRS}
         ${GSTREAMER_APP_INCLUDE_DIRS}
         ${GSTREAMER_VIDEO_INCLUDE_DIRS}
-        ${GSTREAMER_RTSP_INCLUDE_DIRS}
     )
     target_link_libraries(bamboo_qt_ui PRIVATE
         ${GSTREAMER_LIBRARIES}
         ${GSTREAMER_APP_LIBRARIES}
         ${GSTREAMER_VIDEO_LIBRARIES}
-        ${GSTREAMER_RTSP_LIBRARIES}
     )
+    if(ENABLE_RTSP)
+        target_include_directories(bamboo_qt_ui PRIVATE ${GSTREAMER_RTSP_INCLUDE_DIRS})
+        target_link_libraries(bamboo_qt_ui PRIVATE ${GSTREAMER_RTSP_LIBRARIES})
+        target_compile_definitions(bamboo_qt_ui PRIVATE ENABLE_RTSP=1)
+    endif()
     target_compile_definitions(bamboo_qt_ui PRIVATE ENABLE_GSTREAMER=1)
 endif()
 
