@@ -1,4 +1,4 @@
-#include "ModbusClient.h"
+﻿#include "ModbusClient.h"
 #include <errno.h>
 #include <cstring>
 #include <QDebug>
@@ -80,7 +80,7 @@ void ModbusClient::poll() {
     uint16_t buf[count] = {0};
     const int rc = modbus_read_registers(ctx_, start, count, buf);
     if (rc != count) {
-        Q_EMIT errorMessage(tr("Modbus 读失�? %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Modbus 读失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return;
     }
@@ -110,7 +110,7 @@ bool ModbusClient::setVisionCommAck(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D0, static_cast<uint16_t>(value));
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("�?D2000 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("写 D2000 失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
@@ -123,7 +123,7 @@ bool ModbusClient::setVisionStatus(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D1, static_cast<uint16_t>(value));
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("�?D2001 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("写 D2001 失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
@@ -143,7 +143,7 @@ bool ModbusClient::setVisionTransferResult(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D4, static_cast<uint16_t>(value));
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("�?D2004 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("写 D2004 失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }

@@ -15,7 +15,7 @@ void SystemState::start() {
     if (m_running) return;
     m_running = true;
     m_currentStep = 1;
-    m_currentProcess = "进料检测中";
+    m_currentProcess = "Feeding";
     m_workflowTimer.start(800);
     Q_EMIT stateChanged();
 }
@@ -30,14 +30,14 @@ void SystemState::stop() {
     m_running = false;
     m_workflowTimer.stop();
     m_currentStep = 1;
-    m_currentProcess = "已停�?;
+    m_currentProcess = "Stopped";
     Q_EMIT stateChanged();
 }
 
 void SystemState::emergencyStop() {
     m_running = false;
     m_workflowTimer.stop();
-    m_currentProcess = "🚨 紧急停�?;
+    m_currentProcess = "Emergency Stop";
     Q_EMIT stateChanged();
 }
 
@@ -45,14 +45,14 @@ void SystemState::simulateStep() {
     if (!m_running) return;
     m_currentStep = (m_currentStep % 5) + 1;
     switch (m_currentStep) {
-        case 1: m_currentProcess = "进料检测中"; break;
-        case 2: m_currentProcess = "视觉识别"; break;
-        case 3: m_currentProcess = "坐标传输"; break;
-        case 4: m_currentProcess = "切割准备"; break;
-        case 5: m_currentProcess = "执行切割"; break;
+        case 1: m_currentProcess = "Feeding"; break;
+        case 2: m_currentProcess = "Vision"; break;
+        case 3: m_currentProcess = "Coordinate TX"; break;
+        case 4: m_currentProcess = "Cut Prep"; break;
+        case 5: m_currentProcess = "Cutting"; break;
     }
     m_xCoordinate = 200 + QRandomGenerator::global()->bounded(600.0);
-    m_cutQuality = (QRandomGenerator::global()->bounded(100) > 5) ? "正常" : "异常";
+    m_cutQuality = (QRandomGenerator::global()->bounded(100) > 5) ? "OK" : "FAIL";
     Q_EMIT stateChanged();
 }
 
@@ -86,7 +86,8 @@ AiState::AiState(QObject *parent) : QObject(parent) {
 
 WifiState::WifiState(QObject *parent) : QObject(parent) {}
 
-void WifiState::apply(const QString &ssid, const QString &password, const QString &mode, const QString &ip, const QString &mask, const QString &gw, const QString &dns) {
+void WifiState::apply(const QString &ssid, const QString &password, const QString &mode,
+                      const QString &ip, const QString &mask, const QString &gw, const QString &dns) {
     Q_UNUSED(password)
     Q_UNUSED(ip)
     Q_UNUSED(mask)
@@ -94,13 +95,13 @@ void WifiState::apply(const QString &ssid, const QString &password, const QStrin
     Q_UNUSED(dns)
     m_ssid = ssid;
     m_mode = mode.toUpper();
-    m_status = (mode.toLower() == "dhcp") ? "获取地址�? : "静态配置已应用";
+    m_status = (mode.toLower() == "dhcp") ? "DHCP acquiring" : "Static applied";
     Q_EMIT changed();
 }
 
 void WifiState::check() {
     const bool ok = QRandomGenerator::global()->bounded(100) > 15;
-    m_status = ok ? "已连�? : "断开 / 待检�?;
+    m_status = ok ? "Connected" : "Disconnected";
     m_rssi = ok ? -50 - QRandomGenerator::global()->bounded(15) : -120;
     Q_EMIT changed();
 }
