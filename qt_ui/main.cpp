@@ -186,7 +186,8 @@ int main(int argc, char *argv[]) {
     }
     if (enablePreview) {
         const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
-        WebPreview preview(rootWindow, htmlPath, 8080, &app);
+        auto *preview = new WebPreview(rootWindow, htmlPath, 8080, &app);
+        Q_UNUSED(preview);
         qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
     }
 
