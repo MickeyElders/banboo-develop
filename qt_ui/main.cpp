@@ -19,6 +19,7 @@
 #include "ModbusClient.h"
 #include "StateModels.h"
 #include "WebPreview.h"
+#include <iostream>
 
 namespace {
 std::atomic_bool g_shouldQuit{false};
@@ -26,7 +27,7 @@ std::atomic_bool g_shouldQuit{false};
 // Pre-initialize a surfaceless EGL context to unblock nvargus/gst when headless.
 void fixArgusDeadlockInHeadless() {
     // Pre-start nvargus-daemon to avoid lazy startup stalls
-    system("systemctl start nvargus-daemon.service >/dev/null 2>&1");
+    (void)system("systemctl start nvargus-daemon.service >/dev/null 2>&1");
 
     // Try surfaceless first; fall back to default display.
     EGLDisplay display = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
