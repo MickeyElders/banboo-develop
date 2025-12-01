@@ -9,6 +9,7 @@ bool LVGLWaylandInterface::initialize(const LVGLWaylandConfig& config) {
     std::cout << "[LVGLWaylandInterface] initialize stub (no UI) "
               << config.screen_width << "x" << config.screen_height
               << " display=" << config.wayland_display << std::endl;
+    fully_initialized_.store(true);
     return true;
 }
 

@@ -47,7 +47,7 @@ struct SystemConfig {
     
     SystemConfig() {
         system_params.enable_ai_inference = true;
-        system_params.enable_ui_interface = true;
+        system_params.enable_ui_interface = false; // LVGL界面已停用
         system_params.enable_modbus_communication = true;
         system_params.enable_auto_start = false;
         system_params.main_loop_interval_ms = 10;
