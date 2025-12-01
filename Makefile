@@ -10,7 +10,7 @@ MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-g
 	nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils \
 	qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-dialogs \
 	qml6-module-qtmultimedia qml6-module-qtqml qml6-module-qtqml-workerscript qml6-module-qtquick-templates \
-	qt6-multimedia-dev qt6-websockets-dev
+	qt6-multimedia-dev libqt6websockets6-dev
 # Qt6 toolchain from distro (must install if available)
 QT6_DEPS ?= qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-multimedia-dev
 # Optional packages (best effort, ignore failures)

@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Start WebRTC signaling server; DeepStream webrtcbin will use it.
-    WebRTCSignaling signaling(9000, &app);
+    WebRTCSignaling signaling(8080, &app);
     deepStream.setWebRTCSignaling(&signaling);
 
     // Trigger DeepStream autostart here (instead of constructor) for clearer logs
