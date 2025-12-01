@@ -25,7 +25,11 @@ Environment=QT_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/qt6/plugins
 Environment=GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra
 Environment=GST_PLUGIN_SYSTEM_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra
 Environment=LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra-egl:/usr/lib/aarch64-linux-gnu
+<<<<<<< HEAD
 Environment=GST_PLUGIN_SCANNER=/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner
+=======
+Environment=GST_PLUGIN_SCANNER=/usr/libexec/gstreamer-1.0/gst-plugin-scanner
+>>>>>>> 57d9aff6a1adc695f4468c18616cd8bfabfb3531
 Environment=GST_REGISTRY=/var/cache/bamboo-qt/gst-registry.bin
 Environment=WEB_PREVIEW=1
 Environment=HTTP_SERVER=0
