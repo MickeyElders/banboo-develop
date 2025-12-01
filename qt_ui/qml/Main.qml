@@ -80,7 +80,7 @@ ApplicationWindow {
                                     anchors.centerIn: parent
                                     color: done ? success : active ? textPrimary : textSecondary
                                     font.pixelSize: 12
-                                    text: ["进料检�?,"视觉识别","坐标传输","切割准备","执行切割"][index]
+                                    text: ["Step1 进料检测","Step2 视觉识别","Step3 坐标传输","Step4 切割准备","Step5 执行切割"][index]
                                 }
                             }
                         }
