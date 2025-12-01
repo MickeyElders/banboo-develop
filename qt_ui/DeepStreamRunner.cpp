@@ -355,6 +355,7 @@ void DeepStreamRunner::startPipeline() {
     if (m_startThread.joinable()) {
         m_startThread.join();
     }
+    std::cout << "[deepstream] startPipeline launching worker thread" << std::endl;
     m_startThread = std::thread([this]() { this->start({}); });
 }
 
