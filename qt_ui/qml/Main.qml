@@ -22,7 +22,7 @@ ApplicationWindow {
     readonly property color textSecondary: "#9aa4b5"
 
     Component.onCompleted: {
-        // 配置 Modbus 连接（默认连本地 1502，可改为 PLC 502）
+        // Modbus connect: default 127.0.0.1:1502 (set 502 for PLC)
         modbus.configure("127.0.0.1", 1502, 1)
     }
 
