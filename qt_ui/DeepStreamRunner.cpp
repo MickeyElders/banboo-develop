@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QtWebSockets/QWebSocket>
 #include "WebRTCSignaling.h"
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}

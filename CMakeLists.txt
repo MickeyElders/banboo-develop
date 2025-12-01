@@ -114,6 +114,7 @@ endif()
 target_compile_definitions(bamboo_qt_ui PRIVATE
     MODEL_PATH_DEFAULT="${CMAKE_SOURCE_DIR}/models/best.onnx"
     QT_NO_KEYWORDS
+    GST_USE_UNSTABLE_API
 )
 
 target_link_libraries(bamboo_qt_ui PRIVATE
@@ -123,6 +124,7 @@ target_link_libraries(bamboo_qt_ui PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Multimedia
+    Qt6::WebSockets
     ${EGL_LIBRARIES}
     Threads::Threads
 )

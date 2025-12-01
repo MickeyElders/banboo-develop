@@ -1,7 +1,7 @@
 #pragma once
 #include <QObject>
-#include <QWebSocketServer>
-#include <QWebSocket>
+#include <QtWebSockets/QWebSocketServer>
+#include <QtWebSockets/QWebSocket>
 #include <QJsonObject>
 
 // Minimal WebSocket signaling server for WebRTC.
