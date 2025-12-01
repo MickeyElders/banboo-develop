@@ -118,7 +118,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
               }
               if (sink == "rtsp") {
                   // RTSP pipeline with optional nvinfer + nvdsosd overlay
-                  std::string p = "( nvarguscamerasrc sensor-id=0 ispassthrough=true bufapi-version=true do-timestamp=true ! "
+                  std::string p = "( nvarguscamerasrc sensor-id=0 do-timestamp=true ! "
                                   "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! "
                                   "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! ";
                   // If inference/OSD available, use streammux + nvinfer + nvdsosd
@@ -127,11 +127,10 @@ bool DeepStreamRunner::start(const QString &pipeline) {
                       if (hasNvInfer) {
                           p += "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! ";
                       }
-                      if (hasNvOsd) {
-                          p += "nvdsosd name=osd ! ";
-                      }
+                      if (hasNvOsd) p += "nvdsosd name=osd ! ";
                   }
-                  p += "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! ";
+                  // Convert到 CPU 内存 I420，供 x264enc 使用
+                  p += "nvvideoconvert ! video/x-raw,format=I420 ! ";
                   p += encoder;
                   p += "rtph264pay name=pay0 pt=96 )";
                   return p;

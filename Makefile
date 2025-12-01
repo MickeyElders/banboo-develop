@@ -7,7 +7,7 @@ CMAKE_FLAGS ?= -DCMAKE_BUILD_TYPE=Release -DENABLE_GSTREAMER=ON -DENABLE_MODBUS=
 MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools \
 	libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
 	libgstrtspserver-1.0-dev gstreamer1.0-rtsp \
-	nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils \
+	gstreamer1.0-x libx264-dev nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils \
 	qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-dialogs \
 	qml6-module-qtmultimedia qml6-module-qtqml qml6-module-qtqml-workerscript qml6-module-qtquick-templates \
 	qt6-multimedia-dev libqt6websockets6-dev
