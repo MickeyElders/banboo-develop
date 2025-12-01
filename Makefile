@@ -5,11 +5,12 @@ CMAKE_FLAGS ?= -DCMAKE_BUILD_TYPE=Release -DENABLE_GSTREAMER=ON -DENABLE_MODBUS=
 
 # Required Debian packages (fail if missing)
 MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools \
+	libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
 	libgstrtspserver-1.0-dev gstreamer1.0-rtsp \
 	nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils \
 	qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-dialogs \
 	qml6-module-qtmultimedia qml6-module-qtqml qml6-module-qtqml-workerscript qml6-module-qtquick-templates \
-	qt6-multimedia-dev
+	qt6-multimedia-dev qt6-websockets-dev
 # Qt6 toolchain from distro (must install if available)
 QT6_DEPS ?= qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-multimedia-dev
 # Optional packages (best effort, ignore failures)
@@ -25,10 +26,6 @@ QT6_TARBALL ?=
 QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
  https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
  https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
-
-DS_WEBRTC_SRC ?= /opt/nvidia/deepstream/deepstream/sources/apps/sample_apps/deepstream-webrtc-demo
-DS_WEBRTC_BUILD ?= $(DS_WEBRTC_SRC)/build
-DS_WEBRTC_BIN ?= $(DS_WEBRTC_BUILD)/deepstream-webrtc-app
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -97,37 +94,7 @@ service: install
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable $(SERVICE_NAME)
 	@sudo systemctl restart $(SERVICE_NAME)
-	@sudo install -D -m 644 deploy/systemd/bamboo-webrtc.service /etc/systemd/system/bamboo-webrtc.service
-	@sudo systemctl daemon-reload
-	@$(MAKE) --no-print-directory webrtc-bin
-	@sudo systemctl enable bamboo-webrtc.service
-	@sudo systemctl restart bamboo-webrtc.service
 
-.PHONY: service-webrtc
-service-webrtc: install
-	@$(MAKE) --no-print-directory webrtc-bin
-	@sudo install -D -m 644 deploy/systemd/bamboo-webrtc.service /etc/systemd/system/bamboo-webrtc.service
-	@sudo systemctl daemon-reload
-	@sudo systemctl enable bamboo-webrtc.service
-	@sudo systemctl restart bamboo-webrtc.service
-
-.PHONY: webrtc-bin
-webrtc-bin:
-	@if [ -x "$(PREFIX)/bin/deepstream-webrtc-app" ]; then \
-		echo "WebRTC binary already installed at $(PREFIX)/bin/deepstream-webrtc-app"; \
-	elif [ -x "$(DS_WEBRTC_BIN)" ]; then \
-		echo "Installing existing WebRTC binary from $(DS_WEBRTC_BIN)"; \
-		sudo install -D -m 755 "$(DS_WEBRTC_BIN)" "$(PREFIX)/bin/deepstream-webrtc-app"; \
-	elif [ -f "$(DS_WEBRTC_SRC)/CMakeLists.txt" ]; then \
-		echo "Building DeepStream WebRTC demo at $(DS_WEBRTC_SRC)"; \
-		mkdir -p "$(DS_WEBRTC_BUILD)" && cd "$(DS_WEBRTC_BUILD)" && cmake .. && make -j$$(nproc 2>/dev/null || echo 4); \
-		sudo install -D -m 755 "$(DS_WEBRTC_BIN)" "$(PREFIX)/bin/deepstream-webrtc-app"; \
-	else \
-		echo "Warning: WebRTC source not found at $(DS_WEBRTC_SRC)."; \
-		echo " - Set DS_WEBRTC_SRC to your DeepStream webrtc demo path, or"; \
-		echo " - Place a compiled deepstream-webrtc-app at $(PREFIX)/bin/deepstream-webrtc-app"; \
-		echo "Skipping WebRTC build (main app will still install)."; \
-	fi
 
 start:
 	@sudo systemctl start $(SERVICE_NAME)

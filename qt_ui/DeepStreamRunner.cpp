@@ -2,6 +2,9 @@
 #include <iostream>
 #include <cstdlib>
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include "WebRTCSignaling.h"
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
 
@@ -9,6 +12,9 @@ DeepStreamRunner::~DeepStreamRunner() {
     stop();
     if (m_autostartThread.joinable()) {
         m_autostartThread.join();
+    }
+    if (m_webrtcThread.joinable()) {
+        m_webrtcThread.join();
     }
 }
 
@@ -133,6 +139,16 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 
     m_thread = std::thread(&DeepStreamRunner::runLoop, this);
     std::cout << "[deepstream] RTSP server thread started" << std::endl;
+
+    // Bind signaling to handler (once) and start WebRTC pipeline
+    if (m_signaling) {
+        QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
+                         this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
+                         Qt::UniqueConnection);
+        if (!buildWebRTCPipeline()) {
+            std::cout << "[deepstream] WebRTC pipeline start failed" << std::endl;
+        }
+    }
     return true;
 #endif
 }
@@ -152,6 +168,10 @@ void DeepStreamRunner::stop() {
     if (m_thread.joinable()) {
         m_thread.join();
     }
+    if (m_webrtcLoop) g_main_loop_quit(m_webrtcLoop);
+    if (m_webrtcThread.joinable()) {
+        m_webrtcThread.join();
+    }
     if (m_factory) {
         g_object_unref(m_factory);
         m_factory = nullptr;
@@ -159,6 +179,16 @@ void DeepStreamRunner::stop() {
     if (m_server) {
         g_object_unref(m_server);
         m_server = nullptr;
+    }
+    if (m_webrtcPipeline) {
+        gst_element_set_state(m_webrtcPipeline, GST_STATE_NULL);
+        gst_object_unref(m_webrtcPipeline);
+        m_webrtcPipeline = nullptr;
+        m_webrtcBin = nullptr;
+    }
+    if (m_webrtcLoop) {
+        g_main_loop_unref(m_webrtcLoop);
+        m_webrtcLoop = nullptr;
     }
     if (m_loop) {
         g_main_loop_unref(m_loop);
@@ -207,4 +237,103 @@ void DeepStreamRunner::runLoop() {
         g_main_loop_run(m_loop);
     }
 }
+
+bool DeepStreamRunner::buildWebRTCPipeline() {
+    const char *srcUrlEnv = std::getenv("RTSP_SOURCE");
+    const std::string srcUrl = srcUrlEnv ? std::string(srcUrlEnv) : std::string("rtsp://127.0.0.1:8554/deepstream");
+    std::string desc = "rtspsrc location=" + srcUrl + " latency=200 protocols=tcp ! "
+                       "rtph264depay ! h264parse ! rtph264pay pt=96 config-interval=1 ! "
+                       "application/x-rtp,media=video,encoding-name=H264,payload=96 ! "
+                       "webrtcbin name=webrtcbin stun-server=stun://stun.l.google.com:19302";
+
+    GError *err = nullptr;
+    m_webrtcPipeline = gst_parse_launch(desc.c_str(), &err);
+    if (err) {
+        std::cout << "[webrtc] gst_parse_launch error: " << err->message << std::endl;
+        g_error_free(err);
+        return false;
+    }
+    m_webrtcBin = gst_bin_get_by_name(GST_BIN(m_webrtcPipeline), "webrtcbin");
+    if (!m_webrtcBin) {
+        std::cout << "[webrtc] webrtcbin not found in pipeline" << std::endl;
+        return false;
+    }
+    g_signal_connect(m_webrtcBin, "on-negotiation-needed", G_CALLBACK(DeepStreamRunner::onNegotiationNeeded), this);
+    g_signal_connect(m_webrtcBin, "on-ice-candidate", G_CALLBACK(DeepStreamRunner::onIceCandidate), this);
+
+    gst_element_set_state(m_webrtcPipeline, GST_STATE_PLAYING);
+    if (!m_webrtcLoop) m_webrtcLoop = g_main_loop_new(nullptr, FALSE);
+    m_webrtcThread = std::thread([this]() {
+        if (m_webrtcLoop) g_main_loop_run(m_webrtcLoop);
+    });
+    std::cout << "[webrtc] pipeline started, source=" << srcUrl << std::endl;
+    return true;
+}
+
+void DeepStreamRunner::onNegotiationNeeded(GstElement *webrtc, gpointer user_data) {
+    auto *self = static_cast<DeepStreamRunner *>(user_data);
+    GstPromise *promise = gst_promise_new_with_change_func(
+        [](GstPromise *p, gpointer u) {
+            auto *runner = static_cast<DeepStreamRunner *>(u);
+            const GstStructure *s = gst_promise_get_structure(p);
+            GstWebRTCSessionDescription *offer = nullptr;
+            gst_structure_get(s, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
+            gst_promise_unref(p);
+            if (!offer) return;
+            gst_webrtc_bin_set_local_description(GST_WEBRTC_BIN(runner->m_webrtcBin), offer, NULL);
+            runner->sendSdpToPeer(offer, QStringLiteral("offer"));
+            gst_webrtc_session_description_free(offer);
+        },
+        self, nullptr);
+    gst_webrtc_bin_create_offer(GST_WEBRTC_BIN(webrtc), nullptr, promise);
+}
+
+void DeepStreamRunner::onIceCandidate(GstElement *webrtc, guint mlineindex, gchar *candidate, gchar *mid, gpointer user_data) {
+    Q_UNUSED(webrtc);
+    auto *self = static_cast<DeepStreamRunner *>(user_data);
+    if (!self || !self->m_signaling) return;
+    QJsonObject obj;
+    obj["type"] = "ice";
+    obj["sdpMid"] = QString::fromUtf8(mid ? mid : "");
+    obj["sdpMLineIndex"] = int(mlineindex);
+    obj["candidate"] = QString::fromUtf8(candidate ? candidate : "");
+    self->m_signaling->sendMessage(obj);
+}
+
+void DeepStreamRunner::handleSignalingMessage(const QJsonObject &obj) {
+    if (!m_webrtcBin) return;
+    const QString type = obj.value("type").toString();
+    if (type == "answer") {
+        const QString sdp = obj.value("sdp").toString();
+        GstSDPMessage *sdpMsg = nullptr;
+        if (gst_sdp_message_new(&sdpMsg) != GST_SDP_OK) return;
+        if (gst_sdp_message_parse_buffer(reinterpret_cast<const guint8 *>(sdp.toUtf8().constData()),
+                                         sdp.toUtf8().size(), sdpMsg) != GST_SDP_OK) {
+            gst_sdp_message_free(sdpMsg);
+            return;
+        }
+        GstWebRTCSessionDescription *answer =
+            gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_ANSWER, sdpMsg);
+        gst_webrtc_bin_set_remote_description(GST_WEBRTC_BIN(m_webrtcBin), answer, NULL);
+        gst_webrtc_session_description_free(answer);
+    } else if (type == "ice") {
+        const QString cand = obj.value("candidate").toString();
+        int mline = obj.value("sdpMLineIndex").toInt();
+        const QString mid = obj.value("sdpMid").toString();
+        gst_webrtc_bin_add_ice_candidate(GST_WEBRTC_BIN(m_webrtcBin),
+                                         mid.toUtf8().constData(), mline, cand.toUtf8().constData());
+    }
+}
+
+void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QString &type) {
+    if (!m_signaling || !desc) return;
+    gchar *sdpStr = gst_sdp_message_as_text(desc->sdp);
+    if (!sdpStr) return;
+    QJsonObject obj;
+    obj["type"] = type;
+    obj["sdp"] = QString::fromUtf8(sdpStr);
+    m_signaling->sendMessage(obj);
+    g_free(sdpStr);
+}
+#endif
 #endif

@@ -19,6 +19,7 @@
 #include "ModbusClient.h"
 #include "StateModels.h"
 #include "WebPreview.h"
+#include "WebRTCSignaling.h"
 #include <iostream>
 
 namespace {
@@ -187,6 +188,10 @@ int main(int argc, char *argv[]) {
         WebPreview preview(rootWindow, htmlPath, 8080, &app);
         qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
     }
+
+    // Start WebRTC signaling server; DeepStream webrtcbin will use it.
+    WebRTCSignaling signaling(9000, &app);
+    deepStream.setWebRTCSignaling(&signaling);
 
     // Trigger DeepStream autostart here (instead of constructor) for clearer logs
     QTimer::singleShot(0, [&deepStream]() {

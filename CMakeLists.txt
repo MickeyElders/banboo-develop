@@ -18,7 +18,7 @@ find_package(Threads REQUIRED)
 pkg_check_modules(EGL REQUIRED egl)
 
 set(QT_MIN_VERSION 6.2)
-set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia)
+set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia WebSockets)
 
 # Auto-add common distro Qt6 cmake prefixes if not already present
 if(NOT EXISTS "${QT6_ROOT}/lib/cmake/Qt6/Qt6Config.cmake")
@@ -73,6 +73,8 @@ if(ENABLE_GSTREAMER)
     pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
     pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
     pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
+    pkg_check_modules(GSTREAMER_SDP REQUIRED gstreamer-sdp-1.0)
+    pkg_check_modules(GSTREAMER_WEBRTC REQUIRED gstreamer-webrtc-1.0)
     pkg_check_modules(GSTREAMER_RTSP QUIET gstreamer-rtsp-server-1.0)
     if(GSTREAMER_RTSP_FOUND)
         set(ENABLE_RTSP TRUE)
@@ -99,6 +101,7 @@ set(QML_RESOURCES qt_ui/qml/qml.qrc)
 
 add_executable(bamboo_qt_ui
     ${QT_UI_SOURCES}
+    qt_ui/WebRTCSignaling.cpp
     ${QML_RESOURCES}
 )
 
@@ -134,6 +137,8 @@ if(ENABLE_GSTREAMER)
         ${GSTREAMER_INCLUDE_DIRS}
         ${GSTREAMER_APP_INCLUDE_DIRS}
         ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+        ${GSTREAMER_SDP_INCLUDE_DIRS}
+        ${GSTREAMER_WEBRTC_INCLUDE_DIRS}
         ${DEEPSTREAM_ROOT}/sources/includes
     )
     target_link_directories(bamboo_qt_ui PRIVATE ${DEEPSTREAM_ROOT}/lib)
@@ -141,6 +146,8 @@ if(ENABLE_GSTREAMER)
         ${GSTREAMER_LIBRARIES}
         ${GSTREAMER_APP_LIBRARIES}
         ${GSTREAMER_VIDEO_LIBRARIES}
+        ${GSTREAMER_SDP_LIBRARIES}
+        ${GSTREAMER_WEBRTC_LIBRARIES}
     )
     find_library(NVBUFSURFACE_LIB nvbufsurface PATHS ${DEEPSTREAM_ROOT}/lib)
     find_library(NVDGST_HELPER_LIB nvdsgst_helper PATHS ${DEEPSTREAM_ROOT}/lib)

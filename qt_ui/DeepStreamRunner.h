@@ -5,11 +5,14 @@
 #include <gst/gst.h>
 #ifdef ENABLE_RTSP
 #include <gst/rtsp-server/rtsp-server.h>
+#include <gst/webrtc/webrtc.h>
+#include <gst/sdp/sdp.h>
 #endif
 #endif
 
 #include <QObject>
 #include <QString>
+#include <QJsonObject>
 #include <thread>
 #include <mutex>
 
@@ -20,9 +23,9 @@ public:
     explicit DeepStreamRunner(QObject *parent = nullptr);
     ~DeepStreamRunner();
 
+    void setWebRTCSignaling(class WebRTCSignaling *sig) { m_signaling = sig; }
     QString sourceUrl() const { return m_sourceUrl; }
 
-    // 启动 RTSP 推流（摄像头 -> H264 -> rtsp://127.0.0.1:8554/deepstream）
     Q_INVOKABLE bool start(const QString &pipeline = QString());
     Q_INVOKABLE void stop();
 
@@ -35,16 +38,28 @@ private:
     bool ensureGstInited();
 #ifdef ENABLE_RTSP
     bool buildServer(const std::string &launch);
+    bool buildWebRTCPipeline();
     void runLoop();
+
+    // WebRTC callbacks
+    static void onNegotiationNeeded(GstElement *webrtc, gpointer user_data);
+    static void onIceCandidate(GstElement *webrtc, guint mlineindex, gchar *candidate, gchar *mid, gpointer user_data);
+    void handleSignalingMessage(const QJsonObject &obj);
+    void sendSdpToPeer(GstWebRTCSessionDescription *desc, const QString &type);
 
     GstRTSPServer *m_server{nullptr};
     GstRTSPMediaFactory *m_factory{nullptr};
+    GstElement *m_webrtcPipeline{nullptr};
+    GstElement *m_webrtcBin{nullptr};
     GMainLoop *m_loop{nullptr};
+    GMainLoop *m_webrtcLoop{nullptr};
     std::thread m_thread;
+    std::thread m_webrtcThread;
     std::thread m_autostartThread;
     std::once_flag m_gstOnce;
 #endif
 #endif
     QString m_sourceUrl{"rtsp://127.0.0.1:8554/deepstream"};
     std::mutex m_mutex;
+    class WebRTCSignaling *m_signaling{nullptr};
 };
