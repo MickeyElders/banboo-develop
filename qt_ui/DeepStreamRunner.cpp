@@ -21,7 +21,11 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     std::lock_guard<std::mutex> lock(m_mutex);
     stop();
 
-    if (!ensureGstInited()) return false;
+    qInfo() << "[deepstream] start() called, sink env=" << qgetenv("DS_SINK") << "pipeline len=" << pipeline.size();
+    if (!ensureGstInited()) {
+        qWarning() << "[deepstream] gst_init failed";
+        return false;
+    }
 
     std::cout << "[deepstream] Building pipeline for sink=" << (pipeline.isEmpty() ? (std::getenv("DS_SINK") ? std::getenv("DS_SINK") : "fakesink") : "custom") << std::endl;
 

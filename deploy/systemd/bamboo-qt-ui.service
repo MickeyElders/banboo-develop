@@ -41,6 +41,8 @@ Restart=always
 RestartSec=3
 SupplementaryGroups=video render
 KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
