@@ -41,7 +41,8 @@ Environment=WEB_PREVIEW=1
 Environment=HTTP_SERVER=0
 Environment=DS_AUTOSTART=1
 Environment=DS_SINK=rtsp
-Environment=DS_PIPELINE=
+# Force minimal RTSP (no nvinfer/OSD) to validate video; remove to restore full pipeline
+Environment="DS_PIPELINE=nvarguscamerasrc sensor-id=0 do-timestamp=true ! video/x-raw\\(memory:NVMM\\),width=1280,height=720,framerate=30/1,format=NV12 ! nvvidconv ! video/x-raw,format=I420 ! x264enc tune=zerolatency bitrate=8000 speed-preset=ultrafast key-int-max=30 ! h264parse config-interval=1 ! rtph264pay name=pay0 pt=96"
 Environment=DS_FORCE_SW_ENC=1
 
 ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
