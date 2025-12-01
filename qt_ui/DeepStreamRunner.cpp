@@ -210,6 +210,14 @@ void DeepStreamRunner::stop() {
 #if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
 bool DeepStreamRunner::ensureGstInited() {
     std::call_once(m_gstOnce, []() {
+        // Hard-set critical envs so gst does not spawn the missing /usr/libexec scanner path
+        g_setenv("GST_PLUGIN_SCANNER", "/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner", TRUE);
+        g_setenv("GST_PLUGIN_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra", TRUE);
+        g_setenv("GST_PLUGIN_SYSTEM_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra", TRUE);
+        g_setenv("GST_REGISTRY_1_0", "/var/cache/bamboo-qt/gst-registry.bin", TRUE);
+        g_setenv("GST_GL_PLATFORM", "egl", TRUE);
+        g_setenv("GST_GL_API", "gles2", TRUE);
+        g_setenv("EGL_PLATFORM", "surfaceless", TRUE);
         gst_init(nullptr, nullptr);
     });
     return true;
