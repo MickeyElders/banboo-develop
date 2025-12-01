@@ -30,7 +30,8 @@ void configureHeadlessEnvironment() {
     qputenv("QT_QPA_PLATFORM", "offscreen");
     qputenv("QT_QPA_EGLFS_INTEGRATION", "");
     qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
-    qputenv("EGL_PLATFORM", "");
+    qputenv("EGL_PLATFORM", "surfaceless");
+    qputenv("EGL_DISPLAY", "surfaceless");
     if (qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR")) {
         const QByteArray runtimeDir("/run/bamboo-qt");
         qputenv("XDG_RUNTIME_DIR", runtimeDir);
@@ -47,6 +48,7 @@ void configureHeadlessEnvironment() {
 void logOffscreenEnvironment() {
     qInfo() << "[startup] QT_QPA_PLATFORM =" << qgetenv("QT_QPA_PLATFORM");
     qInfo() << "[startup] XDG_RUNTIME_DIR =" << qgetenv("XDG_RUNTIME_DIR");
+    qInfo() << "[startup] EGL_PLATFORM =" << qgetenv("EGL_PLATFORM");
 }
 }  // namespace
 
