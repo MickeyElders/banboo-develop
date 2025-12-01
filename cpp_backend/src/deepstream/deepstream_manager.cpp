@@ -39,7 +39,7 @@ namespace fs = std::filesystem;
 namespace bamboo_cut {
 namespace deepstream {
 
-DeepStreamManager::DeepStreamManager()
+DeepStreamManager::DeepStreamManager(void* /*lvgl_interface*/)
     : pipeline_(nullptr)
     , pipeline2_(nullptr)
     , bus_(nullptr)
@@ -47,33 +47,15 @@ DeepStreamManager::DeepStreamManager()
     , bus_watch_id_(0)
     , bus_watch_id2_(0)
     , appsink_(nullptr)
-   
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)
     , wayland_available_(false)
     , video_surface_(nullptr)
     , video_subsurface_(nullptr) {
+    std::cout << "DeepStreamManager ??????LVGL???" << std::endl;
 }
 
-DeepStreamManager::DeepStreamManager(void* lvgl_interface)
-    : pipeline_(nullptr)
-    , pipeline2_(nullptr)
-    , bus_(nullptr)
-    , bus2_(nullptr)
-    , bus_watch_id_(0)
-    , bus_watch_id2_(0)
-    , appsink_(nullptr)
-   
-    , canvas_update_running_(false)
-    , running_(false)
-    , initialized_(false)
-    , wayland_available_(false)
-    , video_surface_(nullptr)
-    , video_subsurface_(nullptr) {
-    
-    std::cout << "DeepStreamManager 构造函数完成（支持LVGL界面集成）" << std::endl;
-}
 
 DeepStreamManager::~DeepStreamManager() {
     stopCanvasUpdateThread();
@@ -1844,5 +1826,4 @@ VideoLayout DeepStreamManager::calculateWaylandVideoLayout(const DeepStreamConfi
 
 } // namespace deepstream
 } // namespace bamboo_cut
-
 

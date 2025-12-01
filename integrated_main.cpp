@@ -21,26 +21,13 @@
 #include <algorithm>    // for std::max
 // OpenCV鍜屽浘鍍忓鐞?
 #include <opencv2/opencv.hpp>
-#include "bamboo_cut/ui/lvgl_wayland_interface.h"
 
 #ifdef ENABLE_WAYLAND
 #include <wayland-client.h>
 #endif
 
 
-// LVGL澶存枃浠跺寘鍚?- 鏅鸿兘妫€娴嬪绉嶅彲鑳界殑璺緞
-#ifdef ENABLE_LVGL
-#if __has_include(<lvgl/lvgl.h>)
-#include <lvgl/lvgl.h>
-#elif __has_include(<lvgl.h>)
-#include <lvgl.h>
-#elif __has_include("lvgl/lvgl.h")
-#include "lvgl/lvgl.h"
-#elif __has_include("lvgl.h")
-#include "lvgl.h"
 #else
-#warning "LVGL header not found, using placeholder types"
-#undef ENABLE_LVGL
 #endif
 #endif
 
@@ -51,8 +38,6 @@ void redirect_output_to_log();
 void restore_output();
 void cleanup_output_redirection();
 
-#ifndef ENABLE_LVGL
-// LVGL鏈惎鐢ㄦ椂鐨勭被鍨嬪崰浣嶇
 typedef void* lv_obj_t;
 typedef void* lv_event_t;
 typedef void* lv_indev_drv_t;
@@ -63,13 +48,11 @@ typedef void* lv_color_t;
 typedef void* lv_disp_draw_buf_t;
 typedef void* lv_display_t;
 
-// 妯℃嫙LVGL鏋氫妇
 enum lv_indev_state_t {
     LV_INDEV_STATE_REL = 0,
     LV_INDEV_STATE_PR
 };
 
-// 妯℃嫙LVGL瀹氭椂鍣ㄧ粨鏋勪綋锛屽寘鍚玼ser_data鎴愬憳
 struct lv_timer_t {
     void* user_data;
     void(*timer_cb)(struct lv_timer_t*);
@@ -79,7 +62,6 @@ struct lv_timer_t {
     lv_timer_t() : user_data(nullptr), timer_cb(nullptr), period(0), last_run(0) {}
 };
 
-// LVGL鍑芥暟鍗犱綅绗?
 inline void lv_init() {}
 inline void lv_timer_handler() {}
 inline void lv_port_tick_init() {}
@@ -94,7 +76,6 @@ inline void lv_timer_del(lv_timer_t* timer) {
     if (timer) delete timer;
 }
 
-// LVGL DRM鍑芥暟鍗犱綅绗?
 inline lv_display_t* lv_linux_drm_create() {
     return nullptr; // 褰揕VGL鏈惎鐢ㄦ椂杩斿洖nullptr
 }
@@ -105,32 +86,22 @@ inline void lv_disp_drv_init(lv_disp_drv_t* driver) {}
 inline lv_disp_drv_t* lv_disp_drv_register(lv_disp_drv_t* driver) { return driver; }
 inline void lv_disp_flush_ready(lv_disp_drv_t* disp_drv) {}
 
-inline bool lvgl_display_init() {
     // 绾疞VGL鏄剧ず绯荤粺鍒濆鍖?
     try {
-        std::cout << "Initializing pure LVGL display system..." << std::endl;
         
-#ifdef ENABLE_LVGL
-        // 浣跨敤LVGL鐨凩inux DRM椹卞姩
         lv_display_t * disp = lv_linux_drm_create();
         if (!disp) {
-            std::cout << "Failed to create LVGL DRM display" << std::endl;
             return false;
         } else {
-            std::cout << "LVGL DRM display created successfully" << std::endl;
             return true;
         }
 #else
-        std::cout << "Error: LVGL not enabled in build configuration" << std::endl;
-        std::cout << "Please ensure LVGL is properly configured and available" << std::endl;
         return false;
 #endif
         
     } catch (const std::exception& e) {
-        std::cout << "LVGL display initialization exception: " << e.what() << std::endl;
         return false;
     } catch (...) {
-        std::cout << "LVGL display initialization unknown exception" << std::endl;
         return false;
     }
 }
@@ -576,7 +547,6 @@ private:
     std::unique_ptr<inference::BambooDetector> detector_;
     std::unique_ptr<deepstream::DeepStreamManager> deepstream_manager_;
     bool use_mock_data_ = false;
-    void* lvgl_interface_ptr_ = nullptr;  // 鐢ㄤ簬瀛樺偍LVGL鐣岄潰鎸囬拡
     
     // Wayland閰嶇疆 - 鏇夸唬DRM Overlay
     bool wayland_available_ = false;
@@ -590,9 +560,6 @@ public:
     InferenceWorkerThread(IntegratedDataBridge* bridge)
         : data_bridge_(bridge), last_stats_time_(std::chrono::steady_clock::now()) {}
     
-    // 璁剧疆LVGL鐣岄潰鎸囬拡
-    void setLVGLInterface(void* lvgl_interface) {
-        lvgl_interface_ptr_ = lvgl_interface;
     }
     
     // 妫€鏌ayland鐜
@@ -614,9 +581,6 @@ public:
         return deepstream_manager_->initialize(config);
 
 #ifdef ENABLE_WAYLAND
-        // 鑾峰彇LVGL鐨刉ayland瀵硅薄
-        if (!lvgl_interface_ptr_) {
-            std::cerr << "❌ [推理系统] LVGL接口未设置" << std::endl;
             return false;
         }
         
@@ -631,23 +595,17 @@ public:
         void* parent_surface = nullptr;
         
         while (retry_count < MAX_RETRIES) {
-            parent_display = lvgl_if->getWaylandDisplay();
-            parent_compositor = lvgl_if->getWaylandCompositor();
-            parent_subcompositor = lvgl_if->getWaylandSubcompositor();
-            parent_surface = lvgl_if->getWaylandSurface();
             
             if (parent_display && parent_compositor && parent_subcompositor && parent_surface) {
                 std::cout << "鉁?宸茶幏鍙朙VGL Wayland鐖剁獥鍙ｅ璞★紙閲嶈瘯" << retry_count << "娆★級" << std::endl;
                 break;
             }
             
-            std::cout << "鈴?绛夊緟LVGL Wayland瀵硅薄鍒濆鍖?..锛堢" << (retry_count + 1) << "娆″皾璇曪級" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             retry_count++;
         }
         
         if (!parent_display || !parent_compositor || !parent_subcompositor || !parent_surface) {
-            std::cerr << "鉂?鏃犳硶鑾峰彇LVGL Wayland瀵硅薄锛堝凡閲嶈瘯" << MAX_RETRIES << "娆★級" << std::endl;
             std::cerr << "馃攧 DeepStream灏嗕娇鐢ˋppSink杞欢鍚堟垚妯″紡" << std::endl;
             
             // 闄嶇骇鍒癆ppSink妯″紡
@@ -664,12 +622,10 @@ public:
             return deepstream_manager_->initialize(config);
         }
         
-        std::cout << "✅ 已获取LVGL Wayland父窗口对象" << std::endl;
         
         // 馃敡 鍏抽敭淇锛氳幏鍙?camera_panel 鐨勫疄闄呭潗鏍囷紙鍦‵lex甯冨眬瀹屾垚鍚庯級
                 // ?? camera_panel ???Flex ??????
         int camera_x = 0, camera_y = 60, camera_width = 960, camera_height = 640;
-        bool got_cam_panel = lvgl_if->getCameraPanelCoords(camera_x, camera_y, camera_width, camera_height);
         std::cout << "[DeepStream] camera panel coords "
                   << (got_cam_panel ? "" : "(fallback) ")
                   << "(" << camera_x << ", " << camera_y << ") "
@@ -720,7 +676,6 @@ deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
         }
         
         std::cout << "✅ [推理系统] Wayland Subsurface架构初始化完成" << std::endl;
-        std::cout << "馃摵 瑙嗛灏嗙敱 Wayland 鍚堟垚鍣ㄨ嚜鍔ㄥ悎鎴愬埌 LVGL 绐楀彛" << std::endl;
         
         return true;
 #endif
@@ -853,12 +808,8 @@ private:
         
         try {
             // 鍒涘缓 DeepStream 绠＄悊鍣ㄥ疄渚嬶紙濡傛灉鏈塋VGL鐣岄潰鎸囬拡鍒欎紶鍏ワ級
-            if (lvgl_interface_ptr_) {
-                deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>(lvgl_interface_ptr_);
-                std::cout << "馃敆 [DeepStream] 绠＄悊鍣ㄥ凡杩炴帴LVGL鐣岄潰" << std::endl;
             } else {
                 deepstream_manager_ = std::make_unique<deepstream::DeepStreamManager>();
-                std::cout << "⚠️  [DeepStream] 管理器创建（无LVGL界面连接）" << std::endl;
             }
             
             // 閰嶇疆 DeepStream 鍙傛暟
@@ -927,7 +878,6 @@ private:
             std::cout << "❌ DeepStream 管理器启动失败" << std::endl;
             return false;
         }
-        // 启动canvas更新线程 (如果支持LVGL界面集成)
         if (deepstream_manager_) {
             std::cout << "启动Canvas更新线程...（DRM/GBM）" << std::endl;
             deepstream_manager_->startCanvasUpdateThread();
@@ -941,10 +891,8 @@ private:
 };
 
 /**
- * LVGL UI绠＄悊鍣?
  * 浣跨敤浼樺寲鐨凩VGL鐣岄潰瀹炵幇
  */
-class LVGLUIManager {
 private:
     IntegratedDataBridge* data_bridge_;
     
@@ -954,10 +902,8 @@ private:
     bool initialized_ = false;
 
 public:
-    LVGLUIManager(IntegratedDataBridge* bridge)
         : data_bridge_(bridge) {}
     
-    ~LVGLUIManager() {
         cleanup();
     }
 
@@ -981,24 +927,16 @@ public:
         std::cout << "FPS Updated: " << fps << std::endl;
     }
     
-    // 鑾峰彇LVGL Wayland鐣岄潰鎸囬拡锛堢敤浜庝紶閫掔粰DeepStreamManager锛?
-    void* getLVGLInterface() {
-        #ifdef ENABLE_LVGL
-        return lvgl_wayland_interface_.get();
         #else
         return nullptr;
         #endif
     }
     
     bool initialize() {
-        std::cout << "Initializing LVGL UI system with optimized interface..." << std::endl;
         
-        #ifdef ENABLE_LVGL
         try {
             // DRM/GBM 路径，不依赖 Wayland
-            std::cout << "[Display] Using DRM/GBM LVGL interface (Wayland disabled)" << std::endl;
                         
-            // 配置 LVGL（DRM/GBM 参数沿用屏幕尺寸）
             
             config.screen_width = 1280;
             config.screen_height = 800;
@@ -1007,50 +945,34 @@ public:
             config.touch_device = "/dev/input/event0";
             config.wayland_display = "wayland-0";
             
-            std::cout << "初始化 LVGL DRM/GBM 界面..." << std::endl;
-            if (!lvgl_wayland_interface_->initialize(config)) {
-                std::cout << "LVGL DRM/GBM interface initialization failed" << std::endl;
                 return false;
             }
             
-            std::cout << "LVGL DRM/GBM 界面初始化完成，启动界面线程..." << std::endl;
             // 鍚姩鐣岄潰绾跨▼
-            if (!lvgl_wayland_interface_->start()) {
-                std::cout << "LVGL Wayland interface start failed" << std::endl;
                 return false;
             }
             
             // 缁欑晫闈㈢嚎绋嬩竴浜涙椂闂存潵绋冲畾鍚姩
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            std::cout << "LVGL Wayland鐣岄潰绾跨▼鍚姩瀹屾垚" << std::endl;
             
             std::cout << "Wayland浼樺寲鐨凩VGL鐣岄潰鍒涘缓鎴愬姛" << std::endl;
         } catch (const std::exception& e) {
-            std::cout << "LVGL Wayland interface creation exception: " << e.what() << std::endl;
             return false;
         }
         #else
-        std::cout << "LVGL not enabled, using placeholder UI" << std::endl;
         
         // 鍗犱綅绗﹀疄鐜帮細妯℃嫙鍒濆鍖栨垚鍔?
-        std::cout << "Simulated LVGL UI initialization (LVGL disabled)" << std::endl;
         #endif
         
         initialized_ = true;
-        std::cout << "LVGL UI system initialization complete" << std::endl;
         return true;
     }
     
     void runMainLoop() {
         if (!initialized_) return;
         
-        std::cout << "LVGL main loop started with optimized interface" << std::endl;
         
-        #ifdef ENABLE_LVGL
-        if (lvgl_wayland_interface_ && lvgl_wayland_interface_->isRunning()) {
             std::cout << "Using Wayland浼樺寲鐨凩VGL interface main loop" << std::endl;
-            // LVGL Wayland鐣岄潰宸茬粡鍦ㄨ嚜宸辩殑绾跨▼涓繍琛岋紝杩欓噷鍙渶瑕佺瓑寰?
-            while (!g_shutdown_requested && lvgl_wayland_interface_->isRunning()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
         }
@@ -1062,15 +984,10 @@ public:
         }
         #endif
         
-        std::cout << "LVGL main loop exited" << std::endl;
     }
 
 private:
     void cleanup() {
-        #ifdef ENABLE_LVGL
-        if (lvgl_wayland_interface_) {
-            lvgl_wayland_interface_->stop();
-            lvgl_wayland_interface_.reset();
         }
         #endif
         
@@ -1121,7 +1038,6 @@ class IntegratedBambooSystem {
 private:
     IntegratedDataBridge data_bridge_;
     std::unique_ptr<InferenceWorkerThread> inference_worker_;
-    std::unique_ptr<LVGLUIManager> ui_manager_;
     
 public:
     bool initialize() {
@@ -1138,24 +1054,14 @@ public:
         std::cout << "\n[Display] Step1: DRM/GBM mode (Wayland disabled)" << std::endl;
         std::cout << "[Display] Wayland skipped; DRM/GBM active" << std::endl;
         
-        // === Step2: 初始化 LVGL DRM/GBM 界面 ===
-        std::cout << "\n[LVGL] Step2: 初始化 DRM/GBM LVGL 界面..." << std::endl;
-        ui_manager_ = std::make_unique<LVGLUIManager>(&data_bridge_);
-        if (!ui_manager_->initialize()) {
-            std::cout << "❌[LVGL] LVGL DRM/GBM 界面初始化失败" << std::endl;
             return false;
         }
-        std::cout << "✅[LVGL] LVGL DRM/GBM 界面初始化成功" << std::endl;
         
         // === Step3: 初始化 DeepStream DRM 流水线 ===
         std::cout << "\n[DeepStream] Step3: 初始化 DeepStream DRM/GBM 模式..." << std::endl;
         inference_worker_ = std::make_unique<InferenceWorkerThread>(&data_bridge_);
         
         // 浼犻€扡VGL Wayland鐣岄潰鎸囬拡缁欐帹鐞嗗伐浣滅嚎绋?
-        #ifdef ENABLE_LVGL
-        if (ui_manager_ && ui_manager_->getLVGLInterface()) {
-            inference_worker_->setLVGLInterface(ui_manager_->getLVGLInterface());
-            std::cout << "馃敆 [闆嗘垚] LVGL Wayland鐣岄潰鎸囬拡宸蹭紶閫掔粰鎺ㄧ悊宸ヤ綔绾跨▼" << std::endl;
         }
         #endif
         
@@ -1181,28 +1087,19 @@ public:
         std::cout << "Starting Wayland integrated system..." << std::endl;
         
         // 馃敡 鍏抽敭淇锛氫紭鍖朩ayland瀹㈡埛绔惎鍔ㄩ『搴忥紝閬垮厤xdg_positioner鍐茬獊
-        std::cout << "馃敡 绛夊緟LVGL Wayland鐣岄潰瀹屽叏鍚姩鍜岃繛鎺ョǔ瀹?.." << std::endl;
         
-        #ifdef ENABLE_LVGL
-        if (ui_manager_ && ui_manager_->getLVGLInterface()) {
                         int wait_count = 0;
             const int MAX_WAIT_SECONDS = 15;
             
-            while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 wait_count++;
-                std::cout << "鈴?绛夊緟LVGL Wayland瀹屽叏鍒濆鍖?.. (" << (wait_count * 0.5) << "绉?" << std::endl;
             }
             
-            if (lvgl_if->isFullyInitialized()) {
-                std::cout << "鉁?LVGL Wayland宸插畬鍏ㄥ垵濮嬪寲" << std::endl;
             } else {
-                std::cout << "⚠️ 警告：LVGL初始化超时，但继续启动系统" << std::endl;
             }
         } else
         #endif
         {
-            std::cout << "馃摑 LVGL涓嶅彲鐢紝浣跨敤鍥哄畾寤惰繜" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(3));
         }
         
@@ -1221,7 +1118,6 @@ public:
         std::cout << "Press Ctrl+C to exit system" << std::endl;
         
         // 涓荤嚎绋嬭繍琛孶I (闃诲)
-        ui_manager_->runMainLoop();
         
         std::cout << "Starting system shutdown..." << std::endl;
         shutdown();

@@ -173,7 +173,7 @@ public:
      * @brief 构造函数（支持LVGL界面集成）
      * @param lvgl_interface LVGL界面实例指针，用于appsink软件合成
      */
-    DeepStreamManager(void* lvgl_interface);
+    explicit DeepStreamManager(void* lvgl_interface = nullptr);
     
     ~DeepStreamManager();
 
@@ -441,7 +441,7 @@ private:
     std::mutex frame_mutex_;    // 帧数据同步互斥锁
     cv::Mat latest_frame_;      // 最新帧数据
     std::atomic<bool> new_frame_available_{false};  // 新帧可用标志
-    void* lvgl_interface_;      // LVGL界面实例指针
+    void* lvgl_interface_ = nullptr;      // LVGL界面实例指针
     std::thread canvas_update_thread_;          // Canvas更新线程
     std::atomic<bool> canvas_update_running_;   // Canvas更新线程运行标志
     bool inference_available_ = false;

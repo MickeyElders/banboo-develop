@@ -1,10 +1,8 @@
 /**
  * @file bamboo_system.cpp
- * @brief C++ LVGL一体化竹子识别系统核心控制器实现
  * @version 5.0.0
  * @date 2024
  * 
- * C++推理后端 + LVGL界面 + Modbus通信的完整一体化系统
  */
 
 #include "bamboo_cut/core/bamboo_system.h"
@@ -226,7 +224,6 @@ bool BambooSystem::reloadConfig(const SystemConfig& config) {
         // TODO: 更新推理配置
     }
     
-    if (ui_wayland_interface_) {
         // TODO: 更新Wayland界面配置
     }
     
@@ -314,11 +311,8 @@ bool BambooSystem::initializeSubsystems() {
             std::cout << "[BambooSystem] AI推理模块已初始化" << std::endl;
         }
         
-        // 初始化LVGL Wayland界面
         if (config_.system_params.enable_ui_interface) {
-#ifdef ENABLE_LVGL
             try {
-                // LVGL界面已移除
             }
         
         // 初始化Modbus通信
@@ -357,18 +351,6 @@ bool BambooSystem::startSubsystems() {
             return false;
         }
         
-        // 启动LVGL Wayland界面
-        if (ui_wayland_interface_) {
-            try {
-                if (!ui_wayland_interface_->start()) {
-                    std::cerr << "[BambooSystem] Wayland界面线程启动失败" << std::endl;
-                    // 界面启动失败不影响核心功能
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "[BambooSystem] Wayland界面线程启动异常: " << e.what() << std::endl;
-                ui_wayland_interface_.reset();
-            }
-        }
         
         // 启动Modbus通信
         if (modbus_interface_ && !modbus_interface_->start()) {
@@ -404,14 +386,9 @@ void BambooSystem::stopSubsystems() {
         modbus_interface_.reset();
     }
     
-    // 停止LVGL Wayland界面
-    if (ui_wayland_interface_) {
         try {
-            ui_wayland_interface_->stop();
         } catch (const std::exception& e) {
-            std::cerr << "[BambooSystem] 停止LVGL Wayland界面异常: " << e.what() << std::endl;
         }
-        ui_wayland_interface_.reset();
     }
     
     // 停止推理线程
@@ -462,9 +439,7 @@ void BambooSystem::monitorSystemHealth() {
         handleSystemError("推理线程异常停止");
     }
     
-    if (ui_wayland_interface_) {
         try {
-            if (!ui_wayland_interface_->isRunning()) {
                 // Wayland界面异常不影响核心功能
                 utils::Logger::getInstance().log(utils::LogLevel::WARN, "Wayland界面线程异常");
             }
@@ -607,17 +582,17 @@ bool SystemConfig::loadFromFile(const std::string& config_file) {
         } else if (key == "detector.use_tensorrt") {
             detector_config.use_tensorrt = to_bool(value, detector_config.use_tensorrt);
         } else if (key == "ui.screen_width") {
-            ui_config.screen_width = to_int(value, ui_config.screen_width);
+            // ui_config removed
         } else if (key == "ui.screen_height") {
-            ui_config.screen_height = to_int(value, ui_config.screen_height);
+            // ui_config removed
         } else if (key == "ui.refresh_rate") {
-            ui_config.refresh_rate = to_int(value, ui_config.refresh_rate);
+            // ui_config removed
         } else if (key == "ui.enable_touch") {
-            ui_config.enable_touch = to_bool(value, ui_config.enable_touch);
+            // ui_config removed
         } else if (key == "ui.touch_device") {
-            ui_config.touch_device = value;
+            // ui_config removed
         } else if (key == "ui.display_device" || key == "ui.wayland_display") {
-            ui_config.wayland_display = value;
+            // ui_config removed
         } else if (key == "modbus.server_ip") {
             modbus_config.server_ip = value;
         } else if (key == "modbus.server_port") {
@@ -668,12 +643,7 @@ bool SystemConfig::saveToFile(const std::string& config_file) const {
     ofs << "  use_tensorrt: " << (detector_config.use_tensorrt ? "true" : "false") << "\n\n";
 
     ofs << "ui:\n";
-    ofs << "  screen_width: " << ui_config.screen_width << "\n";
-    ofs << "  screen_height: " << ui_config.screen_height << "\n";
-    ofs << "  refresh_rate: " << ui_config.refresh_rate << "\n";
-    ofs << "  enable_touch: " << (ui_config.enable_touch ? "true" : "false") << "\n";
-    ofs << "  touch_device: " << ui_config.touch_device << "\n";
-    ofs << "  wayland_display: " << ui_config.wayland_display << "\n\n";
+    // ui_config removed
 
     ofs << "modbus:\n";
     ofs << "  server_ip: " << modbus_config.server_ip << "\n";
