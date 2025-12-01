@@ -146,14 +146,17 @@ install-qt-kms-config:
 	[ -n "$$conn" ] || conn="$${card}-HDMI-A-1"; \
 	mode=$$(if [ -f "/sys/class/drm/$${conn}/modes" ]; then head -n1 /sys/class/drm/$${conn}/modes; else echo "1920x1080"; fi); \
 	output_name=$${conn#*-}; \
-	cat > "$$tmpfile" <<EOF; \
+	cat > "$$tmpfile" <<'EOF' ; \
 { \
-  "device": "/dev/$$card", \
+  "device": "/dev/REPLACE_CARD", \
   "outputs": [ \
-    { "name": "$$output_name", "mode": "$$mode", "format": "rgb888", "transform": "normal" } \
+    { "name": "REPLACE_OUTPUT", "mode": "REPLACE_MODE", "format": "rgb888", "transform": "normal" } \
   ] \
 } \
-EOF
+EOF \
+	sed -i "s|REPLACE_CARD|$$card|g" "$$tmpfile"; \
+	sed -i "s|REPLACE_OUTPUT|$$output_name|g" "$$tmpfile"; \
+	sed -i "s|REPLACE_MODE|$$mode|g" "$$tmpfile"; \
 	sudo install -m 644 $$tmpfile /etc/qt/eglfs_kms_config.json && rm -f $$tmpfile
 
 qt6-source-install:
