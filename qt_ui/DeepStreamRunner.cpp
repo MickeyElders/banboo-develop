@@ -339,4 +339,17 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
     m_signaling->sendMessage(obj);
     g_free(sdpStr);
 }
+
+void DeepStreamRunner::startPipeline() {
+    const QByteArray autoStart = qgetenv("DS_AUTOSTART");
+    if (!autoStart.isEmpty() && autoStart != "1") {
+        std::cout << "[deepstream] startPipeline skipped (DS_AUTOSTART!=1)" << std::endl;
+        return;
+    }
+    start({});
+}
+
+void DeepStreamRunner::stopPipeline() {
+    stop();
+}
 #endif

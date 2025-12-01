@@ -9,6 +9,7 @@
 #include <QLoggingCategory>
 #include <QTimer>
 #include <QUrl>
+#include <QThread>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <gst/gst.h>
@@ -130,11 +131,11 @@ int main(int argc, char *argv[]) {
     AiState aiState;
     WifiState wifiState;
     qInfo() << "[startup] Core state objects OK, constructing pipelines...";
-    DeepStreamRunner deepStream;
+    DeepStreamRunner *deepStream = new DeepStreamRunner();
     qInfo() << "[startup] DeepStreamRunner constructed";
     ModbusClient modbus;
     qInfo() << "[startup] ModbusClient constructed";
-    QObject::connect(&deepStream, &DeepStreamRunner::errorChanged, [](const QString &msg) {
+    QObject::connect(deepStream, &DeepStreamRunner::errorChanged, [](const QString &msg) {
         qCritical() << "[deepstream] error:" << msg;
     });
 
@@ -147,7 +148,16 @@ int main(int argc, char *argv[]) {
     });
     quitTimer.start();
 
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, &deepStream, [&deepStream]() { deepStream.stop(); });
+    // DeepStream 在专属线程中运行，避免阻塞主线程（Web/UI）
+    QThread *dsThread = new QThread(&app);
+    deepStream->moveToThread(dsThread);
+    QObject::connect(dsThread, &QThread::started, deepStream, &DeepStreamRunner::startPipeline);
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, deepStream, &DeepStreamRunner::stopPipeline, Qt::QueuedConnection);
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, dsThread, &QThread::quit, Qt::QueuedConnection);
+    QObject::connect(dsThread, &QThread::finished, deepStream, &QObject::deleteLater);
+    QObject::connect(dsThread, &QThread::finished, dsThread, &QObject::deleteLater);
+    dsThread->start();
+
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &modbus, [&modbus]() { modbus.shutdown(); });
 
     QQmlApplicationEngine engine;
@@ -155,7 +165,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("jetsonState", &jetsonState);
     engine.rootContext()->setContextProperty("aiState", &aiState);
     engine.rootContext()->setContextProperty("wifiState", &wifiState);
-    engine.rootContext()->setContextProperty("deepStream", &deepStream);
+    engine.rootContext()->setContextProperty("deepStream", deepStream);
     engine.rootContext()->setContextProperty("modbus", &modbus);
 
     qInfo() << "[startup] Loading QML...";
@@ -215,18 +225,6 @@ int main(int argc, char *argv[]) {
     if (okWs && wsEnv > 0) wsPort = quint16(wsEnv);
     WebRTCSignaling signaling(wsPort, &app);
     deepStream.setWebRTCSignaling(&signaling);
-
-    // Trigger DeepStream autostart here (instead of constructor) for clearer logs
-    QTimer::singleShot(0, [&deepStream]() {
-        const QByteArray autoStart = qgetenv("DS_AUTOSTART");
-        if (autoStart == "1") {
-            std::cout << "[deepstream] Autostart from main()" << std::endl;
-            const bool ok = deepStream.start({});
-            std::cout << "[deepstream] Autostart result: " << (ok ? "success" : "failure") << std::endl;
-        } else {
-            std::cout << "[deepstream] Autostart disabled (DS_AUTOSTART!=1)" << std::endl;
-        }
-    });
 
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();

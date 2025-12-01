@@ -32,6 +32,10 @@ public:
     Q_INVOKABLE bool start(const QString &pipeline = QString());
     Q_INVOKABLE void stop();
 
+public Q_SLOTS:
+    void startPipeline();
+    void stopPipeline();
+
 Q_SIGNALS:
     void sourceUrlChanged();
     void errorChanged(const QString &message);
@@ -58,7 +62,6 @@ private:
     GMainLoop *m_webrtcLoop{nullptr};
     std::thread m_thread;
     std::thread m_webrtcThread;
-    std::thread m_autostartThread;
     std::once_flag m_gstOnce;
 #endif
 #endif
