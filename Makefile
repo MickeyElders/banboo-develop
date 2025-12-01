@@ -115,14 +115,13 @@ check_qt6:
 		qtver=$$(qmake6 -query QT_VERSION); \
 	fi; \
 	if [ -z "$$qtver" ]; then \
-		echo "Qt6 not found. Install Qt >= $(QT_MIN_VER) or run 'make qt6-source-install'."; \
-		exit 1; \
-	fi; \
-	if dpkg --compare-versions "$$qtver" ge "$(QT_MIN_VER)"; then \
+		echo "Qt6 not found. Will build and install Qt $(QT_MIN_VER) from source."; \
+		$(MAKE) --no-print-directory qt6-source-install; \
+	elif dpkg --compare-versions "$$qtver" ge "$(QT_MIN_VER)"; then \
 		echo "Qt6 $$qtver OK (>= $(QT_MIN_VER))."; \
 	else \
-		echo "Qt6 $$qtver is too old (< $(QT_MIN_VER)). Please install Qt >= $(QT_MIN_VER) or run 'make qt6-source-install'."; \
-		exit 1; \
+		echo "Qt6 $$qtver is too old (< $(QT_MIN_VER)). Building Qt $(QT_MIN_VER) from source..."; \
+		$(MAKE) --no-print-directory qt6-source-install; \
 	fi
 
 qt6-source-install:
