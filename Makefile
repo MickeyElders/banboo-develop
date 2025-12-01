@@ -38,7 +38,7 @@ start:
 	@sudo systemctl start $(SERVICE_NAME)
 
 stop:
-	@sudo systemctl stop $(SERVICE_NAME)
+	@sudo systemctl stop $(SERVICE_NAME) 2>/dev/null || true
 
 restart:
 	@sudo systemctl restart $(SERVICE_NAME)
