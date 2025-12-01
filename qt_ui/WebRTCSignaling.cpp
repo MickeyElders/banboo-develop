@@ -34,7 +34,7 @@ void WebRTCSignaling::onTextMessageReceived(const QString &message) {
         qWarning() << "[webrtc] invalid JSON message";
         return;
     }
-    emit messageReceived(doc.object());
+    Q_EMIT messageReceived(doc.object());
 }
 
 void WebRTCSignaling::onDisconnected() {
