@@ -30,6 +30,18 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 
     std::cout << "[deepstream] Building pipeline for sink=" << (pipeline.isEmpty() ? (std::getenv("DS_SINK") ? std::getenv("DS_SINK") : "fakesink") : "custom") << std::endl;
 
+    // If DS_PIPELINE is provided, use it verbatim.
+    const char *envPipeline = std::getenv("DS_PIPELINE");
+    if (pipeline.isEmpty() && envPipeline && std::strlen(envPipeline) > 0) {
+        std::cout << "[deepstream] Using DS_PIPELINE from environment" << std::endl;
+        if (!buildServer(std::string(envPipeline))) {
+            Q_EMIT errorChanged(QStringLiteral("启动 RTSP 服务失败 (DS_PIPELINE)"));
+            return false;
+        }
+        m_thread = std::thread(&DeepStreamRunner::runLoop, this);
+        return true;
+    }
+
     auto sinkEnv = std::getenv("DS_SINK");
     const std::string sink = sinkEnv ? std::string(sinkEnv) : std::string("rtsp");
 
