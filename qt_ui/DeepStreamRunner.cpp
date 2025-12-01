@@ -284,12 +284,12 @@ void DeepStreamRunner::onNegotiationNeeded(GstElement *webrtc, gpointer user_dat
             gst_structure_get(s, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
             gst_promise_unref(p);
             if (!offer) return;
-            gst_webrtc_bin_set_local_description(GST_WEBRTC_BIN(runner->m_webrtcBin), offer, NULL);
+            g_signal_emit_by_name(runner->m_webrtcBin, "set-local-description", offer, nullptr);
             runner->sendSdpToPeer(offer, QStringLiteral("offer"));
             gst_webrtc_session_description_free(offer);
         },
         self, nullptr);
-    gst_webrtc_bin_create_offer(GST_WEBRTC_BIN(webrtc), nullptr, promise);
+    g_signal_emit_by_name(webrtc, "create-offer", nullptr, promise);
 }
 
 void DeepStreamRunner::onIceCandidate(GstElement *webrtc, guint mlineindex, gchar *candidate, gchar *mid, gpointer user_data) {
@@ -318,14 +318,14 @@ void DeepStreamRunner::handleSignalingMessage(const QJsonObject &obj) {
         }
         GstWebRTCSessionDescription *answer =
             gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_ANSWER, sdpMsg);
-        gst_webrtc_bin_set_remote_description(GST_WEBRTC_BIN(m_webrtcBin), answer, NULL);
+        g_signal_emit_by_name(m_webrtcBin, "set-remote-description", answer, nullptr);
         gst_webrtc_session_description_free(answer);
     } else if (type == "ice") {
         const QString cand = obj.value("candidate").toString();
         int mline = obj.value("sdpMLineIndex").toInt();
         const QString mid = obj.value("sdpMid").toString();
-        gst_webrtc_bin_add_ice_candidate(GST_WEBRTC_BIN(m_webrtcBin),
-                                         mid.toUtf8().constData(), mline, cand.toUtf8().constData());
+        g_signal_emit_by_name(m_webrtcBin, "add-ice-candidate",
+                              mid.toUtf8().constData(), mline, cand.toUtf8().constData());
     }
 }
 
