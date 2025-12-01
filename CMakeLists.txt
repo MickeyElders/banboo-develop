@@ -118,6 +118,7 @@ target_link_libraries(bamboo_qt_ui PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Multimedia
+    EGL
     Threads::Threads
 )
 
