@@ -16,13 +16,38 @@ set(DEEPSTREAM_ROOT "/opt/nvidia/deepstream/deepstream" CACHE PATH "DeepStream r
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
-set(QT_MIN_VERSION 6.6)
+set(QT_MIN_VERSION 6.2)
 set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia)
+
+# Auto-add common distro Qt6 cmake prefixes if not already present
+if(NOT EXISTS "${QT6_ROOT}/lib/cmake/Qt6/Qt6Config.cmake")
+    find_program(QTPATHS6 qtpaths6)
+    if(QTPATHS6)
+        execute_process(COMMAND ${QTPATHS6} --install-prefix
+            OUTPUT_VARIABLE _qt6_prefix
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(_qt6_prefix)
+            list(APPEND CMAKE_PREFIX_PATH "${_qt6_prefix}/lib/cmake")
+        endif()
+    endif()
+    foreach(_qt6_path IN ITEMS
+        "/usr/lib/aarch64-linux-gnu/cmake/Qt6"
+        "/usr/lib/x86_64-linux-gnu/cmake/Qt6"
+        "/usr/lib/qt6/lib/cmake"
+    )
+        if(EXISTS "${_qt6_path}/Qt6Config.cmake")
+            list(APPEND CMAKE_PREFIX_PATH "${_qt6_path}")
+        endif()
+    endforeach()
+endif()
 
 # Require Qt6; provide actionable install hint if missing.
 find_package(Qt6 ${QT_MIN_VERSION} QUIET COMPONENTS ${QT_COMPONENTS})
 if(NOT Qt6_FOUND)
     message(FATAL_ERROR "Qt6 (>=${QT_MIN_VERSION}) not found. Install Qt6 dev packages or set QT6_ROOT/CMAKE_PREFIX_PATH to your Qt6 install prefix (e.g. /opt/qt6/lib/cmake).")
+endif()
+if(Qt6_VERSION VERSION_LESS "6.6.0")
+    message(WARNING "Qt6 version ${Qt6_VERSION} detected (<6.6). Build will proceed, but eglfs_kms GBM import/zero-copy features are recommended with Qt 6.6+. Upgrade when possible.")
 endif()
 qt_standard_project_setup()
 
