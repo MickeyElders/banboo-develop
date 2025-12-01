@@ -456,75 +456,10 @@ set(ENABLE_PYTHON OFF)
 message(STATUS "Python绑定已禁用 - 使用纯C++一体化架构")
 
 # ================================
-# LVGL配置 - 使用系统安装的LVGL
+# LVGL配置 - 已禁用（改用 Qt UI + DeepStream）
 # ================================
-
-# 查找系统安装的LVGL - 优先使用pkg-config
-pkg_check_modules(LVGL QUIET lvgl)
-if(LVGL_FOUND)
-    message(STATUS "Found LVGL via pkg-config: ${LVGL_VERSION}")
-    set(ENABLE_LVGL ON)
-    include_directories(${LVGL_INCLUDE_DIRS})
-    link_directories(${LVGL_LIBRARY_DIRS})
-    
-    # 创建导入的目标 - 修复路径验证
-    if(EXISTS "${LVGL_INCLUDE_DIRS}")
-        add_library(lvgl SHARED IMPORTED)
-        set_target_properties(lvgl PROPERTIES
-            IMPORTED_LOCATION "${LVGL_LIBRARY_DIRS}/liblvgl.so"
-            INTERFACE_INCLUDE_DIRECTORIES "${LVGL_INCLUDE_DIRS}"
-        )
-    else()
-        message(WARNING "LVGL include directory does not exist: ${LVGL_INCLUDE_DIRS}")
-        # 尝试简单的包含目录设置
-        include_directories(${LVGL_INCLUDE_DIRS})
-    endif()
-else()
-    # 回退到find_package
-    find_package(lvgl QUIET)
-    if(lvgl_FOUND)
-        message(STATUS "Found system LVGL package: ${lvgl_VERSION}")
-        set(ENABLE_LVGL ON)
-    else()
-        # 手动查找系统安装的LVGL
-        find_path(LVGL_INCLUDE_DIR lvgl/lvgl.h
-            PATHS
-                /usr/local/include
-                /usr/include
-                /opt/lvgl/include
-            NO_DEFAULT_PATH)
-        
-        find_library(LVGL_LIBRARY lvgl
-            PATHS
-                /usr/local/lib
-                /usr/lib
-                /usr/lib/aarch64-linux-gnu
-                /usr/lib/x86_64-linux-gnu
-                /opt/lvgl/lib
-            NO_DEFAULT_PATH)
-        
-        if(LVGL_INCLUDE_DIR AND LVGL_LIBRARY)
-            message(STATUS "Found system LVGL manually:")
-            message(STATUS "  Include: ${LVGL_INCLUDE_DIR}")
-            message(STATUS "  Library: ${LVGL_LIBRARY}")
-            set(ENABLE_LVGL ON)
-            set(LVGL_FOUND TRUE)
-            
-            # 创建导入的目标
-            add_library(lvgl SHARED IMPORTED)
-            set_target_properties(lvgl PROPERTIES
-                IMPORTED_LOCATION ${LVGL_LIBRARY}
-                INTERFACE_INCLUDE_DIRECTORIES ${LVGL_INCLUDE_DIR}
-            )
-            
-            include_directories(${LVGL_INCLUDE_DIR})
-        else()
-            message(WARNING "System LVGL not found - LVGL功能将被禁用")
-            set(ENABLE_LVGL OFF)
-            set(LVGL_FOUND FALSE)
-        endif()
-    endif()
-endif()
+set(ENABLE_LVGL OFF CACHE BOOL "Disable LVGL frontend" FORCE)
+set(LVGL_FOUND FALSE)
 
 # 设置LVGL配置文件路径
 if(ENABLE_LVGL)
@@ -701,53 +636,7 @@ list(REMOVE_ITEM CPP_BACKEND_SOURCES
     "cpp_backend/src/ffi/flutter_interface.cpp"  # 排除Flutter接口
 )
 
-# LVGL前端源文件 - 基于原有CMakeLists.txt的精确配置
-set(LVGL_FRONTEND_SOURCES
-    # 应用层
-    lvgl_frontend/src/app/main_app.cpp
-    lvgl_frontend/src/app/event_manager.cpp
-    lvgl_frontend/src/app/config_manager.cpp
-    
-    # 系统层
-    lvgl_frontend/src/system/lv_port_tick.c
-    
-    # 显示系统
-    lvgl_frontend/src/display/framebuffer_driver.cpp
-    lvgl_frontend/src/display/lvgl_display.cpp
-    lvgl_frontend/src/display/gpu_accelerated.cpp
-    
-    # 输入系统
-    lvgl_frontend/src/input/touch_driver.cpp
-    lvgl_frontend/src/input/input_calibration.cpp
-    
-    # 摄像头系统
-    lvgl_frontend/src/camera/v4l2_camera.cpp
-    lvgl_frontend/src/camera/camera_manager.cpp
-    lvgl_frontend/src/camera/shared_memory_reader.cpp
-    lvgl_frontend/src/camera/gstreamer_receiver.cpp
-    
-    # 后端通信系统
-    lvgl_frontend/src/backend/backend_client.cpp
-    lvgl_frontend/src/backend/tcp_socket_client.cpp
-    
-    # AI推理系统
-    lvgl_frontend/src/ai/tensorrt_engine.cpp
-    lvgl_frontend/src/ai/yolo_detector.cpp
-    lvgl_frontend/src/ai/detection_processor.cpp
-    
-    # GUI组件
-    lvgl_frontend/src/gui/video_view.cpp
-    lvgl_frontend/src/gui/control_panel.cpp
-    lvgl_frontend/src/gui/status_bar.cpp
-    lvgl_frontend/src/gui/settings_page.cpp
-)
-
-# 条件包含CUDA相关文件
-if(ENABLE_CUDA)
-    list(APPEND LVGL_FRONTEND_SOURCES
-        lvgl_frontend/src/camera/cuda_processor.cpp
-    )
-endif()
+set(LVGL_FRONTEND_SOURCES)
 
 # C++推理核心源文件 - 来自cpp_inference项目
 set(CPP_INFERENCE_SOURCES)
@@ -766,7 +655,7 @@ else()
 endif()
 
 # 过滤不存在的源文件
-set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${LVGL_FRONTEND_SOURCES} ${CPP_INFERENCE_SOURCES})
+set(ALL_SOURCES ${CPP_BACKEND_SOURCES} ${CPP_INFERENCE_SOURCES})
 set(VALID_SOURCES)
 foreach(src ${ALL_SOURCES})
     # 如果是绝对路径（如生成的协议文件），直接添加

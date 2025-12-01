@@ -26,9 +26,10 @@ CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release \
                -DENABLE_TENSORRT=ON \
                -DENABLE_CUDA=ON \
                -DENABLE_MODBUS=ON \
-               -DENABLE_LVGL=ON \
+               -DENABLE_LVGL=OFF \
                -DENABLE_CPP_INFERENCE=ON \
-               -DENABLE_HARDWARE_ACCELERATION=ON
+               -DENABLE_HARDWARE_ACCELERATION=ON \
+               -DENABLE_QT_UI=ON
 
 # === 模型转换配置 ===
 PYTHON ?= python3
@@ -51,12 +52,12 @@ CUDA_BIN ?= $(CUDA_HOME)/bin
 CUDA_CPATH ?= $(CUDA_INCLUDE)
 CUDA_LIBRARY_PATH ?= $(CUDA_LIB)
 
-MODEL_SRC := models/best.pt
+MODEL_SRC := models/best.onnx
 MODEL_CONVERTER := models/convert_model.py
 MODEL_BUILD_DIR := $(BUILD_DIR)/models
-MODEL_ONNX_TMP := $(MODEL_BUILD_DIR)/bamboo_detector.onnx
+MODEL_ONNX_TMP := $(MODEL_SRC)
 MODEL_TRT_TMP := $(MODEL_BUILD_DIR)/bamboo_detector.trt
-MODEL_ONNX := $(MODEL_BUILD_DIR)/bamboo_detection.onnx
+MODEL_ONNX := $(MODEL_SRC)
 MODEL_ENGINE := $(MODEL_BUILD_DIR)/bamboo_detection.onnx_b1_gpu0_fp16.engine
 MODEL_DEPLOY_DIR := $(INSTALL_DIR)/models
 
@@ -803,7 +804,7 @@ build-debug:
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
 		-DENABLE_AI_OPTIMIZATION=ON \
 		-DENABLE_MODBUS=ON \
-		-DENABLE_LVGL=ON
+		-DENABLE_LVGL=OFF
 	@cd $(BUILD_DIR)_debug && make -j$(shell nproc)
 	@echo "$(GREEN)[SUCCESS]$(NC) 璋冭瘯鐗堟湰鏋勫缓瀹屾垚"
 
@@ -853,13 +854,13 @@ endif
 		sudo cp $(MODEL_ONNX) $(MODEL_DEPLOY_DIR)/; \
 		echo "$(GREEN)[SUCCESS]$(NC) ONNX 模型已部署 -> $(MODEL_DEPLOY_DIR)"; \
 	else \
-		echo "$(YELLOW)[WARN]$(NC) 未找到 $(MODEL_ONNX)，请先运行 make convert-model"; \
+		echo "$(RED)[ERROR]$(NC) 未找到 $(MODEL_ONNX)，请放置 models/best.onnx"; exit 1; \
 	fi
 	@if [ -f "$(MODEL_ENGINE)" ]; then \
 		sudo cp $(MODEL_ENGINE) $(MODEL_DEPLOY_DIR)/; \
 		echo "$(GREEN)[SUCCESS]$(NC) TensorRT 引擎已部署 -> $(MODEL_DEPLOY_DIR)"; \
 	else \
-		echo "$(YELLOW)[WARN]$(NC) 未找到 $(MODEL_ENGINE)，请先运行 make convert-model"; \
+		echo "$(YELLOW)[WARN]$(NC) 未找到 $(MODEL_ENGINE)，可跳过或自行转换"; \
 	fi
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/logs
 	@sudo chown -R $(USER):$(USER) $(INSTALL_DIR)/backup
@@ -1094,7 +1095,7 @@ unified-build:
 		$$(pkg-config --cflags --libs gstreamer-1.0) \
 		$$(pkg-config --cflags --libs gstreamer-app-1.0) \
 		-lEGL -lpthread \
-		-std=c++17 -O2 -DENABLE_LVGL=1
+		-std=c++17 -O2 -DENABLE_LVGL=0
 	@echo "$(GREEN)[SUCCESS]$(NC) 缁熶竴鏋舵瀯缂栬瘧瀹屾垚: ./simple_unified_main"
 
 unified-run:
