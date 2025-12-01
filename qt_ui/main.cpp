@@ -5,12 +5,23 @@
 #include <QQmlContext>
 #include <QProcessEnvironment>
 #include <QUrl>
+#include <QTimer>
+#include <atomic>
+#include <csignal>
 
 #include "DeepStreamRunner.h"
 #include "ModbusClient.h"
 #include "StateModels.h"
 
 namespace {
+std::atomic_bool g_shouldQuit{false};
+
+void handleSignal(int signum) {
+    if (signum == SIGTERM || signum == SIGINT) {
+        g_shouldQuit.store(true);
+    }
+}
+
 void configureHeadlessEnvironment() {
     // Prefer eglfs/DRM when DISPLAY is absent; allow user overrides when set.
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsEmpty("DISPLAY")) {
@@ -31,10 +42,13 @@ void configureHeadlessEnvironment() {
 }  // namespace
 
 int main(int argc, char *argv[]) {
+    std::signal(SIGTERM, handleSignal);
+    std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
 
     QGuiApplication app(argc, argv);
     QCoreApplication::setApplicationName("AI竹节识别切割系统");
+    QCoreApplication::setQuitOnLastWindowClosed(false);
 
     SystemState systemState;
     JetsonState jetsonState;
@@ -42,6 +56,18 @@ int main(int argc, char *argv[]) {
     WifiState wifiState;
     DeepStreamRunner deepStream;
     ModbusClient modbus;
+
+    QTimer quitTimer;
+    quitTimer.setInterval(200);
+    QObject::connect(&quitTimer, &QTimer::timeout, &app, [&app]() {
+        if (g_shouldQuit.load()) {
+            app.quit();
+        }
+    });
+    quitTimer.start();
+
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &deepStream, [&deepStream]() { deepStream.stop(); });
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &modbus, [&modbus]() { modbus.disconnect(); });
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("systemState", &systemState);

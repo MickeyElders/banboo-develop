@@ -136,7 +136,25 @@ check_qt6:
 
 install-qt-kms-config:
 	@sudo mkdir -p /etc/qt
-	@sudo install -m 644 deploy/qt/eglfs_kms_config.json /etc/qt/eglfs_kms_config.json
+	@tmpfile=$$(mktemp); \
+	card=$$(ls /sys/class/drm | grep '^card[0-9]\+$$' | head -n1); \
+	[ -n "$$card" ] || card="card0"; \
+	conn=$$(for d in /sys/class/drm/$${card}-*; do \
+		[ -f "$$d/status" ] || continue; \
+		if grep -q "^connected" "$$d/status"; then basename "$$d"; break; fi; \
+	done); \
+	[ -n "$$conn" ] || conn="$${card}-HDMI-A-1"; \
+	mode=$$(if [ -f "/sys/class/drm/$${conn}/modes" ]; then head -n1 /sys/class/drm/$${conn}/modes; else echo "1920x1080"; fi); \
+	output_name=$${conn#*-}; \
+	cat > "$$tmpfile" <<EOF; \
+{ \
+  "device": "/dev/$$card", \
+  "outputs": [ \
+    { "name": "$$output_name", "mode": "$$mode", "format": "rgb888", "transform": "normal" } \
+  ] \
+} \
+EOF
+	sudo install -m 644 $$tmpfile /etc/qt/eglfs_kms_config.json && rm -f $$tmpfile
 
 qt6-source-install:
 	@set -e; \
