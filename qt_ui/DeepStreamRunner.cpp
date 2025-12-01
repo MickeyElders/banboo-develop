@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QtWebSockets/QWebSocket>
 #include <gst/gstpromise.h>
+#include <gst/webrtc/webrtc.h>
 #include <gst/sdp/sdp.h>
 #include "WebRTCSignaling.h"
 
@@ -278,7 +279,7 @@ void DeepStreamRunner::onNegotiationNeeded(GstElement *webrtc, gpointer user_dat
     GstPromise *promise = gst_promise_new_with_change_func(
         [](GstPromise *p, gpointer u) {
             auto *runner = static_cast<DeepStreamRunner *>(u);
-            const GstStructure *s = gst_promise_get_structure(p);
+            const GstStructure *s = gst_promise_get_reply(p);
             GstWebRTCSessionDescription *offer = nullptr;
             gst_structure_get(s, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
             gst_promise_unref(p);
