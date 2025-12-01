@@ -9,7 +9,7 @@ class HttpServer : public QObject {
 public:
     explicit HttpServer(const QString &htmlPath, quint16 port = 8080, QObject *parent = nullptr);
 
-private slots:
+private Q_SLOTS:
     void onNewConnection();
     void onReadyRead();
     void onDisconnected();
