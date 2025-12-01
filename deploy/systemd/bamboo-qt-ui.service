@@ -17,6 +17,8 @@ Environment=GBM_BACKEND=
 Environment=EGL_PLATFORM=
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
 Environment=QT_LOGGING_RULES=qt.qpa.*=false
+Environment=QSG_RHI_BACKEND=software
+Environment=QT_QUICK_BACKEND=software
 Environment=GST_DEBUG=2
 ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
 ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui

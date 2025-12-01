@@ -4,6 +4,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QProcessEnvironment>
+#include <QFile>
 #include <QTimer>
 #include <QUrl>
 #include <atomic>
@@ -32,6 +33,12 @@ void configureHeadlessEnvironment() {
         const QByteArray runtimeDir("/run/bamboo-qt");
         qputenv("XDG_RUNTIME_DIR", runtimeDir);
         QDir().mkpath(QString::fromUtf8(runtimeDir));
+    }
+    // Enforce 0700 permissions on runtime dir to satisfy QStandardPaths
+    const QString rd = QString::fromUtf8(qgetenv("XDG_RUNTIME_DIR"));
+    if (!rd.isEmpty()) {
+        QFile::setPermissions(rd, QFile::Permissions(
+            QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
     }
 }
 
