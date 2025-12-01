@@ -6,6 +6,9 @@
 #include <QProcessEnvironment>
 #include <QTimer>
 #include <QUrl>
+#include <QFile>
+#include <QDirIterator>
+#include <QTextStream>
 #include <atomic>
 #include <csignal>
 
@@ -39,12 +42,33 @@ void configureHeadlessEnvironment() {
         QDir().mkpath(QString::fromUtf8(runtimeDir));
     }
 }
+
+void logKmsEnvironment() {
+    qInfo() << "[startup] QT_QPA_PLATFORM =" << qgetenv("QT_QPA_PLATFORM");
+    qInfo() << "[startup] QT_QPA_EGLFS_INTEGRATION =" << qgetenv("QT_QPA_EGLFS_INTEGRATION");
+    qInfo() << "[startup] QT_QPA_EGLFS_KMS_CONFIG =" << qgetenv("QT_QPA_EGLFS_KMS_CONFIG");
+    QFile cfg(QString::fromUtf8(qgetenv("QT_QPA_EGLFS_KMS_CONFIG")));
+    if (cfg.exists()) {
+        qInfo() << "[startup] Found eglfs_kms config:" << cfg.fileName();
+    } else {
+        qWarning() << "[startup] Missing eglfs_kms config file:" << cfg.fileName();
+    }
+    QStringList cards;
+    QDirIterator it("/dev/dri", QDir::System | QDir::Readable | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        const QString path = it.next();
+        if (path.contains("card"))
+            cards << path;
+    }
+    qInfo() << "[startup] DRM devices:" << cards.join(",");
+}
 }  // namespace
 
 int main(int argc, char *argv[]) {
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
+    logKmsEnvironment();
 
     QGuiApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
