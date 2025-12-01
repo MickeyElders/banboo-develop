@@ -15,6 +15,8 @@ QT_MIN_VER ?= 6.6.3
 QT6_SOURCE_URL ?= https://download.qt.io/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 QT6_PREFIX ?= /opt/qt6
 QT6_TARBALL ?=
+# Optional mirror list (space separated). Override if you have a faster/closer mirror.
+QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -130,19 +132,28 @@ qt6-source-install:
 	tmpdir=$$(mktemp -d); \
 	tarball="$(QT6_TARBALL)"; \
 	url="$(QT6_SOURCE_URL)"; \
+	mirrors="$(QT6_MIRRORS)"; \
 	cd $$tmpdir; \
 	if [ -n "$$tarball" ]; then \
 		if [ ! -f "$$tarball" ]; then echo "QT6_TARBALL specified but file not found: $$tarball"; exit 1; fi; \
 		cp "$$tarball" ./qt-everywhere-src-6.6.3.tar.xz; \
 		echo "Using local Qt6 source tarball $$tarball"; \
 	else \
-		echo "Downloading Qt6 from $$url"; \
-		if command -v wget >/dev/null 2>&1; then \
-			wget -q --show-progress -O qt-everywhere-src-6.6.3.tar.xz "$$url"; \
-		elif command -v curl >/dev/null 2>&1; then \
-			curl -L --progress-bar -o qt-everywhere-src-6.6.3.tar.xz "$$url"; \
-		else \
-			echo "Need wget or curl to fetch Qt6 sources. Install one and retry."; \
+		ok=0; \
+		for u in $$url $$mirrors; do \
+			echo "Downloading Qt6 from $$u"; \
+			if command -v wget >/dev/null 2>&1; then \
+				wget -q --show-progress -O qt-everywhere-src-6.6.3.tar.xz "$$u" && ok=1 && break; \
+			elif command -v curl >/dev/null 2>&1; then \
+				curl -L --progress-bar -o qt-everywhere-src-6.6.3.tar.xz "$$u" && ok=1 && break; \
+			else \
+				echo "Need wget or curl to fetch Qt6 sources. Install one and retry."; \
+				exit 1; \
+			fi; \
+			echo "Download failed from $$u, trying next mirror..."; \
+		done; \
+		if [ $$ok -ne 1 ]; then \
+			echo "All Qt6 download attempts failed. Check network/URL or set QT6_TARBALL to a local qt-everywhere-src-6.6.3.tar.xz."; \
 			exit 1; \
 		fi; \
 	fi; \
