@@ -5,8 +5,8 @@ CMAKE_FLAGS ?= -DCMAKE_BUILD_TYPE=Release -DENABLE_GSTREAMER=ON -DENABLE_MODBUS=
 
 # 必须依赖（缺少就中断）
 MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools qtbase5-dev qtdeclarative5-dev qml-module-qtquick-controls2 qml-module-qtquick-layouts qtmultimedia5-dev
-# 可选依赖（尝试安装，失败不影响构建），RTSP 服务器包在不同发行版有不同命名
-OPTIONAL_DEPS ?= gstreamer1.0-rtsp gstreamer1.0-rtsp-server gstreamer1.0-plugins-rtsp gstreamer1.0-libav
+# 可选依赖（尝试安装，失败不影响构建），RTSP 服务器 dev 包常见命名
+OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-plugins-rtsp gstreamer1.0-libav
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -74,7 +74,7 @@ status:
 	@sudo systemctl status $(SERVICE_NAME) --no-pager
 
 logs:
-	@sudo journalctl -u $(SERVICE_NAME) -f
+	@sudo journalctl -u $(SERVICE_NAME) -n 200 -f
 
 deploy: service
 
