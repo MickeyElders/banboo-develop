@@ -6,6 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
+RuntimeDirectory=bamboo-qt
+RuntimeDirectoryMode=0700
 WorkingDirectory=/opt/bamboo-qt
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
@@ -14,7 +16,6 @@ Environment=GBM_DRIVERS_PATH=/usr/lib/aarch64-linux-gnu/tegra
 Environment=EGL_PLATFORM=drm
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
 Environment=GST_DEBUG=2
-ExecStartPre=/bin/mkdir -p /run/bamboo-qt
 ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
 Restart=always
 RestartSec=3

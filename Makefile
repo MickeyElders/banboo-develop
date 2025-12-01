@@ -80,6 +80,7 @@ install-models:
 	@cp -f models/best.onnx "$(PREFIX)/models/" 2>/dev/null || true
 
 service: install
+	@$(MAKE) --no-print-directory install-qt-kms-config
 	@sudo install -D -m 644 deploy/systemd/bamboo-qt-ui.service /etc/systemd/system/$(SERVICE_NAME)
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable $(SERVICE_NAME)
@@ -111,7 +112,7 @@ clean:
 distclean: clean
 	@rm -f CMakeCache.txt
 
-.PHONY: check_qt6 qt6-source-install
+.PHONY: check_qt6 qt6-source-install install-qt-kms-config
 
 check_qt6:
 	@qtver=""; \
@@ -132,6 +133,10 @@ check_qt6:
 		echo "Qt6 $$qtver is too old (< $(QT_MIN_VER)). Install via apt or run 'make qt6-source-install' to build 6.6.3."; \
 		exit 1; \
 	fi
+
+install-qt-kms-config:
+	@sudo mkdir -p /etc/qt
+	@sudo install -m 644 deploy/qt/eglfs_kms_config.json /etc/qt/eglfs_kms_config.json
 
 qt6-source-install:
 	@set -e; \
