@@ -5,6 +5,8 @@
 #include <QQmlContext>
 #include <QProcessEnvironment>
 #include <QFile>
+#include <QFileDevice>
+#include <QLoggingCategory>
 #include <QTimer>
 #include <QUrl>
 #include <atomic>
@@ -49,6 +51,12 @@ void logOffscreenEnvironment() {
 }  // namespace
 
 int main(int argc, char *argv[]) {
+    // Enable verbose Qt logs for diagnostics
+    QLoggingCategory::setFilterRules(QStringLiteral(
+        "qt.qpa.*=true\n"
+        "qt.scenegraph.general=true\n"
+        "qt.rhi.*=true\n"
+        "qt.quick.*=true\n"));
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
@@ -57,6 +65,7 @@ int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
     QCoreApplication::setApplicationName("AI Bamboo");
+    qInfo() << "[startup] QGuiApplication constructed";
 
     SystemState systemState;
     JetsonState jetsonState;
@@ -64,6 +73,7 @@ int main(int argc, char *argv[]) {
     WifiState wifiState;
     DeepStreamRunner deepStream;
     ModbusClient modbus;
+    qInfo() << "[startup] Core objects constructed";
 
     QTimer quitTimer;
     quitTimer.setInterval(200);
@@ -85,6 +95,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("deepStream", &deepStream);
     engine.rootContext()->setContextProperty("modbus", &modbus);
 
+    qInfo() << "[startup] Loading QML...";
     const QUrl url(QStringLiteral("qrc:/Main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,
                      [url](QObject *obj, const QUrl &objUrl) {

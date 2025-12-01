@@ -16,7 +16,6 @@ Environment=GBM_DRIVERS_PATH=
 Environment=GBM_BACKEND=
 Environment=EGL_PLATFORM=
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
-Environment=QT_LOGGING_RULES=qt.qpa.*=false
 Environment=QSG_RHI_BACKEND=software
 Environment=QT_QUICK_BACKEND=software
 Environment=GST_DEBUG=2
