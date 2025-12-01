@@ -6,15 +6,17 @@
 #include <QTimer>
 #include <QByteArray>
 
-// Simple MJPEG HTTP server that captures the QQuickWindow offscreen buffer
-// and streams it to connected clients (e.g. curl or browser).
+// Simple HTTP server:
+//   GET /      -> serves bamboo.html (or minimal fallback)
+//   GET /mjpeg -> MJPEG stream from QQuickWindow::grabWindow
 class WebPreview : public QObject {
     Q_OBJECT
 public:
-    explicit WebPreview(QQuickWindow *window, quint16 port = 8080, QObject *parent = nullptr);
+    explicit WebPreview(QQuickWindow *window, const QString &htmlPath, quint16 port = 8080, QObject *parent = nullptr);
 
 private Q_SLOTS:
     void onNewConnection();
+    void onClientReadyRead();
     void onClientDisconnected();
     void onCapture();
 
@@ -24,7 +26,9 @@ private:
     QList<QTcpSocket *> m_clients;
     QTimer m_timer;
     QByteArray m_boundary{"--frameboundary"};
+    QString m_htmlPath;
 
     void sendFrame(QTcpSocket *client, const QByteArray &jpeg);
     QByteArray grabJpeg();
+    void sendHtml(QTcpSocket *client);
 };

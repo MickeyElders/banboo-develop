@@ -1,11 +1,13 @@
 #include "WebPreview.h"
 
 #include <QBuffer>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QFile>
 #include <QImage>
 
-WebPreview::WebPreview(QQuickWindow *window, quint16 port, QObject *parent)
-    : QObject(parent), m_window(window) {
+WebPreview::WebPreview(QQuickWindow *window, const QString &htmlPath, quint16 port, QObject *parent)
+    : QObject(parent), m_window(window), m_htmlPath(htmlPath) {
     if (!m_window) {
         qWarning() << "[webpreview] No window provided, MJPEG preview disabled.";
         return;
@@ -15,7 +17,7 @@ WebPreview::WebPreview(QQuickWindow *window, quint16 port, QObject *parent)
     if (!m_server.listen(QHostAddress::Any, port)) {
         qWarning() << "[webpreview] Failed to listen on port" << port << ":" << m_server.errorString();
     } else {
-        qInfo() << "[webpreview] MJPEG preview listening on port" << port;
+        qInfo() << "[webpreview] Web preview listening on port" << port << "(/ for HTML, /mjpeg for stream)";
     }
 
     m_timer.setInterval(200);  // ~5 FPS preview
@@ -28,6 +30,21 @@ void WebPreview::onNewConnection() {
         QTcpSocket *client = m_server.nextPendingConnection();
         if (!client) continue;
         connect(client, &QTcpSocket::disconnected, this, &WebPreview::onClientDisconnected);
+        connect(client, &QTcpSocket::readyRead, this, &WebPreview::onClientReadyRead);
+    }
+}
+
+void WebPreview::onClientReadyRead() {
+    QTcpSocket *client = qobject_cast<QTcpSocket *>(sender());
+    if (!client) return;
+    const QByteArray req = client->readAll();
+    const QList<QByteArray> lines = req.split('\n');
+    if (lines.isEmpty()) return;
+    const QList<QByteArray> parts = lines.first().split(' ');
+    if (parts.size() < 2) return;
+    const QByteArray path = parts.at(1);
+    if (path == "/mjpeg") {
+        // Switch to MJPEG streaming
         m_clients << client;
         QByteArray header;
         header += "HTTP/1.0 200 OK\r\n";
@@ -36,7 +53,10 @@ void WebPreview::onNewConnection() {
         header += "Connection: close\r\n\r\n";
         client->write(header);
         client->flush();
-        qInfo() << "[webpreview] Client connected, total:" << m_clients.size();
+        qInfo() << "[webpreview] MJPEG client connected, total:" << m_clients.size();
+    } else {
+        sendHtml(client);
+        client->disconnectFromHost();
     }
 }
 
@@ -69,6 +89,25 @@ void WebPreview::sendFrame(QTcpSocket *client, const QByteArray &jpeg) {
     part += jpeg;
     part += "\r\n";
     client->write(part);
+    client->flush();
+}
+
+void WebPreview::sendHtml(QTcpSocket *client) {
+    if (!client) return;
+    QByteArray body;
+    QFile f(m_htmlPath);
+    if (f.exists() && f.open(QIODevice::ReadOnly)) {
+        body = f.readAll();
+    } else {
+        body = "<html><body><h3>Bamboo Preview</h3><img src=\"/mjpeg\" /></body></html>";
+    }
+    QByteArray header;
+    header += "HTTP/1.0 200 OK\r\n";
+    header += "Content-Type: text/html; charset=utf-8\r\n";
+    header += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
+    header += "Connection: close\r\n\r\n";
+    client->write(header);
+    client->write(body);
     client->flush();
 }
 

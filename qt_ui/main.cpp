@@ -117,8 +117,10 @@ int main(int argc, char *argv[]) {
     }
 
     QQuickWindow *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-    WebPreview preview(rootWindow, 8080, &app);
-    qInfo() << "[startup] MJPEG web preview on port 8080";
+    // Serve bamboo.html (installed to prefix) with embedded MJPEG at /mjpeg
+    const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
+    WebPreview preview(rootWindow, htmlPath, 8080, &app);
+    qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
 
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();
