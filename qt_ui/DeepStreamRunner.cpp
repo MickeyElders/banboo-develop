@@ -5,7 +5,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QtWebSockets/QWebSocket>
-#include <gst/promise.h>
 #include <gst/sdp/sdp.h>
 #include "WebRTCSignaling.h"
 
