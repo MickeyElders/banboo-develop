@@ -17,8 +17,13 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 set(QT_MIN_VERSION 6.6)
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS
-    Core Gui Qml Quick QuickControls2 Multimedia)
+set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia)
+
+# Require Qt6; provide actionable install hint if missing.
+find_package(Qt6 ${QT_MIN_VERSION} QUIET COMPONENTS ${QT_COMPONENTS})
+if(NOT Qt6_FOUND)
+    message(FATAL_ERROR "Qt6 (>=${QT_MIN_VERSION}) not found. Install Qt6 dev packages or set QT6_ROOT/CMAKE_PREFIX_PATH to your Qt6 install prefix (e.g. /opt/qt6/lib/cmake).")
+endif()
 qt_standard_project_setup()
 
 # Modbus (optional)
