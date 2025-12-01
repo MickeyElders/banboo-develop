@@ -142,7 +142,7 @@ ApplicationWindow {
                             Label { anchors.centerIn: parent; text: "X轴导轨 (0 - 1000.0 mm)"; color: "#2196f3"; font.pixelSize: 12 }
                             Rectangle {
                                 width: 2; color: error; anchors.top: parent.top; anchors.bottom: parent.bottom
-                                x: parent.width * ((modbus.xCoordinate || systemState.xCoordinate) / 1000.0)
+                                x: parent.width * ((modbus.visionTargetCoord || systemState.xCoordinate) / 1000.0)
                             }
                         }
                     }
@@ -157,9 +157,9 @@ ApplicationWindow {
                             columns: 3
                             Repeater {
                                 model: [
-                                    {label: "X坐标", value: Qt.formatNumber(modbus.xCoordinate || systemState.xCoordinate, 'f', 1) + "mm"},
-                                    {label: "切割质量", value: modbus.cutQuality === 0 ? "正常" : "异常"},
-                                    {label: "刀片选择", value: modbus.bladeNumber}
+                                    {label: "X坐标", value: Qt.formatNumber(modbus.visionTargetCoord || systemState.xCoordinate, 'f', 1) + "mm"},
+                                    {label: "PLC接收状态", value: modbus.plcReceiveState === 1 ? "可接收" : (modbus.plcReceiveState === 2 ? "送料中" : "未知")},
+                                    {label: "送料伺服当前位置", value: modbus.plcServoPosition.toFixed(1) + " mm"}
                                 ]
                                 delegate: Rectangle {
                                     color: Qt.rgba(1,1,1,0.02)
@@ -201,20 +201,37 @@ ApplicationWindow {
                             anchors.fill: parent; anchors.margins: 8; spacing: 6
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: "📊 Modbus 寄存器"; color: textPrimary; font.bold: true }
+                                Label { text: "📊 Modbus"; color: textPrimary; font.bold: true }
                                 Item { Layout.fillWidth: true }
                                 Label { text: modbus.connected ? "已连接" : "未连接"; color: modbus.connected ? success : error; font.pixelSize: 12 }
                             }
+                            Label { text: "PLC → 相机 (D2100 系列)"; color: textSecondary; font.pixelSize: 12 }
                             GridLayout {
                                 columns: 2; rowSpacing: 4; columnSpacing: 6
                                 Repeater {
                                     model: [
-                                        {k:"40001 系统状态",v: modbus.systemStatus},
-                                        {k:"40002 PLC 命令",v: modbus.plcCommand},
-                                        {k:"40003 坐标就绪",v: modbus.coordReady},
-                                        {k:"40004-5 X坐标",v: Math.round(modbus.xCoordinate*10)},
-                                        {k:"40006 质量",v: modbus.cutQuality},
-                                        {k:"40007-8 心跳",v: modbus.heartbeat}
+                                        {k:"D2100 通讯请求",v: modbus.plcPowerRequest},
+                                        {k:"D2101 接收状态",v: modbus.plcReceiveState},
+                                        {k:"D2102/3 送料伺服",v: modbus.plcServoPosition.toFixed(1)},
+                                        {k:"D2104/5 坐标反馈",v: modbus.plcCoordFeedback.toFixed(1)}
+                                    ]
+                                    delegate: RowLayout {
+                                        Layout.fillWidth: true
+                                        Label { text: modelData.k; color: textSecondary; font.pixelSize: 11 }
+                                        Item { Layout.fillWidth: true }
+                                        Label { text: modelData.v; color: accent; font.pixelSize: 12; font.family: "Consolas" }
+                                    }
+                                }
+                            }
+                            Label { text: "相机 → PLC (D2000 系列)", color: textSecondary; font.pixelSize: 12; anchors.margins: 6 }
+                            GridLayout {
+                                columns: 2; rowSpacing: 4; columnSpacing: 6
+                                Repeater {
+                                    model: [
+                                        {k:"D2000 通讯应答",v: modbus.visionCommAck},
+                                        {k:"D2001 相机状态",v: modbus.visionStatus},
+                                        {k:"D2002/3 目标坐标",v: modbus.visionTargetCoord.toFixed(1)},
+                                        {k:"D2004 传输结果",v: modbus.visionTransferResult}
                                     ]
                                     delegate: RowLayout {
                                         Layout.fillWidth: true
@@ -341,9 +358,9 @@ ApplicationWindow {
                     spacing: 10
                     RowLayout {
                         spacing: 8
-                        Button { text: "启动系统"; onClicked: { modbus.setSystemStatus(1); modbus.sendCommand(1); } }
-                        Button { text: "暂停"; onClicked: { modbus.sendCommand(5) } }
-                        Button { text: "停止"; onClicked: { modbus.setSystemStatus(0); modbus.sendCommand(0) } }
+                        Button { text: "启动系统"; onClicked: { modbus.setVisionCommAck(1); modbus.setVisionStatus(1); modbus.setVisionTransferResult(0); } }
+                        Button { text: "暂停"; onClicked: { modbus.setVisionStatus(3); } }
+                        Button { text: "停止"; onClicked: { modbus.setVisionStatus(3); modbus.setVisionCommAck(0); } }
                     }
                     Item { Layout.fillWidth: true }
                     ColumnLayout {
@@ -356,7 +373,7 @@ ApplicationWindow {
                     }
                     RowLayout {
                         spacing: 8
-                        Button { text: "🚨 紧急停机"; onClicked: { modbus.sendCommand(6); modbus.setSystemStatus(0); }; background: Rectangle { color: error; radius: 6 } }
+                        Button { text: "🚨 紧急停机"; onClicked: { modbus.setVisionStatus(2); modbus.setVisionCommAck(0); modbus.setVisionTransferResult(2); }; background: Rectangle { color: error; radius: 6 } }
                         Button { text: "⏻ 关机"; onClicked: settingsDialog.open() }
                     }
                 }

@@ -1,16 +1,27 @@
 #include "ModbusClient.h"
 #include <modbus/modbus.h>
 #include <errno.h>
+#include <cstring>
 #include <QDebug>
 
 namespace {
-constexpr int kStartAddress = 40001;
-constexpr int kCount = 19; // 40001 - 40019 inclusive
-
 inline uint32_t combine(uint16_t high, uint16_t low) {
     return (static_cast<uint32_t>(high) << 16) | low;
 }
+inline void splitFloat(float value, uint16_t &high, uint16_t &low) {
+    uint32_t u = 0;
+    static_assert(sizeof(float) == sizeof(uint32_t), "float size mismatch");
+    memcpy(&u, &value, sizeof(float));
+    high = static_cast<uint16_t>((u >> 16) & 0xFFFF);
+    low = static_cast<uint16_t>(u & 0xFFFF);
 }
+inline float toFloat(uint16_t high, uint16_t low) {
+    uint32_t u = combine(high, low);
+    float f;
+    memcpy(&f, &u, sizeof(float));
+    return f;
+}
+} // namespace
 
 ModbusClient::ModbusClient(QObject *parent) : QObject(parent) {
     pollTimer_.setInterval(200); // 5Hz poll，视实际负载可调
@@ -64,48 +75,79 @@ void ModbusClient::disconnect() {
 
 void ModbusClient::poll() {
     if (!ensureConnected()) return;
-    uint16_t buf[kCount] = {0};
-    const int rc = modbus_read_registers(ctx_, kStartAddress - 40001, kCount, buf);
-    if (rc != kCount) {
+    // 读取 PLC -> 相机：D2100-2105 (0x0834-0x0839)
+    constexpr int start = 0x0834;
+    constexpr int count = 6;
+    uint16_t buf[count] = {0};
+    const int rc = modbus_read_registers(ctx_, start, count, buf);
+    if (rc != count) {
         emit errorMessage(tr("Modbus 读失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return;
     }
-    regs_.system_status   = buf[0];
-    regs_.plc_command     = buf[1];
-    regs_.coord_ready     = buf[2];
-    regs_.x_coordinate    = combine(buf[3], buf[4]);
-    regs_.cut_quality     = buf[5];
-    regs_.heartbeat       = combine(buf[6], buf[7]);
-    regs_.blade_number    = buf[8];
-    regs_.health_status   = buf[9];
-    regs_.tail_status     = buf[10];
-    regs_.plc_ext_alarm   = buf[11];
-    regs_.rail_direction  = buf[13];
-    regs_.remaining_length= combine(buf[14], buf[15]);
-    regs_.coverage        = buf[16];
-    regs_.feed_speed_gear = buf[17];
-    regs_.process_mode    = buf[18];
+    plc_to_cam_.power_request   = buf[0];
+    plc_to_cam_.receive_state   = buf[1];
+    plc_to_cam_.servo_pos       = toFloat(buf[2], buf[3]);
+    plc_to_cam_.coord_feedback  = toFloat(buf[4], buf[5]);
     emit registersUpdated();
 }
 
-bool ModbusClient::writeRegister(int address, int value) {
+bool ModbusClient::writeFloat(int addr, float value) {
     if (!ensureConnected()) return false;
-    const int rc = modbus_write_register(ctx_, address - 40001, static_cast<uint16_t>(value));
+    uint16_t high = 0, low = 0;
+    splitFloat(value, high, low);
+    uint16_t payload[2] = {high, low};
+    const int rc = modbus_write_registers(ctx_, addr, 2, payload);
     if (rc == -1) {
-        emit errorMessage(tr("写寄存器失败 %1: %2").arg(address).arg(modbus_strerror(errno)));
+        emit errorMessage(tr("写浮点寄存器失败 %1: %2").arg(addr).arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
     return true;
 }
 
-bool ModbusClient::sendCommand(int command) {
-    // 写 40002
-    return writeRegister(40002, command);
+bool ModbusClient::setVisionCommAck(int value) {
+    cam_to_plc_.comm_ack = value;
+    if (!ensureConnected()) return false;
+    const int rc = modbus_write_register(ctx_, 0x07D0, static_cast<uint16_t>(value));
+    if (rc == -1) {
+        emit errorMessage(tr("写 D2000 失败: %1").arg(modbus_strerror(errno)));
+        disconnect();
+        return false;
+    }
+    emit registersUpdated();
+    return true;
 }
 
-bool ModbusClient::setSystemStatus(int status) {
-    // 写 40001
-    return writeRegister(40001, status);
+bool ModbusClient::setVisionStatus(int value) {
+    cam_to_plc_.status = value;
+    if (!ensureConnected()) return false;
+    const int rc = modbus_write_register(ctx_, 0x07D1, static_cast<uint16_t>(value));
+    if (rc == -1) {
+        emit errorMessage(tr("写 D2001 失败: %1").arg(modbus_strerror(errno)));
+        disconnect();
+        return false;
+    }
+    emit registersUpdated();
+    return true;
+}
+
+bool ModbusClient::setVisionTargetCoord(double coord) {
+    cam_to_plc_.target_coord = static_cast<float>(coord);
+    const bool ok = writeFloat(0x07D2, static_cast<float>(coord));
+    if (ok) emit registersUpdated();
+    return ok;
+}
+
+bool ModbusClient::setVisionTransferResult(int value) {
+    cam_to_plc_.transfer_result = value;
+    if (!ensureConnected()) return false;
+    const int rc = modbus_write_register(ctx_, 0x07D4, static_cast<uint16_t>(value));
+    if (rc == -1) {
+        emit errorMessage(tr("写 D2004 失败: %1").arg(modbus_strerror(errno)));
+        disconnect();
+        return false;
+    }
+    emit registersUpdated();
+    return true;
 }
