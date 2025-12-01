@@ -15,6 +15,8 @@ Environment=QT_QPA_EGLFS_KMS_CONFIG=/etc/qt/eglfs_kms_config.json
 Environment=GBM_DRIVERS_PATH=/usr/lib/aarch64-linux-gnu/tegra
 Environment=EGL_PLATFORM=drm
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
+Environment=QT_QPA_EGLFS_DEBUG=1
+Environment=QT_LOGGING_RULES=qt.qpa.eglfs.kms=true;qt.qpa.egl=true;qt.qpa.gl=true
 Environment=GST_DEBUG=2
 ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
 Restart=always
