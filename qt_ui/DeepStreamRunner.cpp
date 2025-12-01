@@ -61,11 +61,12 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 
     std::cout << "[deepstream] start() invoked, sink=" << sink << std::endl;
     // Detect hardware encoder; fall back to x264enc if missing.
-    bool forceSwEnc = false;
+    // JetPack 6.x 上 NVENC 设备节点常不可用，默认强制软件编码；显式设置 DS_FORCE_SW_ENC=0 才尝试 NVENC。
+    bool forceSwEnc = true;
     {
         bool ok = false;
         int sw = qEnvironmentVariableIntValue("DS_FORCE_SW_ENC", &ok);
-        forceSwEnc = ok && sw == 1;
+        if (ok && sw == 0) forceSwEnc = false;
     }
     bool hasNvEnc = false;
     bool hasNvInfer = false;
@@ -267,23 +268,61 @@ void DeepStreamRunner::runLoop() {
 bool DeepStreamRunner::buildWebRTCPipeline() {
     const char *srcUrlEnv = std::getenv("RTSP_SOURCE");
     const std::string srcUrl = srcUrlEnv ? std::string(srcUrlEnv) : std::string("rtsp://127.0.0.1:8554/deepstream");
-    std::string desc = "rtspsrc location=" + srcUrl + " latency=200 protocols=tcp ! "
-                       "rtph264depay ! h264parse ! rtph264pay pt=96 config-interval=1 ! "
-                       "application/x-rtp,media=video,encoding-name=H264,payload=96 ! "
-                       "webrtcbin name=webrtcbin stun-server=stun://stun.l.google.com:19302";
+    // Manual build to avoid parse/link issues
+    m_webrtcPipeline = gst_pipeline_new("webrtc-pipeline");
+    if (!m_webrtcPipeline) return false;
 
-    GError *err = nullptr;
-    m_webrtcPipeline = gst_parse_launch(desc.c_str(), &err);
-    if (err) {
-        std::cout << "[webrtc] gst_parse_launch error: " << err->message << std::endl;
-        g_error_free(err);
+    GstElement *src = gst_element_factory_make("rtspsrc", "src");
+    GstElement *depay = gst_element_factory_make("rtph264depay", "depay");
+    GstElement *parse = gst_element_factory_make("h264parse", "parse");
+    GstElement *pay = gst_element_factory_make("rtph264pay", "pay");
+    GstElement *capsf = gst_element_factory_make("capsfilter", "capsf");
+    m_webrtcBin = gst_element_factory_make("webrtcbin", "webrtcbin");
+
+    if (!src || !depay || !parse || !pay || !capsf || !m_webrtcBin) {
+        std::cout << "[webrtc] element create failed (check gstreamer1.0-nice/webrtcbin plugins)" << std::endl;
         return false;
     }
-    m_webrtcBin = gst_bin_get_by_name(GST_BIN(m_webrtcPipeline), "webrtcbin");
-    if (!m_webrtcBin) {
-        std::cout << "[webrtc] webrtcbin not found in pipeline" << std::endl;
+
+    g_object_set(src, "location", srcUrl.c_str(), "latency", 200, "protocols", 4 /*tcp*/, nullptr);
+    g_object_set(pay, "pt", 96, "config-interval", 1, nullptr);
+    GstCaps *caps = gst_caps_from_string("application/x-rtp,media=video,encoding-name=H264,payload=96,clock-rate=90000");
+    g_object_set(capsf, "caps", caps, nullptr);
+    gst_caps_unref(caps);
+    g_object_set(m_webrtcBin, "stun-server", "stun://stun.l.google.com:19302", nullptr);
+
+    gst_bin_add_many(GST_BIN(m_webrtcPipeline), src, depay, parse, pay, capsf, m_webrtcBin, nullptr);
+
+    if (!gst_element_link_many(depay, parse, pay, capsf, NULL)) {
+        std::cout << "[webrtc] link depay->parse->pay->caps failed" << std::endl;
         return false;
     }
+
+    // Link capsfilter to webrtcbin sink pad
+    GstPad *paySrcPad = gst_element_get_static_pad(capsf, "src");
+    GstPad *webrtcSinkPad = gst_element_get_request_pad(m_webrtcBin, "sink_%u");
+    if (!paySrcPad || !webrtcSinkPad || gst_pad_link(paySrcPad, webrtcSinkPad) != GST_PAD_LINK_OK) {
+        std::cout << "[webrtc] pad link to webrtcbin failed" << std::endl;
+        if (paySrcPad) gst_object_unref(paySrcPad);
+        if (webrtcSinkPad) gst_object_unref(webrtcSinkPad);
+        return false;
+    }
+    if (paySrcPad) gst_object_unref(paySrcPad);
+    if (webrtcSinkPad) gst_object_unref(webrtcSinkPad);
+
+    // rtspsrc has dynamic pads
+    g_signal_connect(src, "pad-added", G_CALLBACK(+[](GstElement *, GstPad *pad, gpointer user_data) {
+        auto *depay = static_cast<GstElement *>(user_data);
+        GstPad *sink = gst_element_get_static_pad(depay, "sink");
+        if (!sink) return;
+        if (gst_pad_is_linked(sink)) {
+            gst_object_unref(sink);
+            return;
+        }
+        gst_pad_link(pad, sink);
+        gst_object_unref(sink);
+    }), depay);
+
     g_signal_connect(m_webrtcBin, "on-negotiation-needed", G_CALLBACK(DeepStreamRunner::onNegotiationNeeded), this);
     g_signal_connect(m_webrtcBin, "on-ice-candidate", G_CALLBACK(DeepStreamRunner::onIceCandidate), this);
 
