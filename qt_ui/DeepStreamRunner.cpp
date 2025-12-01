@@ -52,9 +52,26 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     const std::string sink = sinkEnv ? std::string(sinkEnv) : std::string("rtsp");
 
     std::cout << "[deepstream] start() invoked, sink=" << sink << std::endl;
+    // Detect hardware encoder; fall back to x264enc if missing.
+    bool hasNvEnc = false;
+    if (gst_is_initialized()) {
+        GstElementFactory *f = gst_element_factory_find("nvv4l2h264enc");
+        if (f) {
+            hasNvEnc = true;
+            gst_object_unref(f);
+        }
+    }
+    const std::string encoder = hasNvEnc
+        ? "nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! "
+          "h264parse config-interval=1 ! "
+        : "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast ! "
+          "h264parse config-interval=1 ! ";
+    if (!hasNvEnc) {
+        std::cout << "[deepstream] nvv4l2h264enc not found, falling back to x264enc (CPU)" << std::endl;
+    }
 
     const std::string launch = pipeline.isEmpty()
-        ? ([&sink]() -> std::string {
+        ? ([&sink, &encoder]() -> std::string {
               if (sink == "drm") {
                   // Direct push to DRM plane; no display server required.
                   return "nvarguscamerasrc sensor-id=0 ! "
@@ -73,8 +90,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
                          "m.sink_0 nvstreammux name=m width=1280 height=720 batch-size=1 live-source=1 ! "
                          "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! "
                          "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! "
-                         "nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! "
-                         "h264parse config-interval=1 ! "
+                         + encoder +
                          "rtph264pay name=pay0 pt=96 )";
               }
               // Safe headless default: no display, no encoder
