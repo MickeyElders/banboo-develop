@@ -14,6 +14,7 @@ OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-libav q
 QT_MIN_VER ?= 6.6.3
 QT6_SOURCE_URL ?= https://download.qt.io/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 QT6_PREFIX ?= /opt/qt6
+QT6_TARBALL ?=
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -126,10 +127,25 @@ check_qt6:
 
 qt6-source-install:
 	@set -e; \
-	echo "Downloading Qt6 from $(QT6_SOURCE_URL)"; \
 	tmpdir=$$(mktemp -d); \
+	tarball="$(QT6_TARBALL)"; \
+	url="$(QT6_SOURCE_URL)"; \
 	cd $$tmpdir; \
-	wget -q --show-progress $(QT6_SOURCE_URL); \
+	if [ -n "$$tarball" ]; then \
+		if [ ! -f "$$tarball" ]; then echo "QT6_TARBALL specified but file not found: $$tarball"; exit 1; fi; \
+		cp "$$tarball" ./qt-everywhere-src-6.6.3.tar.xz; \
+		echo "Using local Qt6 source tarball $$tarball"; \
+	else \
+		echo "Downloading Qt6 from $$url"; \
+		if command -v wget >/dev/null 2>&1; then \
+			wget -q --show-progress -O qt-everywhere-src-6.6.3.tar.xz "$$url"; \
+		elif command -v curl >/dev/null 2>&1; then \
+			curl -L --progress-bar -o qt-everywhere-src-6.6.3.tar.xz "$$url"; \
+		else \
+			echo "Need wget or curl to fetch Qt6 sources. Install one and retry."; \
+			exit 1; \
+		fi; \
+	fi; \
 	tar xf qt-everywhere-src-6.6.3.tar.xz; \
 	cd qt-everywhere-src-6.6.3; \
 	mkdir -p build && cd build; \
