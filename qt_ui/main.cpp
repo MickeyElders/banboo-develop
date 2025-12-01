@@ -108,12 +108,11 @@ int main(int argc, char *argv[]) {
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
-    // If no DRM connectors are present, fall back to offscreen to avoid abort.
-    if (!hasConnectedDrmOutput()) {
-        qWarning() << "[startup] No DRM connectors detected, forcing offscreen platform.";
-        qputenv("QT_QPA_PLATFORM", "offscreen");
-        qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
-    }
+    // Force offscreen for stability on headless JetPack 6.x (avoids missing connector issues).
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    qputenv("QT_QPA_EGLFS_INTEGRATION", "");
+    qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
+    qputenv("EGL_PLATFORM", "");
     logKmsEnvironment();
     logDrmConnectors();
 
