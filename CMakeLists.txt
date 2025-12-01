@@ -534,7 +534,7 @@ set(CPP_BACKEND_SOURCES
 
 # 选择接口实现：Wayland 或 DRM
 if(ENABLE_WAYLAND)
-    list(APPEND CPP_BACKEND_SOURCES cpp_backend/src/ui/lvgl_wayland_interface.cpp)
+    # LVGL/Wayland 界面已移除
 else()
     list(APPEND CPP_BACKEND_SOURCES cpp_backend/src/ui/lvgl_drm_interface.cpp)
 endif()
@@ -852,7 +852,6 @@ if(ENABLE_QT_UI)
     else()
         message(WARNING "MODBUS_LIBRARY not found - Qt UI Modbus功能将不可用")
     endif()
-    target_compile_definitions(bamboo_qt_ui PRIVATE QT_NO_KEYWORDS)
     message(STATUS "Qt UI target enabled: bamboo_qt_ui (using ${QT_NAMESPACE})")
 endif()
 

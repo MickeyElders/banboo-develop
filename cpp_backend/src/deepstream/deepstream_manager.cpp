@@ -4,8 +4,6 @@
  */
 
 #include "bamboo_cut/deepstream/deepstream_manager.h"
-#include "bamboo_cut/ui/lvgl_wayland_interface.h"
-#include "bamboo_cut/ui/egl_context_manager.h"
 #include <iostream>
 #include <sstream>
 #include <gst/gst.h>
@@ -32,10 +30,6 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#ifdef ENABLE_LVGL
-#include <lvgl/lvgl.h>
-#endif
-
 #ifndef EGL_NO_STREAM_KHR
 #define EGL_NO_STREAM_KHR reinterpret_cast<EGLStreamKHR>(0)
 #endif
@@ -53,7 +47,7 @@ DeepStreamManager::DeepStreamManager()
     , bus_watch_id_(0)
     , bus_watch_id2_(0)
     , appsink_(nullptr)
-    , lvgl_interface_(nullptr)
+   
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)
@@ -70,7 +64,7 @@ DeepStreamManager::DeepStreamManager(void* lvgl_interface)
     , bus_watch_id_(0)
     , bus_watch_id2_(0)
     , appsink_(nullptr)
-    , lvgl_interface_(lvgl_interface)
+   
     , canvas_update_running_(false)
     , running_(false)
     , initialized_(false)

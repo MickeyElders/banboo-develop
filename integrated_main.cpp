@@ -234,7 +234,6 @@ public:
 #include "bamboo_cut/inference/bamboo_detector.h"
 #include "bamboo_cut/core/data_bridge.h"
 #include "bamboo_cut/deepstream/deepstream_manager.h"
-#include "bamboo_cut/ui/lvgl_wayland_interface.h"
 
 // 浣跨敤鐪熷疄鐨勫懡鍚嶇┖闂?
 using namespace bamboo_cut;

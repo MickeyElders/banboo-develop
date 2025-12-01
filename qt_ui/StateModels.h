@@ -24,13 +24,13 @@ public:
     QString cutQuality() const { return m_cutQuality; }
     QString bladeSelection() const { return m_bladeSelection; }
 
-public slots:
+public Q_SLOTS:
     void start();
     void pause();
     void stop();
     void emergencyStop();
 
-signals:
+Q_SIGNALS:
     void stateChanged();
 
 private:
@@ -66,10 +66,10 @@ public:
     double fanRpm() const { return m_fanRpm; }
     QString perfMode() const { return m_perfMode; }
 
-public slots:
+public Q_SLOTS:
     void setPerfMode(const QString &mode);
 
-signals:
+Q_SIGNALS:
     void changed();
 
 private:
@@ -97,8 +97,7 @@ public:
     int total() const { return m_total; }
     int today() const { return m_today; }
     double accuracy() const { return m_accuracy; }
-
-signals:
+Q_SIGNALS:
     void changed();
 
 private:
@@ -123,11 +122,11 @@ public:
     QString status() const { return m_status; }
     int rssi() const { return m_rssi; }
 
-public slots:
+public Q_SLOTS:
     void apply(const QString &ssid, const QString &password, const QString &mode, const QString &ip, const QString &mask, const QString &gw, const QString &dns);
     void check();
 
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

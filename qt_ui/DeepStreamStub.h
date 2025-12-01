@@ -12,10 +12,10 @@ public:
     void setSourceUrl(const QString &url) {
         if (m_sourceUrl == url) return;
         m_sourceUrl = url;
-        emit changed();
+        Q_EMIT changed();
     }
 
-signals:
+Q_SIGNALS:
     void changed();
 
 private:

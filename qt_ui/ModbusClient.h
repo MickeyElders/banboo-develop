@@ -47,7 +47,7 @@ public:
     Q_INVOKABLE bool setVisionTargetCoord(double coord);   // 写 D2002/3 float mm
     Q_INVOKABLE bool setVisionTransferResult(int value);   // 写 D2004 (1成功、2失败)
 
-signals:
+Q_SIGNALS:
     void registersUpdated();
     void connectionChanged(bool connected);
     void errorMessage(const QString &msg);

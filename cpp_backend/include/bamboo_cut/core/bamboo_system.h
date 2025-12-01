@@ -15,7 +15,6 @@
 
 #include "bamboo_cut/core/data_bridge.h"
 #include "bamboo_cut/inference/bamboo_detector.h"
-#include "bamboo_cut/ui/lvgl_wayland_interface.h"
 #include "bamboo_cut/communication/modbus_interface.h"
 
 namespace bamboo_cut {
