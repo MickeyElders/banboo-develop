@@ -78,7 +78,6 @@ install: build install-config install-models
 	cd "$(BUILD_DIR)" && cmake --install . --prefix "$(PREFIX)"
 	@# install web assets
 	@install -m 644 bamboo.html "$(PREFIX)/" 2>/dev/null || true
-	@install -m 755 deploy/systemd/webrtc-launch.sh "$(PREFIX)/bin/webrtc-launch.sh"
 
 install-config:
 	@mkdir -p "$(PREFIX)/config"
