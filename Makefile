@@ -137,19 +137,28 @@ check_qt6:
 install-qt-kms-config:
 	@sudo mkdir -p /etc/qt
 	@tmpfile=$$(mktemp); \
-	sel_card=""; sel_conn=""; \
-	for c in $$(ls /sys/class/drm | grep '^card[0-9]\+$$'); do \
+	all_cards=$$(ls /sys/class/drm | grep '^card[0-9]\+$$'); \
+	sel_card=""; \
+	outputs=""; \
+	for c in $$all_cards; do \
 		for d in /sys/class/drm/$${c}-*; do \
 			[ -f "$$d/status" ] || continue; \
-			if grep -q "^connected" "$$d/status"; then sel_card="$$c"; sel_conn=$$(basename "$$d"); break 2; fi; \
+			if grep -q "^connected" "$$d/status"; then \
+				name=$${d##*-}; \
+				mode=$$(if [ -f "$$d/modes" ]; then head -n1 "$$d/modes"; else echo "1920x1080"; fi); \
+				outputs="$${outputs}    { \"name\": \"$$name\", \"mode\": \"$$mode\", \"format\": \"rgb888\", \"transform\": \"normal\" },\n"; \
+				[ -n "$$sel_card" ] || sel_card="$$c"; \
+			fi; \
 		done; \
 	done; \
-	if [ -z "$$sel_card" ]; then sel_card=$$(ls /sys/class/drm | grep '^card[0-9]\+$$' | head -n1); fi; \
+	if [ -z "$$sel_card" ]; then sel_card=$$(echo $$all_cards | awk '{print $$1}'); fi; \
 	[ -n "$$sel_card" ] || sel_card="card0"; \
-	if [ -z "$$sel_conn" ]; then sel_conn="$${sel_card}-HDMI-A-1"; fi; \
-	mode=$$(if [ -f "/sys/class/drm/$${sel_conn}/modes" ]; then head -n1 /sys/class/drm/$${sel_conn}/modes; else echo "1920x1080"; fi); \
-	output_name=$${sel_conn#*-}; \
-	printf '{\n  "device": "/dev/dri/%s",\n  "outputs": [\n    { "name": "%s", "mode": "%s", "format": "rgb888", "transform": "normal" }\n  ]\n}\n' "$$sel_card" "$$output_name" "$$mode" > "$$tmpfile"; \
+	if [ -z "$$outputs" ]; then \
+		outputs="    { \"name\": \"HDMI-A-1\", \"mode\": \"1920x1080\", \"format\": \"rgb888\", \"transform\": \"normal\" }\n"; \
+	fi; \
+	# drop trailing comma if present \
+	outputs_clean=$$(printf "$$outputs" | sed '$$ s/},$$/}/'); \
+	{ printf '{\n  \"device\": \"/dev/dri/%s\",\n  \"outputs\": [\n' "$$sel_card"; printf "%s" "$$outputs_clean"; printf '  ]\n}\n'; } > "$$tmpfile"; \
 	sudo install -m 644 $$tmpfile /etc/qt/eglfs_kms_config.json && rm -f $$tmpfile
 
 qt6-source-install:
