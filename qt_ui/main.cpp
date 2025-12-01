@@ -193,7 +193,8 @@ int main(int argc, char *argv[]) {
         const QByteArray autoStart = qgetenv("DS_AUTOSTART");
         if (autoStart == "1") {
             std::cout << "[deepstream] Autostart from main()" << std::endl;
-            deepStream.start({});
+            const bool ok = deepStream.start({});
+            std::cout << "[deepstream] Autostart result: " << (ok ? "success" : "failure") << std::endl;
         } else {
             std::cout << "[deepstream] Autostart disabled (DS_AUTOSTART!=1)" << std::endl;
         }
