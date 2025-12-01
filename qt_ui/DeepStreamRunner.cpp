@@ -14,9 +14,6 @@ DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
 
 DeepStreamRunner::~DeepStreamRunner() {
     stop();
-    if (m_autostartThread.joinable()) {
-        m_autostartThread.join();
-    }
     if (m_webrtcThread.joinable()) {
         m_webrtcThread.join();
     }

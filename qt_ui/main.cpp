@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
     int wsEnv = qEnvironmentVariableIntValue("WEBRTC_PORT", &okWs);
     if (okWs && wsEnv > 0) wsPort = quint16(wsEnv);
     WebRTCSignaling signaling(wsPort, &app);
-    deepStream.setWebRTCSignaling(&signaling);
+    deepStream->setWebRTCSignaling(&signaling);
 
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();
