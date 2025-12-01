@@ -92,6 +92,10 @@ service: install
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable $(SERVICE_NAME)
 	@sudo systemctl restart $(SERVICE_NAME)
+	@sudo install -D -m 644 deploy/systemd/bamboo-webrtc.service /etc/systemd/system/bamboo-webrtc.service
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable bamboo-webrtc.service
+	@sudo systemctl restart bamboo-webrtc.service
 
 .PHONY: service-webrtc
 service-webrtc: install
