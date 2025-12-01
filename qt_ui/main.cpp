@@ -189,8 +189,20 @@ int main(int argc, char *argv[]) {
         qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
     }
 
-    // Start WebRTC signaling server; DeepStream webrtcbin will use it.
-    WebRTCSignaling signaling(8080, &app);
+    // Start HTTP server to serve bamboo.html (default 8080, override HTTP_PORT)
+    quint16 httpPort = 8080;
+    bool okHttp = false;
+    int httpEnv = qEnvironmentVariableIntValue("HTTP_PORT", &okHttp);
+    if (okHttp && httpEnv > 0) httpPort = quint16(httpEnv);
+    const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
+    HttpServer http(htmlPath, httpPort, &app);
+
+    // Start WebRTC signaling server (WebSocket). Default 9000 to avoid HTTP port clash.
+    quint16 wsPort = 9000;
+    bool okWs = false;
+    int wsEnv = qEnvironmentVariableIntValue("WEBRTC_PORT", &okWs);
+    if (okWs && wsEnv > 0) wsPort = quint16(wsEnv);
+    WebRTCSignaling signaling(wsPort, &app);
     deepStream.setWebRTCSignaling(&signaling);
 
     // Trigger DeepStream autostart here (instead of constructor) for clearer logs

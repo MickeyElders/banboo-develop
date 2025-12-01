@@ -95,6 +95,7 @@ set(QT_UI_SOURCES
     qt_ui/ModbusClient.cpp
     qt_ui/DeepStreamRunner.cpp
     qt_ui/WebPreview.cpp
+    qt_ui/HttpServer.cpp
 )
 
 set(QML_RESOURCES qt_ui/qml/qml.qrc)
