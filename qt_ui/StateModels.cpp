@@ -5,7 +5,7 @@
 SystemState::SystemState(QObject *parent) : QObject(parent) {
     connect(&m_heartbeatTimer, &QTimer::timeout, this, [this]() {
         m_heartbeat = (m_heartbeat + 1) % 4000000000;
-        emit stateChanged();
+        Q_EMIT stateChanged();
     });
     connect(&m_workflowTimer, &QTimer::timeout, this, &SystemState::simulateStep);
     m_heartbeatTimer.start(500); // 500ms heartbeats
@@ -17,28 +17,28 @@ void SystemState::start() {
     m_currentStep = 1;
     m_currentProcess = "进料检测中";
     m_workflowTimer.start(800);
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 
 void SystemState::pause() {
     m_running = false;
     m_workflowTimer.stop();
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 
 void SystemState::stop() {
     m_running = false;
     m_workflowTimer.stop();
     m_currentStep = 1;
-    m_currentProcess = "已停止";
-    emit stateChanged();
+    m_currentProcess = "已停�?;
+    Q_EMIT stateChanged();
 }
 
 void SystemState::emergencyStop() {
     m_running = false;
     m_workflowTimer.stop();
-    m_currentProcess = "🚨 紧急停机";
-    emit stateChanged();
+    m_currentProcess = "🚨 紧急停�?;
+    Q_EMIT stateChanged();
 }
 
 void SystemState::simulateStep() {
@@ -53,7 +53,7 @@ void SystemState::simulateStep() {
     }
     m_xCoordinate = 200 + QRandomGenerator::global()->bounded(600.0);
     m_cutQuality = (QRandomGenerator::global()->bounded(100) > 5) ? "正常" : "异常";
-    emit stateChanged();
+    Q_EMIT stateChanged();
 }
 
 JetsonState::JetsonState(QObject *parent) : QObject(parent) {
@@ -63,14 +63,14 @@ JetsonState::JetsonState(QObject *parent) : QObject(parent) {
         m_memUsed = 1.8 + QRandomGenerator::global()->bounded(3.0);
         m_temp = 45 + QRandomGenerator::global()->bounded(12.0);
         m_fanRpm = 1800 + QRandomGenerator::global()->bounded(600.0);
-        emit changed();
+        Q_EMIT changed();
     });
     m_timer.start(2000);
 }
 
 void JetsonState::setPerfMode(const QString &mode) {
     m_perfMode = mode;
-    emit changed();
+    Q_EMIT changed();
 }
 
 AiState::AiState(QObject *parent) : QObject(parent) {
@@ -79,7 +79,7 @@ AiState::AiState(QObject *parent) : QObject(parent) {
         m_fps = 24 + QRandomGenerator::global()->bounded(8.0);
         m_today += 1;
         m_total += 1;
-        emit changed();
+        Q_EMIT changed();
     });
     m_timer.start(3000);
 }
@@ -94,13 +94,13 @@ void WifiState::apply(const QString &ssid, const QString &password, const QStrin
     Q_UNUSED(dns)
     m_ssid = ssid;
     m_mode = mode.toUpper();
-    m_status = (mode.toLower() == "dhcp") ? "获取地址中" : "静态配置已应用";
-    emit changed();
+    m_status = (mode.toLower() == "dhcp") ? "获取地址�? : "静态配置已应用";
+    Q_EMIT changed();
 }
 
 void WifiState::check() {
     const bool ok = QRandomGenerator::global()->bounded(100) > 15;
-    m_status = ok ? "已连接" : "断开 / 待检查";
+    m_status = ok ? "已连�? : "断开 / 待检�?;
     m_rssi = ok ? -50 - QRandomGenerator::global()->bounded(15) : -120;
-    emit changed();
+    Q_EMIT changed();
 }

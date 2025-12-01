@@ -43,20 +43,20 @@ bool ModbusClient::ensureConnected() {
     if (connected_ && ctx_) return true;
     ctx_ = modbus_new_tcp(host_.toStdString().c_str(), port_);
     if (!ctx_) {
-        emit errorMessage(tr("Modbus 创建失败"));
+        Q_EMIT errorMessage(tr("Modbus 创建失败"));
         return false;
     }
     modbus_set_slave(ctx_, slaveId_);
     if (modbus_connect(ctx_) == -1) {
-        emit errorMessage(tr("Modbus 连接失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Modbus 连接失败: %1").arg(modbus_strerror(errno)));
         modbus_free(ctx_);
         ctx_ = nullptr;
         connected_ = false;
-        emit connectionChanged(false);
+        Q_EMIT connectionChanged(false);
         return false;
     }
     connected_ = true;
-    emit connectionChanged(true);
+    Q_EMIT connectionChanged(true);
     return true;
 }
 
@@ -68,7 +68,7 @@ void ModbusClient::disconnect() {
     }
     if (connected_) {
         connected_ = false;
-        emit connectionChanged(false);
+        Q_EMIT connectionChanged(false);
     }
 }
 
@@ -80,7 +80,7 @@ void ModbusClient::poll() {
     uint16_t buf[count] = {0};
     const int rc = modbus_read_registers(ctx_, start, count, buf);
     if (rc != count) {
-        emit errorMessage(tr("Modbus 读失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Modbus 读失�? %1").arg(modbus_strerror(errno)));
         disconnect();
         return;
     }
@@ -88,7 +88,7 @@ void ModbusClient::poll() {
     plc_to_cam_.receive_state   = buf[1];
     plc_to_cam_.servo_pos       = toFloat(buf[2], buf[3]);
     plc_to_cam_.coord_feedback  = toFloat(buf[4], buf[5]);
-    emit registersUpdated();
+    Q_EMIT registersUpdated();
 }
 
 bool ModbusClient::writeFloat(int addr, float value) {
@@ -98,7 +98,7 @@ bool ModbusClient::writeFloat(int addr, float value) {
     uint16_t payload[2] = {high, low};
     const int rc = modbus_write_registers(ctx_, addr, 2, payload);
     if (rc == -1) {
-        emit errorMessage(tr("写浮点寄存器失败 %1: %2").arg(addr).arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("写浮点寄存器失败 %1: %2").arg(addr).arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
@@ -110,11 +110,11 @@ bool ModbusClient::setVisionCommAck(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D0, static_cast<uint16_t>(value));
     if (rc == -1) {
-        emit errorMessage(tr("写 D2000 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("�?D2000 失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
-    emit registersUpdated();
+    Q_EMIT registersUpdated();
     return true;
 }
 
@@ -123,18 +123,18 @@ bool ModbusClient::setVisionStatus(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D1, static_cast<uint16_t>(value));
     if (rc == -1) {
-        emit errorMessage(tr("写 D2001 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("�?D2001 失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
-    emit registersUpdated();
+    Q_EMIT registersUpdated();
     return true;
 }
 
 bool ModbusClient::setVisionTargetCoord(double coord) {
     cam_to_plc_.target_coord = static_cast<float>(coord);
     const bool ok = writeFloat(0x07D2, static_cast<float>(coord));
-    if (ok) emit registersUpdated();
+    if (ok) Q_EMIT registersUpdated();
     return ok;
 }
 
@@ -143,10 +143,10 @@ bool ModbusClient::setVisionTransferResult(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D4, static_cast<uint16_t>(value));
     if (rc == -1) {
-        emit errorMessage(tr("写 D2004 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("�?D2004 失败: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
-    emit registersUpdated();
+    Q_EMIT registersUpdated();
     return true;
 }

@@ -14,7 +14,7 @@ DeepStreamRunner::~DeepStreamRunner() {
 bool DeepStreamRunner::start(const QString &pipeline) {
 #if !defined(ENABLE_GSTREAMER) || !defined(ENABLE_RTSP)
     Q_UNUSED(pipeline);
-    emit errorChanged(QStringLiteral("RTSP server unavailable (missing gstreamer-rtsp-server)"));
+    Q_EMIT errorChanged(QStringLiteral("RTSP server unavailable (missing gstreamer-rtsp-server)"));
     return false;
 #else
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -34,7 +34,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         : pipeline.toStdString();
 
     if (!buildServer(launch)) {
-        emit errorChanged(QStringLiteral("启动 RTSP 服务失败"));
+        Q_EMIT errorChanged(QStringLiteral("启动 RTSP 服务失败"));
         return false;
     }
 
