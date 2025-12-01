@@ -15,6 +15,7 @@
 #include "DeepStreamRunner.h"
 #include "ModbusClient.h"
 #include "StateModels.h"
+#include "WebPreview.h"
 
 namespace {
 std::atomic_bool g_shouldQuit{false};
@@ -26,18 +27,12 @@ void handleSignal(int signum) {
 }
 
 void configureHeadlessEnvironment() {
-    // If DISPLAY is present, prefer xcb; otherwise fall back to offscreen/surfaceless.
-    if (!qEnvironmentVariableIsEmpty("DISPLAY")) {
-        if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
-            qputenv("QT_QPA_PLATFORM", "xcb");
-        }
-    } else {
-        qputenv("QT_QPA_PLATFORM", "offscreen");
-        qputenv("QT_QPA_EGLFS_INTEGRATION", "");
-        qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
-        qputenv("EGL_PLATFORM", "surfaceless");
-        qputenv("EGL_DISPLAY", "surfaceless");
-    }
+    // Always offscreen for headless stability; RTSP承担可视输出
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    qputenv("QT_QPA_EGLFS_INTEGRATION", "");
+    qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
+    qputenv("EGL_PLATFORM", "surfaceless");
+    qputenv("EGL_DISPLAY", "surfaceless");
     if (qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR")) {
         const QByteArray runtimeDir("/run/bamboo-qt");
         qputenv("XDG_RUNTIME_DIR", runtimeDir);
@@ -120,6 +115,11 @@ int main(int argc, char *argv[]) {
         qCritical() << "[startup] Failed to load QML root" << url;
         return -1;
     }
+
+    QQuickWindow *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    WebPreview preview(rootWindow, 8080, &app);
+    qInfo() << "[startup] MJPEG web preview on port 8080";
+
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();
 }
