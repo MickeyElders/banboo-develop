@@ -43,6 +43,7 @@ Environment=DS_AUTOSTART=1
 Environment=DS_SINK=rtsp
 # Let code auto-build pipeline (nvv4l2h264enc -> x264enc fallback). Override via runtime DS_PIPELINE if needed.
 Environment=DS_PIPELINE=
+Environment=DS_FORCE_SW_ENC=1
 
 ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
 ExecStartPre=/bin/mkdir -p -m 755 /var/cache/bamboo-qt

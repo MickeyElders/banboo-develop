@@ -61,14 +61,21 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 
     std::cout << "[deepstream] start() invoked, sink=" << sink << std::endl;
     // Detect hardware encoder; fall back to x264enc if missing.
+    bool forceSwEnc = false;
+    {
+        bool ok = false;
+        int sw = qEnvironmentVariableIntValue("DS_FORCE_SW_ENC", &ok);
+        forceSwEnc = ok && sw == 1;
+    }
     bool hasNvEnc = false;
     bool hasNvInfer = false;
     bool hasNvOsd = false;
     if (gst_is_initialized()) {
-        GstElementFactory *f = gst_element_factory_find("nvv4l2h264enc");
-        if (f) {
-            hasNvEnc = true;
-            gst_object_unref(f);
+        if (!forceSwEnc) {
+            if (GstElementFactory *f = gst_element_factory_find("nvv4l2h264enc")) {
+                hasNvEnc = true;
+                gst_object_unref(f);
+            }
         }
         if (GstElementFactory *fi = gst_element_factory_find("nvinfer")) {
             hasNvInfer = true;
@@ -79,14 +86,15 @@ bool DeepStreamRunner::start(const QString &pipeline) {
             gst_object_unref(fo);
         }
     }
-    std::cout << "[deepstream] capability: enc=" << hasNvEnc << " infer=" << hasNvInfer << " osd=" << hasNvOsd << std::endl;
+    std::cout << "[deepstream] capability: enc=" << hasNvEnc << " infer=" << hasNvInfer << " osd=" << hasNvOsd
+              << " force_sw_enc=" << forceSwEnc << std::endl;
     const std::string encoder = hasNvEnc
         ? "nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! "
           "h264parse config-interval=1 ! "
         : "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast ! "
           "h264parse config-interval=1 ! ";
     if (!hasNvEnc) {
-        std::cout << "[deepstream] nvv4l2h264enc not found, falling back to x264enc (CPU)" << std::endl;
+        std::cout << "[deepstream] nvv4l2h264enc disabled/unavailable, falling back to x264enc (CPU)" << std::endl;
     }
     if (!hasNvInfer) {
         std::cout << "[deepstream] nvinfer not found, running without inference/OSD" << std::endl;
