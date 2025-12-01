@@ -35,6 +35,37 @@
             overflow: hidden;
         }
 
+        #webrtc-panel {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            width: 360px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+            padding: 8px;
+            z-index: 50;
+        }
+        #webrtc-panel h4 {
+            margin: 0 0 6px 0;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #webrtc-panel video {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background: #000;
+            border-radius: 8px;
+        }
+        #webrtc-status {
+            font-size: 12px;
+            color: var(--error);
+        }
+
         .main-container {
             display: grid;
             grid-template-areas:
@@ -180,6 +211,15 @@
             border-radius: 10px;
             position: relative;
             overflow: hidden;
+        }
+        .camera-canvas video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+            display: none;
         }
 
         .camera-placeholder {
@@ -706,6 +746,11 @@
         </div>
     </div>
 
+    <div id="webrtc-panel">
+        <h4>WebRTC 预览 <span id="webrtc-status">未连接</span></h4>
+        <video id="webrtc-video" autoplay playsinline muted></video>
+    </div>
+
     <script>
         // 模拟数据（预览用，Qt 版本请绑定真实接口）
         const systemState = {
@@ -1017,6 +1062,62 @@
             document.getElementById('response-time').textContent = responseTime + 'ms';
             document.getElementById('plc-response').textContent = responseTime + 'ms';
         }, 1000);
+
+        // WebRTC over WebSocket (port 8080)
+        (function initWebRTC() {
+            const statusEl = document.getElementById('webrtc-status');
+            const videoEl = document.getElementById('webrtc-video');
+            if (!statusEl || !videoEl) return;
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            const ws = new WebSocket(`ws://${location.hostname || '127.0.0.1'}:8080`);
+
+            const setStatus = (txt, good = false) => {
+                statusEl.textContent = txt;
+                statusEl.style.color = good ? '#4caf50' : '#f44336';
+            };
+
+            pc.ontrack = (e) => {
+                if (e.streams && e.streams[0]) {
+                    videoEl.srcObject = e.streams[0];
+                    videoEl.style.display = 'block';
+                }
+            };
+            pc.onicecandidate = (e) => {
+                if (e.candidate && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'ice',
+                        candidate: e.candidate.candidate,
+                        sdpMid: e.candidate.sdpMid,
+                        sdpMLineIndex: e.candidate.sdpMLineIndex
+                    }));
+                }
+            };
+
+            ws.onopen = () => setStatus('信令已连接', true);
+            ws.onclose = () => setStatus('未连接');
+            ws.onerror = () => setStatus('信令错误');
+            ws.onmessage = async (msg) => {
+                try {
+                    const data = JSON.parse(msg.data);
+                    if (data.type === 'offer' && data.sdp) {
+                        await pc.setRemoteDescription({ type: 'offer', sdp: data.sdp });
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
+                        setStatus('协商中...', true);
+                    } else if (data.type === 'ice' && data.candidate) {
+                        await pc.addIceCandidate({
+                            candidate: data.candidate,
+                            sdpMid: data.sdpMid || null,
+                            sdpMLineIndex: data.sdpMLineIndex || 0
+                        });
+                    }
+                } catch (e) {
+                    console.error('webrtc signaling error', e);
+                    setStatus('信令解析失败');
+                }
+            };
+        })();
 
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
     </script>
