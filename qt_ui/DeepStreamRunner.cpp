@@ -15,6 +15,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 #if !defined(ENABLE_GSTREAMER) || !defined(ENABLE_RTSP)
     Q_UNUSED(pipeline);
     Q_EMIT errorChanged(QStringLiteral("RTSP server unavailable (missing gstreamer-rtsp-server)"));
+    std::cout << "[deepstream] start failed: RTSP not built in" << std::endl;
     return false;
 #else
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -30,9 +31,11 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         std::cout << "[deepstream] Using DS_PIPELINE from environment" << std::endl;
         if (!buildServer(std::string(envPipeline))) {
             Q_EMIT errorChanged(QStringLiteral("启动 RTSP 服务失败 (DS_PIPELINE)"));
+            std::cout << "[deepstream] buildServer failed (DS_PIPELINE)" << std::endl;
             return false;
         }
         m_thread = std::thread(&DeepStreamRunner::runLoop, this);
+        std::cout << "[deepstream] RTSP server thread started (DS_PIPELINE)" << std::endl;
         return true;
     }
 
@@ -119,10 +122,12 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 
     if (!buildServer(launch)) {
         Q_EMIT errorChanged(QStringLiteral("启动 RTSP 服务失败"));
+        std::cout << "[deepstream] buildServer failed (auto launch)" << std::endl;
         return false;
     }
 
     m_thread = std::thread(&DeepStreamRunner::runLoop, this);
+    std::cout << "[deepstream] RTSP server thread started" << std::endl;
     return true;
 #endif
 }
