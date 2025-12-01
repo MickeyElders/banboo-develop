@@ -118,10 +118,15 @@ webrtc-bin:
 	elif [ -x "$(DS_WEBRTC_BIN)" ]; then \
 		echo "Installing existing WebRTC binary from $(DS_WEBRTC_BIN)"; \
 		sudo install -D -m 755 "$(DS_WEBRTC_BIN)" "$(PREFIX)/bin/deepstream-webrtc-app"; \
-	else \
+	elif [ -f "$(DS_WEBRTC_SRC)/CMakeLists.txt" ]; then \
 		echo "Building DeepStream WebRTC demo at $(DS_WEBRTC_SRC)"; \
 		mkdir -p "$(DS_WEBRTC_BUILD)" && cd "$(DS_WEBRTC_BUILD)" && cmake .. && make -j$$(nproc 2>/dev/null || echo 4); \
 		sudo install -D -m 755 "$(DS_WEBRTC_BIN)" "$(PREFIX)/bin/deepstream-webrtc-app"; \
+	else \
+		echo "Warning: WebRTC source not found at $(DS_WEBRTC_SRC)."; \
+		echo " - Set DS_WEBRTC_SRC to your DeepStream webrtc demo path, or"; \
+		echo " - Place a compiled deepstream-webrtc-app at $(PREFIX)/bin/deepstream-webrtc-app"; \
+		echo "Skipping WebRTC build (main app will still install)."; \
 	fi
 
 start:
