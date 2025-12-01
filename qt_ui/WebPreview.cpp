@@ -29,8 +29,12 @@ void WebPreview::onNewConnection() {
     while (m_server.hasPendingConnections()) {
         QTcpSocket *client = m_server.nextPendingConnection();
         if (!client) continue;
+        qInfo() << "[webpreview] connection from" << client->peerAddress().toString() << ":" << client->peerPort();
         connect(client, &QTcpSocket::disconnected, this, &WebPreview::onClientDisconnected);
         connect(client, &QTcpSocket::readyRead, this, &WebPreview::onClientReadyRead);
+        if (client->bytesAvailable() > 0) {
+            onClientReadyRead();
+        }
     }
 }
 
@@ -38,11 +42,13 @@ void WebPreview::onClientReadyRead() {
     QTcpSocket *client = qobject_cast<QTcpSocket *>(sender());
     if (!client) return;
     const QByteArray req = client->readAll();
+    qInfo() << "[webpreview] request bytes" << req.size() << "from" << client->peerAddress().toString();
     const QList<QByteArray> lines = req.split('\n');
     if (lines.isEmpty()) return;
     const QList<QByteArray> parts = lines.first().split(' ');
     if (parts.size() < 2) return;
     const QByteArray path = parts.at(1);
+    qInfo() << "[webpreview] path" << path;
     if (path == "/mjpeg") {
         // Switch to MJPEG streaming
         m_clients << client;

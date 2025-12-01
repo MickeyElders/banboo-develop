@@ -28,7 +28,7 @@ Environment=LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-li
 Environment=GST_PLUGIN_SCANNER=/usr/lib/aarch64-linux-gnu/gstreamer-1.0/gst-plugin-scanner
 Environment=GST_REGISTRY=/var/cache/bamboo-qt/gst-registry.bin
 Environment=WEB_PREVIEW=1
-Environment=HTTP_SERVER=1
+Environment=HTTP_SERVER=0
 Environment=DS_AUTOSTART=1
 Environment=DS_SINK=rtsp
 # 如需 CSI/Argus 摄像头推流，可设置 DS_PIPELINE；留空时使用非阻塞测试源

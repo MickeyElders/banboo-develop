@@ -190,12 +190,12 @@ int main(int argc, char *argv[]) {
         qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
     }
 
-    // HTTP server: default ON (8080) unless HTTP_SERVER=0
-    bool enableHttp = true;
+    // HTTP server: default OFF (use WebPreview on 8080). Enable with HTTP_SERVER=1.
+    bool enableHttp = false;
     bool okHttpFlag = false;
     int httpFlag = qEnvironmentVariableIntValue("HTTP_SERVER", &okHttpFlag);
-    if (okHttpFlag && httpFlag == 0) {
-        enableHttp = false;
+    if (okHttpFlag && httpFlag == 1) {
+        enableHttp = true;
     }
     if (enableHttp) {
         quint16 httpPort = 8080;
