@@ -215,12 +215,12 @@ ApplicationWindow {
         modal: true
         standardButtons: Dialog.Ok
         title: "Settings"
-        implicitWidth: 320
-        implicitHeight: 180
+        width: 320
+        height: 180
         contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 10
             spacing: 10
-            implicitWidth: childrenRect.width + 20
-            implicitHeight: childrenRect.height + 20
             Label { text: "Settings placeholder"; color: textSecondary }
         }
     }
