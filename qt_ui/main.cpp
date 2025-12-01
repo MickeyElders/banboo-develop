@@ -20,6 +20,7 @@
 #include "StateModels.h"
 #include "WebPreview.h"
 #include "WebRTCSignaling.h"
+#include "HttpServer.h"
 #include <iostream>
 
 namespace {

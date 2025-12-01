@@ -18,7 +18,7 @@ find_package(Threads REQUIRED)
 pkg_check_modules(EGL REQUIRED egl)
 
 set(QT_MIN_VERSION 6.2)
-set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia WebSockets)
+set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia WebSockets Network)
 
 # Auto-add common distro Qt6 cmake prefixes if not already present
 if(NOT EXISTS "${QT6_ROOT}/lib/cmake/Qt6/Qt6Config.cmake")
@@ -126,6 +126,7 @@ target_link_libraries(bamboo_qt_ui PRIVATE
     Qt6::QuickControls2
     Qt6::Multimedia
     Qt6::WebSockets
+    Qt6::Network
     ${EGL_LIBRARIES}
     Threads::Threads
 )
