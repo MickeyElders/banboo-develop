@@ -14,7 +14,9 @@
 #include <EGL/eglext.h>
 #include <gst/gst.h>
 #include <atomic>
+#include <array>
 #include <csignal>
+#include <iomanip>
 
 #include "DeepStreamRunner.h"
 #include "ModbusClient.h"
@@ -37,41 +39,91 @@ void fixArgusDeadlockInHeadless() {
     static EGLContext s_context = EGL_NO_CONTEXT;
     static EGLSurface s_surface = EGL_NO_SURFACE;
     if (s_display == EGL_NO_DISPLAY) {
-        // Try surfaceless first; fall back to default display.
-        s_display = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
+        auto tryInitDisplay = [&](EGLDisplay candidate, const char *tag) -> bool {
+            if (candidate == EGL_NO_DISPLAY) return false;
+            EGLint major = 0, minor = 0;
+            if (eglInitialize(candidate, &major, &minor) == EGL_FALSE) {
+                std::cout << "[startup] eglInitialize failed (" << tag << ") err=0x"
+                          << std::hex << eglGetError() << std::dec << std::endl;
+                return false;
+            }
+            eglBindAPI(EGL_OPENGL_ES_API);
+            static const EGLint configAttribs[] = {
+                EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL_NONE
+            };
+            EGLConfig config;
+            EGLint numConfigs = 0;
+            if (!eglChooseConfig(candidate, configAttribs, &config, 1, &numConfigs) || numConfigs < 1) {
+                std::cout << "[startup] eglChooseConfig failed (" << tag << ")" << std::endl;
+                eglTerminate(candidate);
+                return false;
+            }
+            static const EGLint contextAttribs[] = {
+                EGL_CONTEXT_CLIENT_VERSION, 2,
+                EGL_NONE
+            };
+            EGLContext ctx = eglCreateContext(candidate, config, EGL_NO_CONTEXT, contextAttribs);
+            EGLint pbufferAttribs[] = {
+                EGL_WIDTH, 16,
+                EGL_HEIGHT, 16,
+                EGL_NONE,
+            };
+            EGLSurface surf = eglCreatePbufferSurface(candidate, config, pbufferAttribs);
+            if (ctx == EGL_NO_CONTEXT || surf == EGL_NO_SURFACE) {
+                std::cout << "[startup] eglCreateContext/Surface failed (" << tag << ")" << std::endl;
+                if (ctx != EGL_NO_CONTEXT) eglDestroyContext(candidate, ctx);
+                if (surf != EGL_NO_SURFACE) eglDestroySurface(candidate, surf);
+                eglTerminate(candidate);
+                return false;
+            }
+            if (eglMakeCurrent(candidate, surf, surf, ctx) == EGL_FALSE) {
+                std::cout << "[startup] eglMakeCurrent failed (" << tag << ") err=0x"
+                          << std::hex << eglGetError() << std::dec << std::endl;
+                eglDestroyContext(candidate, ctx);
+                eglDestroySurface(candidate, surf);
+                eglTerminate(candidate);
+                return false;
+            }
+            s_display = candidate;
+            s_context = ctx;
+            s_surface = surf;
+            std::cout << "[startup] EGL ready via " << tag << " v" << major << "." << minor << std::endl;
+            return true;
+        };
+
+        // 1) Prefer device platform (works in pure headless/multi-user.target)
+        auto eglQueryDevicesEXT =
+            reinterpret_cast<PFNEGLQUERYDEVICESEXTPROC>(eglGetProcAddress("eglQueryDevicesEXT"));
+        auto eglGetPlatformDisplayEXT =
+            reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(eglGetProcAddress("eglGetPlatformDisplayEXT"));
+        if (eglQueryDevicesEXT && eglGetPlatformDisplayEXT) {
+            std::array<EGLDeviceEXT, 4> devices{};
+            EGLint numDevices = 0;
+            if (eglQueryDevicesEXT(static_cast<EGLint>(devices.size()), devices.data(), &numDevices) == EGL_TRUE &&
+                numDevices > 0) {
+                for (EGLint i = 0; i < numDevices && s_display == EGL_NO_DISPLAY; ++i) {
+                    EGLDisplay d = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, devices[i], nullptr);
+                    tryInitDisplay(d, "EGL_PLATFORM_DEVICE_EXT");
+                }
+            }
+        }
+
+        // 2) Surfaceless platform (Mesa-style) if available
+#ifdef EGL_PLATFORM_SURFACELESS_MESA
         if (s_display == EGL_NO_DISPLAY) {
-            s_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+            EGLDisplay d = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
+            tryInitDisplay(d, "EGL_PLATFORM_SURFACELESS_MESA");
         }
-        EGLint major = 0, minor = 0;
-        if (eglInitialize(s_display, &major, &minor) == EGL_FALSE) {
-            s_display = EGL_NO_DISPLAY;
-            return;  // likely already initialized elsewhere
+#endif
+
+        // 3) Fallback to default display
+        if (s_display == EGL_NO_DISPLAY) {
+            tryInitDisplay(eglGetDisplay(EGL_DEFAULT_DISPLAY), "EGL_DEFAULT_DISPLAY");
         }
-        eglBindAPI(EGL_OPENGL_ES_API);
-        static const EGLint configAttribs[] = {
-            EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-            EGL_NONE
-        };
-        EGLConfig config;
-        EGLint numConfigs = 0;
-        if (!eglChooseConfig(s_display, configAttribs, &config, 1, &numConfigs) || numConfigs < 1) {
-            return;
-        }
-        static const EGLint contextAttribs[] = {
-            EGL_CONTEXT_CLIENT_VERSION, 2,
-            EGL_NONE
-        };
-        s_context = eglCreateContext(s_display, config, EGL_NO_CONTEXT, contextAttribs);
-        EGLint pbufferAttribs[] = {
-            EGL_WIDTH, 16,
-            EGL_HEIGHT, 16,
-            EGL_NONE,
-        };
-        s_surface = eglCreatePbufferSurface(s_display, config, pbufferAttribs);
-        if (s_context != EGL_NO_CONTEXT && s_surface != EGL_NO_SURFACE) {
-            eglMakeCurrent(s_display, s_surface, s_surface, s_context);
-            // 保持上下文存活，Argus 将检测到有效 EGLDisplay
+        if (s_display == EGL_NO_DISPLAY) {
+            std::cout << "[startup] Failed to bootstrap EGL for Argus (no display available)" << std::endl;
         }
     }
 

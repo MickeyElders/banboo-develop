@@ -81,3 +81,41 @@ sudo XDG_RUNTIME_DIR=/run/nvidia-wayland WAYLAND_DISPLAY=wayland-0 \
 - `integrated_main.cpp`：`InferenceWorkerThread::processFrame` 仅生成模拟帧，未执行真实检测或 Modbus 交互；需改为调用 DeepStream/YOLO 推理、通过 `IntegratedDataBridge` 更新 UI 与 PLC。
 - `cpp_inference/inference_core.cpp`：独立 TensorRT 推理实现未接入主二进制或导出接口，需决定集成方式或移除。
 
+变更留存（截至 2025-12-02）
+
+qt_ui/main.cpp：fixArgusDeadlockInHeadless() 现在创建并常驻 surfaceless EGLDisplay/EGLContext/PBuffer，不再销毁；确保 headless 下 Argus 能拿到有效 EGLDisplay。继续强制 GST_GL_PLATFORM=egl / GST_GL_API=gles2 / EGL_PLATFORM=surfaceless。
+qt_ui/DeepStreamRunner.cpp：
+DeepStream 放入子线程，主线程仅跑 Qt 事件循环与 Web 服务。
+默认强制软件编码 x264（DS_FORCE_SW_ENC=1），若手动置 0 且有 nvv4l2h264enc 才尝试 NVENC。
+自动管线（无 DS_PIPELINE 时）：nvarguscamerasrc → nvvidconv →（可选 nvstreammux+nvinfer+nvdsosd）→ nvvideoconvert → x264enc → rtph264pay，RTSP 服务 8554。WebRTC 拉 rtsp://127.0.0.1:8554，libnice 依赖 gstreamer1.0-nice。
+DS_PIPELINE 若存在则原样使用。
+deploy/systemd/bamboo-qt-ui.service：
+offscreen 环境、GStreamer 插件路径、gst-plugin-scanner 软链到 /usr/libexec/gstreamer-1.0/gst-plugin-scanner。
+默认 DS_AUTOSTART=1，DS_SINK=rtsp，DS_FORCE_SW_ENC=1。
+为保证通路，暂时将 DS_PIPELINE 设为最小相机→nvvidconv→I420→x264enc→rtph264pay。
+Makefile：必装依赖包含 gstreamer1.0-nice/libnice10、gstreamer1.0-x、libx264-dev、nvidia-l4t-gstreamer/nvidia-l4t-multimedia 等；Qt6/QML/Multimedia/Quick 控件依赖齐全。
+现象与原因
+
+8080/9000 监听正常，但无视频；RTSP 503/超时。nvarguscamerasrc 报 “No cameras available / Unable to open BW Ioctl FD”。
+根因：Argus 相机栈未成功启动；在纯 headless 下需要有效 EGLDisplay，且 Argus 服务/DTB/overlay/电源接口需正常。
+已采取的解决路径
+
+持久化 EGL 上下文，避免 headless EGL_NO_DISPLAY 让 Argus 静默失败。
+将 DeepStream 从主线程移到子线程，防止 GStreamer 内部阻塞 Qt 事件循环。
+固定 x264 软件编码，绕过 NVENC 设备缺失。
+硬设 GStreamer 环境变量与 plugin-scanner 路径，避免扫描失败。
+下一步排查与操作指引
+
+先让 Argus 出帧（关键）：
+export GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra
+export GST_PLUGIN_SCANNER=/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner
+export GST_GL_PLATFORM=egl GST_GL_API=gles2 EGL_PLATFORM=surfaceless XDG_RUNTIME_DIR=/run/bamboo-qt
+gst-launch-1.0 -v nvarguscamerasrc sensor-id=0 num-buffers=30 ! \
+  'video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12' ! fakesink
+若失败，检查 Jetson-IO/DTB 选择正确 CSI overlay，重启 nvargus-daemon，必要时重新刷机/同步 BSP。
+验证链路时可临时设置测试源，不依赖相机：
+sudo systemctl set-environment DS_PIPELINE="videotestsrc is-live=true ! video/x-raw,width=1280,height=720,framerate=30/1 ! x264enc tune=zerolatency bitrate=4000 speed-preset=superfast ! h264parse config-interval=1 ! rtph264pay name=pay0 pt=96"
+sudo systemctl restart bamboo-qt-ui
+确认 RTSP/Web/WebRTC 全链路可达后，再去掉 DS_PIPELINE 用相机。
+WebRTC 需安装 libnice/gstreamer1.0-nice，确保 webrtcbin 可用。
+相机恢复后，可移除服务里强制的最小 DS_PIPELINE，恢复自动管线（含 nvinfer/nvdsosd），模型路径已指向 /opt/bamboo-qt/models/best.onnx。
