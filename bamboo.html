@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI竹节识别切割系统 v2.1 - Modbus通信版</title>
+    <title>AI竹节识别切割系统 v2.1 - Jetson Orin NX 预览</title>
     <style>
         * {
             margin: 0;
@@ -11,156 +11,200 @@
             box-sizing: border-box;
         }
 
-        body {
-            font-family: 'Consolas', 'Arial', 'Microsoft YaHei', sans-serif;
-            background-color: #1E1E1E;
-            color: #FFFFFF;
-            overflow: hidden;
-            height: 100vh;
-        }
-
         :root {
-            --bg-main: #1E1E1E;
-            --bg-panel: #2D2D2D;
-            --accent: #FF6B35;
-            --success: #4CAF50;
-            --warning: #FFC107;
-            --error: #F44336;
-            --text-primary: #FFFFFF;
-            --text-secondary: #B0B0B0;
-            --border: #404040;
-            --modbus-blue: #2196F3;
-            --emergency: #FF1744;
-            --power: #9C27B0;
-            --jetson-green: #76B900;
+            --bg-main: #0f131a;
+            --bg-panel: #161b24;
+            --bg-spot: #1f2632;
+            --text-primary: #e8ecf3;
+            --text-secondary: #9aa4b5;
+            --accent: #ff7a3d;
+            --success: #4caf50;
+            --warning: #f2c14f;
+            --error: #f44336;
+            --border: #2a3342;
+            --jetson: #76b900;
+            --modbus: #2196f3;
+            --power: #c93dff;
         }
 
-        /* 主布局 - 左右两列 */
+        body {
+            font-family: 'Microsoft YaHei', 'Consolas', Arial, sans-serif;
+            background: radial-gradient(120% 120% at 20% 20%, #1a222f 0%, #0f131a 40%, #0c1016 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
         .main-container {
             display: grid;
-            grid-template-areas: 
+            grid-template-areas:
                 "header header"
                 "camera control"
                 "footer footer";
-            grid-template-rows: 60px 1fr 80px;
-            grid-template-columns: 1fr 380px;
-            height: 100vh;
+            grid-template-columns: 1fr 420px;
+            grid-template-rows: 68px 1fr 90px;
             gap: 10px;
-            padding: 0 10px 10px 10px;
+            height: 100vh;
+            padding: 10px;
         }
 
-        /* 顶部状态栏 */
         .header-panel {
             grid-area: header;
-            background-color: var(--bg-panel);
-            border-bottom: 2px solid var(--border);
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 20px;
+            padding: 0 16px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
         }
 
         .system-title {
             font-size: 18px;
-            font-weight: bold;
-            color: var(--text-primary);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1b88ff, #58c4ff);
+            color: #031422;
         }
 
         .workflow-status {
             display: flex;
             align-items: center;
-            gap: 15px;
-            font-size: 14px;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .settings-btn {
+            padding: 6px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.25s ease;
+        }
+
+        .settings-btn:hover {
+            transform: translateY(-1px);
+            border-color: var(--accent);
+            color: var(--accent);
         }
 
         .workflow-step {
-            padding: 5px 10px;
+            padding: 6px 10px;
+            border-radius: 12px;
+            background: var(--bg-spot);
             border: 1px solid var(--border);
-            border-radius: 15px;
-            background-color: var(--bg-main);
             transition: all 0.3s ease;
+            color: var(--text-secondary);
         }
 
         .workflow-step.active {
-            background-color: var(--accent);
+            background: rgba(255, 122, 61, 0.2);
+            color: var(--text-primary);
             border-color: var(--accent);
-            box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
+            box-shadow: 0 0 12px rgba(255, 122, 61, 0.4);
         }
 
         .workflow-step.completed {
-            background-color: var(--success);
+            background: rgba(76, 175, 80, 0.18);
+            color: var(--success);
             border-color: var(--success);
         }
 
-        .heartbeat-monitor {
+        .heartbeat {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 14px;
+            font-size: 13px;
             color: var(--success);
         }
 
         .heartbeat-dot {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            background-color: var(--success);
-            animation: heartbeat 1s infinite;
+            background: var(--success);
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.8);
+            animation: beat 1.2s infinite;
         }
 
-        @keyframes heartbeat {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); }
+        @keyframes beat {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
         }
 
-        /* 摄像头和检测区域 */
         .camera-panel {
             grid-area: camera;
-            background-color: var(--bg-panel);
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
             display: flex;
             flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
         }
 
         .camera-title {
-            color: var(--accent);
-            font-size: 16px;
-            margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-        }
-
-        .detection-info {
-            font-size: 12px;
-            color: var(--text-secondary);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
         }
 
         .camera-canvas {
             flex: 1;
-            background-color: #000000;
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            background: linear-gradient(135deg, rgba(33, 45, 63, 0.8), rgba(17, 23, 33, 0.9));
+            border: 1px dashed var(--border);
+            border-radius: 10px;
             position: relative;
             overflow: hidden;
-            margin-bottom: 10px;
+        }
+
+        .camera-placeholder {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            text-align: center;
         }
 
         .rail-indicator {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            height: 30px;
-            background-color: rgba(33, 150, 243, 0.3);
-            border: 1px solid var(--modbus-blue);
-            border-radius: 4px;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid var(--modbus);
+            background: rgba(33, 150, 243, 0.12);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--modbus-blue);
+            color: var(--modbus);
             font-size: 12px;
         }
 
@@ -169,431 +213,327 @@
             top: 0;
             width: 2px;
             height: 100%;
-            background-color: var(--error);
+            background: var(--error);
             transition: left 0.5s ease;
         }
 
         .coordinate-display {
-            background-color: #1A1A1A;
+            background: var(--bg-spot);
+            border: 1px solid var(--border);
+            border-radius: 10px;
             padding: 10px;
-            border-radius: 4px;
-            border: 1px solid var(--accent);
         }
 
         .coord-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             font-size: 12px;
         }
 
         .coord-item {
-            text-align: center;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
         }
 
-        .coord-label {
-            color: var(--text-secondary);
-            display: block;
-        }
+        .coord-label { color: var(--text-secondary); }
 
         .coord-value {
-            color: var(--accent);
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 700;
+            color: var(--accent);
         }
 
-        /* 右侧整合控制面板 */
         .control-panel {
             grid-area: control;
-            background-color: var(--bg-panel);
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
             overflow-y: auto;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
         }
 
         .panel-section {
-            background-color: #1A1A1A;
-            border: 1px solid;
-            border-radius: 5px;
-            padding: 8px;
-            margin-bottom: 4px;
+            background: var(--bg-spot);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
         }
 
         .section-title {
             font-size: 13px;
-            margin-bottom: 6px;
+            font-weight: 700;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-weight: bold;
+            gap: 8px;
         }
 
-        .plc-section {
-            border-color: var(--success);
-        }
-
-        .plc-section .section-title {
-            color: var(--success);
-        }
-
-        .jetson-section {
-            border-color: var(--jetson-green);
-        }
-
-        .jetson-section .section-title {
-            color: var(--jetson-green);
-        }
-
-        .modbus-section {
-            border-color: var(--modbus-blue);
-        }
-
-        .modbus-section .section-title {
-            color: var(--modbus-blue);
-        }
-
-        .communication-section {
-            border-color: var(--text-secondary);
-        }
-
-        .communication-section .section-title {
-            color: var(--text-secondary);
-        }
+        .section-title small { color: var(--text-secondary); font-weight: 400; }
 
         .registers-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 10px;
-            margin-top: 3px;
+            font-size: 11px;
         }
 
         .registers-table th,
         .registers-table td {
+            padding: 4px 6px;
             border: 1px solid var(--border);
-            padding: 2px 4px;
-            text-align: left;
         }
 
         .registers-table th {
-            background-color: var(--modbus-blue);
-            color: white;
-            font-size: 9px;
+            background: rgba(33, 150, 243, 0.16);
+            color: var(--text-primary);
         }
 
-        .registers-table .register-addr {
-            color: var(--modbus-blue);
-            font-family: 'Consolas', monospace;
-        }
-
-        .registers-table .register-value {
-            color: var(--accent);
-            font-family: 'Consolas', monospace;
-            font-weight: bold;
-        }
+        .register-addr { color: var(--modbus); font-family: Consolas, monospace; }
+        .register-value { color: var(--accent); font-weight: 700; font-family: Consolas, monospace; }
 
         .status-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px;
-            font-size: 10px;
-        }
-
-        .status-grid-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 4px;
-            font-size: 10px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            font-size: 11px;
         }
 
         .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 6px;
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 3px;
-        }
-
-        .status-label {
-            color: var(--text-secondary);
-        }
-
-        .status-value {
-            color: var(--text-primary);
-            font-weight: bold;
-            font-family: 'Consolas', monospace;
-        }
-
-        .blade-selector {
-            display: flex;
-            gap: 3px;
-            margin-top: 4px;
-        }
-
-        .blade-btn {
-            flex: 1;
-            padding: 3px;
+            background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border);
-            background-color: var(--bg-main);
-            color: var(--text-secondary);
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 9px;
-            transition: all 0.3s ease;
-        }
-
-        .blade-btn.active {
-            background-color: var(--accent);
-            border-color: var(--accent);
-            color: white;
-        }
-
-        /* 进度条样式 */
-        .progress-container {
-            margin-top: 4px;
-        }
-
-        .progress-label {
+            border-radius: 8px;
+            padding: 6px 8px;
             display: flex;
             justify-content: space-between;
-            font-size: 9px;
+        }
+
+        .progress-container { margin-top: 6px; }
+        .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+        .progress-bar { width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
+        .progress-cpu { background: var(--jetson); }
+        .progress-gpu { background: var(--accent); }
+        .progress-memory { background: var(--warning); }
+        .progress-temp { background: var(--error); }
+
+        .mode-pill {
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 11px;
             color: var(--text-secondary);
-            margin-bottom: 2px;
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background-color: var(--border);
-            border-radius: 3px;
-            overflow: hidden;
+        .network-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 6px;
         }
 
-        .progress-fill {
-            height: 100%;
-            transition: width 0.3s ease;
-            border-radius: 3px;
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 11px;
         }
 
-        .progress-cpu { background-color: var(--jetson-green); }
-        .progress-gpu { background-color: var(--accent); }
-        .progress-memory { background-color: var(--warning); }
-        .progress-temp { background-color: var(--error); }
+        .form-field label { color: var(--text-secondary); }
 
-        /* 温度指示器 */
-        .temp-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-left: 4px;
+        .form-field input,
+        .form-field select {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 8px;
+            color: var(--text-primary);
+            font-size: 12px;
         }
 
-        .temp-normal { background-color: var(--success); }
-        .temp-warm { background-color: var(--warning); }
-        .temp-hot { background-color: var(--error); }
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
 
-        /* 底部操作按钮 */
+        .btn {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-main);
+            color: var(--text-primary);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .btn:hover { transform: translateY(-1px); border-color: var(--accent); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-accent { background: var(--accent); border-color: var(--accent); color: #0f0f0f; }
+        .btn-warning { background: var(--warning); border-color: var(--warning); color: #0f0f0f; }
+        .btn-error { background: var(--error); border-color: var(--error); color: #fff; }
+        .btn-outline { background: transparent; }
+
         .footer-panel {
             grid-area: footer;
-            background-color: var(--bg-panel);
-            border-top: 2px solid var(--border);
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 20px;
+            box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.35);
         }
 
-        .control-buttons {
-            display: flex;
-            gap: 15px;
+        .control-buttons { display: flex; gap: 10px; }
+        .emergency-section { display: flex; gap: 10px; }
+
+        .inline-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-secondary);
         }
 
-        .emergency-section {
+        .status-good { color: var(--success); }
+        .status-bad { color: var(--error); }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .modal {
+            width: 720px;
+            max-width: 90vw;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+            padding: 14px;
+        }
+
+        .modal-header {
             display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .modal-close {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            display: grid;
             gap: 10px;
         }
 
-        .industrial-btn {
-            padding: 12px 20px;
-            border: 2px solid;
-            border-radius: 6px;
-            background-color: transparent;
-            color: var(--text-primary);
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            min-width: 120px;
+        .modal-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
 
-        .btn-start {
-            border-color: var(--success);
-            background-color: var(--success);
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
-        .btn-pause {
-            border-color: var(--warning);
-            color: var(--warning);
-        }
-
-        .btn-pause:hover {
-            background-color: var(--warning);
-            color: var(--bg-main);
-        }
-
-        .btn-emergency {
-            border-color: var(--emergency);
-            background-color: var(--emergency);
-            animation: emergency-blink 1s infinite;
-        }
-
-        @keyframes emergency-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .btn-stop {
-            border-color: var(--error);
-            color: var(--error);
-        }
-
-        .btn-stop:hover {
-            background-color: var(--error);
-            color: white;
-        }
-
-        .btn-power {
-            border-color: var(--power);
-            color: var(--power);
-        }
-
-        .btn-power:hover {
-            background-color: var(--power);
-            color: white;
-        }
-
-        /* 响应式调整 */
         @media (max-width: 1400px) {
-            .main-container {
-                grid-template-columns: 1fr 360px;
-            }
+            .main-container { grid-template-columns: 1fr 380px; }
         }
-
-        /* 滚动条样式 */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-main);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-
-        /* 版本信息样式 */
-        .version-info {
-            font-size: 9px;
-            color: var(--text-secondary);
-            margin-top: 4px;
-            line-height: 1.2;
-        }
-
-        /* 性能模式指示器 */
-        .performance-mode {
-            display: inline-block;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 8px;
-            font-weight: bold;
-            margin-left: 4px;
-        }
-
-        .mode-maxn { background-color: var(--error); color: white; }
-        .mode-5w { background-color: var(--success); color: white; }
-        .mode-10w { background-color: var(--warning); color: white; }
-        .mode-15w { background-color: var(--accent); color: white; }
     </style>
 </head>
 <body>
     <div class="main-container">
-        <!-- 顶部状态栏 -->
         <div class="header-panel">
-            <div class="system-title">AI竹节识别切割系统 v2.1 - Modbus TCP</div>
-            
-            <div class="workflow-status">
-                <div class="workflow-step" id="step-1">进料检测</div>
-                <div class="workflow-step" id="step-2">视觉识别</div>
-                <div class="workflow-step" id="step-3">坐标传输</div>
-                <div class="workflow-step" id="step-4">切割准备</div>
-                <div class="workflow-step" id="step-5">执行切割</div>
+            <div class="system-title">
+                AI竹节识别切割系统 v2.1
+                <span class="badge">Jetson Orin NX · Modbus TCP</span>
             </div>
-            
-            <div class="heartbeat-monitor">
-                <div class="heartbeat-dot"></div>
-                <span>心跳: <span id="heartbeat-counter">12345</span></span>
-                <span style="margin-left: 15px;">响应: <span id="response-time">12ms</span></span>
+            <div class="header-actions">
+                <div class="workflow-status">
+                    <div class="workflow-step" id="step-1">进料检测</div>
+                    <div class="workflow-step" id="step-2">视觉识别</div>
+                    <div class="workflow-step" id="step-3">坐标传输</div>
+                    <div class="workflow-step" id="step-4">切割准备</div>
+                    <div class="workflow-step" id="step-5">执行切割</div>
+                </div>
+                <button class="settings-btn" id="settings-btn">⚙️ 设置</button>
+                <div class="heartbeat">
+                    <div class="heartbeat-dot"></div>
+                    <span>心跳 <span id="heartbeat-counter">12345</span></span>
+                    <span class="inline-pill">响应 <span id="response-time">12ms</span></span>
+                </div>
             </div>
         </div>
 
-        <!-- 摄像头和检测区域 -->
         <div class="camera-panel">
             <div class="camera-title">
                 📹 实时检测画面
-                <div class="detection-info">
-                    导轨范围: 0-1000.0mm | 精度: 0.1mm | FPS: <span id="detection-fps">28.5</span>
-                </div>
+                <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度</span>
             </div>
-            
             <div class="camera-canvas">
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--text-secondary);">
-                    竹材检测视野<br>
-                    <small>1280 x 720 | YOLOv8 推理中</small><br>
-                    <small>推理时间: <span id="inference-time">15.3ms</span></small>
+                <div class="camera-placeholder">
+                    <div>
+                        <div>竹材检测预览 / RTSP 或 GStreamer 流</div>
+                        <small>推理时间 <span id="inference-time">15.3ms</span> · FPS <span id="detection-fps">28.5</span></small>
+                    </div>
                 </div>
-                
-                <!-- 导轨指示器 -->
                 <div class="rail-indicator">
-                    X轴导轨 (0-1000.0mm)
+                    X轴导轨 (0 - 1000.0 mm)
                     <div class="cutting-position" id="cutting-position" style="left: 25%;"></div>
                 </div>
             </div>
-            
-            <!-- 坐标显示 -->
             <div class="coordinate-display">
                 <div class="coord-grid">
                     <div class="coord-item">
-                        <span class="coord-label">X坐标</span>
-                        <span class="coord-value" id="x-coordinate">245.8mm</span>
+                        <div class="coord-label">X坐标</div>
+                        <div class="coord-value" id="x-coordinate">245.8mm</div>
                     </div>
                     <div class="coord-item">
-                        <span class="coord-label">切割质量</span>
-                        <span class="coord-value" id="cut-quality" style="color: var(--success);">正常</span>
+                        <div class="coord-label">切割质量</div>
+                        <div class="coord-value" id="cut-quality" style="color: var(--success);">正常</div>
                     </div>
                     <div class="coord-item">
-                        <span class="coord-label">刀片选择</span>
-                        <span class="coord-value" id="blade-selection">双刀片</span>
+                        <div class="coord-label">刀片选择</div>
+                        <div class="coord-value" id="blade-selection">双刀片</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 右侧整合控制面板 -->
         <div class="control-panel">
-            <!-- Modbus寄存器状态 -->
             <div class="panel-section modbus-section">
-                <div class="section-title">📊 Modbus寄存器状态</div>
+                <div class="section-title">📊 Modbus 寄存器状态 <small>40001+</small></div>
                 <table class="registers-table">
                     <thead>
                         <tr>
@@ -603,284 +543,175 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td class="register-addr">40001</td>
-                            <td>系统状态</td>
-                            <td class="register-value" id="reg-40001">1</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40002</td>
-                            <td>PLC命令</td>
-                            <td class="register-value" id="reg-40002">2</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40003</td>
-                            <td>坐标就绪</td>
-                            <td class="register-value" id="reg-40003">1</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40004-40005</td>
-                            <td>X坐标</td>
-                            <td class="register-value" id="reg-40004">2458</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40006</td>
-                            <td>切割质量</td>
-                            <td class="register-value" id="reg-40006">0</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40007-40008</td>
-                            <td>心跳计数</td>
-                            <td class="register-value" id="reg-40007">12345</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40009</td>
-                            <td>刀片编号</td>
-                            <td class="register-value" id="reg-40009">3</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40010</td>
-                            <td>健康状态</td>
-                            <td class="register-value" id="reg-40010">0</td>
-                        </tr>
+                        <tr><td class="register-addr">40001</td><td>系统状态</td><td class="register-value" id="reg-40001">1</td></tr>
+                        <tr><td class="register-addr">40002</td><td>PLC 命令</td><td class="register-value" id="reg-40002">2</td></tr>
+                        <tr><td class="register-addr">40003</td><td>坐标就绪</td><td class="register-value" id="reg-40003">1</td></tr>
+                        <tr><td class="register-addr">40004-40005</td><td>X 坐标</td><td class="register-value" id="reg-40004">2458</td></tr>
+                        <tr><td class="register-addr">40006</td><td>切割质量</td><td class="register-value" id="reg-40006">0</td></tr>
+                        <tr><td class="register-addr">40007-40008</td><td>心跳计数</td><td class="register-value" id="reg-40007">12345</td></tr>
+                        <tr><td class="register-addr">40009</td><td>刀片编号</td><td class="register-value" id="reg-40009">3</td></tr>
+                        <tr><td class="register-addr">40010</td><td>健康状态</td><td class="register-value" id="reg-40010">0</td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <!-- PLC通信状态 -->
             <div class="panel-section plc-section">
-                <div class="section-title">🔗 PLC通信状态</div>
+                <div class="section-title">🔌 PLC / 现场 IO</div>
                 <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">连接状态:</span>
-                        <span class="status-value" style="color: var(--success);">已连接</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">PLC地址:</span>
-                        <span class="status-value">192.168.1.100</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">响应时间:</span>
-                        <span class="status-value" id="plc-response">12ms</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">总切割数:</span>
-                        <span class="status-value" id="total-cuts">1,247</span>
-                    </div>
-                </div>
-                
-                <!-- 刀片选择 -->
-                <div class="blade-selector">
-                    <div class="blade-btn" id="blade-1">刀片1</div>
-                    <div class="blade-btn" id="blade-2">刀片2</div>
-                    <div class="blade-btn active" id="blade-3">双刀片</div>
+                    <div class="status-item"><span>PLC 连接</span><span class="status-good" id="plc-link">在线</span></div>
+                    <div class="status-item"><span>响应</span><span id="plc-response">12ms</span></div>
+                    <div class="status-item"><span>急停回路</span><span class="status-good">闭合</span></div>
+                    <div class="status-item"><span>气压</span><span>0.62 MPa</span></div>
                 </div>
             </div>
 
-            <!-- Jetson系统详细信息 -->
             <div class="panel-section jetson-section">
-                <div class="section-title">
-                    🟢 Jetson Orin Nano 8GB
-                    <span class="performance-mode mode-15w">15W</span>
-                </div>
-                
-                <!-- CPU信息 -->
+                <div class="section-title">🟢 Jetson Orin NX 状态 <small>无 X11，适配无头运行</small></div>
                 <div class="progress-container">
-                    <div class="progress-label">
-                        <span>CPU (6核 ARM Cortex-A78AE)</span>
-                        <span id="cpu-usage">45%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill progress-cpu" id="cpu-progress" style="width: 45%;"></div>
-                    </div>
+                    <div class="progress-label"><span>CPU</span><span id="cpu-usage">45%</span></div>
+                    <div class="progress-bar"><div class="progress-fill progress-cpu" id="cpu-progress" style="width: 45%;"></div></div>
+                    <div class="progress-label"><span>GPU</span><span id="gpu-usage">32%</span></div>
+                    <div class="progress-bar"><div class="progress-fill progress-gpu" id="gpu-progress" style="width: 32%;"></div></div>
+                    <div class="progress-label"><span>内存</span><span id="memory-usage">2.1GB/8GB</span></div>
+                    <div class="progress-bar"><div class="progress-fill progress-memory" id="memory-progress" style="width: 26%;"></div></div>
+                    <div class="progress-label"><span>温度</span><span id="thermal-temp">52°C</span></div>
+                    <div class="progress-bar"><div class="progress-fill progress-temp" id="temp-progress" style="width: 52%;"></div></div>
                 </div>
-
-                <!-- GPU信息 -->
-                <div class="progress-container">
-                    <div class="progress-label">
-                        <span>GPU (1024-core NVIDIA Ampere)</span>
-                        <span id="gpu-usage">32%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill progress-gpu" id="gpu-progress" style="width: 32%;"></div>
-                    </div>
-                </div>
-
-                <!-- 内存信息 -->
-                <div class="progress-container">
-                    <div class="progress-label">
-                        <span>内存 (LPDDR5)</span>
-                        <span id="memory-usage">2.1GB/8GB</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill progress-memory" id="memory-progress" style="width: 26%;"></div>
-                    </div>
-                </div>
-
-                <!-- 详细系统信息 -->
-                <div class="status-grid-3">
-                    <div class="status-item">
-                        <span class="status-label">CPU频率:</span>
-                        <span class="status-value" id="cpu-freq">1.5GHz</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">GPU频率:</span>
-                        <span class="status-value" id="gpu-freq">624MHz</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">EMC频率:</span>
-                        <span class="status-value" id="emc-freq">2133MHz</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">CPU温度:</span>
-                        <span class="status-value" id="cpu-temp">52°C<span class="temp-indicator temp-normal"></span></span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">GPU温度:</span>
-                        <span class="status-value" id="gpu-temp">49°C<span class="temp-indicator temp-normal"></span></span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">热区温度:</span>
-                        <span class="status-value" id="thermal-temp">45°C<span class="temp-indicator temp-normal"></span></span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">风扇转速:</span>
-                        <span class="status-value" id="fan-speed">2150RPM</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">功耗:</span>
-                        <span class="status-value" id="power-draw">8.2W</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">电压:</span>
-                        <span class="status-value" id="voltage">5.1V</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">存储使用:</span>
-                        <span class="status-value" id="storage-usage">45GB/128GB</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">运行时间:</span>
-                        <span class="status-value" id="uptime">2d 3h 15m</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">网络状态:</span>
-                        <span class="status-value" style="color: var(--success);">1Gbps</span>
-                    </div>
-                </div>
-
-                <!-- 软件版本信息 -->
-                <div class="version-info">
-                    JetPack 6.0 | CUDA 12.2 | TensorRT 8.6.1 | OpenCV 4.8.0<br>
-                    Python 3.10.12 | PyTorch 2.1.0 | ONNX Runtime 1.17.1
+                <div class="status-grid" style="margin-top: 6px;">
+                    <div class="status-item"><span>功耗</span><span id="power-draw">8.2W</span></div>
+                    <div class="status-item"><span>风扇</span><span id="fan-speed">2150 RPM</span></div>
+                    <div class="status-item"><span>EMC</span><span id="emc-freq">2133 MHz</span></div>
+                    <div class="status-item"><span>运行时长</span><span id="uptime">2d 3h 15m</span></div>
+                    <div class="status-item"><span>性能模式</span><span id="perf-mode">15W</span></div>
+                    <div class="status-item"><span>X11</span><span class="status-good">已禁用</span></div>
                 </div>
             </div>
 
-            <!-- AI模型状态 -->
-            <div class="panel-section" style="border-color: var(--accent);">
-                <div class="section-title" style="color: var(--accent);">🤖 AI模型状态</div>
+            <div class="panel-section ai-section">
+                <div class="section-title">🧠 模型 & 检测</div>
                 <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">模型版本:</span>
-                        <span class="status-value">YOLOv8n</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">推理时间:</span>
-                        <span class="status-value" id="model-inference">15.3ms</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">置信阈值:</span>
-                        <span class="status-value">0.85</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">检测精度:</span>
-                        <span class="status-value">94.2%</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">总检测数:</span>
-                        <span class="status-value" id="total-detections">15,432</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">今日检测:</span>
-                        <span class="status-value" id="today-detections">89</span>
-                    </div>
+                    <div class="status-item"><span>模型版本</span><span>YOLOv8n</span></div>
+                    <div class="status-item"><span>推理时间</span><span id="model-inference">15.3ms</span></div>
+                    <div class="status-item"><span>置信阈值</span><span>0.85</span></div>
+                    <div class="status-item"><span>检测精度</span><span>94.2%</span></div>
+                    <div class="status-item"><span>总检测数</span><span id="total-detections">15,432</span></div>
+                    <div class="status-item"><span>今日检测</span><span id="today-detections">89</span></div>
                 </div>
             </div>
 
-            <!-- 通信统计 -->
             <div class="panel-section communication-section">
                 <div class="section-title">📈 通信统计</div>
                 <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">连接时长:</span>
-                        <span class="status-value" id="connection-time">2h 15m</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">数据包:</span>
-                        <span class="status-value" id="data-packets">15,432</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">错误率:</span>
-                        <span class="status-value" id="error-rate">0.02%</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">吞吐量:</span>
-                        <span class="status-value" id="throughput">1.2KB/s</span>
-                    </div>
+                    <div class="status-item"><span>连接时长</span><span id="connection-time">2h 15m</span></div>
+                    <div class="status-item"><span>数据包</span><span id="data-packets">15,432</span></div>
+                    <div class="status-item"><span>错误率</span><span id="error-rate">0.02%</span></div>
+                    <div class="status-item"><span>吞吐</span><span id="throughput">1.2KB/s</span></div>
+                    <div class="status-item"><span>Wi-Fi</span><span id="wifi-summary">wlan0 | 已连接</span></div>
+                    <div class="status-item"><span>Wi-Fi 模式</span><span id="wifi-mode">DHCP</span></div>
                 </div>
             </div>
+
         </div>
 
-        <!-- 底部操作按钮 -->
         <div class="footer-panel">
             <div class="control-buttons">
-                <button class="industrial-btn btn-start" id="start-btn">▶ 启动系统</button>
-                <button class="industrial-btn btn-pause" id="pause-btn">⏸ 暂停</button>
-                <button class="industrial-btn btn-stop" id="stop-btn">⏹ 停止</button>
+                <button class="btn btn-accent" id="start-btn">启动系统</button>
+                <button class="btn" id="pause-btn">暂停</button>
+                <button class="btn btn-outline" id="stop-btn">停止</button>
             </div>
-            
             <div style="text-align: center; color: var(--text-secondary);">
                 <div>当前工序: <span id="current-process">进料检测中</span></div>
-                <div style="font-size: 12px; margin-top: 5px;">
-                    上次切割: 14:25:33 | 今日切割: <span id="daily-cuts">89</span>次 | 效率: <span id="efficiency">94.2%</span>
-                </div>
+                <div style="font-size: 12px; margin-top: 4px;">上次切割 14:25:33 | 今日切割 <span id="daily-cuts">89</span> | 效率 <span id="efficiency">94.2%</span></div>
             </div>
-            
             <div class="emergency-section">
-                <button class="industrial-btn btn-emergency" id="emergency-btn">🚨 紧急停止</button>
-                <button class="industrial-btn btn-power" id="power-btn">⏻ 关机</button>
+                <button class="btn btn-error" id="emergency-btn">🚨 紧急停机</button>
+                <button class="btn" id="power-btn">⏻ 关机</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                系统设置
+                <button class="modal-close" id="modal-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="panel-section">
+                    <div class="section-title">🛡️ 电源控制（无头）</div>
+                    <div class="modal-actions">
+                        <button class="btn btn-warning" id="modal-reboot-btn">重启 Jetson</button>
+                        <button class="btn btn-error" id="modal-shutdown-btn">安全关机</button>
+                        <button class="btn btn-outline" id="modal-restart-service-btn">重启推理/Modbus 服务</button>
+                    </div>
+                </div>
+                <div class="panel-section">
+                    <div class="section-title">⚡ 性能模式</div>
+                    <div class="modal-actions">
+                        <button class="btn btn-outline perf-btn" data-mode="10W">10W</button>
+                        <button class="btn btn-outline perf-btn" data-mode="15W">15W</button>
+                        <button class="btn btn-outline perf-btn" data-mode="MAXN">MAXN</button>
+                    </div>
+                </div>
+                <div class="panel-section">
+                    <div class="section-title">📶 Wi-Fi 配置</div>
+                    <div class="modal-row">
+                        <div class="form-field">
+                            <label for="wifi-ssid">SSID</label>
+                            <input id="wifi-ssid" value="FactoryWiFi">
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-password">密码</label>
+                            <input id="wifi-password" type="password" value="******">
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-security">安全</label>
+                            <select id="wifi-security">
+                                <option value="WPA2-PSK">WPA2-PSK</option>
+                                <option value="WPA3">WPA3</option>
+                                <option value="OPEN">开放</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-mode-select">获取地址</label>
+                            <select id="wifi-mode-select">
+                                <option value="dhcp">DHCP</option>
+                                <option value="static">静态</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-ip">IP 地址</label>
+                            <input id="wifi-ip" value="192.168.1.120">
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-mask">子网掩码</label>
+                            <input id="wifi-mask" value="255.255.255.0">
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-gateway">网关</label>
+                            <input id="wifi-gateway" value="192.168.1.1">
+                        </div>
+                        <div class="form-field">
+                            <label for="wifi-dns">DNS</label>
+                            <input id="wifi-dns" value="223.5.5.5">
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-accent" id="apply-wifi-btn">应用 Wi-Fi</button>
+                        <button class="btn" id="check-wifi-btn">连通性检测</button>
+                        <button class="btn btn-outline" id="restart-wifi-btn">重启 Wi-Fi 服务</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // 模拟Jetson系统数据
-        let jetsonData = {
-            cpu: { usage: 45, freq: 1500, temp: 52 },
-            gpu: { usage: 32, freq: 624, temp: 49 },
-            memory: { used: 2.1, total: 8.0 },
-            thermal: { temp: 45 },
-            fan: { speed: 2150 },
-            power: { draw: 8.2, voltage: 5.1 },
-            emc: { freq: 2133 },
-            storage: { used: 45, total: 128 },
-            uptime: { days: 2, hours: 3, minutes: 15 }
-        };
-
-        // 模拟AI模型数据
-        let aiModelData = {
-            inferenceTime: 15.3,
-            detectionFps: 28.5,
-            totalDetections: 15432,
-            todayDetections: 89,
-            accuracy: 94.2
-        };
-
-        // 模拟数据和状态
-        let systemState = {
+        // 模拟数据（预览用，Qt 版本请绑定真实接口）
+        const systemState = {
             isRunning: false,
             currentStep: 1,
-            heartbeatCounter: 12345,
+            heartbeat: 12345,
             xCoordinate: 245.8,
             cutQuality: 0,
             bladeSelection: 3,
@@ -888,16 +719,41 @@
             coordinateReady: 0
         };
 
-        // Modbus寄存器状态码映射
-        const statusMaps = {
-            systemStatus: ['停止', '运行', '错误', '暂停', '紧急停止', '维护模式'],
-            plcCommand: ['无', '进料检测', '切割准备', '切割完成', '启动送料', '暂停', '紧急停止', '恢复运行'],
-            cutQuality: ['正常', '异常'],
-            bladeType: ['无', '刀片1', '刀片2', '双刀片'],
-            healthStatus: ['正常', '警告', '错误', '严重错误']
+        const jetsonData = {
+            cpu: { usage: 45, temp: 52 },
+            gpu: { usage: 32, temp: 49 },
+            memory: { used: 2.1, total: 8 },
+            thermal: { temp: 52 },
+            fan: { speed: 2150 },
+            power: { draw: 8.2 },
+            emc: { freq: 2133 },
+            uptime: { days: 2, hours: 3, minutes: 15 }
         };
 
-        // 工作流程步骤
+        const aiModelData = {
+            inferenceTime: 15.3,
+            detectionFps: 28.5,
+            totalDetections: 15432,
+            todayDetections: 89,
+            accuracy: 94.2
+        };
+
+        const wifiState = {
+            iface: 'wlan0',
+            ssid: 'FactoryWiFi',
+            password: '******',
+            security: 'WPA2-PSK',
+            mode: 'dhcp',
+            ip: '192.168.1.120',
+            mask: '255.255.255.0',
+            gateway: '192.168.1.1',
+            dns: '223.5.5.5',
+            status: '已连接',
+            rssi: -55
+        };
+
+        const performanceState = { mode: '15W' };
+
         const workflowSteps = [
             { id: 1, name: '进料检测', plcCmd: 1 },
             { id: 2, name: '视觉识别', plcCmd: 0 },
@@ -906,1314 +762,62 @@
             { id: 5, name: '执行切割', plcCmd: 3 }
         ];
 
-        // 更新心跳计数器
-        function updateHeartbeat() {
-            systemState.heartbeatCounter += 1;
-            if (systemState.heartbeatCounter > 4294967295) {
-                systemState.heartbeatCounter = 0; // 溢出处理
-            }
-            document.getElementById('heartbeat-counter').textContent = systemState.heartbeatCounter;
-            document.getElementById('reg-40007').textContent = systemState.heartbeatCounter;
-        }
-
-        // 更新Jetson系统信息
-        function updateJetsonInfo() {
-            // CPU
-            jetsonData.cpu.usage = 40 + Math.random() * 20;
-            jetsonData.cpu.freq = 1200 + Math.random() * 600;
-            jetsonData.cpu.temp = 45 + Math.random() * 15;
-            
-            // GPU
-            jetsonData.gpu.usage = 25 + Math.random() * 25;
-            jetsonData.gpu.freq = 500 + Math.random() * 300;
-            jetsonData.gpu.temp = 40 + Math.random() * 20;
-            
-            // 其他参数
-            jetsonData.thermal.temp = 40 + Math.random() * 15;
-            jetsonData.fan.speed = 2000 + Math.random() * 500;
-            jetsonData.power.draw = 7 + Math.random() * 3;
-            jetsonData.power.voltage = 4.9 + Math.random() * 0.4;
-            jetsonData.emc.freq = 2000 + Math.random() * 300;
-            
-            // AI模型数据
-            aiModelData.inferenceTime = 12 + Math.random() * 8;
-            aiModelData.detectionFps = 25 + Math.random() * 8;
-            
-            // 更新显示
-            document.getElementById('cpu-usage').textContent = jetsonData.cpu.usage.toFixed(1) + '%';
-            document.getElementById('cpu-progress').style.width = jetsonData.cpu.usage + '%';
-            document.getElementById('cpu-freq').textContent = (jetsonData.cpu.freq / 1000).toFixed(1) + 'GHz';
-            document.getElementById('cpu-temp').textContent = jetsonData.cpu.temp.toFixed(0) + '°C';
-            
-            document.getElementById('gpu-usage').textContent = jetsonData.gpu.usage.toFixed(1) + '%';
-            document.getElementById('gpu-progress').style.width = jetsonData.gpu.usage + '%';
-            document.getElementById('gpu-freq').textContent = jetsonData.gpu.freq.toFixed(0) + 'MHz';
-            document.getElementById('gpu-temp').textContent = jetsonData.gpu.temp.toFixed(0) + '°C';
-            
-            document.getElementById('memory-usage').textContent = jetsonData.memory.used.toFixed(1) + 'GB/' + jetsonData.memory.total + 'GB';
-            document.getElementById('memory-progress').style.width = (jetsonData.memory.used / jetsonData.memory.total * 100) + '%';
-            
-            document.getElementById('thermal-temp').textContent = jetsonData.thermal.temp.toFixed(0) + '°C';
-            document.getElementById('fan-speed').textContent = jetsonData.fan.speed.toFixed(0) + 'RPM';
-            document.getElementById('power-draw').textContent = jetsonData.power.draw.toFixed(1) + 'W';
-            document.getElementById('voltage').textContent = jetsonData.power.voltage.toFixed(1) + 'V';
-            document.getElementById('emc-freq').textContent = jetsonData.emc.freq.toFixed(0) + 'MHz';
-            document.getElementById('storage-usage').textContent = jetsonData.storage.used + 'GB/' + jetsonData.storage.total + 'GB';
-            document.getElementById('uptime').textContent = jetsonData.uptime.days + 'd ' + jetsonData.uptime.hours + 'h ' + jetsonData.uptime.minutes + 'm';
-            
-            // AI模型信息
-            document.getElementById('model-inference').textContent = aiModelData.inferenceTime.toFixed(1) + 'ms';
-            document.getElementById('inference-time').textContent = aiModelData.inferenceTime.toFixed(1) + 'ms';
-            document.getElementById('detection-fps').textContent = aiModelData.detectionFps.toFixed(1);
-            document.getElementById('total-detections').textContent = aiModelData.totalDetections.toLocaleString();
-            document.getElementById('today-detections').textContent = aiModelData.todayDetections;
-            
-            // 温度指示器颜色
-            updateTempIndicators();
-        }
-
-        // 更新温度指示器颜色
-        function updateTempIndicators() {
-            const tempElements = [
-                { id: 'cpu-temp', temp: jetsonData.cpu.temp },
-                { id: 'gpu-temp', temp: jetsonData.gpu.temp },
-                { id: 'thermal-temp', temp: jetsonData.thermal.temp }
-            ];
-            
-            tempElements.forEach(element => {
-                const indicator = document.querySelector(`#${element.id} .temp-indicator`);
-                if (indicator) {
-                    indicator.className = 'temp-indicator';
-                    if (element.temp > 70) {
-                        indicator.classList.add('temp-hot');
-                    } else if (element.temp > 60) {
-                        indicator.classList.add('temp-warm');
-                    } else {
-                        indicator.classList.add('temp-normal');
-                    }
-                }
-            });
-        }
-
-        // 更新工作流程状态
-        function updateWorkflowStatus(step) {
-            // 清除所有步骤状态
-            for (let i = 1; i <= 5; i++) {
-                const stepEl = document.getElementById(`step-${i}`);
-                stepEl.classList.remove('active', 'completed');
-                stepEl.style.backgroundColor = '';
-                stepEl.style.borderColor = '';
-                
-                if (i < step) {
-                    stepEl.classList.add('completed');
-                } else if (i === step) {
-                    stepEl.classList.add('active');
-                }
-            }
-            
-            systemState.currentStep = step;
-            document.getElementById('current-process').textContent = workflowSteps[step - 1].name + '中';
-        }
-
-        // 更新Modbus寄存器显示
-        function updateModbusRegisters() {
-            document.getElementById('reg-40001').textContent = systemState.isRunning ? 1 : 0;
-            document.getElementById('reg-40002').textContent = systemState.plcCommand;
-            document.getElementById('reg-40003').textContent = systemState.coordinateReady;
-            document.getElementById('reg-40004').textContent = Math.round(systemState.xCoordinate * 10);
-            document.getElementById('reg-40006').textContent = systemState.cutQuality;
-            document.getElementById('reg-40009').textContent = systemState.bladeSelection;
-            document.getElementById('reg-40010').textContent = 0; // 正常状态
-            
-            // 更新界面显示
-            document.getElementById('x-coordinate').textContent = systemState.xCoordinate.toFixed(1) + 'mm';
-            document.getElementById('cut-quality').textContent = statusMaps.cutQuality[systemState.cutQuality];
-            document.getElementById('blade-selection').textContent = statusMaps.bladeType[systemState.bladeSelection];
-            
-            // 更新切割位置指示器
-            const position = (systemState.xCoordinate / 1000.0) * 100;
-            document.getElementById('cutting-position').style.left = position + '%';
-        }
-
-        // 模拟工作流程
-        function simulateWorkflow() {
-            if (!systemState.isRunning) return;
-            
-            const currentStep = systemState.currentStep;
-            
-            switch (currentStep) {
-                case 1: // 进料检测
-                    systemState.plcCommand = 1;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(2);
-                            simulateWorkflow();
-                        }
-                    }, 3000);
-                    break;
-                    
-                case 2: // 视觉识别
-                    systemState.plcCommand = 0;
-                    // 模拟检测到竹材
-                    systemState.xCoordinate = 200 + Math.random() * 600; // 200-800mm
-                    systemState.coordinateReady = 1;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(3);
-                            simulateWorkflow();
-                        }
-                    }, 2000);
-                    break;
-                    
-                case 3: // 坐标传输
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(4);
-                            simulateWorkflow();
-                        }
-                    }, 1000);
-                    break;
-                    
-                case 4: // 切割准备
-                    systemState.plcCommand = 2;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(5);
-                            simulateWorkflow();
-                        }
-                    }, 4000);
-                    break;
-                    
-                case 5: // 执行切割
-                    systemState.plcCommand = 3;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            // 完成一个循环，重新开始
-                            systemState.coordinateReady = 0;
-                            aiModelData.todayDetections++;
-                            aiModelData.totalDetections++;
-                            updateWorkflowStatus(1);
-                            simulateWorkflow();
-                        }
-                    }, 3000);
-                    break;
-            }
-            
-            updateModbusRegisters();
-        }
-
-        // 按钮事件处理
-        document.getElementById('start-btn').addEventListener('click', function() {
-            systemState.isRunning = true;
-            this.textContent = '🔄 运行中';
-            this.style.backgroundColor = 'var(--warning)';
-            this.disabled = true;
-            
-            updateWorkflowStatus(1);
-            simulateWorkflow();
-        });
-
-        document.getElementById('pause-btn').addEventListener('click', function() {
-            if (systemState.isRunning) {
-                systemState.isRunning = false;
-                systemState.plcCommand = 5; // 暂停命令
-                document.getElementById('start-btn').textContent = '▶ 恢复运行';
-                document.getElementById('start-btn').disabled = false;
-                document.getElementById('start-btn').style.backgroundColor = 'var(--success)';
-                updateModbusRegisters();
-            }
-        });
-
-        document.getElementById('stop-btn').addEventListener('click', function() {
-            systemState.isRunning = false;
-            systemState.plcCommand = 0;
-            systemState.coordinateReady = 0;
-            updateWorkflowStatus(1);
-            
-            document.getElementById('start-btn').textContent = '▶ 启动系统';
-            document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').style.backgroundColor = 'var(--success)';
-            
-            // 清除所有工作流程状态
-            for (let i = 1; i <= 5; i++) {
-                document.getElementById(`step-${i}`).classList.remove('active', 'completed');
-            }
-            
-            updateModbusRegisters();
-        });
-
-        document.getElementById('emergency-btn').addEventListener('click', function() {
-            systemState.isRunning = false;
-            systemState.plcCommand = 6; // 紧急停止
-            
-            // 所有步骤变红色表示紧急停止
-            for (let i = 1; i <= 5; i++) {
-                const stepEl = document.getElementById(`step-${i}`);
-                stepEl.classList.remove('active', 'completed');
-                stepEl.style.backgroundColor = 'var(--emergency)';
-                stepEl.style.borderColor = 'var(--emergency)';
-            }
-            
-            document.getElementById('current-process').textContent = '🚨 紧急停止';
-            document.getElementById('start-btn').textContent = '⚠ 恢复运行';
-            document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').style.backgroundColor = 'var(--warning)';
-            
-            updateModbusRegisters();
-        });
-
-        document.getElementById('power-btn').addEventListener('click', function() {
-            if (confirm('确定要关闭Jetson系统吗？')) {
-                alert('正在安全关机...\n1. 停止AI模型推理\n2. 保存系统日志\n3. 关闭Modbus服务\n4. 系统关机');
-            }
-        });
-
-        // 刀片选择
-        document.querySelectorAll('.blade-btn').forEach((btn, index) => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.blade-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                systemState.bladeSelection = index + 1;
-                updateModbusRegisters();
-            });
-        });
-
-        // 初始化和定时更新
-        setInterval(updateHeartbeat, 20); // 50Hz心跳
-        setInterval(updateJetsonInfo, 2000); // 2秒更新系统信息
-        setInterval(() => {
-            // 更新响应时间
-            const responseTime = Math.floor(Math.random() * 10) + 8;
-            document.getElementById('response-time').textContent = responseTime + 'ms';
-            document.getElementById('plc-response').textContent = responseTime + 'ms';
-        }, 1000);
-
-        // 页面加载完成后初始化
-        updateModbusRegisters();
-        updateWorkflowStatus(1);
-        updateJetsonInfo();
-
-        console.log('AI竹节识别切割系统 - Jetson详细监控版界面已加载');
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI竹节识别切割系统 v2.1 - Modbus通信版</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Consolas', 'Arial', 'Microsoft YaHei', sans-serif;
-            background-color: #1E1E1E;
-            color: #FFFFFF;
-            overflow: hidden;
-            height: 100vh;
-        }
-
-        :root {
-            --bg-main: #1E1E1E;
-            --bg-panel: #2D2D2D;
-            --accent: #FF6B35;
-            --success: #4CAF50;
-            --warning: #FFC107;
-            --error: #F44336;
-            --text-primary: #FFFFFF;
-            --text-secondary: #B0B0B0;
-            --border: #404040;
-            --modbus-blue: #2196F3;
-            --emergency: #FF1744;
-            --power: #9C27B0;
-            --jetson-green: #76B900;
-        }
-
-        /* 主布局 - 左右两列 */
-        .main-container {
-            display: grid;
-            grid-template-areas: 
-                "header header"
-                "camera control"
-                "footer footer";
-            grid-template-rows: 60px 1fr 80px;
-            grid-template-columns: 1fr 380px;
-            height: 100vh;
-            gap: 10px;
-            padding: 0 10px 10px 10px;
-        }
-
-        /* 顶部状态栏 */
-        .header-panel {
-            grid-area: header;
-            background-color: var(--bg-panel);
-            border-bottom: 2px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-        }
-
-        .system-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: var(--text-primary);
-        }
-
-        .workflow-status {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 14px;
-        }
-
-        .workflow-step {
-            padding: 5px 10px;
-            border: 1px solid var(--border);
-            border-radius: 15px;
-            background-color: var(--bg-main);
-            transition: all 0.3s ease;
-        }
-
-        .workflow-step.active {
-            background-color: var(--accent);
-            border-color: var(--accent);
-            box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
-        }
-
-        .workflow-step.completed {
-            background-color: var(--success);
-            border-color: var(--success);
-        }
-
-        .heartbeat-monitor {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            color: var(--success);
-        }
-
-        .heartbeat-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--success);
-            animation: heartbeat 1s infinite;
-        }
-
-        @keyframes heartbeat {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-        }
-
-        /* 摄像头和检测区域 */
-        .camera-panel {
-            grid-area: camera;
-            background-color: var(--bg-panel);
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .camera-title {
-            color: var(--accent);
-            font-size: 16px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .detection-info {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .camera-canvas {
-            flex: 1;
-            background-color: #000000;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            position: relative;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-
-        .rail-indicator {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            height: 30px;
-            background-color: rgba(33, 150, 243, 0.3);
-            border: 1px solid var(--modbus-blue);
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--modbus-blue);
-            font-size: 12px;
-        }
-
-        .cutting-position {
-            position: absolute;
-            top: 0;
-            width: 2px;
-            height: 100%;
-            background-color: var(--error);
-            transition: left 0.5s ease;
-        }
-
-        .coordinate-display {
-            background-color: #1A1A1A;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid var(--accent);
-        }
-
-        .coord-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            font-size: 12px;
-        }
-
-        .coord-item {
-            text-align: center;
-        }
-
-        .coord-label {
-            color: var(--text-secondary);
-            display: block;
-        }
-
-        .coord-value {
-            color: var(--accent);
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        /* 右侧整合控制面板 */
-        .control-panel {
-            grid-area: control;
-            background-color: var(--bg-panel);
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            overflow-y: auto;
-        }
-
-        .panel-section {
-            background-color: #1A1A1A;
-            border: 1px solid;
-            border-radius: 5px;
-            padding: 8px;
-            margin-bottom: 4px;
-        }
-
-        .section-title {
-            font-size: 13px;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-weight: bold;
-        }
-
-        .plc-section {
-            border-color: var(--success);
-        }
-
-        .plc-section .section-title {
-            color: var(--success);
-        }
-
-        .jetson-section {
-            border-color: var(--jetson-green);
-        }
-
-        .jetson-section .section-title {
-            color: var(--jetson-green);
-        }
-
-        .modbus-section {
-            border-color: var(--modbus-blue);
-        }
-
-        .modbus-section .section-title {
-            color: var(--modbus-blue);
-        }
-
-        .communication-section {
-            border-color: var(--text-secondary);
-        }
-
-        .communication-section .section-title {
-            color: var(--text-secondary);
-        }
-
-        .registers-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 10px;
-            margin-top: 3px;
-        }
-
-        .registers-table th,
-        .registers-table td {
-            border: 1px solid var(--border);
-            padding: 2px 4px;
-            text-align: left;
-        }
-
-        .registers-table th {
-            background-color: var(--modbus-blue);
-            color: white;
-            font-size: 9px;
-        }
-
-        .registers-table .register-addr {
-            color: var(--modbus-blue);
-            font-family: 'Consolas', monospace;
-        }
-
-        .registers-table .register-value {
-            color: var(--accent);
-            font-family: 'Consolas', monospace;
-            font-weight: bold;
-        }
-
-        .status-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px;
-            font-size: 10px;
-        }
-
-        .status-grid-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 4px;
-            font-size: 10px;
-        }
-
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 6px;
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 3px;
-        }
-
-        .status-label {
-            color: var(--text-secondary);
-        }
-
-        .status-value {
-            color: var(--text-primary);
-            font-weight: bold;
-            font-family: 'Consolas', monospace;
-        }
-
-        .blade-selector {
-            display: flex;
-            gap: 3px;
-            margin-top: 4px;
-        }
-
-        .blade-btn {
-            flex: 1;
-            padding: 3px;
-            border: 1px solid var(--border);
-            background-color: var(--bg-main);
-            color: var(--text-secondary);
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 9px;
-            transition: all 0.3s ease;
-        }
-
-        .blade-btn.active {
-            background-color: var(--accent);
-            border-color: var(--accent);
-            color: white;
-        }
-
-        /* 进度条样式 */
-        .progress-container {
-            margin-top: 4px;
-        }
-
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 9px;
-            color: var(--text-secondary);
-            margin-bottom: 2px;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background-color: var(--border);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            transition: width 0.3s ease;
-            border-radius: 3px;
-        }
-
-        .progress-cpu { background-color: var(--jetson-green); }
-        .progress-gpu { background-color: var(--accent); }
-        .progress-memory { background-color: var(--warning); }
-        .progress-temp { background-color: var(--error); }
-
-        /* 温度指示器 */
-        .temp-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-left: 4px;
-        }
-
-        .temp-normal { background-color: var(--success); }
-        .temp-warm { background-color: var(--warning); }
-        .temp-hot { background-color: var(--error); }
-
-        /* 底部操作按钮 */
-        .footer-panel {
-            grid-area: footer;
-            background-color: var(--bg-panel);
-            border-top: 2px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-        }
-
-        .control-buttons {
-            display: flex;
-            gap: 15px;
-        }
-
-        .emergency-section {
-            display: flex;
-            gap: 10px;
-        }
-
-        .industrial-btn {
-            padding: 12px 20px;
-            border: 2px solid;
-            border-radius: 6px;
-            background-color: transparent;
-            color: var(--text-primary);
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            min-width: 120px;
-        }
-
-        .btn-start {
-            border-color: var(--success);
-            background-color: var(--success);
-        }
-
-        .btn-pause {
-            border-color: var(--warning);
-            color: var(--warning);
-        }
-
-        .btn-pause:hover {
-            background-color: var(--warning);
-            color: var(--bg-main);
-        }
-
-        .btn-emergency {
-            border-color: var(--emergency);
-            background-color: var(--emergency);
-            animation: emergency-blink 1s infinite;
-        }
-
-        @keyframes emergency-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .btn-stop {
-            border-color: var(--error);
-            color: var(--error);
-        }
-
-        .btn-stop:hover {
-            background-color: var(--error);
-            color: white;
-        }
-
-        .btn-power {
-            border-color: var(--power);
-            color: var(--power);
-        }
-
-        .btn-power:hover {
-            background-color: var(--power);
-            color: white;
-        }
-
-        /* 响应式调整 */
-        @media (max-width: 1400px) {
-            .main-container {
-                grid-template-columns: 1fr 360px;
-            }
-        }
-
-        /* 滚动条样式 */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-main);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-
-        /* 版本信息样式 */
-        .version-info {
-            font-size: 9px;
-            color: var(--text-secondary);
-            margin-top: 4px;
-            line-height: 1.2;
-        }
-
-        /* 性能模式指示器 */
-        .performance-mode {
-            display: inline-block;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 8px;
-            font-weight: bold;
-            margin-left: 4px;
-        }
-
-        .mode-maxn { background-color: var(--error); color: white; }
-        .mode-5w { background-color: var(--success); color: white; }
-        .mode-10w { background-color: var(--warning); color: white; }
-        .mode-15w { background-color: var(--accent); color: white; }
-    </style>
-</head>
-<body>
-    <div class="main-container">
-        <!-- 顶部状态栏 -->
-        <div class="header-panel">
-            <div class="system-title">AI竹节识别切割系统 v2.1 - Modbus TCP</div>
-            
-            <div class="workflow-status">
-                <div class="workflow-step" id="step-1">进料检测</div>
-                <div class="workflow-step" id="step-2">视觉识别</div>
-                <div class="workflow-step" id="step-3">坐标传输</div>
-                <div class="workflow-step" id="step-4">切割准备</div>
-                <div class="workflow-step" id="step-5">执行切割</div>
-            </div>
-            
-            <div class="heartbeat-monitor">
-                <div class="heartbeat-dot"></div>
-                <span>心跳: <span id="heartbeat-counter">12345</span></span>
-                <span style="margin-left: 15px;">响应: <span id="response-time">12ms</span></span>
-            </div>
-        </div>
-
-        <!-- 摄像头和检测区域 -->
-        <div class="camera-panel">
-            <div class="camera-title">
-                📹 实时检测画面
-                <div class="detection-info">
-                    导轨范围: 0-1000.0mm | 精度: 0.1mm | FPS: <span id="detection-fps">28.5</span>
-                </div>
-            </div>
-            
-            <div class="camera-canvas">
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--text-secondary);">
-                    竹材检测视野<br>
-                    <small>1280 x 720 | YOLOv8 推理中</small><br>
-                    <small>推理时间: <span id="inference-time">15.3ms</span></small>
-                </div>
-                
-                <!-- 导轨指示器 -->
-                <div class="rail-indicator">
-                    X轴导轨 (0-1000.0mm)
-                    <div class="cutting-position" id="cutting-position" style="left: 25%;"></div>
-                </div>
-            </div>
-            
-            <!-- 坐标显示 -->
-            <div class="coordinate-display">
-                <div class="coord-grid">
-                    <div class="coord-item">
-                        <span class="coord-label">X坐标</span>
-                        <span class="coord-value" id="x-coordinate">245.8mm</span>
-                    </div>
-                    <div class="coord-item">
-                        <span class="coord-label">切割质量</span>
-                        <span class="coord-value" id="cut-quality" style="color: var(--success);">正常</span>
-                    </div>
-                    <div class="coord-item">
-                        <span class="coord-label">刀片选择</span>
-                        <span class="coord-value" id="blade-selection">双刀片</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 右侧整合控制面板 -->
-        <div class="control-panel">
-            <!-- Modbus寄存器状态 -->
-            <div class="panel-section modbus-section">
-                <div class="section-title">📊 Modbus寄存器状态</div>
-                <table class="registers-table">
-                    <thead>
-                        <tr>
-                            <th>地址</th>
-                            <th>描述</th>
-                            <th>值</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="register-addr">40001</td>
-                            <td>系统状态</td>
-                            <td class="register-value" id="reg-40001">1</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40002</td>
-                            <td>PLC命令</td>
-                            <td class="register-value" id="reg-40002">2</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40003</td>
-                            <td>坐标就绪</td>
-                            <td class="register-value" id="reg-40003">1</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40004-40005</td>
-                            <td>X坐标</td>
-                            <td class="register-value" id="reg-40004">2458</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40006</td>
-                            <td>切割质量</td>
-                            <td class="register-value" id="reg-40006">0</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40007-40008</td>
-                            <td>心跳计数</td>
-                            <td class="register-value" id="reg-40007">12345</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40009</td>
-                            <td>刀片编号</td>
-                            <td class="register-value" id="reg-40009">3</td>
-                        </tr>
-                        <tr>
-                            <td class="register-addr">40010</td>
-                            <td>健康状态</td>
-                            <td class="register-value" id="reg-40010">0</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- PLC通信状态 -->
-            <div class="panel-section plc-section">
-                <div class="section-title">🔗 PLC通信状态</div>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">连接状态:</span>
-                        <span class="status-value" style="color: var(--success);">已连接</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">PLC地址:</span>
-                        <span class="status-value">192.168.1.100</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">响应时间:</span>
-                        <span class="status-value" id="plc-response">12ms</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">总切割数:</span>
-                        <span class="status-value" id="total-cuts">1,247</span>
-                    </div>
-                </div>
-                
-                <!-- 刀片选择 -->
-                <div class="blade-selector">
-                    <div class="blade-btn" id="blade-1">刀片1</div>
-                    <div class="blade-btn" id="blade-2">刀片2</div>
-                    <div class="blade-btn active" id="blade-3">双刀片</div>
-                </div>
-            </div>
-
-            <!-- Jetson系统详细信息 -->
-            <div class="panel-section jetson-section">
-                <div class="section-title">
-                    🟢 Jetson Orin Nano 8GB
-                    <span class="performance-mode mode-15w">15W</span>
-                </div>
-                
-                <!-- CPU信息 -->
-                <div class="progress-container">
-                    <div class="progress-label">
-                        <span>CPU (6核 ARM Cortex-A78AE)</span>
-                        <span id="cpu-usage">45%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill progress-cpu" id="cpu-progress" style="width: 45%;"></div>
-                    </div>
-                </div>
-
-                <!-- GPU信息 -->
-                <div class="progress-container">
-                    <div class="progress-label">
-                        <span>GPU (1024-core NVIDIA Ampere)</span>
-                        <span id="gpu-usage">32%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill progress-gpu" id="gpu-progress" style="width: 32%;"></div>
-                    </div>
-                </div>
-
-                <!-- 内存信息 -->
-                <div class="progress-container">
-                    <div class="progress-label">
-                        <span>内存 (LPDDR5)</span>
-                        <span id="memory-usage">2.1GB/8GB</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill progress-memory" id="memory-progress" style="width: 26%;"></div>
-                    </div>
-                </div>
-
-                <!-- 详细系统信息 -->
-                <div class="status-grid-3">
-                    <div class="status-item">
-                        <span class="status-label">CPU频率:</span>
-                        <span class="status-value" id="cpu-freq">1.5GHz</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">GPU频率:</span>
-                        <span class="status-value" id="gpu-freq">624MHz</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">EMC频率:</span>
-                        <span class="status-value" id="emc-freq">2133MHz</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">CPU温度:</span>
-                        <span class="status-value" id="cpu-temp">52°C<span class="temp-indicator temp-normal"></span></span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">GPU温度:</span>
-                        <span class="status-value" id="gpu-temp">49°C<span class="temp-indicator temp-normal"></span></span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">热区温度:</span>
-                        <span class="status-value" id="thermal-temp">45°C<span class="temp-indicator temp-normal"></span></span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">风扇转速:</span>
-                        <span class="status-value" id="fan-speed">2150RPM</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">功耗:</span>
-                        <span class="status-value" id="power-draw">8.2W</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">电压:</span>
-                        <span class="status-value" id="voltage">5.1V</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">存储使用:</span>
-                        <span class="status-value" id="storage-usage">45GB/128GB</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">运行时间:</span>
-                        <span class="status-value" id="uptime">2d 3h 15m</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">网络状态:</span>
-                        <span class="status-value" style="color: var(--success);">1Gbps</span>
-                    </div>
-                </div>
-
-                <!-- 软件版本信息 -->
-                <div class="version-info">
-                    JetPack 6.0 | CUDA 12.2 | TensorRT 8.6.1 | OpenCV 4.8.0<br>
-                    Python 3.10.12 | PyTorch 2.1.0 | ONNX Runtime 1.17.1
-                </div>
-            </div>
-
-            <!-- AI模型状态 -->
-            <div class="panel-section" style="border-color: var(--accent);">
-                <div class="section-title" style="color: var(--accent);">🤖 AI模型状态</div>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">模型版本:</span>
-                        <span class="status-value">YOLOv8n</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">推理时间:</span>
-                        <span class="status-value" id="model-inference">15.3ms</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">置信阈值:</span>
-                        <span class="status-value">0.85</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">检测精度:</span>
-                        <span class="status-value">94.2%</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">总检测数:</span>
-                        <span class="status-value" id="total-detections">15,432</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">今日检测:</span>
-                        <span class="status-value" id="today-detections">89</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 通信统计 -->
-            <div class="panel-section communication-section">
-                <div class="section-title">📈 通信统计</div>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">连接时长:</span>
-                        <span class="status-value" id="connection-time">2h 15m</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">数据包:</span>
-                        <span class="status-value" id="data-packets">15,432</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">错误率:</span>
-                        <span class="status-value" id="error-rate">0.02%</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">吞吐量:</span>
-                        <span class="status-value" id="throughput">1.2KB/s</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 底部操作按钮 -->
-        <div class="footer-panel">
-            <div class="control-buttons">
-                <button class="industrial-btn btn-start" id="start-btn">▶ 启动系统</button>
-                <button class="industrial-btn btn-pause" id="pause-btn">⏸ 暂停</button>
-                <button class="industrial-btn btn-stop" id="stop-btn">⏹ 停止</button>
-            </div>
-            
-            <div style="text-align: center; color: var(--text-secondary);">
-                <div>当前工序: <span id="current-process">进料检测中</span></div>
-                <div style="font-size: 12px; margin-top: 5px;">
-                    上次切割: 14:25:33 | 今日切割: <span id="daily-cuts">89</span>次 | 效率: <span id="efficiency">94.2%</span>
-                </div>
-            </div>
-            
-            <div class="emergency-section">
-                <button class="industrial-btn btn-emergency" id="emergency-btn">🚨 紧急停止</button>
-                <button class="industrial-btn btn-power" id="power-btn">⏻ 关机</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // 模拟Jetson系统数据
-        let jetsonData = {
-            cpu: { usage: 45, freq: 1500, temp: 52 },
-            gpu: { usage: 32, freq: 624, temp: 49 },
-            memory: { used: 2.1, total: 8.0 },
-            thermal: { temp: 45 },
-            fan: { speed: 2150 },
-            power: { draw: 8.2, voltage: 5.1 },
-            emc: { freq: 2133 },
-            storage: { used: 45, total: 128 },
-            uptime: { days: 2, hours: 3, minutes: 15 }
-        };
-
-        // 模拟AI模型数据
-        let aiModelData = {
-            inferenceTime: 15.3,
-            detectionFps: 28.5,
-            totalDetections: 15432,
-            todayDetections: 89,
-            accuracy: 94.2
-        };
-
-        // 模拟数据和状态
-        let systemState = {
-            isRunning: false,
-            currentStep: 1,
-            heartbeatCounter: 12345,
-            xCoordinate: 245.8,
-            cutQuality: 0,
-            bladeSelection: 3,
-            plcCommand: 0,
-            coordinateReady: 0
-        };
-
-        // Modbus寄存器状态码映射
         const statusMaps = {
-            systemStatus: ['停止', '运行', '错误', '暂停', '紧急停止', '维护模式'],
-            plcCommand: ['无', '进料检测', '切割准备', '切割完成', '启动送料', '暂停', '紧急停止', '恢复运行'],
             cutQuality: ['正常', '异常'],
-            bladeType: ['无', '刀片1', '刀片2', '双刀片'],
-            healthStatus: ['正常', '警告', '错误', '严重错误']
+            bladeType: ['未选', '刀片A', '刀片B', '双刀片']
         };
 
-        // 工作流程步骤
-        const workflowSteps = [
-            { id: 1, name: '进料检测', plcCmd: 1 },
-            { id: 2, name: '视觉识别', plcCmd: 0 },
-            { id: 3, name: '坐标传输', plcCmd: 0 },
-            { id: 4, name: '切割准备', plcCmd: 2 },
-            { id: 5, name: '执行切割', plcCmd: 3 }
-        ];
-
-        // 更新心跳计数器
         function updateHeartbeat() {
-            systemState.heartbeatCounter += 1;
-            if (systemState.heartbeatCounter > 4294967295) {
-                systemState.heartbeatCounter = 0; // 溢出处理
-            }
-            document.getElementById('heartbeat-counter').textContent = systemState.heartbeatCounter;
-            document.getElementById('reg-40007').textContent = systemState.heartbeatCounter;
+            systemState.heartbeat += 1;
+            document.getElementById('heartbeat-counter').textContent = systemState.heartbeat;
+            document.getElementById('reg-40007').textContent = systemState.heartbeat;
         }
 
-        // 更新Jetson系统信息
         function updateJetsonInfo() {
-            // CPU
-            jetsonData.cpu.usage = 40 + Math.random() * 20;
-            jetsonData.cpu.freq = 1200 + Math.random() * 600;
-            jetsonData.cpu.temp = 45 + Math.random() * 15;
-            
-            // GPU
-            jetsonData.gpu.usage = 25 + Math.random() * 25;
-            jetsonData.gpu.freq = 500 + Math.random() * 300;
-            jetsonData.gpu.temp = 40 + Math.random() * 20;
-            
-            // 其他参数
-            jetsonData.thermal.temp = 40 + Math.random() * 15;
-            jetsonData.fan.speed = 2000 + Math.random() * 500;
-            jetsonData.power.draw = 7 + Math.random() * 3;
-            jetsonData.power.voltage = 4.9 + Math.random() * 0.4;
-            jetsonData.emc.freq = 2000 + Math.random() * 300;
-            
-            // AI模型数据
-            aiModelData.inferenceTime = 12 + Math.random() * 8;
-            aiModelData.detectionFps = 25 + Math.random() * 8;
-            
-            // 更新显示
+            jetsonData.cpu.usage = 35 + Math.random() * 30;
+            jetsonData.gpu.usage = 20 + Math.random() * 35;
+            jetsonData.memory.used = 1.8 + Math.random() * 3.0;
+            jetsonData.cpu.temp = 45 + Math.random() * 12;
+            jetsonData.gpu.temp = 42 + Math.random() * 10;
+            jetsonData.thermal.temp = Math.max(jetsonData.cpu.temp, jetsonData.gpu.temp);
+            jetsonData.fan.speed = 1800 + Math.random() * 600;
+            jetsonData.power.draw = 7 + Math.random() * 5;
+
             document.getElementById('cpu-usage').textContent = jetsonData.cpu.usage.toFixed(1) + '%';
             document.getElementById('cpu-progress').style.width = jetsonData.cpu.usage + '%';
-            document.getElementById('cpu-freq').textContent = (jetsonData.cpu.freq / 1000).toFixed(1) + 'GHz';
-            document.getElementById('cpu-temp').textContent = jetsonData.cpu.temp.toFixed(0) + '°C';
-            
             document.getElementById('gpu-usage').textContent = jetsonData.gpu.usage.toFixed(1) + '%';
             document.getElementById('gpu-progress').style.width = jetsonData.gpu.usage + '%';
-            document.getElementById('gpu-freq').textContent = jetsonData.gpu.freq.toFixed(0) + 'MHz';
-            document.getElementById('gpu-temp').textContent = jetsonData.gpu.temp.toFixed(0) + '°C';
-            
+
+            const memPercent = (jetsonData.memory.used / jetsonData.memory.total) * 100;
             document.getElementById('memory-usage').textContent = jetsonData.memory.used.toFixed(1) + 'GB/' + jetsonData.memory.total + 'GB';
-            document.getElementById('memory-progress').style.width = (jetsonData.memory.used / jetsonData.memory.total * 100) + '%';
-            
+            document.getElementById('memory-progress').style.width = memPercent + '%';
+
             document.getElementById('thermal-temp').textContent = jetsonData.thermal.temp.toFixed(0) + '°C';
-            document.getElementById('fan-speed').textContent = jetsonData.fan.speed.toFixed(0) + 'RPM';
+            document.getElementById('temp-progress').style.width = jetsonData.thermal.temp + '%';
+            document.getElementById('fan-speed').textContent = jetsonData.fan.speed.toFixed(0) + ' RPM';
             document.getElementById('power-draw').textContent = jetsonData.power.draw.toFixed(1) + 'W';
-            document.getElementById('voltage').textContent = jetsonData.power.voltage.toFixed(1) + 'V';
-            document.getElementById('emc-freq').textContent = jetsonData.emc.freq.toFixed(0) + 'MHz';
-            document.getElementById('storage-usage').textContent = jetsonData.storage.used + 'GB/' + jetsonData.storage.total + 'GB';
-            document.getElementById('uptime').textContent = jetsonData.uptime.days + 'd ' + jetsonData.uptime.hours + 'h ' + jetsonData.uptime.minutes + 'm';
-            
-            // AI模型信息
+            document.getElementById('emc-freq').textContent = jetsonData.emc.freq + ' MHz';
+            document.getElementById('uptime').textContent = `${jetsonData.uptime.days}d ${jetsonData.uptime.hours}h ${jetsonData.uptime.minutes}m`;
+            document.getElementById('perf-mode').textContent = performanceState.mode;
+
+            aiModelData.inferenceTime = 12 + Math.random() * 8;
+            aiModelData.detectionFps = 24 + Math.random() * 8;
             document.getElementById('model-inference').textContent = aiModelData.inferenceTime.toFixed(1) + 'ms';
             document.getElementById('inference-time').textContent = aiModelData.inferenceTime.toFixed(1) + 'ms';
             document.getElementById('detection-fps').textContent = aiModelData.detectionFps.toFixed(1);
-            document.getElementById('total-detections').textContent = aiModelData.totalDetections.toLocaleString();
-            document.getElementById('today-detections').textContent = aiModelData.todayDetections;
-            
-            // 温度指示器颜色
-            updateTempIndicators();
         }
 
-        // 更新温度指示器颜色
-        function updateTempIndicators() {
-            const tempElements = [
-                { id: 'cpu-temp', temp: jetsonData.cpu.temp },
-                { id: 'gpu-temp', temp: jetsonData.gpu.temp },
-                { id: 'thermal-temp', temp: jetsonData.thermal.temp }
-            ];
-            
-            tempElements.forEach(element => {
-                const indicator = document.querySelector(`#${element.id} .temp-indicator`);
-                if (indicator) {
-                    indicator.className = 'temp-indicator';
-                    if (element.temp > 70) {
-                        indicator.classList.add('temp-hot');
-                    } else if (element.temp > 60) {
-                        indicator.classList.add('temp-warm');
-                    } else {
-                        indicator.classList.add('temp-normal');
-                    }
-                }
-            });
-        }
-
-        // 更新工作流程状态
         function updateWorkflowStatus(step) {
-            // 清除所有步骤状态
             for (let i = 1; i <= 5; i++) {
-                const stepEl = document.getElementById(`step-${i}`);
-                stepEl.classList.remove('active', 'completed');
-                stepEl.style.backgroundColor = '';
-                stepEl.style.borderColor = '';
-                
-                if (i < step) {
-                    stepEl.classList.add('completed');
-                } else if (i === step) {
-                    stepEl.classList.add('active');
-                }
+                const el = document.getElementById(`step-${i}`);
+                el.classList.remove('active', 'completed');
+                if (i < step) el.classList.add('completed');
+                if (i === step) el.classList.add('active');
             }
-            
             systemState.currentStep = step;
-            document.getElementById('current-process').textContent = workflowSteps[step - 1].name + '中';
+            document.getElementById('current-process').textContent = workflowSteps[step - 1].name;
         }
 
-        // 更新Modbus寄存器显示
         function updateModbusRegisters() {
             document.getElementById('reg-40001').textContent = systemState.isRunning ? 1 : 0;
             document.getElementById('reg-40002').textContent = systemState.plcCommand;
@@ -2221,177 +825,200 @@
             document.getElementById('reg-40004').textContent = Math.round(systemState.xCoordinate * 10);
             document.getElementById('reg-40006').textContent = systemState.cutQuality;
             document.getElementById('reg-40009').textContent = systemState.bladeSelection;
-            document.getElementById('reg-40010').textContent = 0; // 正常状态
-            
-            // 更新界面显示
+            document.getElementById('reg-40010').textContent = 0;
+
             document.getElementById('x-coordinate').textContent = systemState.xCoordinate.toFixed(1) + 'mm';
             document.getElementById('cut-quality').textContent = statusMaps.cutQuality[systemState.cutQuality];
             document.getElementById('blade-selection').textContent = statusMaps.bladeType[systemState.bladeSelection];
-            
-            // 更新切割位置指示器
-            const position = (systemState.xCoordinate / 1000.0) * 100;
-            document.getElementById('cutting-position').style.left = position + '%';
+
+            const pos = (systemState.xCoordinate / 1000) * 100;
+            document.getElementById('cutting-position').style.left = `${pos}%`;
         }
 
-        // 模拟工作流程
         function simulateWorkflow() {
             if (!systemState.isRunning) return;
-            
-            const currentStep = systemState.currentStep;
-            
-            switch (currentStep) {
-                case 1: // 进料检测
+            const step = systemState.currentStep;
+            switch (step) {
+                case 1:
                     systemState.plcCommand = 1;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(2);
-                            simulateWorkflow();
-                        }
-                    }, 3000);
+                    setTimeout(() => { updateWorkflowStatus(2); simulateWorkflow(); }, 1500);
                     break;
-                    
-                case 2: // 视觉识别
+                case 2:
                     systemState.plcCommand = 0;
-                    // 模拟检测到竹材
-                    systemState.xCoordinate = 200 + Math.random() * 600; // 200-800mm
+                    systemState.xCoordinate = 200 + Math.random() * 600;
                     systemState.coordinateReady = 1;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(3);
-                            simulateWorkflow();
-                        }
-                    }, 2000);
+                    setTimeout(() => { updateWorkflowStatus(3); simulateWorkflow(); }, 1200);
                     break;
-                    
-                case 3: // 坐标传输
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(4);
-                            simulateWorkflow();
-                        }
-                    }, 1000);
+                case 3:
+                    setTimeout(() => { updateWorkflowStatus(4); simulateWorkflow(); }, 800);
                     break;
-                    
-                case 4: // 切割准备
+                case 4:
                     systemState.plcCommand = 2;
-                    setTimeout(() => {
-                        if (systemState.isRunning) {
-                            updateWorkflowStatus(5);
-                            simulateWorkflow();
-                        }
-                    }, 4000);
+                    setTimeout(() => { updateWorkflowStatus(5); simulateWorkflow(); }, 2000);
                     break;
-                    
-                case 5: // 执行切割
+                case 5:
                     systemState.plcCommand = 3;
                     setTimeout(() => {
-                        if (systemState.isRunning) {
-                            // 完成一个循环，重新开始
-                            systemState.coordinateReady = 0;
-                            aiModelData.todayDetections++;
-                            aiModelData.totalDetections++;
-                            updateWorkflowStatus(1);
-                            simulateWorkflow();
-                        }
-                    }, 3000);
+                        systemState.coordinateReady = 0;
+                        aiModelData.todayDetections += 1;
+                        aiModelData.totalDetections += 1;
+                        document.getElementById('today-detections').textContent = aiModelData.todayDetections;
+                        document.getElementById('total-detections').textContent = aiModelData.totalDetections.toLocaleString();
+                        updateWorkflowStatus(1);
+                        simulateWorkflow();
+                    }, 1500);
                     break;
             }
-            
             updateModbusRegisters();
         }
 
-        // 按钮事件处理
-        document.getElementById('start-btn').addEventListener('click', function() {
+        function updateWifiUI() {
+            const disableStatic = wifiState.mode === 'dhcp';
+            ['wifi-ip','wifi-mask','wifi-gateway','wifi-dns'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = disableStatic;
+            });
+            const summary = `${wifiState.iface} | ${wifiState.status}${wifiState.rssi ? ` | ${wifiState.rssi} dBm` : ''}`;
+            document.getElementById('wifi-summary').textContent = summary;
+            document.getElementById('wifi-mode').textContent = wifiState.mode.toUpperCase();
+
+            const ssidEl = document.getElementById('wifi-ssid');
+            if (ssidEl) {
+                ssidEl.value = wifiState.ssid;
+                document.getElementById('wifi-password').value = wifiState.password;
+                document.getElementById('wifi-security').value = wifiState.security;
+                document.getElementById('wifi-mode-select').value = wifiState.mode;
+                document.getElementById('wifi-ip').value = wifiState.ip;
+                document.getElementById('wifi-mask').value = wifiState.mask;
+                document.getElementById('wifi-gateway').value = wifiState.gateway;
+                document.getElementById('wifi-dns').value = wifiState.dns;
+            }
+        }
+
+        function applyWifiConfig() {
+            wifiState.ssid = document.getElementById('wifi-ssid').value;
+            wifiState.password = document.getElementById('wifi-password').value;
+            wifiState.security = document.getElementById('wifi-security').value;
+            wifiState.mode = document.getElementById('wifi-mode-select').value;
+            wifiState.ip = document.getElementById('wifi-ip').value;
+            wifiState.mask = document.getElementById('wifi-mask').value;
+            wifiState.gateway = document.getElementById('wifi-gateway').value;
+            wifiState.dns = document.getElementById('wifi-dns').value;
+            wifiState.status = wifiState.mode === 'dhcp' ? '获取地址中' : '静态配置已应用';
+            updateWifiUI();
+            alert(`[预览] Wi-Fi 已应用: ${wifiState.ssid} (${wifiState.mode})`);
+        }
+
+        function checkWifi() {
+            const ok = Math.random() > 0.15;
+            wifiState.status = ok ? '已连接' : '断开 / 待检查';
+            wifiState.rssi = ok ? -50 - Math.floor(Math.random() * 15) : null;
+            updateWifiUI();
+            alert(ok ? '[预览] Wi-Fi 连通正常' : '[预览] Wi-Fi 未连接，请检查天线/密码/信道');
+        }
+
+        function restartWifiService() {
+            alert('[预览] 重启 Wi-Fi 服务，请在实际部署中调用 network manager/connman/自定义脚本');
+        }
+
+        function handlePowerAction(action) {
+            const labelMap = {
+                reboot: '重启 Jetson',
+                shutdown: '安全关机',
+                restartService: '重启推理/Modbus 服务'
+            };
+            const message = `[预览] ${labelMap[action]} 已触发。实际部署请调用 systemd/DBus/脚本。`;
+            alert(message);
+        }
+
+        function openSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
             systemState.isRunning = true;
-            this.textContent = '🔄 运行中';
-            this.style.backgroundColor = 'var(--warning)';
-            this.disabled = true;
-            
+            systemState.plcCommand = 1;
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('start-btn').textContent = '运行中';
             updateWorkflowStatus(1);
             simulateWorkflow();
         });
 
-        document.getElementById('pause-btn').addEventListener('click', function() {
-            if (systemState.isRunning) {
-                systemState.isRunning = false;
-                systemState.plcCommand = 5; // 暂停命令
-                document.getElementById('start-btn').textContent = '▶ 恢复运行';
-                document.getElementById('start-btn').disabled = false;
-                document.getElementById('start-btn').style.backgroundColor = 'var(--success)';
-                updateModbusRegisters();
-            }
+        document.getElementById('pause-btn').addEventListener('click', () => {
+            if (!systemState.isRunning) return;
+            systemState.isRunning = false;
+            systemState.plcCommand = 5;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('start-btn').textContent = '恢复运行';
+            updateModbusRegisters();
         });
 
-        document.getElementById('stop-btn').addEventListener('click', function() {
+        document.getElementById('stop-btn').addEventListener('click', () => {
             systemState.isRunning = false;
             systemState.plcCommand = 0;
             systemState.coordinateReady = 0;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('start-btn').textContent = '启动系统';
             updateWorkflowStatus(1);
-            
-            document.getElementById('start-btn').textContent = '▶ 启动系统';
-            document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').style.backgroundColor = 'var(--success)';
-            
-            // 清除所有工作流程状态
-            for (let i = 1; i <= 5; i++) {
-                document.getElementById(`step-${i}`).classList.remove('active', 'completed');
-            }
-            
             updateModbusRegisters();
         });
 
-        document.getElementById('emergency-btn').addEventListener('click', function() {
+        document.getElementById('emergency-btn').addEventListener('click', () => {
             systemState.isRunning = false;
-            systemState.plcCommand = 6; // 紧急停止
-            
-            // 所有步骤变红色表示紧急停止
-            for (let i = 1; i <= 5; i++) {
-                const stepEl = document.getElementById(`step-${i}`);
-                stepEl.classList.remove('active', 'completed');
-                stepEl.style.backgroundColor = 'var(--emergency)';
-                stepEl.style.borderColor = 'var(--emergency)';
-            }
-            
-            document.getElementById('current-process').textContent = '🚨 紧急停止';
-            document.getElementById('start-btn').textContent = '⚠ 恢复运行';
-            document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').style.backgroundColor = 'var(--warning)';
-            
+            systemState.plcCommand = 6;
+            ['step-1','step-2','step-3','step-4','step-5'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('active', 'completed');
+                el.style.borderColor = 'var(--error)';
+                el.style.color = 'var(--error)';
+            });
+            document.getElementById('current-process').textContent = '🚨 紧急停机';
             updateModbusRegisters();
         });
 
-        document.getElementById('power-btn').addEventListener('click', function() {
-            if (confirm('确定要关闭Jetson系统吗？')) {
-                alert('正在安全关机...\n1. 停止AI模型推理\n2. 保存系统日志\n3. 关闭Modbus服务\n4. 系统关机');
-            }
+        document.getElementById('power-btn').addEventListener('click', openSettingsModal);
+        document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
+        document.getElementById('modal-close').addEventListener('click', closeSettingsModal);
+        document.getElementById('settings-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'settings-modal') closeSettingsModal();
         });
 
-        // 刀片选择
-        document.querySelectorAll('.blade-btn').forEach((btn, index) => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.blade-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                systemState.bladeSelection = index + 1;
-                updateModbusRegisters();
+        document.getElementById('modal-shutdown-btn').addEventListener('click', () => handlePowerAction('shutdown'));
+        document.getElementById('modal-reboot-btn').addEventListener('click', () => handlePowerAction('reboot'));
+        document.getElementById('modal-restart-service-btn').addEventListener('click', () => handlePowerAction('restartService'));
+
+        document.querySelectorAll('.perf-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                performanceState.mode = btn.dataset.mode;
+                updateJetsonInfo();
+                alert(`[预览] 性能模式切换到 ${btn.dataset.mode}，实际部署请调用 nvpmodel`);
             });
         });
 
-        // 初始化和定时更新
-        setInterval(updateHeartbeat, 20); // 50Hz心跳
-        setInterval(updateJetsonInfo, 2000); // 2秒更新系统信息
+        document.getElementById('apply-wifi-btn').addEventListener('click', applyWifiConfig);
+        document.getElementById('check-wifi-btn').addEventListener('click', checkWifi);
+        document.getElementById('restart-wifi-btn').addEventListener('click', restartWifiService);
+        document.getElementById('wifi-mode-select').addEventListener('change', (e) => {
+            wifiState.mode = e.target.value;
+            updateWifiUI();
+        });
+
+        updateWifiUI();
+        updateModbusRegisters();
+        updateWorkflowStatus(1);
+        setInterval(updateHeartbeat, 500);
+        setInterval(updateJetsonInfo, 2000);
         setInterval(() => {
-            // 更新响应时间
             const responseTime = Math.floor(Math.random() * 10) + 8;
             document.getElementById('response-time').textContent = responseTime + 'ms';
             document.getElementById('plc-response').textContent = responseTime + 'ms';
         }, 1000);
 
-        // 页面加载完成后初始化
-        updateModbusRegisters();
-        updateWorkflowStatus(1);
-        updateJetsonInfo();
-
-        console.log('AI竹节识别切割系统 - Jetson详细监控版界面已加载');
+        console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
     </script>
 </body>
 </html>

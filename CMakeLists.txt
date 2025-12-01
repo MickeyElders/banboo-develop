@@ -924,6 +924,44 @@ install(TARGETS bamboo_integrated
     COMPONENT Runtime
 )
 
+# ================================
+# 可选：Qt Quick 界面 (JetPack 6.2 自带 Qt)
+# ================================
+option(ENABLE_QT_UI "Build Qt Quick UI front-end (DeepStream preview)" OFF)
+if(ENABLE_QT_UI)
+    find_package(Qt6 QUIET COMPONENTS Quick QuickControls2 Multimedia)
+    if(Qt6_FOUND)
+        set(QT_NAMESPACE Qt6)
+    else()
+        find_package(Qt5 REQUIRED COMPONENTS Quick QuickControls2 Multimedia)
+        set(QT_NAMESPACE Qt5)
+    endif()
+
+    set(QT_UI_SOURCES
+        qt_ui/main.cpp
+        qt_ui/StateModels.cpp
+        qt_ui/DeepStreamStub.cpp
+        qt_ui/ModbusClient.cpp
+        qt_ui/qml/qml.qrc
+    )
+
+    add_executable(bamboo_qt_ui ${QT_UI_SOURCES})
+    target_compile_features(bamboo_qt_ui PUBLIC cxx_std_17)
+    target_link_libraries(bamboo_qt_ui
+        PRIVATE
+            ${QT_NAMESPACE}::Quick
+            ${QT_NAMESPACE}::QuickControls2
+            ${QT_NAMESPACE}::Multimedia
+    )
+    if(MODBUS_LIBRARY)
+        target_link_libraries(bamboo_qt_ui PRIVATE ${MODBUS_LIBRARY})
+    else()
+        message(WARNING "MODBUS_LIBRARY not found - Qt UI Modbus功能将不可用")
+    endif()
+    target_compile_definitions(bamboo_qt_ui PRIVATE QT_NO_KEYWORDS)
+    message(STATUS "Qt UI target enabled: bamboo_qt_ui (using ${QT_NAMESPACE})")
+endif()
+
 # 安装配置文件
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
     install(DIRECTORY config/
