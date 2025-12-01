@@ -27,16 +27,11 @@ void handleSignal(int signum) {
 }
 
 void configureHeadlessEnvironment() {
-    // Prefer eglfs/DRM when DISPLAY is absent; allow user overrides when set.
-    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsEmpty("DISPLAY")) {
-        qputenv("QT_QPA_PLATFORM", "eglfs");
-    }
-    if (qEnvironmentVariableIsEmpty("QT_QPA_EGLFS_INTEGRATION")) {
-        qputenv("QT_QPA_EGLFS_INTEGRATION", "eglfs_kms");
-    }
-    if (qEnvironmentVariableIsEmpty("EGL_PLATFORM")) {
-        qputenv("EGL_PLATFORM", "drm");
-    }
+    // Force offscreen; KMS path is disabled due to JetPack 6.x headless connector issues.
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    qputenv("QT_QPA_EGLFS_INTEGRATION", "");
+    qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
+    qputenv("EGL_PLATFORM", "");
     if (qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR")) {
         const QByteArray runtimeDir("/run/bamboo-qt");
         qputenv("XDG_RUNTIME_DIR", runtimeDir);
@@ -108,11 +103,6 @@ int main(int argc, char *argv[]) {
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
-    // Force offscreen for stability on headless JetPack 6.x (avoids missing connector issues).
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    qputenv("QT_QPA_EGLFS_INTEGRATION", "");
-    qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
-    qputenv("EGL_PLATFORM", "");
     logKmsEnvironment();
     logDrmConnectors();
 
