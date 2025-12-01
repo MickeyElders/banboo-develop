@@ -54,11 +54,21 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     std::cout << "[deepstream] start() invoked, sink=" << sink << std::endl;
     // Detect hardware encoder; fall back to x264enc if missing.
     bool hasNvEnc = false;
+    bool hasNvInfer = false;
+    bool hasNvOsd = false;
     if (gst_is_initialized()) {
         GstElementFactory *f = gst_element_factory_find("nvv4l2h264enc");
         if (f) {
             hasNvEnc = true;
             gst_object_unref(f);
+        }
+        if (GstElementFactory *fi = gst_element_factory_find("nvinfer")) {
+            hasNvInfer = true;
+            gst_object_unref(fi);
+        }
+        if (GstElementFactory *fo = gst_element_factory_find("nvdsosd")) {
+            hasNvOsd = true;
+            gst_object_unref(fo);
         }
     }
     const std::string encoder = hasNvEnc
@@ -69,9 +79,15 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     if (!hasNvEnc) {
         std::cout << "[deepstream] nvv4l2h264enc not found, falling back to x264enc (CPU)" << std::endl;
     }
+    if (!hasNvInfer) {
+        std::cout << "[deepstream] nvinfer not found, running without inference/OSD" << std::endl;
+    }
+    if (!hasNvOsd) {
+        std::cout << "[deepstream] nvdsosd not found, skipping OSD overlay" << std::endl;
+    }
 
     const std::string launch = pipeline.isEmpty()
-        ? ([&sink, &encoder]() -> std::string {
+        ? ([&sink, &encoder, hasNvInfer, hasNvOsd]() -> std::string {
               if (sink == "drm") {
                   // Direct push to DRM plane; no display server required.
                   return "nvarguscamerasrc sensor-id=0 ! "
@@ -83,12 +99,24 @@ bool DeepStreamRunner::start(const QString &pipeline) {
                          "nvdrmvideosink sync=false plane-id=0 qos=false";
               }
               if (sink == "rtsp") {
-                  // Minimal RTSP pipeline with CSI camera -> H264 -> RTSP (no nvinfer to avoid blocking)
-                  return "( nvarguscamerasrc sensor-id=0 ispassthrough=true bufapi-version=true do-timestamp=true ! "
-                         "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! "
-                         "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! "
-                         + encoder +
-                         "rtph264pay name=pay0 pt=96 )";
+                  // RTSP pipeline with optional nvinfer + nvdsosd overlay
+                  std::string p = "( nvarguscamerasrc sensor-id=0 ispassthrough=true bufapi-version=true do-timestamp=true ! "
+                                  "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! "
+                                  "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! ";
+                  // If inference/OSD available, use streammux + nvinfer + nvdsosd
+                  if (hasNvInfer || hasNvOsd) {
+                      p += "m.sink_0 nvstreammux name=m width=1280 height=720 batch-size=1 live-source=1 ! ";
+                      if (hasNvInfer) {
+                          p += "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! ";
+                      }
+                      if (hasNvOsd) {
+                          p += "nvdsosd name=osd ! ";
+                      }
+                  }
+                  p += "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! ";
+                  p += encoder;
+                  p += "rtph264pay name=pay0 pt=96 )";
+                  return p;
               }
               // Safe headless default: no display, no encoder
               return "( nvarguscamerasrc sensor-id=0 ! "
