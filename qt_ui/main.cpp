@@ -131,6 +131,9 @@ int main(int argc, char *argv[]) {
     qInfo() << "[startup] DeepStreamRunner constructed";
     ModbusClient modbus;
     qInfo() << "[startup] ModbusClient constructed";
+    QObject::connect(&deepStream, &DeepStreamRunner::errorChanged, [](const QString &msg) {
+        qCritical() << "[deepstream] error:" << msg;
+    });
 
     QTimer quitTimer;
     quitTimer.setInterval(200);
@@ -183,6 +186,17 @@ int main(int argc, char *argv[]) {
         WebPreview preview(rootWindow, htmlPath, 8080, &app);
         qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
     }
+
+    // Trigger DeepStream autostart here (instead of constructor) for clearer logs
+    QTimer::singleShot(0, [&deepStream]() {
+        const QByteArray autoStart = qgetenv("DS_AUTOSTART");
+        if (autoStart == "1") {
+            std::cout << "[deepstream] Autostart from main()" << std::endl;
+            deepStream.start({});
+        } else {
+            std::cout << "[deepstream] Autostart disabled (DS_AUTOSTART!=1)" << std::endl;
+        }
+    });
 
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();

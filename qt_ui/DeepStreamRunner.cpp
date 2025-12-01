@@ -2,19 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 
-DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {
-#if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
-    const char *autoStart = std::getenv("DS_AUTOSTART");
-    if (autoStart && std::strcmp(autoStart, "1") == 0) {
-        // Run autostart asynchronously to avoid blocking UI init (argus/Gst may stall in headless)
-        m_autostartThread = std::thread([this]() {
-            start({});
-        });
-    } else {
-        std::cout << "[deepstream] Auto-start skipped (set DS_AUTOSTART=1 to enable)" << std::endl;
-    }
-#endif
-}
+DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
 
 DeepStreamRunner::~DeepStreamRunner() {
     stop();
