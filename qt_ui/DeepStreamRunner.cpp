@@ -4,7 +4,12 @@
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {
 #if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
-    start({});
+    const char *autoStart = std::getenv("DS_AUTOSTART");
+    if (autoStart && std::strcmp(autoStart, "1") == 0) {
+        start({});
+    } else {
+        std::cout << "[deepstream] Auto-start skipped (set DS_AUTOSTART=1 to enable)" << std::endl;
+    }
 #endif
 }
 
@@ -24,7 +29,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     if (!ensureGstInited()) return false;
 
     auto sinkEnv = std::getenv("DS_SINK");
-    const std::string sink = sinkEnv ? std::string(sinkEnv) : std::string("rtsp");
+    const std::string sink = sinkEnv ? std::string(sinkEnv) : std::string("fakesink");
 
     const std::string launch = pipeline.isEmpty()
         ? ([&sink]() -> std::string {
@@ -38,15 +43,25 @@ bool DeepStreamRunner::start(const QString &pipeline) {
                          "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! "
                          "nvdrmvideosink sync=false plane-id=0 qos=false";
               }
-              // Default RTSP pipeline
+              if (sink == "rtsp") {
+                  // RTSP pipeline
+                  return "( nvarguscamerasrc sensor-id=0 ! "
+                         "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1 ! "
+                         "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! "
+                         "m.sink_0 nvstreammux name=m width=1280 height=720 batch-size=1 live-source=1 ! "
+                         "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! "
+                         "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! "
+                         "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast ! "
+                         "rtph264pay name=pay0 pt=96 )";
+              }
+              // Safe headless default: no display, no encoder
               return "( nvarguscamerasrc sensor-id=0 ! "
                      "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1 ! "
                      "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! "
                      "m.sink_0 nvstreammux name=m width=1280 height=720 batch-size=1 live-source=1 ! "
                      "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! "
                      "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! "
-                     "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast ! "
-                     "rtph264pay name=pay0 pt=96 )";
+                     "fakesink sync=false )";
           })()
         : pipeline.toStdString();
 
