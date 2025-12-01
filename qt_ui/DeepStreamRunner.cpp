@@ -150,8 +150,8 @@ bool DeepStreamRunner::buildServer(const std::string &launch) {
 
     m_server = gst_rtsp_server_new();
     if (!m_server) return false;
-    // Force RTSP service port to 8080
-    gst_rtsp_server_set_service(m_server, "8080");
+    // RTSP 使用 8554，避免与 Web 预览 8080 端口冲突
+    gst_rtsp_server_set_service(m_server, "8554");
 
     GstRTSPMountPoints *mounts = gst_rtsp_server_get_mount_points(m_server);
     if (!mounts) return false;
