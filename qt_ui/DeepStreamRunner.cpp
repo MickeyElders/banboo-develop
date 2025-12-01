@@ -83,13 +83,10 @@ bool DeepStreamRunner::start(const QString &pipeline) {
                          "nvdrmvideosink sync=false plane-id=0 qos=false";
               }
               if (sink == "rtsp") {
-                  // RTSP pipeline with CSI/Argus camera -> H264 -> RTSP
+                  // Minimal RTSP pipeline with CSI camera -> H264 -> RTSP (no nvinfer to avoid blocking)
                   return "( nvarguscamerasrc sensor-id=0 ispassthrough=true bufapi-version=true do-timestamp=true ! "
                          "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! "
                          "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! "
-                         "m.sink_0 nvstreammux name=m width=1280 height=720 batch-size=1 live-source=1 ! "
-                         "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! "
-                         "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! "
                          + encoder +
                          "rtph264pay name=pay0 pt=96 )";
               }
@@ -162,6 +159,7 @@ bool DeepStreamRunner::buildServer(const std::string &launch) {
     m_factory = gst_rtsp_media_factory_new();
     gst_rtsp_media_factory_set_launch(m_factory, launch.c_str());
     gst_rtsp_media_factory_set_shared(m_factory, TRUE);
+    std::cout << "[deepstream] RTSP launch: " << launch << std::endl;
 
     gst_rtsp_mount_points_add_factory(mounts, "/deepstream", m_factory);
     g_object_unref(mounts);
