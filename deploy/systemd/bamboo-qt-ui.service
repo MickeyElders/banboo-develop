@@ -29,7 +29,7 @@ Environment=GST_PLUGIN_SCANNER=/usr/lib/aarch64-linux-gnu/gstreamer-1.0/gst-plug
 Environment=GST_REGISTRY=/var/cache/bamboo-qt/gst-registry.bin
 Environment=WEB_PREVIEW=1
 Environment=HTTP_SERVER=0
-Environment=DS_AUTOSTART=0
+Environment=DS_AUTOSTART=1
 Environment=DS_SINK=rtsp
 # 默认 CSI0 推流到 RTSP；启用时请设置 DS_AUTOSTART=1 或 runtime 覆盖
 Environment="DS_PIPELINE=nvarguscamerasrc sensor-id=0 ! video/x-raw\\(memory:NVMM\\),width=1280,height=720,framerate=30/1 ! nvvidconv ! video/x-raw\\(memory:NVMM\\),format=NV12 ! nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 control-rate=1 ! rtph264pay name=pay0 pt=96"
