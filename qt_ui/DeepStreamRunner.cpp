@@ -34,6 +34,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         qWarning() << "[deepstream] gst_init failed";
         return false;
     }
+    std::cout << "[deepstream] stage: gst_init ok" << std::endl;
 
     std::cout << "[deepstream] Building pipeline for sink=" << (pipeline.isEmpty() ? (std::getenv("DS_SINK") ? std::getenv("DS_SINK") : "fakesink") : "custom") << std::endl;
 
@@ -74,6 +75,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
             gst_object_unref(fo);
         }
     }
+    std::cout << "[deepstream] capability: enc=" << hasNvEnc << " infer=" << hasNvInfer << " osd=" << hasNvOsd << std::endl;
     const std::string encoder = hasNvEnc
         ? "nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! "
           "h264parse config-interval=1 ! "
@@ -132,11 +134,13 @@ bool DeepStreamRunner::start(const QString &pipeline) {
           })()
         : pipeline.toStdString();
 
+    std::cout << "[deepstream] stage: buildServer begin" << std::endl;
     if (!buildServer(launch)) {
         Q_EMIT errorChanged(QStringLiteral("启动 RTSP 服务失败"));
         std::cout << "[deepstream] buildServer failed (auto launch)" << std::endl;
         return false;
     }
+    std::cout << "[deepstream] stage: buildServer ok" << std::endl;
 
     m_thread = std::thread(&DeepStreamRunner::runLoop, this);
     std::cout << "[deepstream] RTSP server thread started" << std::endl;
@@ -150,6 +154,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
             std::cout << "[deepstream] WebRTC pipeline start failed" << std::endl;
         }
     }
+    std::cout << "[deepstream] start() finished, pipeline up" << std::endl;
     return true;
 #endif
 }
