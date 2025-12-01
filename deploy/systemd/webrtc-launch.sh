@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Default RTSP input (from main app)
 RTSP_URL="${RTSP_URL:-rtsp://127.0.0.1:8554/deepstream}"
-# Default listen port for websocket/HTTP (DeepStream webrtc demo)
-WEBRTC_PORT="${WEBRTC_PORT:-8888}"
+# Default listen port for websocket/HTTP (DeepStream webrtc demo). Override via WEBRTC_PORT.
+WEBRTC_PORT="${WEBRTC_PORT:-8080}"
 # Path to DeepStream WebRTC demo binary
 WEBRTC_BIN="${WEBRTC_BIN:-/opt/nvidia/deepstream/deepstream/sources/apps/sample_apps/deepstream-webrtc-demo/build/deepstream-webrtc-app}"
 
