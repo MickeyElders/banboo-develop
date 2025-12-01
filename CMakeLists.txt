@@ -836,6 +836,11 @@ if(ENABLE_QT_UI)
 
     add_executable(bamboo_qt_ui ${QT_UI_SOURCES})
     target_compile_features(bamboo_qt_ui PUBLIC cxx_std_17)
+    set_target_properties(bamboo_qt_ui PROPERTIES
+        AUTOMOC ON
+        AUTORCC ON
+        AUTOUIC ON
+    )
     target_link_libraries(bamboo_qt_ui
         PRIVATE
             ${QT_NAMESPACE}::Quick

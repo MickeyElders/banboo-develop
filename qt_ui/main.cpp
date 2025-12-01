@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("deepStream", &deepStream);
     engine.rootContext()->setContextProperty("modbus", &modbus);
 
-    const QUrl url(u"qrc:/Main.qml"_qs);
+    const QUrl url(QStringLiteral("qrc:/Main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,
                      [url](QObject *obj, const QUrl &objUrl) {
                          if (!obj && url == objUrl)
