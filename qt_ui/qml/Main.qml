@@ -13,7 +13,7 @@ ApplicationWindow {
 
     readonly property color bgPanel: "#161b24"
     readonly property color bgSpot: "#1f2632"
-    readonly property color border: "#2a3342"
+    readonly property color borderColor: "#2a3342"
     readonly property color accent: "#ff7a3d"
     readonly property color success: "#4caf50"
     readonly property color warning: "#f2c14f"
@@ -56,7 +56,7 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     radius: 8
                     color: bgPanel
-                    border.color: border
+                    border.color: borderColor
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 10
@@ -67,7 +67,7 @@ ApplicationWindow {
                             Layout.fillHeight: true
                             radius: 6
                             color: "#000"
-                            border.color: border
+                            border.color: borderColor
                             // Placeholder for embedded video; DeepStreamRunner provides RTSP URL for external player
                             Label { anchors.centerIn: parent; text: "Video preview (RTSP)"; color: textSecondary }
                         }
@@ -79,7 +79,7 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     radius: 8
                     color: bgPanel
-                    border.color: border
+                    border.color: borderColor
                     Flickable {
                         anchors.fill: parent
                         contentWidth: parent.width
