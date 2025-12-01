@@ -37,6 +37,7 @@ ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
 ExecStartPre=/bin/mkdir -p -m 755 /var/cache/bamboo-qt
 ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
 TimeoutStartSec=30
+TimeoutStopSec=5
 Restart=always
 RestartSec=3
 SupplementaryGroups=video render

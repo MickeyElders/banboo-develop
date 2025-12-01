@@ -141,9 +141,14 @@ void DeepStreamRunner::stop() {
 #if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    if (m_loop) {
-        g_main_loop_quit(m_loop);
+    // Drop active RTSP clients to avoid long waits on quit/join
+    if (m_server) {
+        auto filter = [](GstRTSPServer *, GstRTSPClient *, gpointer) {
+            return GST_RTSP_FILTER_REMOVE;
+        };
+        gst_rtsp_server_client_filter(m_server, filter, nullptr);
     }
+    if (m_loop) g_main_loop_quit(m_loop);
     if (m_thread.joinable()) {
         m_thread.join();
     }
