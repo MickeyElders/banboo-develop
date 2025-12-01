@@ -64,6 +64,23 @@ void logKmsEnvironment() {
     qInfo() << "[startup] DRM devices:" << cards.join(",");
 }
 
+bool hasConnectedDrmOutput() {
+    QDir drmDir("/sys/class/drm");
+    const QFileInfoList entries = drmDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QFileInfo &info : entries) {
+        const QString name = info.fileName();
+        if (!name.contains("-")) continue;  // skip card root
+        QFile status(info.absoluteFilePath() + "/status");
+        if (status.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            const QString statusText = QString::fromLatin1(status.readAll()).trimmed();
+            if (statusText == "connected") {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void logDrmConnectors() {
     QDir drmDir("/sys/class/drm");
     const QFileInfoList entries = drmDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
@@ -91,6 +108,12 @@ int main(int argc, char *argv[]) {
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
+    // If no DRM connectors are present, fall back to offscreen to avoid abort.
+    if (!hasConnectedDrmOutput()) {
+        qWarning() << "[startup] No DRM connectors detected, forcing offscreen platform.";
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+        qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
+    }
     logKmsEnvironment();
     logDrmConnectors();
 
