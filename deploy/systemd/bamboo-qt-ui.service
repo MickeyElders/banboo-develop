@@ -1,0 +1,17 @@
+[Unit]
+Description=Bamboo Qt DeepStream UI
+After=network-online.target nvargus-daemon.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=QT_QPA_PLATFORM=eglfs
+Environment=XDG_RUNTIME_DIR=/tmp/bamboo-qt-runtime
+Environment=GST_DEBUG=2
+ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
+Restart=on-failure
+RestartSec=2
+User=root
+
+[Install]
+WantedBy=multi-user.target

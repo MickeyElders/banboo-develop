@@ -4,7 +4,7 @@
 #include <QProcessEnvironment>
 
 #include "StateModels.h"
-#include "DeepStreamStub.h"
+#include "DeepStreamRunner.h"
 #include "ModbusClient.h"
 
 int main(int argc, char *argv[]) {
@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     JetsonState jetsonState;
     AiState aiState;
     WifiState wifiState;
-    DeepStreamStub deepStream;
+    DeepStreamRunner deepStream;
     ModbusClient modbus;
 
     QQmlApplicationEngine engine;
