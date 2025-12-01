@@ -1,17 +1,24 @@
 [Unit]
-Description=Bamboo Qt DeepStream UI
+Description=Bamboo Qt DeepStream UI (headless eglfs_kms)
 After=network-online.target nvargus-daemon.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-Environment=QT_QPA_PLATFORM=eglfs
-Environment=XDG_RUNTIME_DIR=/tmp/bamboo-qt-runtime
-Environment=GST_DEBUG=2
-ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
-Restart=on-failure
-RestartSec=2
 User=root
+WorkingDirectory=/opt/bamboo-qt
+Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+Environment=QT_QPA_EGLFS_KMS_CONFIG=/etc/qt/eglfs_kms_config.json
+Environment=GBM_DRIVERS_PATH=/usr/lib/aarch64-linux-gnu/tegra
+Environment=EGL_PLATFORM=drm
+Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
+Environment=GST_DEBUG=2
+ExecStartPre=/bin/mkdir -p /run/bamboo-qt
+ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
+Restart=always
+RestartSec=3
+SupplementaryGroups=video render
 
 [Install]
 WantedBy=multi-user.target

@@ -1,17 +1,37 @@
+#include <QCoreApplication>
+#include <QDir>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QProcessEnvironment>
+#include <QUrl>
 
-#include "StateModels.h"
 #include "DeepStreamRunner.h"
 #include "ModbusClient.h"
+#include "StateModels.h"
 
-int main(int argc, char *argv[]) {
-    // 无 X11 环境下自动切换 eglfs，避免平台插件错误
+namespace {
+void configureHeadlessEnvironment() {
+    // Prefer eglfs/DRM when DISPLAY is absent; allow user overrides when set.
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsEmpty("DISPLAY")) {
         qputenv("QT_QPA_PLATFORM", "eglfs");
     }
+    if (qEnvironmentVariableIsEmpty("QT_QPA_EGLFS_INTEGRATION")) {
+        qputenv("QT_QPA_EGLFS_INTEGRATION", "eglfs_kms");
+    }
+    if (qEnvironmentVariableIsEmpty("EGL_PLATFORM")) {
+        qputenv("EGL_PLATFORM", "drm");
+    }
+    if (qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR")) {
+        const QByteArray runtimeDir("/run/bamboo-qt");
+        qputenv("XDG_RUNTIME_DIR", runtimeDir);
+        QDir().mkpath(QString::fromUtf8(runtimeDir));
+    }
+}
+}  // namespace
+
+int main(int argc, char *argv[]) {
+    configureHeadlessEnvironment();
 
     QGuiApplication app(argc, argv);
     QCoreApplication::setApplicationName("AI竹节识别切割系统");
@@ -34,9 +54,11 @@ int main(int argc, char *argv[]) {
     const QUrl url(QStringLiteral("qrc:/Main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,
                      [url](QObject *obj, const QUrl &objUrl) {
-                         if (!obj && url == objUrl)
+                         if (!obj && url == objUrl) {
                              QCoreApplication::exit(-1);
-                     }, Qt::QueuedConnection);
+                         }
+                     },
+                     Qt::QueuedConnection);
     engine.load(url);
     return app.exec();
 }
