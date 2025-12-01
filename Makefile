@@ -10,13 +10,16 @@ QT6_DEPS ?= qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-multimedia-d
 # Optional packages (best effort, ignore failures)
 OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-libav qt6-shadertools-dev
 
-# Minimal acceptable Qt6 version and source installer settings
-QT_MIN_VER ?= 6.6.3
+# Minimal acceptable Qt6 version (LTS, apt friendly)
+QT_MIN_VER ?= 6.2.4
+# Optional source upgrade to 6.6.3 when you need GBM/eglfs improvements
 QT6_SOURCE_URL ?= https://download.qt.io/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 QT6_PREFIX ?= /opt/qt6
 QT6_TARBALL ?=
-# Optional mirror list (space separated). Override if you have a faster/closer mirror.
-QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
+# Optional mirror list (space separated)
+QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
+ https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
+ https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -118,13 +121,16 @@ check_qt6:
 		qtver=$$(qmake6 -query QT_VERSION); \
 	fi; \
 	if [ -z "$$qtver" ]; then \
-		echo "Qt6 not found. Will build and install Qt $(QT_MIN_VER) from source."; \
-		$(MAKE) --no-print-directory qt6-source-install; \
+		echo "Qt6 not found. Install Qt >= $(QT_MIN_VER) via apt (qt6-base-dev qt6-declarative-dev qt6-multimedia-dev) or run 'make qt6-source-install' to build 6.6.3 manually."; \
+		exit 1; \
 	elif dpkg --compare-versions "$$qtver" ge "$(QT_MIN_VER)"; then \
 		echo "Qt6 $$qtver OK (>= $(QT_MIN_VER))."; \
+		if dpkg --compare-versions "$$qtver" lt "6.6.3"; then \
+			echo "Note: For eglfs_kms/GBM 零拷贝增强，可选手动升级到 6.6.3：make qt6-source-install"; \
+		fi; \
 	else \
-		echo "Qt6 $$qtver is too old (< $(QT_MIN_VER)). Building Qt $(QT_MIN_VER) from source..."; \
-		$(MAKE) --no-print-directory qt6-source-install; \
+		echo "Qt6 $$qtver is too old (< $(QT_MIN_VER)). Install via apt or run 'make qt6-source-install' to build 6.6.3."; \
+		exit 1; \
 	fi
 
 qt6-source-install:
