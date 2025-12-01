@@ -1,12 +1,15 @@
 PREFIX ?= /opt/bamboo-qt
 BUILD_DIR ?= build
 SERVICE_NAME ?= bamboo-qt-ui.service
+TITLE ?= Bamboo Qt UI
 CMAKE_FLAGS ?= -DCMAKE_BUILD_TYPE=Release -DENABLE_GSTREAMER=ON -DENABLE_MODBUS=ON
 
 # 必须依赖（缺少就中断）
-MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools qtbase5-dev qtdeclarative5-dev qml-module-qtquick-controls2 qml-module-qtquick-layouts qtmultimedia5-dev
-# 可选依赖（尝试安装，失败不影响构建），RTSP 服务器 dev 包常见命名
-OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-plugins-rtsp gstreamer1.0-libav
+MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools
+# Qt6 必须依赖（缺少自动安装）
+QT6_DEPS ?= qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-multimedia-dev qt6-shadertools-dev
+# 可选依赖（尝试安装，失败不影响构建），RTSP 服务 dev 包常见命名
+OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-libav
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -21,7 +24,7 @@ deps:
 		echo "Installing missing packages:$$missing"; \
 		sudo apt-get update && sudo apt-get install -y $$missing; \
 	else \
-		echo "All Debian dependencies already installed."; \
+		echo "All mandatory packages already installed."; \
 	fi
 	@opt_missing=""; \
 	for pkg in $(OPTIONAL_DEPS); do \
@@ -32,6 +35,16 @@ deps:
 		sudo apt-get install -y $$opt_missing || true; \
 	else \
 		echo "All optional packages already installed."; \
+	fi
+	@qt_missing=""; \
+	for pkg in $(QT6_DEPS); do \
+		dpkg -s $$pkg >/dev/null 2>&1 || qt_missing="$$qt_missing $$pkg"; \
+	done; \
+	if [ -n "$$qt_missing" ]; then \
+		echo "Installing Qt6 toolchain:$$qt_missing"; \
+		sudo apt-get update && sudo apt-get install -y $$qt_missing; \
+	else \
+		echo "Qt6 toolchain already installed."; \
 	fi
 
 configure: deps
