@@ -21,6 +21,7 @@
 #include <algorithm>    // for std::max
 // OpenCV鍜屽浘鍍忓鐞?
 #include <opencv2/opencv.hpp>
+#include "bamboo_cut/ui/lvgl_wayland_interface.h"
 
 #ifdef ENABLE_WAYLAND
 #include <wayland-client.h>
@@ -619,8 +620,7 @@ public:
             return false;
         }
         
-        auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_ptr_);
-        
+                
         // 馃敡 鍏抽敭锛氱瓑寰匧VGL鐨刉ayland瀵硅薄瀹屽叏鍒濆鍖?
         int retry_count = 0;
         const int MAX_RETRIES = 20;
@@ -949,8 +949,7 @@ private:
     IntegratedDataBridge* data_bridge_;
     
     // 浣跨敤Wayland浼樺寲鐨凩VGL鐣岄潰瀹炵幇
-    std::unique_ptr<bamboo_cut::ui::LVGLWaylandInterface> lvgl_wayland_interface_;
-    
+        
     // 鍏煎鎬ф柟娉曟槧灏?
     bool initialized_ = false;
 
@@ -998,10 +997,9 @@ public:
         try {
             // DRM/GBM 路径，不依赖 Wayland
             std::cout << "[Display] Using DRM/GBM LVGL interface (Wayland disabled)" << std::endl;
-            lvgl_wayland_interface_ = std::make_unique<bamboo_cut::ui::LVGLWaylandInterface>();
-            
+                        
             // 配置 LVGL（DRM/GBM 参数沿用屏幕尺寸）
-            bamboo_cut::ui::LVGLWaylandConfig config;
+            
             config.screen_width = 1280;
             config.screen_height = 800;
             config.refresh_rate = 60;
@@ -1187,8 +1185,7 @@ public:
         
         #ifdef ENABLE_LVGL
         if (ui_manager_ && ui_manager_->getLVGLInterface()) {
-            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(ui_manager_->getLVGLInterface());
-            int wait_count = 0;
+                        int wait_count = 0;
             const int MAX_WAIT_SECONDS = 15;
             
             while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {

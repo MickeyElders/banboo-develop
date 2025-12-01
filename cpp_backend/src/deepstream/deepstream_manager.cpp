@@ -416,18 +416,7 @@ bool DeepStreamManager::startSinglePipelineMode() {
     std::cout << "等待LVGL完全初始化..." << std::endl;
     
     try {
-        if (lvgl_interface_) {
-            auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_);
-            int wait_count = 0;
-            const int MAX_WAIT_SECONDS = 10;
-            
-            while (!lvgl_if->isFullyInitialized() && wait_count < MAX_WAIT_SECONDS) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                wait_count++;
-                std::cout << "等待LVGL Wayland初始化完成... (" << (wait_count * 0.5) << "秒)" << std::endl;
-            }
-            
-            if (lvgl_if->isFullyInitialized()) {
+if (lvgl_if->isFullyInitialized()) {
                 std::cout << "? LVGL Wayland已完全初始化，继续启动DeepStream管道" << std::endl;
             } else {
                 std::cout << "?? 警告：LVGL Wayland初始化超时，继续启动DeepStream管道" << std::endl;
@@ -1732,24 +1721,7 @@ void DeepStreamManager::canvasUpdateLoop() {
         }
         
         auto current_time = std::chrono::steady_clock::now();
-        
-        if (new_frame_available_.load() && lvgl_interface_) {
-            std::lock_guard<std::mutex> lock(frame_mutex_);
-            
-            if (!latest_frame_.empty()) {
-                #ifdef ENABLE_LVGL
-                         
-                auto* lvgl_if = static_cast<bamboo_cut::ui::LVGLWaylandInterface*>(lvgl_interface_);
-                lv_obj_t* canvas = lvgl_if->getCameraCanvas();
-                
-                if (canvas) {
-                    // Canvas对象获取成功（静默模式）
-                    
-                    // ?? 修复1: 确保帧格式统一为BGRA
-                    cv::Mat display_frame;
-                    if (latest_frame_.channels() == 4) {
-                        display_frame = latest_frame_.clone();  // 克隆避免引用问题
-                    } else if (latest_frame_.channels() == 3) {
+else if (latest_frame_.channels() == 3) {
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_BGR2BGRA);
                     } else {
                         cv::cvtColor(latest_frame_, display_frame, cv::COLOR_GRAY2BGRA);

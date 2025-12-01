@@ -1,5 +1,4 @@
 #include "ModbusClient.h"
-#include <modbus/modbus.h>
 #include <errno.h>
 #include <cstring>
 #include <QDebug>

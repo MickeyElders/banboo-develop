@@ -3,8 +3,7 @@
 #include <QObject>
 #include <QTimer>
 #include <cstdint>
-
-struct modbus_t;
+#include <modbus/modbus.h>
 
 // 轻量 Modbus 客户端，轮询 PLC/本地服务器寄存器，供 QML 绑定。
 // 地址映射基于需求：

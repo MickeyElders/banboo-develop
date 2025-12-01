@@ -318,34 +318,8 @@ bool BambooSystem::initializeSubsystems() {
         if (config_.system_params.enable_ui_interface) {
 #ifdef ENABLE_LVGL
             try {
-                ui_wayland_interface_ = std::make_unique<ui::LVGLWaylandInterface>();
-                
-                // 转换配置结构
-                ui::LVGLWaylandConfig wayland_config;
-                wayland_config.screen_width = config_.ui_config.screen_width;
-                wayland_config.screen_height = config_.ui_config.screen_height;
-                wayland_config.refresh_rate = 60; // 默认刷新率
-                wayland_config.enable_touch = true;
-                wayland_config.touch_device = "/dev/input/event0";
-                wayland_config.wayland_display = "wayland-0";
-                wayland_config.fullscreen = true;
-                
-                if (ui_wayland_interface_->initialize(wayland_config)) {
-                    system_info_.ui_interface_active = true;
-                    std::cout << "[BambooSystem] LVGL Wayland界面模块已初始化" << std::endl;
-                } else {
-                    std::cerr << "[BambooSystem] LVGL Wayland界面初始化失败" << std::endl;
-                    ui_wayland_interface_.reset(); // 清理失败的界面对象
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "[BambooSystem] LVGL Wayland界面初始化异常: " << e.what() << std::endl;
-                ui_wayland_interface_.reset();
+                // LVGL界面已移除
             }
-#else
-            std::cout << "[BambooSystem] LVGL未启用，跳过界面初始化" << std::endl;
-            system_info_.ui_interface_active = false;
-#endif
-        }
         
         // 初始化Modbus通信
         if (config_.system_params.enable_modbus_communication) {

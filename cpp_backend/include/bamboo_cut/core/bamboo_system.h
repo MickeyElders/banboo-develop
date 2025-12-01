@@ -15,6 +15,8 @@
 
 #include "bamboo_cut/core/data_bridge.h"
 #include "bamboo_cut/inference/bamboo_detector.h"
+#include <memory>
+#include <string>
 #include "bamboo_cut/communication/modbus_interface.h"
 
 namespace bamboo_cut {
@@ -28,7 +30,6 @@ struct SystemConfig {
     inference::DetectorConfig detector_config;
     
     // LVGL Wayland界面配置
-    ui::LVGLWaylandConfig ui_config;
     
     // Modbus通信配置
     communication::ModbusConfig modbus_config;
@@ -327,7 +328,6 @@ private:
     
     // 子系统组件
     std::unique_ptr<inference::InferenceThread> inference_thread_;
-    std::unique_ptr<ui::LVGLWaylandInterface> ui_wayland_interface_;
     std::unique_ptr<communication::ModbusInterface> modbus_interface_;
     std::unique_ptr<WorkflowManager> workflow_manager_;
     
