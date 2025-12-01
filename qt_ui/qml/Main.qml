@@ -20,7 +20,7 @@ ApplicationWindow {
 
     color: "#0f131a"
 
-    title: qsTr("AI绔硅妭璇嗗埆鍒囧壊绯荤粺 v2.1 - Qt Preview")
+    title: qsTr("AI v2.1 - Qt Preview")
 
 
 
@@ -102,7 +102,7 @@ ApplicationWindow {
 
                         spacing: 10
 
-                        Label { text: "AI绔硅妭璇嗗埆鍒囧壊绯荤粺 v2.1"; color: textPrimary; font.bold: true; font.pixelSize: 18 }
+                        Label { text: "AI v2.1"; color: textPrimary; font.bold: true; font.pixelSize: 18 }
 
                         Rectangle {
 
@@ -120,7 +120,7 @@ ApplicationWindow {
 
                                 anchors.margins: 6
 
-                                Label { text: "Jetson Orin NX 路 Modbus TCP"; color: "#031422"; font.pixelSize: 11; font.bold: true }
+                                Label { text: "Jetson Orin NX  Modbus TCP"; color: "#031422"; font.pixelSize: 11; font.bold: true }
 
                             }
 
@@ -162,7 +162,7 @@ ApplicationWindow {
 
                                     font.pixelSize: 12
 
-                                    text: ["Step1 杩涙枡妫€娴?,"Step2 瑙嗚璇嗗埆","Step3 鍧愭爣浼犺緭","Step4 鍒囧壊鍑嗗","Step5 鎵ц鍒囧壊"][index]
+                                    text: ["Step1 ","Step2 ","Step3 ","Step4 ","Step5 "][index]
                                 }
 
                             }
@@ -173,7 +173,7 @@ ApplicationWindow {
 
                     Button {
 
-                        text: "鈿欙笍 璁剧疆"
+                        text: " "
 
                         onClicked: settingsDialog.open()
 
@@ -185,9 +185,9 @@ ApplicationWindow {
 
                         Rectangle { width: 12; height: 12; radius: 6; color: success; anchors.verticalCenter: parent.verticalCenter; opacity: 0.8 }
 
-                        Label { text: "蹇冭烦 " + modbus.heartbeat; color: success; font.pixelSize: 12 }
+                        Label { text: " " + modbus.heartbeat; color: success; font.pixelSize: 12 }
 
-                        Label { text: "鍝嶅簲 12ms"; color: textSecondary; font.pixelSize: 12 }
+                        Label { text: " 12ms"; color: textSecondary; font.pixelSize: 12 }
 
                     }
 
@@ -277,7 +277,7 @@ ApplicationWindow {
 
                             border.color: "#2196f3"
 
-                            Label { anchors.centerIn: parent; text: "X杞村锟?(0 - 1000.0 mm)"; color: "#2196f3"; font.pixelSize: 12 }
+                            Label { anchors.centerIn: parent; text: "X?(0 - 1000.0 mm)"; color: "#2196f3"; font.pixelSize: 12 }
 
                             Rectangle {
 
@@ -313,11 +313,11 @@ ApplicationWindow {
 
                                 model: [
 
-                                    {label: "X鍧愭爣", value: Qt.formatNumber(modbus.visionTargetCoord || systemState.xCoordinate, 'f', 1) + "mm"},
+                                    {label: "X", value: Qt.formatNumber(modbus.visionTargetCoord || systemState.xCoordinate, 'f', 1) + "mm"},
 
-                                    {label: "PLC鎺ユ敹鐘讹拷?, value: modbus.plcReceiveState === 1 ? "鍙帴锟? : (modbus.plcReceiveState === 2 ? "閫佹枡锟? : "鏈煡")},
+                                    {label: "PLC?, value: modbus.plcReceiveState === 1 ? "? : (modbus.plcReceiveState === 2 ? "? : "")},
 
-                                    {label: "閫佹枡浼烘湇褰撳墠浣嶇疆", value: modbus.plcServoPosition.toFixed(1) + " mm"}
+                                    {label: "", value: modbus.plcServoPosition.toFixed(1) + " mm"}
 
                                 ]
 
@@ -401,15 +401,15 @@ ApplicationWindow {
 
                                 Layout.fillWidth: true
 
-                                Label { text: "馃搳 Modbus"; color: textPrimary; font.bold: true }
+                                Label { text: " Modbus"; color: textPrimary; font.bold: true }
 
                                 Item { Layout.fillWidth: true }
 
-                                Label { text: modbus.connected ? "宸茶繛锟? : "鏈繛锟?; color: modbus.connected ? success : error; font.pixelSize: 12 }
+                                Label { text: modbus.connected ? "Connected" : "Disconnected"; color: modbus.connected ? success : error; font.pixelSize: 12 }
 
                             }
 
-                            Label { text: "PLC 锟?鐩告満 (D2100 绯诲垪)"; color: textSecondary; font.pixelSize: 12 }
+                            Label { text: "PLC status (D2100 block)"; color: textSecondary; font.pixelSize: 12 }
 
                             GridLayout {
 
@@ -419,13 +419,13 @@ ApplicationWindow {
 
                                     model: [
 
-                                        {k:"D2100 閫氳璇锋眰",v: modbus.plcPowerRequest},
+                                        {k:"D2100 ",v: modbus.plcPowerRequest},
 
-                                        {k:"D2101 鎺ユ敹鐘讹拷?,v: modbus.plcReceiveState},
+                                        {k:"D2101 ?,v: modbus.plcReceiveState},
 
-                                        {k:"D2102/3 閫佹枡浼烘湇",v: modbus.plcServoPosition.toFixed(1)},
+                                        {k:"D2102/3 ",v: modbus.plcServoPosition.toFixed(1)},
 
-                                        {k:"D2104/5 鍧愭爣鍙嶉",v: modbus.plcCoordFeedback.toFixed(1)}
+                                        {k:"D2104/5 ",v: modbus.plcCoordFeedback.toFixed(1)}
 
                                     ]
 
@@ -450,10 +450,10 @@ ApplicationWindow {
                                 columns: 2; rowSpacing: 4; columnSpacing: 6
                                 Repeater {
                                     model: [
-                                        {k:"D2000 閫氳搴旂瓟",v: modbus.visionCommAck},
-                                        {k:"D2001 鐩告満鐘舵€?,v: modbus.visionStatus},
-                                        {k:"D2002/3 鐩爣鍧愭爣",v: modbus.visionTargetCoord.toFixed(1)},
-                                        {k:"D2004 浼犺緭缁撴灉",v: modbus.visionTransferResult}
+                                        {k:"D2000 ",v: modbus.visionCommAck},
+                                        {k:"D2001 ?,v: modbus.visionStatus},
+                                        {k:"D2002/3 ",v: modbus.visionTargetCoord.toFixed(1)},
+                                        {k:"D2004 ",v: modbus.visionTransferResult}
                                     ]
                                     delegate: RowLayout {
                                         Layout.fillWidth: true
@@ -475,7 +475,7 @@ ApplicationWindow {
 
                             anchors.fill: parent; anchors.margins: 8; spacing: 6
 
-                            Label { text: "馃煝 Jetson Orin NX"; color: textPrimary; font.bold: true }
+                            Label { text: " Jetson Orin NX"; color: textPrimary; font.bold: true }
 
                             Column {
 
@@ -515,9 +515,9 @@ ApplicationWindow {
 
                                 bar("GPU", jetsonState.gpuUsage.toFixed(1)+"%", accent)
 
-                                bar("鍐呭瓨", (jetsonState.memUsed/jetsonState.memTotal*100).toFixed(1)+"%", warning)
+                                bar("", (jetsonState.memUsed/jetsonState.memTotal*100).toFixed(1)+"%", warning)
 
-                                bar("娓╁害", jetsonState.temp.toFixed(0)+"%", error)
+                                bar("", jetsonState.temp.toFixed(0)+"%", error)
 
                             }
 
@@ -529,13 +529,13 @@ ApplicationWindow {
 
                                     model: [
 
-                                        {k:"鍔燂拷?, v: jetsonState.cpuUsage.toFixed(0)+" W"},
+                                        {k:"?, v: jetsonState.cpuUsage.toFixed(0)+" W"},
 
-                                        {k:"椋庢墖", v: jetsonState.fanRpm.toFixed(0)+" RPM"},
+                                        {k:"", v: jetsonState.fanRpm.toFixed(0)+" RPM"},
 
-                                        {k:"鎬ц兘妯″紡", v: jetsonState.perfMode},
+                                        {k:"", v: jetsonState.perfMode},
 
-                                        {k:"X11", v:"宸茬锟?}
+                                        {k:"X11", v:"?}
 
                                     ]
 
@@ -567,7 +567,7 @@ ApplicationWindow {
 
                             anchors.fill: parent; anchors.margins: 8; spacing: 6
 
-                            Label { text: "馃 妯″瀷 & 妫€锟?; color: textPrimary; font.bold: true }
+                            Label { text: "AI / Inference stats"; color: textPrimary; font.bold: true }
 
                             GridLayout {
 
@@ -577,17 +577,17 @@ ApplicationWindow {
 
                                     model: [
 
-                                        {k:"妯″瀷鐗堟湰", v:"YOLOv8n"},
+                                        {k:"", v:"YOLOv8n"},
 
-                                        {k:"鎺ㄧ悊鏃堕棿", v: aiState.inferenceMs.toFixed(1)+"ms"},
+                                        {k:"", v: aiState.inferenceMs.toFixed(1)+"ms"},
 
                                         {k:"FPS", v: aiState.fps.toFixed(1)},
 
-                                        {k:"妫€娴嬬簿锟?, v: aiState.accuracy.toFixed(1)+"%"},
+                                        {k:"?, v: aiState.accuracy.toFixed(1)+"%"},
 
-                                        {k:"鎬绘娴嬫暟", v: aiState.total},
+                                        {k:"", v: aiState.total},
 
-                                        {k:"浠婃棩妫€锟?, v: aiState.today}
+                                        {k:"?, v: aiState.today}
 
                                     ]
 
@@ -619,7 +619,7 @@ ApplicationWindow {
 
                             anchors.fill: parent; anchors.margins: 8; spacing: 6
 
-                            Label { text: "馃搱 閫氫俊缁熻"; color: textPrimary; font.bold: true }
+                            Label { text: " "; color: textPrimary; font.bold: true }
 
                             GridLayout {
 
@@ -629,17 +629,17 @@ ApplicationWindow {
 
                                     model: [
 
-                                        {k:"杩炴帴鏃堕暱", v:"2h 15m"},
+                                        {k:"", v:"2h 15m"},
 
-                                        {k:"鏁版嵁锟?, v:"15,432"},
+                                        {k:"?, v:"15,432"},
 
-                                        {k:"閿欒锟?, v:"0.02%"},
+                                        {k:"?, v:"0.02%"},
 
-                                        {k:"鍚炲悙", v:"1.2KB/s"},
+                                        {k:"", v:"1.2KB/s"},
 
                                         {k:"Wi-Fi", v:`${wifiState.ssid} (${wifiState.mode})`},
 
-                                        {k:"淇″彿", v: wifiState.rssi + " dBm"}
+                                        {k:"", v: wifiState.rssi + " dBm"}
 
                                     ]
 
@@ -697,11 +697,11 @@ ApplicationWindow {
 
                         spacing: 8
 
-                        Button { text: "鍚姩绯荤粺"; onClicked: { modbus.setVisionCommAck(1); modbus.setVisionStatus(1); modbus.setVisionTransferResult(0); } }
+                        Button { text: "Ack OK"; onClicked: { modbus.setVisionCommAck(1); modbus.setVisionStatus(1); modbus.setVisionTransferResult(0); } }
+                        Button { text: "Set Idle"; onClicked: { modbus.setVisionStatus(3); } }
+                        Button { text: "Fail"; onClicked: { modbus.setVisionStatus(3); modbus.setVisionCommAck(0); } }
 
-                        Button { text: "鏆傚仠"; onClicked: { modbus.setVisionStatus(3); } }
-
-                        Button { text: "鍋滄"; onClicked: { modbus.setVisionStatus(3); modbus.setVisionCommAck(0); } }
+                        Button { text: "Reset"; onClicked: { modbus.setVisionStatus(3); modbus.setVisionCommAck(0); } }
 
                     }
 
@@ -713,13 +713,13 @@ ApplicationWindow {
 
                         Label {
 
-                            text: "褰撳墠宸ュ簭: " + ["杩涙枡妫€锟?,"瑙嗚璇嗗埆","鍧愭爣浼犺緭","鍒囧壊鍑嗗","鎵ц鍒囧壊"][Math.max(0, Math.min(4, (modbus.plcCommand||1)-1))]
+                            text: "Workflow step: " + ["Step1","Step2","Step3","Step4","Step5"][Math.max(0, Math.min(4, (modbus.plcCommand||1)-1))]
 
                             color: textSecondary; font.pixelSize: 13
 
                         }
 
-                        Label { text: "涓婃鍒囧壊 14:25:33 | 浠婃棩鍒囧壊 " + aiState.today + " | 鏁堢巼 94.2%"; color: textSecondary; font.pixelSize: 12 }
+                        Label { text: "Last event: 14:25:33 | Today " + aiState.today + " | Acc 94.2%"; color: textSecondary; font.pixelSize: 12 }
 
                     }
 
@@ -727,9 +727,9 @@ ApplicationWindow {
 
                         spacing: 8
 
-                        Button { text: "馃毃 绱ф€ュ仠锟?; onClicked: { modbus.setVisionStatus(2); modbus.setVisionCommAck(0); modbus.setVisionTransferResult(2); }; background: Rectangle { color: error; radius: 6 } }
-
-                        Button { text: "锟?鍏虫満"; onClicked: settingsDialog.open() }
+                        Button { text: "Mark NG"; onClicked: { modbus.setVisionStatus(2); modbus.setVisionCommAck(0); modbus.setVisionTransferResult(2); }; background: Rectangle { color: error; radius: 6 } }
+                        Button { text: "Settings"; onClicked: settingsDialog.open() }
+                        Button { text: "Settings"; onClicked: settingsDialog.open() }
 
                     }
 
@@ -771,7 +771,7 @@ ApplicationWindow {
 
         standardButtons: Dialog.Close
 
-        title: "绯荤粺璁剧疆"
+        title: ""
 
         contentItem: ColumnLayout {
 
@@ -781,7 +781,7 @@ ApplicationWindow {
 
             GroupBox {
 
-                title: "鐢垫簮鎺у埗"
+                title: ""
 
                 Layout.fillWidth: true
 
@@ -789,11 +789,11 @@ ApplicationWindow {
 
                     spacing: 8
 
-                    Button { text: "閲嶅惎 Jetson"; onClicked: console.log("reboot (todo: hook systemd)") }
+                    Button { text: " Jetson"; onClicked: console.log("reboot (todo: hook systemd)") }
 
-                    Button { text: "瀹夊叏鍏虫満"; onClicked: console.log("shutdown (todo: hook systemd)") }
+                    Button { text: "Shutdown"; onClicked: console.log("shutdown (todo: hook systemd)") }
 
-                    Button { text: "閲嶅惎鎺ㄧ悊/Modbus 鏈嶅姟"; onClicked: console.log("restart services") }
+                    Button { text: "Restart UI/Modbus"; onClicked: console.log("restart services") }
 
                 }
 
@@ -801,7 +801,7 @@ ApplicationWindow {
 
             GroupBox {
 
-                title: "鎬ц兘妯″紡"
+                title: ""
 
                 Layout.fillWidth: true
 
@@ -815,7 +815,7 @@ ApplicationWindow {
 
                     Button { text: "MAXN"; onClicked: jetsonState.setPerfMode("MAXN") }
 
-                    Label { text: "褰撳墠: " + jetsonState.perfMode; color: textSecondary }
+                    Label { text: ": " + jetsonState.perfMode; color: textSecondary }
 
                 }
 
@@ -823,7 +823,7 @@ ApplicationWindow {
 
             GroupBox {
 
-                title: "Modbus 杩炴帴"
+                title: "Modbus "
 
                 Layout.fillWidth: true
 
@@ -839,11 +839,11 @@ ApplicationWindow {
 
                     TextField { id: mbHost; text: "127.0.0.1" }
 
-                    Label { text: "绔彛"; color: textSecondary }
+                    Label { text: "Port"; color: textSecondary }
 
                     TextField { id: mbPort; text: "1502" }
 
-                    Label { text: "Slave ID"; color: textSecondary }
+                    Label { text: "Mode"; color: textSecondary }
 
                     TextField { id: mbSlave; text: "1" }
 
@@ -853,9 +853,9 @@ ApplicationWindow {
 
                     spacing: 8
 
-                    Button { text: "杩炴帴"; onClicked: modbus.configure(mbHost.text, parseInt(mbPort.text), parseInt(mbSlave.text)) }
+                    Button { text: "Reconnect"; onClicked: modbus.configure(mbHost.text, parseInt(mbPort.text), parseInt(mbSlave.text)) }
 
-                    Label { text: modbus.connected ? "宸茶繛锟? : "鏈繛锟?; color: modbus.connected ? success : error }
+                    Label { text: modbus.connected ? "Connected" : "Disconnected"; color: modbus.connected ? success : error }
 
                 }
 
@@ -863,7 +863,7 @@ ApplicationWindow {
 
             GroupBox {
 
-                title: "Wi-Fi 閰嶇疆"
+                title: "Wi-Fi "
 
                 Layout.fillWidth: true
 
@@ -879,11 +879,11 @@ ApplicationWindow {
 
                     TextField { id: ssidField; text: wifiState.ssid; placeholderText: "SSID" }
 
-                    Label { text: "瀵嗙爜"; color: textSecondary }
+                    Label { text: ""; color: textSecondary }
 
                     TextField { id: pwdField; text: "******"; echoMode: TextInput.Password }
 
-                    Label { text: "妯″紡"; color: textSecondary }
+                    Label { text: ""; color: textSecondary }
 
                     ComboBox { id: modeBox; model: ["DHCP","STATIC"]; currentIndex: wifiState.mode === "STATIC" ? 1 : 0 }
 
@@ -891,11 +891,11 @@ ApplicationWindow {
 
                     TextField { id: ipField; text: "192.168.1.120"; enabled: modeBox.currentText === "STATIC" }
 
-                    Label { text: "鎺╃爜"; color: textSecondary }
+                    Label { text: ""; color: textSecondary }
 
                     TextField { id: maskField; text: "255.255.255.0"; enabled: modeBox.currentText === "STATIC" }
 
-                    Label { text: "缃戝叧"; color: textSecondary }
+                    Label { text: ""; color: textSecondary }
 
                     TextField { id: gwField; text: "192.168.1.1"; enabled: modeBox.currentText === "STATIC" }
 
@@ -909,11 +909,11 @@ ApplicationWindow {
 
                     spacing: 8
 
-                    Button { text: "搴旂敤"; onClicked: wifiState.apply(ssidField.text, pwdField.text, modeBox.currentText, ipField.text, maskField.text, gwField.text, dnsField.text) }
+                    Button { text: "Apply WiFi"; onClicked: wifiState.apply(ssidField.text, pwdField.text, modeBox.currentText, ipField.text, maskField.text, gwField.text, dnsField.text) }
+                    Button { text: "Check WiFi"; onClicked: wifiState.check() }
+                    Label { text: "Status " + wifiState.status + " | RSSI " + wifiState.rssi + " dBm"; color: textSecondary }
 
-                    Button { text: "妫€锟?; onClicked: wifiState.check() }
-
-                    Label { text: "鐘讹拷? " + wifiState.status + " | RSSI " + wifiState.rssi + " dBm"; color: textSecondary }
+                    Label { text: "Status " + wifiState.status + " | RSSI " + wifiState.rssi + " dBm"; color: textSecondary }
 
                 }
 
