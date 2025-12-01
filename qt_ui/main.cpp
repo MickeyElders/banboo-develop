@@ -9,6 +9,9 @@
 #include <QLoggingCategory>
 #include <QTimer>
 #include <QUrl>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <gst/gst.h>
 #include <atomic>
 #include <csignal>
 
@@ -19,6 +22,42 @@
 
 namespace {
 std::atomic_bool g_shouldQuit{false};
+
+// Pre-initialize a surfaceless EGL context to unblock nvargus/gst when headless.
+void fixArgusDeadlockInHeadless() {
+    // Try surfaceless first; fall back to default display.
+    EGLDisplay display = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
+    if (display == EGL_NO_DISPLAY) {
+        display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    }
+    EGLint major = 0, minor = 0;
+    if (eglInitialize(display, &major, &minor) == EGL_FALSE) {
+        return;  // likely already initialized elsewhere
+    }
+    eglBindAPI(EGL_OPENGL_ES_API);
+    static const EGLint configAttribs[] = {
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+    };
+    EGLConfig config;
+    EGLint numConfigs = 0;
+    eglChooseConfig(display, configAttribs, &config, 1, &numConfigs);
+    static const EGLint contextAttribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+    EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
+    if (context != EGL_NO_CONTEXT) {
+        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, context);
+        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroyContext(display, context);
+    }
+    eglTerminate(display);
+
+    // Force GStreamer GL to use EGL/GLES2
+    g_setenv("GST_GL_PLATFORM", "egl", TRUE);
+    g_setenv("GST_GL_API", "gles2", TRUE);
+}
 
 void handleSignal(int signum) {
     if (signum == SIGTERM || signum == SIGINT) {
@@ -54,6 +93,7 @@ void logOffscreenEnvironment() {
 }  // namespace
 
 int main(int argc, char *argv[]) {
+    fixArgusDeadlockInHeadless();  // must run before any gst_init in DeepStream
     // Enable verbose Qt logs for diagnostics
     QLoggingCategory::setFilterRules(QStringLiteral(
         "qt.qpa.*=true\n"
