@@ -20,6 +20,10 @@ void HttpServer::onNewConnection() {
         qInfo() << "[http] connection from" << sock->peerAddress().toString() << ":" << sock->peerPort();
         connect(sock, &QTcpSocket::readyRead, this, &HttpServer::onReadyRead);
         connect(sock, &QTcpSocket::disconnected, this, &HttpServer::onDisconnected);
+        // In fast clients (curl), data may already be buffered before readyRead is connected.
+        if (sock->bytesAvailable() > 0) {
+            onReadyRead();
+        }
     }
 }
 
@@ -27,6 +31,7 @@ void HttpServer::onReadyRead() {
     QTcpSocket *sock = qobject_cast<QTcpSocket *>(sender());
     if (!sock) return;
     const QByteArray req = sock->readAll();
+    qInfo() << "[http] request bytes" << req.size() << "from" << sock->peerAddress().toString();
     if (!req.startsWith("GET")) {
         sock->disconnectFromHost();
         return;
@@ -57,5 +62,6 @@ void HttpServer::sendResponse(QTcpSocket *sock, const QByteArray &body, const QB
     resp += body;
     sock->write(resp);
     sock->flush();
+    sock->waitForBytesWritten(100);
     sock->disconnectFromHost();
 }
