@@ -1,5 +1,5 @@
 [Unit]
-Description=Bamboo Qt DeepStream UI (headless eglfs_kms)
+Description=Bamboo Qt DeepStream UI (offscreen)
 After=network-online.target nvargus-daemon.service
 Wants=network-online.target
 
