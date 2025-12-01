@@ -32,42 +32,48 @@ void fixArgusDeadlockInHeadless() {
     // Pre-start nvargus-daemon to avoid lazy startup stalls
     (void)system("systemctl start nvargus-daemon.service >/dev/null 2>&1");
 
-    // Try surfaceless first; fall back to default display.
-    EGLDisplay display = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
-    if (display == EGL_NO_DISPLAY) {
-        display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    }
-    EGLint major = 0, minor = 0;
-    if (eglInitialize(display, &major, &minor) == EGL_FALSE) {
-        return;  // likely already initialized elsewhere
-    }
-    eglBindAPI(EGL_OPENGL_ES_API);
-    static const EGLint configAttribs[] = {
-        EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_NONE
-    };
-    EGLConfig config;
-    EGLint numConfigs = 0;
-    eglChooseConfig(display, configAttribs, &config, 1, &numConfigs);
-    static const EGLint contextAttribs[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
-        EGL_NONE
-    };
-    EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
-    if (context != EGL_NO_CONTEXT) {
+    // Hold a persistent EGLDisplay/EGLContext for Argus. Do NOT destroy/terminate.
+    static EGLDisplay s_display = EGL_NO_DISPLAY;
+    static EGLContext s_context = EGL_NO_CONTEXT;
+    static EGLSurface s_surface = EGL_NO_SURFACE;
+    if (s_display == EGL_NO_DISPLAY) {
+        // Try surfaceless first; fall back to default display.
+        s_display = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
+        if (s_display == EGL_NO_DISPLAY) {
+            s_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+        }
+        EGLint major = 0, minor = 0;
+        if (eglInitialize(s_display, &major, &minor) == EGL_FALSE) {
+            s_display = EGL_NO_DISPLAY;
+            return;  // likely already initialized elsewhere
+        }
+        eglBindAPI(EGL_OPENGL_ES_API);
+        static const EGLint configAttribs[] = {
+            EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+            EGL_NONE
+        };
+        EGLConfig config;
+        EGLint numConfigs = 0;
+        if (!eglChooseConfig(s_display, configAttribs, &config, 1, &numConfigs) || numConfigs < 1) {
+            return;
+        }
+        static const EGLint contextAttribs[] = {
+            EGL_CONTEXT_CLIENT_VERSION, 2,
+            EGL_NONE
+        };
+        s_context = eglCreateContext(s_display, config, EGL_NO_CONTEXT, contextAttribs);
         EGLint pbufferAttribs[] = {
             EGL_WIDTH, 16,
             EGL_HEIGHT, 16,
             EGL_NONE,
         };
-        EGLSurface surface = eglCreatePbufferSurface(display, config, pbufferAttribs);
-        eglMakeCurrent(display, surface, surface, context);
-        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        eglDestroySurface(display, surface);
-        eglDestroyContext(display, context);
+        s_surface = eglCreatePbufferSurface(s_display, config, pbufferAttribs);
+        if (s_context != EGL_NO_CONTEXT && s_surface != EGL_NO_SURFACE) {
+            eglMakeCurrent(s_display, s_surface, s_surface, s_context);
+            // 保持上下文存活，Argus 将检测到有效 EGLDisplay
+        }
     }
-    eglTerminate(display);
 
     // Force GStreamer GL to use EGL/GLES2
     g_setenv("GST_GL_PLATFORM", "egl", TRUE);
