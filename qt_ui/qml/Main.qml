@@ -131,9 +131,26 @@ ApplicationWindow {
                                 }
                                 RowLayout {
                                     spacing: 8
-                                    Button { text: "Ack OK"; onClicked: { modbus.setVisionCommAck(1); modbus.setVisionStatus(1); modbus.setVisionTransferResult(0); } }
-                                    Button { text: "Set Idle"; onClicked: { modbus.setVisionStatus(3); } }
-                                    Button { text: "Fail"; onClicked: { modbus.setVisionStatus(3); modbus.setVisionCommAck(0); modbus.setVisionTransferResult(2); } }
+                                    Button {
+                                        text: "Ack OK"
+                                        onClicked: {
+                                            modbus.setVisionCommAck(1)
+                                            modbus.setVisionStatus(1)
+                                            modbus.setVisionTransferResult(0)
+                                        }
+                                    }
+                                    Button {
+                                        text: "Set Idle"
+                                        onClicked: modbus.setVisionStatus(3)
+                                    }
+                                    Button {
+                                        text: "Fail"
+                                        onClicked: {
+                                            modbus.setVisionStatus(3)
+                                            modbus.setVisionCommAck(0)
+                                            modbus.setVisionTransferResult(2)
+                                        }
+                                    }
                                 }
                             }
 
@@ -145,7 +162,15 @@ ApplicationWindow {
                                 Label { text: "Last event placeholder"; color: textSecondary; font.pixelSize: 12 }
                                 RowLayout {
                                     spacing: 8
-                                    Button { text: "Mark NG"; onClicked: { modbus.setVisionStatus(2); modbus.setVisionCommAck(0); modbus.setVisionTransferResult(2); }; background: Rectangle { color: error; radius: 6 } }
+                                    Button {
+                                        text: "Mark NG"
+                                        onClicked: {
+                                            modbus.setVisionStatus(2)
+                                            modbus.setVisionCommAck(0)
+                                            modbus.setVisionTransferResult(2)
+                                        }
+                                        background: Rectangle { color: error; radius: 6 }
+                                    }
                                     Button { text: "Settings"; onClicked: settingsDialog.open() }
                                 }
                             }
