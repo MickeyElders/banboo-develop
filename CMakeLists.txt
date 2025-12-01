@@ -49,7 +49,10 @@ endif()
 if(Qt6_VERSION VERSION_LESS "6.6.0")
     message(WARNING "Qt6 version ${Qt6_VERSION} detected (<6.6). Build will proceed, but eglfs_kms GBM import/zero-copy features are recommended with Qt 6.6+. Upgrade when possible.")
 endif()
-qt_standard_project_setup()
+# Some distro Qt 6.2 packages do not ship qt_standard_project_setup; guard its usage.
+if(COMMAND qt_standard_project_setup)
+    qt_standard_project_setup()
+endif()
 
 # Modbus (optional)
 set(MODBUS_FOUND FALSE)
