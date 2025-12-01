@@ -1,4 +1,4 @@
-﻿#include "ModbusClient.h"
+#include "ModbusClient.h"
 #include <errno.h>
 #include <cstring>
 #include <QDebug>
@@ -23,7 +23,7 @@ inline float toFloat(uint16_t high, uint16_t low) {
 } // namespace
 
 ModbusClient::ModbusClient(QObject *parent) : QObject(parent) {
-    pollTimer_.setInterval(200); // 5Hz poll，视实际负载可调
+    pollTimer_.setInterval(200); // 5Hz poll, adjust per workload
     connect(&pollTimer_, &QTimer::timeout, this, &ModbusClient::poll);
     pollTimer_.start();
 }
@@ -43,12 +43,12 @@ bool ModbusClient::ensureConnected() {
     if (connected_ && ctx_) return true;
     ctx_ = modbus_new_tcp(host_.toStdString().c_str(), port_);
     if (!ctx_) {
-        Q_EMIT errorMessage(tr("Modbus 创建失败"));
+        Q_EMIT errorMessage(tr("Modbus create failed"));
         return false;
     }
     modbus_set_slave(ctx_, slaveId_);
     if (modbus_connect(ctx_) == -1) {
-        Q_EMIT errorMessage(tr("Modbus 连接失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Modbus connect failed: %1").arg(modbus_strerror(errno)));
         modbus_free(ctx_);
         ctx_ = nullptr;
         connected_ = false;
@@ -72,15 +72,18 @@ void ModbusClient::disconnect() {
     }
 }
 
+void ModbusClient::shutdown() {
+    disconnect();
+}
+
 void ModbusClient::poll() {
     if (!ensureConnected()) return;
-    // 读取 PLC -> 相机：D2100-2105 (0x0834-0x0839)
-    constexpr int start = 0x0834;
-    constexpr int count = 6;
+    constexpr int start = 0x0834; // D2100
+    constexpr int count = 6;      // D2100-2105
     uint16_t buf[count] = {0};
     const int rc = modbus_read_registers(ctx_, start, count, buf);
     if (rc != count) {
-        Q_EMIT errorMessage(tr("Modbus 读失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Modbus read failed: %1").arg(modbus_strerror(errno)));
         disconnect();
         return;
     }
@@ -98,7 +101,7 @@ bool ModbusClient::writeFloat(int addr, float value) {
     uint16_t payload[2] = {high, low};
     const int rc = modbus_write_registers(ctx_, addr, 2, payload);
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("写浮点寄存器失败 %1: %2").arg(addr).arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Write float failed %1: %2").arg(addr).arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
@@ -110,7 +113,7 @@ bool ModbusClient::setVisionCommAck(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D0, static_cast<uint16_t>(value));
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("写 D2000 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Write D2000 failed: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
@@ -123,7 +126,7 @@ bool ModbusClient::setVisionStatus(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D1, static_cast<uint16_t>(value));
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("写 D2001 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Write D2001 failed: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }
@@ -143,7 +146,7 @@ bool ModbusClient::setVisionTransferResult(int value) {
     if (!ensureConnected()) return false;
     const int rc = modbus_write_register(ctx_, 0x07D4, static_cast<uint16_t>(value));
     if (rc == -1) {
-        Q_EMIT errorMessage(tr("写 D2004 失败: %1").arg(modbus_strerror(errno)));
+        Q_EMIT errorMessage(tr("Write D2004 failed: %1").arg(modbus_strerror(errno)));
         disconnect();
         return false;
     }

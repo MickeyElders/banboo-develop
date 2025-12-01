@@ -4,8 +4,8 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QProcessEnvironment>
-#include <QUrl>
 #include <QTimer>
+#include <QUrl>
 #include <atomic>
 #include <csignal>
 
@@ -47,8 +47,8 @@ int main(int argc, char *argv[]) {
     configureHeadlessEnvironment();
 
     QGuiApplication app(argc, argv);
-    QCoreApplication::setApplicationName("AI竹节识别切割系统");
-    QCoreApplication::setQuitOnLastWindowClosed(false);
+    app.setQuitOnLastWindowClosed(false);
+    QCoreApplication::setApplicationName("AI Bamboo");
 
     SystemState systemState;
     JetsonState jetsonState;
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     quitTimer.start();
 
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &deepStream, [&deepStream]() { deepStream.stop(); });
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, &modbus, [&modbus]() { modbus.disconnect(); });
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &modbus, [&modbus]() { modbus.shutdown(); });
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("systemState", &systemState);
