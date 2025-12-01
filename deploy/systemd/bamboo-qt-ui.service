@@ -1,6 +1,6 @@
 [Unit]
 Description=Bamboo Qt DeepStream UI (offscreen)
-After=network-online.target nvargus-daemon.service
+After=multi-user.target network-online.target nvargus-daemon.service
 Wants=network-online.target
 
 [Service]
@@ -16,9 +16,7 @@ Environment=GBM_DRIVERS_PATH=
 Environment=GBM_BACKEND=
 Environment=EGL_PLATFORM=
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
-Environment=QT_QUICK_BACKEND=software
-Environment=QT_QPA_EGLFS_DEBUG=0
-Environment=QT_LOGGING_RULES=qt.qpa.eglfs.kms=false;qt.qpa.egl=true;qt.qpa.gl=true
+Environment=QT_LOGGING_RULES=qt.qpa.*=false
 Environment=GST_DEBUG=2
 ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
 ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui

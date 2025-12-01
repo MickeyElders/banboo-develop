@@ -6,10 +6,6 @@
 #include <QProcessEnvironment>
 #include <QTimer>
 #include <QUrl>
-#include <QFileInfo>
-#include <QFile>
-#include <QDirIterator>
-#include <QTextStream>
 #include <atomic>
 #include <csignal>
 
@@ -39,63 +35,9 @@ void configureHeadlessEnvironment() {
     }
 }
 
-void logKmsEnvironment() {
+void logOffscreenEnvironment() {
     qInfo() << "[startup] QT_QPA_PLATFORM =" << qgetenv("QT_QPA_PLATFORM");
-    qInfo() << "[startup] QT_QPA_EGLFS_INTEGRATION =" << qgetenv("QT_QPA_EGLFS_INTEGRATION");
-    qInfo() << "[startup] QT_QPA_EGLFS_KMS_CONFIG =" << qgetenv("QT_QPA_EGLFS_KMS_CONFIG");
-    QFile cfg(QString::fromUtf8(qgetenv("QT_QPA_EGLFS_KMS_CONFIG")));
-    if (cfg.exists()) {
-        qInfo() << "[startup] Found eglfs_kms config:" << cfg.fileName();
-    } else {
-        qWarning() << "[startup] Missing eglfs_kms config file:" << cfg.fileName();
-    }
-    QStringList cards;
-    QDirIterator it("/dev/dri", QDir::System | QDir::Readable | QDir::NoDotAndDotDot);
-    while (it.hasNext()) {
-        const QString path = it.next();
-        if (path.contains("card"))
-            cards << path;
-    }
-    qInfo() << "[startup] DRM devices:" << cards.join(",");
-}
-
-bool hasConnectedDrmOutput() {
-    QDir drmDir("/sys/class/drm");
-    const QFileInfoList entries = drmDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo &info : entries) {
-        const QString name = info.fileName();
-        if (!name.contains("-")) continue;  // skip card root
-        QFile status(info.absoluteFilePath() + "/status");
-        if (status.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            const QString statusText = QString::fromLatin1(status.readAll()).trimmed();
-            if (statusText == "connected") {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-void logDrmConnectors() {
-    QDir drmDir("/sys/class/drm");
-    const QFileInfoList entries = drmDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo &info : entries) {
-        const QString name = info.fileName();
-        if (!name.contains("-")) continue;  // skip card root
-        const QString statusPath = info.absoluteFilePath() + "/status";
-        QFile status(statusPath);
-        QString statusText;
-        if (status.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            statusText = QString::fromLatin1(status.readAll()).trimmed();
-        }
-        QString modeText;
-        QFile modes(info.absoluteFilePath() + "/modes");
-        if (modes.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QTextStream ts(&modes);
-            modeText = ts.readLine();
-        }
-        qInfo() << "[drm]" << name << "status:" << statusText << "preferred mode:" << modeText;
-    }
+    qInfo() << "[startup] XDG_RUNTIME_DIR =" << qgetenv("XDG_RUNTIME_DIR");
 }
 }  // namespace
 
@@ -103,8 +45,7 @@ int main(int argc, char *argv[]) {
     std::signal(SIGTERM, handleSignal);
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
-    logKmsEnvironment();
-    logDrmConnectors();
+    logOffscreenEnvironment();
 
     QGuiApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
