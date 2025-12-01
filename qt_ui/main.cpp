@@ -6,6 +6,7 @@
 #include <QProcessEnvironment>
 #include <QTimer>
 #include <QUrl>
+#include <QFileInfo>
 #include <QFile>
 #include <QDirIterator>
 #include <QTextStream>
@@ -62,6 +63,28 @@ void logKmsEnvironment() {
     }
     qInfo() << "[startup] DRM devices:" << cards.join(",");
 }
+
+void logDrmConnectors() {
+    QDir drmDir("/sys/class/drm");
+    const QFileInfoList entries = drmDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QFileInfo &info : entries) {
+        const QString name = info.fileName();
+        if (!name.contains("-")) continue;  // skip card root
+        const QString statusPath = info.absoluteFilePath() + "/status";
+        QFile status(statusPath);
+        QString statusText;
+        if (status.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            statusText = QString::fromLatin1(status.readAll()).trimmed();
+        }
+        QString modeText;
+        QFile modes(info.absoluteFilePath() + "/modes");
+        if (modes.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream ts(&modes);
+            modeText = ts.readLine();
+        }
+        qInfo() << "[drm]" << name << "status:" << statusText << "preferred mode:" << modeText;
+    }
+}
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -69,6 +92,7 @@ int main(int argc, char *argv[]) {
     std::signal(SIGINT, handleSignal);
     configureHeadlessEnvironment();
     logKmsEnvironment();
+    logDrmConnectors();
 
     QGuiApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
@@ -110,5 +134,10 @@ int main(int argc, char *argv[]) {
                      },
                      Qt::QueuedConnection);
     engine.load(url);
+    if (engine.rootObjects().isEmpty()) {
+        qCritical() << "[startup] Failed to load QML root" << url;
+        return -1;
+    }
+    qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();
 }
