@@ -190,13 +190,19 @@ int main(int argc, char *argv[]) {
         qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
     }
 
-    // Start HTTP server to serve bamboo.html (default 8080, override HTTP_PORT)
-    quint16 httpPort = 8080;
-    bool okHttp = false;
-    int httpEnv = qEnvironmentVariableIntValue("HTTP_PORT", &okHttp);
-    if (okHttp && httpEnv > 0) httpPort = quint16(httpEnv);
-    const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
-    HttpServer http(htmlPath, httpPort, &app);
+    // Legacy HTTP server (disabled by default). Enable with HTTP_SERVER=1.
+    bool enableHttp = false;
+    bool okHttpFlag = false;
+    int httpFlag = qEnvironmentVariableIntValue("HTTP_SERVER", &okHttpFlag);
+    if (okHttpFlag && httpFlag == 1) {
+        quint16 httpPort = 8080;
+        bool okHttpPort = false;
+        int httpEnv = qEnvironmentVariableIntValue("HTTP_PORT", &okHttpPort);
+        if (okHttpPort && httpEnv > 0) httpPort = quint16(httpEnv);
+        const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
+        HttpServer *http = new HttpServer(htmlPath, httpPort, &app);
+        Q_UNUSED(http);
+    }
 
     // Start WebRTC signaling server (WebSocket). Default 9000 to avoid HTTP port clash.
     quint16 wsPort = 9000;
