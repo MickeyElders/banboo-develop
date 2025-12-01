@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QHostAddress>
 
 // Very small HTTP server serving a single HTML file (bamboo.html by default).
 class HttpServer : public QObject {

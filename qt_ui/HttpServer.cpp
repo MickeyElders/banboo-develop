@@ -6,7 +6,7 @@
 HttpServer::HttpServer(const QString &htmlPath, quint16 port, QObject *parent)
     : QObject(parent), m_htmlPath(htmlPath) {
     connect(&m_server, &QTcpServer::newConnection, this, &HttpServer::onNewConnection);
-    if (!m_server.listen(QHostAddress::Any, port)) {
+    if (!m_server.listen(QHostAddress::AnyIPv4, port)) {
         qWarning() << "[http] listen failed on port" << port << ":" << m_server.errorString();
     } else {
         qInfo() << "[http] serving" << htmlPath << "on port" << port;
@@ -17,6 +17,7 @@ void HttpServer::onNewConnection() {
     while (m_server.hasPendingConnections()) {
         QTcpSocket *sock = m_server.nextPendingConnection();
         if (!sock) continue;
+        qInfo() << "[http] connection from" << sock->peerAddress().toString() << ":" << sock->peerPort();
         connect(sock, &QTcpSocket::readyRead, this, &HttpServer::onReadyRead);
         connect(sock, &QTcpSocket::disconnected, this, &HttpServer::onDisconnected);
     }
