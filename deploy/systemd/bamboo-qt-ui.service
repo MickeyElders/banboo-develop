@@ -21,9 +21,7 @@ Environment=QT_LOGGING_RULES=qt.qpa.eglfs.kms=false;qt.qpa.egl=true;qt.qpa.gl=tr
 Environment=GST_DEBUG=2
 ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
 ExecStart=/opt/bamboo-qt/bin/bamboo_qt_ui
-StandardInput=tty
-TTYPath=/dev/tty1
-TTYReset=yes
+TimeoutStartSec=30
 Restart=always
 RestartSec=3
 SupplementaryGroups=video render
