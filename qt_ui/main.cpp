@@ -1,12 +1,18 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QProcessEnvironment>
 
 #include "StateModels.h"
 #include "DeepStreamStub.h"
 #include "ModbusClient.h"
 
 int main(int argc, char *argv[]) {
+    // 无 X11 环境下自动切换 eglfs，避免平台插件错误
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsEmpty("DISPLAY")) {
+        qputenv("QT_QPA_PLATFORM", "eglfs");
+    }
+
     QGuiApplication app(argc, argv);
     QCoreApplication::setApplicationName("AI竹节识别切割系统");
 
