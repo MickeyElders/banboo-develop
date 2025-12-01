@@ -33,6 +33,8 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     auto sinkEnv = std::getenv("DS_SINK");
     const std::string sink = sinkEnv ? std::string(sinkEnv) : std::string("rtsp");
 
+    std::cout << "[deepstream] start() invoked, sink=" << sink << std::endl;
+
     const std::string launch = pipeline.isEmpty()
         ? ([&sink]() -> std::string {
               if (sink == "drm") {

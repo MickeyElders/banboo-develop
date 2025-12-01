@@ -22,7 +22,7 @@ Environment=QT_QPA_NO_MOUSE=1
 Environment=QT_QPA_NO_TOUCH=1
 Environment=QML2_IMPORT_PATH=/usr/lib/aarch64-linux-gnu/qt6/qml
 Environment=QT_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/qt6/plugins
-Environment=DS_AUTOSTART=1
+Environment=DS_AUTOSTART=0
 Environment=DS_SINK=rtsp
 Environment=GST_DEBUG=2
 ExecStartPre=/bin/mkdir -p -m 700 /run/bamboo-qt
