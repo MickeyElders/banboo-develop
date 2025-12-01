@@ -6,11 +6,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_GSTREAMER "Build with GStreamer/DeepStream pipeline" ON)
+option(ENABLE_MODBUS "Build with libmodbus Modbus TCP client" ON)
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia)
-pkg_check_modules(MODBUS REQUIRED modbus)
+
+# Modbus (optional)
+set(MODBUS_FOUND FALSE)
+if(ENABLE_MODBUS)
+    pkg_check_modules(MODBUS QUIET modbus)
+    if(NOT MODBUS_FOUND)
+        pkg_check_modules(MODBUS QUIET libmodbus)
+    endif()
+    if(MODBUS_FOUND)
+        message(STATUS "Found Modbus: ${MODBUS_VERSION}")
+    else()
+        message(WARNING "libmodbus not found; Modbus client will be disabled. Install libmodbus-dev to enable.")
+    endif()
+endif()
 
 if(ENABLE_GSTREAMER)
     pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
@@ -38,7 +52,9 @@ add_executable(bamboo_qt_ui
 )
 
 target_include_directories(bamboo_qt_ui PRIVATE qt_ui)
-target_include_directories(bamboo_qt_ui PRIVATE ${MODBUS_INCLUDE_DIRS})
+if(MODBUS_FOUND)
+    target_include_directories(bamboo_qt_ui PRIVATE ${MODBUS_INCLUDE_DIRS})
+endif()
 
 target_compile_definitions(bamboo_qt_ui PRIVATE
     MODEL_PATH_DEFAULT="${CMAKE_SOURCE_DIR}/models/best.onnx"
@@ -52,8 +68,12 @@ target_link_libraries(bamboo_qt_ui PRIVATE
     Qt5::QuickControls2
     Qt5::Multimedia
     Threads::Threads
-    ${MODBUS_LIBRARIES}
 )
+
+if(MODBUS_FOUND)
+    target_link_libraries(bamboo_qt_ui PRIVATE ${MODBUS_LIBRARIES})
+    target_compile_definitions(bamboo_qt_ui PRIVATE ENABLE_MODBUS=1)
+endif()
 
 if(ENABLE_GSTREAMER)
     target_include_directories(bamboo_qt_ui PRIVATE
