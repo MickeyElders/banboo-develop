@@ -168,10 +168,21 @@ int main(int argc, char *argv[]) {
     }
 
     QQuickWindow *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-    // Serve bamboo.html (installed to prefix) with embedded MJPEG at /mjpeg
-    const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
-    WebPreview preview(rootWindow, htmlPath, 8080, &app);
-    qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
+    // 默认关闭 MJPEG 预览，设置 WEB_PREVIEW=1 可开启（避免与 WebRTC/其他端口冲突）
+    bool enablePreview = false;
+    bool okEnv = false;
+    int previewEnv = qEnvironmentVariableIntValue("WEB_PREVIEW", &okEnv);
+    if (okEnv && previewEnv == 1) {
+        enablePreview = true;
+    }
+    if (!enablePreview) {
+        qInfo() << "[startup] Web preview disabled (set WEB_PREVIEW=1 to enable)";
+    }
+    if (enablePreview) {
+        const QString htmlPath = QCoreApplication::applicationDirPath() + "/../bamboo.html";
+        WebPreview preview(rootWindow, htmlPath, 8080, &app);
+        qInfo() << "[startup] Web preview on http://<device-ip>:8080/ (MJPEG at /mjpeg)";
+    }
 
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();

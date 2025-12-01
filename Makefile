@@ -76,6 +76,7 @@ install: build install-config install-models
 	cd "$(BUILD_DIR)" && cmake --install . --prefix "$(PREFIX)"
 	@# install web assets
 	@install -m 644 bamboo.html "$(PREFIX)/" 2>/dev/null || true
+	@install -m 755 deploy/systemd/webrtc-launch.sh "$(PREFIX)/bin/webrtc-launch.sh"
 
 install-config:
 	@mkdir -p "$(PREFIX)/config"
@@ -91,6 +92,13 @@ service: install
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable $(SERVICE_NAME)
 	@sudo systemctl restart $(SERVICE_NAME)
+
+.PHONY: service-webrtc
+service-webrtc: install
+	@sudo install -D -m 644 deploy/systemd/bamboo-webrtc.service /etc/systemd/system/bamboo-webrtc.service
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable bamboo-webrtc.service
+	@sudo systemctl restart bamboo-webrtc.service
 
 start:
 	@sudo systemctl start $(SERVICE_NAME)

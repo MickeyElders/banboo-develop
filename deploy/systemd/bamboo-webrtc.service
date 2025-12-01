@@ -1,0 +1,22 @@
+[Unit]
+Description=Bamboo DeepStream WebRTC gateway (RTSP -> WebRTC)
+After=network-online.target multi-user.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/bamboo-qt
+Environment=RTSP_URL=rtsp://127.0.0.1:8554/deepstream
+Environment=WEBRTC_PORT=8888
+Environment=WEBRTC_BIN=/opt/nvidia/deepstream/deepstream/sources/apps/sample_apps/deepstream-webrtc-demo/build/deepstream-webrtc-app
+Environment=LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu
+Environment=GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra
+Environment=GST_PLUGIN_SYSTEM_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra
+Environment=GST_PLUGIN_SCANNER=/usr/lib/aarch64-linux-gnu/gstreamer-1.0/gst-plugin-scanner
+ExecStart=/opt/bamboo-qt/bin/webrtc-launch.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
