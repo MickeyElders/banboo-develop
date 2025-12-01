@@ -1,5 +1,8 @@
 #pragma once
+#pragma once
 #include <QObject>
+#include <QString>
+#include <QList>
 #include <QtWebSockets/QWebSocketServer>
 #include <QtWebSockets/QWebSocket>
 #include <QJsonObject>
@@ -12,10 +15,10 @@ public:
     explicit WebRTCSignaling(quint16 port = 9000, QObject *parent = nullptr);
     void sendMessage(const QJsonObject &obj);
 
-signals:
+Q_SIGNALS:
     void messageReceived(const QJsonObject &obj);
 
-private slots:
+private Q_SLOTS:
     void onNewConnection();
     void onTextMessageReceived(const QString &message);
     void onDisconnected();

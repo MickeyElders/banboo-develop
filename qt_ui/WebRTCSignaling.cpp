@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QJsonObject>
 
 WebRTCSignaling::WebRTCSignaling(quint16 port, QObject *parent)
     : QObject(parent),

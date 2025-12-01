@@ -5,6 +5,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QtWebSockets/QWebSocket>
+#include <gst/promise.h>
+#include <gst/sdp/sdp.h>
 #include "WebRTCSignaling.h"
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
@@ -336,5 +338,4 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
     m_signaling->sendMessage(obj);
     g_free(sdpStr);
 }
-#endif
 #endif

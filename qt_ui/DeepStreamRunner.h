@@ -1,6 +1,9 @@
 #pragma once
 
 #ifdef ENABLE_GSTREAMER
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#endif
 // gst/glib headers must come before Qt to avoid macro clashes with Qt's signals/slots
 #include <gst/gst.h>
 #ifdef ENABLE_RTSP
