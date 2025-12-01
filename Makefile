@@ -1,15 +1,14 @@
 PREFIX ?= /opt/bamboo-qt
 BUILD_DIR ?= build
 SERVICE_NAME ?= bamboo-qt-ui.service
-TITLE ?= Bamboo Qt UI
 CMAKE_FLAGS ?= -DCMAKE_BUILD_TYPE=Release -DENABLE_GSTREAMER=ON -DENABLE_MODBUS=ON
 
-# 必须依赖（缺少就中断）
+# Required Debian packages (fail if missing)
 MANDATORY_DEPS ?= libmodbus-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools
-# Qt6 必须依赖（缺少自动安装）
-QT6_DEPS ?= qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-multimedia-dev qt6-shadertools-dev
-# 可选依赖（尝试安装，失败不影响构建），RTSP 服务 dev 包常见命名
-OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-libav
+# Qt6 toolchain (must install)
+QT6_DEPS ?= qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-multimedia-dev
+# Optional packages (best effort, ignore failures)
+OPTIONAL_DEPS ?= libgstrtspserver-1.0-dev gstreamer1.0-rtsp gstreamer1.0-libav qt6-shadertools-dev
 
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
@@ -26,16 +25,6 @@ deps:
 	else \
 		echo "All mandatory packages already installed."; \
 	fi
-	@opt_missing=""; \
-	for pkg in $(OPTIONAL_DEPS); do \
-		dpkg -s $$pkg >/dev/null 2>&1 || opt_missing="$$opt_missing $$pkg"; \
-	done; \
-	if [ -n "$$opt_missing" ]; then \
-		echo "Attempting to install optional packages (ignored if unavailable):$$opt_missing"; \
-		sudo apt-get install -y $$opt_missing || true; \
-	else \
-		echo "All optional packages already installed."; \
-	fi
 	@qt_missing=""; \
 	for pkg in $(QT6_DEPS); do \
 		dpkg -s $$pkg >/dev/null 2>&1 || qt_missing="$$qt_missing $$pkg"; \
@@ -45,6 +34,16 @@ deps:
 		sudo apt-get update && sudo apt-get install -y $$qt_missing; \
 	else \
 		echo "Qt6 toolchain already installed."; \
+	fi
+	@opt_missing=""; \
+	for pkg in $(OPTIONAL_DEPS); do \
+		dpkg -s $$pkg >/dev/null 2>&1 || opt_missing="$$opt_missing $$pkg"; \
+	done; \
+	if [ -n "$$opt_missing" ]; then \
+		echo "Attempting to install optional packages (ignored if unavailable):$$opt_missing"; \
+		sudo apt-get install -y $$opt_missing || true; \
+	else \
+		echo "All optional packages already installed."; \
 	fi
 
 configure: deps
@@ -91,7 +90,7 @@ logs:
 
 deploy: service
 
-# 完整重新部署：停服→清理→重建→安装并重启服务
+# Full redeploy: stop -> clean -> build/install -> restart service
 redeploy: stop clean service
 
 clean:
