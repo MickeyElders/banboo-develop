@@ -148,16 +148,8 @@ int main(int argc, char *argv[]) {
     });
     quitTimer.start();
 
-    // DeepStream 在专属线程中运行，避免阻塞主线程（Web/UI）
-    QThread *dsThread = new QThread(&app);
-    deepStream->moveToThread(dsThread);
-    QObject::connect(dsThread, &QThread::started, deepStream, &DeepStreamRunner::startPipeline);
+    // DeepStream 仍在内部使用 std::thread 驱动 RTSP/Loop，避免 Qt 主线程阻塞
     QObject::connect(&app, &QCoreApplication::aboutToQuit, deepStream, &DeepStreamRunner::stopPipeline, Qt::QueuedConnection);
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, dsThread, &QThread::quit, Qt::QueuedConnection);
-    QObject::connect(dsThread, &QThread::finished, deepStream, &QObject::deleteLater);
-    QObject::connect(dsThread, &QThread::finished, dsThread, &QObject::deleteLater);
-    dsThread->start();
-
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &modbus, [&modbus]() { modbus.shutdown(); });
 
     QQmlApplicationEngine engine;
@@ -225,6 +217,18 @@ int main(int argc, char *argv[]) {
     if (okWs && wsEnv > 0) wsPort = quint16(wsEnv);
     WebRTCSignaling signaling(wsPort, &app);
     deepStream->setWebRTCSignaling(&signaling);
+
+    // Autostart DeepStream based on DS_AUTOSTART (runs in DeepStream internal threads)
+    QTimer::singleShot(0, [deepStream]() {
+        const QByteArray autoStart = qgetenv("DS_AUTOSTART");
+        if (autoStart == "1") {
+            std::cout << "[deepstream] Autostart from main()" << std::endl;
+            const bool ok = deepStream->start({});
+            std::cout << "[deepstream] Autostart result: " << (ok ? "success" : "failure") << std::endl;
+        } else {
+            std::cout << "[deepstream] Autostart disabled (DS_AUTOSTART!=1)" << std::endl;
+        }
+    });
 
     qInfo() << "[startup] QML loaded, entering event loop";
     return app.exec();
