@@ -1,6 +1,7 @@
 #include "DeepStreamRunner.h"
 #include <iostream>
 #include <cstdlib>
+#include <QDebug>
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
 
