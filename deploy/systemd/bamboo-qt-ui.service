@@ -9,11 +9,11 @@ User=root
 RuntimeDirectory=bamboo-qt
 RuntimeDirectoryMode=0700
 WorkingDirectory=/opt/bamboo-qt
-Environment=QT_QPA_PLATFORM=offscreen
+Environment=QT_QPA_PLATFORM=xcb
 Environment=QT_QPA_EGLFS_INTEGRATION=
 Environment=QT_QPA_EGLFS_KMS_CONFIG=
-Environment=EGL_PLATFORM=surfaceless
-Environment=EGL_DISPLAY=surfaceless
+Environment=EGL_PLATFORM=
+Environment=EGL_DISPLAY=
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
 Environment=QSG_RHI_BACKEND=software
 Environment=QT_QUICK_BACKEND=software

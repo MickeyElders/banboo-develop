@@ -26,12 +26,18 @@ void handleSignal(int signum) {
 }
 
 void configureHeadlessEnvironment() {
-    // Force offscreen; KMS path is disabled due to JetPack 6.x headless connector issues.
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    qputenv("QT_QPA_EGLFS_INTEGRATION", "");
-    qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
-    qputenv("EGL_PLATFORM", "surfaceless");
-    qputenv("EGL_DISPLAY", "surfaceless");
+    // If DISPLAY is present, prefer xcb; otherwise fall back to offscreen/surfaceless.
+    if (!qEnvironmentVariableIsEmpty("DISPLAY")) {
+        if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
+            qputenv("QT_QPA_PLATFORM", "xcb");
+        }
+    } else {
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+        qputenv("QT_QPA_EGLFS_INTEGRATION", "");
+        qputenv("QT_QPA_EGLFS_KMS_CONFIG", "");
+        qputenv("EGL_PLATFORM", "surfaceless");
+        qputenv("EGL_DISPLAY", "surfaceless");
+    }
     if (qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR")) {
         const QByteArray runtimeDir("/run/bamboo-qt");
         qputenv("XDG_RUNTIME_DIR", runtimeDir);
