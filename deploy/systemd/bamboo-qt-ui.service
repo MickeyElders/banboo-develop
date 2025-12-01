@@ -12,12 +12,12 @@ WorkingDirectory=/opt/bamboo-qt
 Environment=QT_QPA_PLATFORM=offscreen
 Environment=QT_QPA_EGLFS_INTEGRATION=
 Environment=QT_QPA_EGLFS_KMS_CONFIG=
-Environment=GBM_DRIVERS_PATH=
-Environment=GBM_BACKEND=
-Environment=EGL_PLATFORM=
 Environment=XDG_RUNTIME_DIR=/run/bamboo-qt
 Environment=QSG_RHI_BACKEND=software
 Environment=QT_QUICK_BACKEND=software
+Environment=QT_LOGGING_RULES=qt.qpa.*=false;qt.quick.*=false;qt.scenegraph.*=false;qt.rhi.*=false
+Environment=QT_QPA_NO_MOUSE=1
+Environment=QT_QPA_NO_TOUCH=1
 Environment=QML2_IMPORT_PATH=/usr/lib/aarch64-linux-gnu/qt6/qml
 Environment=QT_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/qt6/plugins
 Environment=GST_DEBUG=2
