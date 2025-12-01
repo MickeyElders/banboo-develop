@@ -66,14 +66,15 @@ bool DeepStreamRunner::start(const QString &pipeline) {
                          "nvdrmvideosink sync=false plane-id=0 qos=false";
               }
               if (sink == "rtsp") {
-                  // RTSP pipeline with videotestsrc (non-blocking in headless)
-                  return "( videotestsrc is-live=true pattern=ball ! "
-                         "video/x-raw,width=1280,height=720,framerate=30/1 ! "
+                  // RTSP pipeline with CSI/Argus camera -> H264 -> RTSP
+                  return "( nvarguscamerasrc sensor-id=0 ispassthrough=true bufapi-version=true do-timestamp=true ! "
+                         "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! "
                          "nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! "
                          "m.sink_0 nvstreammux name=m width=1280 height=720 batch-size=1 live-source=1 ! "
                          "nvinfer config-file-path=config/nvinfer_config.txt batch-size=1 ! "
                          "nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! "
-                         "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast ! "
+                         "nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! "
+                         "h264parse config-interval=1 ! "
                          "rtph264pay name=pay0 pt=96 )";
               }
               // Safe headless default: no display, no encoder
