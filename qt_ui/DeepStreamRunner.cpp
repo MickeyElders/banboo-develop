@@ -2,9 +2,6 @@
 #include <iostream>
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {
-#if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
-    start({});
-#endif
 }
 
 DeepStreamRunner::~DeepStreamRunner() {

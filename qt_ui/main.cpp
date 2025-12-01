@@ -67,13 +67,16 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setApplicationName("AI Bamboo");
     qInfo() << "[startup] QGuiApplication constructed";
 
+    qInfo() << "[startup] Constructing core state objects...";
     SystemState systemState;
     JetsonState jetsonState;
     AiState aiState;
     WifiState wifiState;
+    qInfo() << "[startup] Core state objects OK, constructing pipelines...";
     DeepStreamRunner deepStream;
+    qInfo() << "[startup] DeepStreamRunner constructed";
     ModbusClient modbus;
-    qInfo() << "[startup] Core objects constructed";
+    qInfo() << "[startup] ModbusClient constructed";
 
     QTimer quitTimer;
     quitTimer.setInterval(200);
