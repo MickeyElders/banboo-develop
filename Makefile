@@ -26,6 +26,10 @@ QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6
  https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
  https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 
+DS_WEBRTC_SRC ?= /opt/nvidia/deepstream/deepstream/sources/apps/sample_apps/deepstream-webrtc-demo
+DS_WEBRTC_BUILD ?= $(DS_WEBRTC_SRC)/build
+DS_WEBRTC_BIN ?= $(DS_WEBRTC_BUILD)/deepstream-webrtc-app
+
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
 
 all: build
@@ -95,15 +99,30 @@ service: install
 	@sudo systemctl restart $(SERVICE_NAME)
 	@sudo install -D -m 644 deploy/systemd/bamboo-webrtc.service /etc/systemd/system/bamboo-webrtc.service
 	@sudo systemctl daemon-reload
+	@$(MAKE) --no-print-directory webrtc-bin
 	@sudo systemctl enable bamboo-webrtc.service
 	@sudo systemctl restart bamboo-webrtc.service
 
 .PHONY: service-webrtc
 service-webrtc: install
+	@$(MAKE) --no-print-directory webrtc-bin
 	@sudo install -D -m 644 deploy/systemd/bamboo-webrtc.service /etc/systemd/system/bamboo-webrtc.service
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable bamboo-webrtc.service
 	@sudo systemctl restart bamboo-webrtc.service
+
+.PHONY: webrtc-bin
+webrtc-bin:
+	@if [ -x "$(PREFIX)/bin/deepstream-webrtc-app" ]; then \
+		echo "WebRTC binary already installed at $(PREFIX)/bin/deepstream-webrtc-app"; \
+	elif [ -x "$(DS_WEBRTC_BIN)" ]; then \
+		echo "Installing existing WebRTC binary from $(DS_WEBRTC_BIN)"; \
+		sudo install -D -m 755 "$(DS_WEBRTC_BIN)" "$(PREFIX)/bin/deepstream-webrtc-app"; \
+	else \
+		echo "Building DeepStream WebRTC demo at $(DS_WEBRTC_SRC)"; \
+		mkdir -p "$(DS_WEBRTC_BUILD)" && cd "$(DS_WEBRTC_BUILD)" && cmake .. && make -j$$(nproc 2>/dev/null || echo 4); \
+		sudo install -D -m 755 "$(DS_WEBRTC_BIN)" "$(PREFIX)/bin/deepstream-webrtc-app"; \
+	fi
 
 start:
 	@sudo systemctl start $(SERVICE_NAME)
