@@ -29,8 +29,9 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     std::cout << "[deepstream] start failed: RTSP not built in" << std::endl;
     return false;
 #else
-    std::lock_guard<std::mutex> lock(m_mutex);
+    // 先停掉现有管线（stop 内部自带锁），避免与后续锁死
     stop();
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     qInfo() << "[deepstream] start() called, sink env=" << qgetenv("DS_SINK") << "pipeline len=" << pipeline.size();
     if (!ensureGstInited()) {
