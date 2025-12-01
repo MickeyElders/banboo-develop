@@ -1,10 +1,5 @@
 #pragma once
 
-#include <QObject>
-#include <QString>
-#include <thread>
-#include <mutex>
-
 #ifdef ENABLE_GSTREAMER
 extern "C" {
 #include <gst/gst.h>
@@ -12,7 +7,13 @@ extern "C" {
 #include <gst/rtsp-server/rtsp-server.h>
 #endif
 }
+// gst/glib headers must come before Qt to avoid macro clashes with Qt's signals/slots
 #endif
+
+#include <QObject>
+#include <QString>
+#include <thread>
+#include <mutex>
 
 class DeepStreamRunner : public QObject {
     Q_OBJECT
