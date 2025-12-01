@@ -137,16 +137,19 @@ check_qt6:
 install-qt-kms-config:
 	@sudo mkdir -p /etc/qt
 	@tmpfile=$$(mktemp); \
-	card=$$(ls /sys/class/drm | grep '^card[0-9]\+$$' | head -n1); \
-	[ -n "$$card" ] || card="card0"; \
-	conn=$$(for d in /sys/class/drm/$${card}-*; do \
-		[ -f "$$d/status" ] || continue; \
-		if grep -q "^connected" "$$d/status"; then basename "$$d"; break; fi; \
-	done); \
-	[ -n "$$conn" ] || conn="$${card}-HDMI-A-1"; \
-	mode=$$(if [ -f "/sys/class/drm/$${conn}/modes" ]; then head -n1 /sys/class/drm/$${conn}/modes; else echo "1920x1080"; fi); \
-	output_name=$${conn#*-}; \
-	printf '{\n  "device": "/dev/dri/%s",\n  "outputs": [\n    { "name": "%s", "mode": "%s", "format": "rgb888", "transform": "normal" }\n  ]\n}\n' "$$card" "$$output_name" "$$mode" > "$$tmpfile"; \
+	sel_card=""; sel_conn=""; \
+	for c in $$(ls /sys/class/drm | grep '^card[0-9]\+$$'); do \
+		for d in /sys/class/drm/$${c}-*; do \
+			[ -f "$$d/status" ] || continue; \
+			if grep -q "^connected" "$$d/status"; then sel_card="$$c"; sel_conn=$$(basename "$$d"); break 2; fi; \
+		done; \
+	done; \
+	if [ -z "$$sel_card" ]; then sel_card=$$(ls /sys/class/drm | grep '^card[0-9]\+$$' | head -n1); fi; \
+	[ -n "$$sel_card" ] || sel_card="card0"; \
+	if [ -z "$$sel_conn" ]; then sel_conn="$${sel_card}-HDMI-A-1"; fi; \
+	mode=$$(if [ -f "/sys/class/drm/$${sel_conn}/modes" ]; then head -n1 /sys/class/drm/$${sel_conn}/modes; else echo "1920x1080"; fi); \
+	output_name=$${sel_conn#*-}; \
+	printf '{\n  "device": "/dev/dri/%s",\n  "outputs": [\n    { "name": "%s", "mode": "%s", "format": "rgb888", "transform": "normal" }\n  ]\n}\n' "$$sel_card" "$$output_name" "$$mode" > "$$tmpfile"; \
 	sudo install -m 644 $$tmpfile /etc/qt/eglfs_kms_config.json && rm -f $$tmpfile
 
 qt6-source-install:
