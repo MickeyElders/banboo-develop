@@ -107,6 +107,7 @@ endif()
 
 target_compile_definitions(bamboo_qt_ui PRIVATE
     MODEL_PATH_DEFAULT="${CMAKE_SOURCE_DIR}/models/best.onnx"
+    QT_NO_KEYWORDS
 )
 
 target_link_libraries(bamboo_qt_ui PRIVATE
