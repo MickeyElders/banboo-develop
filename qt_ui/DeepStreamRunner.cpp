@@ -17,6 +17,9 @@ DeepStreamRunner::~DeepStreamRunner() {
     if (m_webrtcThread.joinable()) {
         m_webrtcThread.join();
     }
+    if (m_startThread.joinable()) {
+        m_startThread.join();
+    }
 }
 
 bool DeepStreamRunner::start(const QString &pipeline) {
@@ -342,7 +345,23 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
     g_free(sdpStr);
 }
 
-void DeepStreamRunner::startPipeline() { start({}); }
+void DeepStreamRunner::startPipeline() {
+    const QByteArray autoStart = qgetenv("DS_AUTOSTART");
+    if (!autoStart.isEmpty() && autoStart != "1") {
+        std::cout << "[deepstream] startPipeline skipped (DS_AUTOSTART!=1)" << std::endl;
+        return;
+    }
+    // Run start() in a worker thread to avoid blocking Qt event loop.
+    if (m_startThread.joinable()) {
+        m_startThread.join();
+    }
+    m_startThread = std::thread([this]() { this->start({}); });
+}
 
-void DeepStreamRunner::stopPipeline() { stop(); }
+void DeepStreamRunner::stopPipeline() {
+    if (m_startThread.joinable()) {
+        m_startThread.join();
+    }
+    stop();
+}
 #endif

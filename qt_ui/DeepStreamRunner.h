@@ -62,6 +62,7 @@ private:
     GMainLoop *m_webrtcLoop{nullptr};
     std::thread m_thread;
     std::thread m_webrtcThread;
+    std::thread m_startThread;
     std::once_flag m_gstOnce;
 #endif
 #endif
