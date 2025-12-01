@@ -41,6 +41,7 @@ private:
     GstRTSPMediaFactory *m_factory{nullptr};
     GMainLoop *m_loop{nullptr};
     std::thread m_thread;
+    std::thread m_autostartThread;
     std::once_flag m_gstOnce;
 #endif
 #endif

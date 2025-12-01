@@ -25,6 +25,9 @@ std::atomic_bool g_shouldQuit{false};
 
 // Pre-initialize a surfaceless EGL context to unblock nvargus/gst when headless.
 void fixArgusDeadlockInHeadless() {
+    // Pre-start nvargus-daemon to avoid lazy startup stalls
+    system("systemctl start nvargus-daemon.service >/dev/null 2>&1");
+
     // Try surfaceless first; fall back to default display.
     EGLDisplay display = eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
     if (display == EGL_NO_DISPLAY) {
@@ -36,6 +39,7 @@ void fixArgusDeadlockInHeadless() {
     }
     eglBindAPI(EGL_OPENGL_ES_API);
     static const EGLint configAttribs[] = {
+        EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_NONE
     };
@@ -48,8 +52,15 @@ void fixArgusDeadlockInHeadless() {
     };
     EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
     if (context != EGL_NO_CONTEXT) {
-        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, context);
+        EGLint pbufferAttribs[] = {
+            EGL_WIDTH, 16,
+            EGL_HEIGHT, 16,
+            EGL_NONE,
+        };
+        EGLSurface surface = eglCreatePbufferSurface(display, config, pbufferAttribs);
+        eglMakeCurrent(display, surface, surface, context);
         eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroySurface(display, surface);
         eglDestroyContext(display, context);
     }
     eglTerminate(display);

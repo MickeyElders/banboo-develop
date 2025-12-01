@@ -15,6 +15,7 @@ set(DEEPSTREAM_ROOT "/opt/nvidia/deepstream/deepstream" CACHE PATH "DeepStream r
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
+pkg_check_modules(EGL REQUIRED egl)
 
 set(QT_MIN_VERSION 6.2)
 set(QT_COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia)
@@ -102,6 +103,7 @@ add_executable(bamboo_qt_ui
 )
 
 target_include_directories(bamboo_qt_ui PRIVATE qt_ui)
+target_include_directories(bamboo_qt_ui PRIVATE ${EGL_INCLUDE_DIRS})
 if(MODBUS_FOUND)
     target_include_directories(bamboo_qt_ui PRIVATE ${MODBUS_INCLUDE_DIRS})
 endif()
@@ -118,7 +120,7 @@ target_link_libraries(bamboo_qt_ui PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Multimedia
-    EGL
+    ${EGL_LIBRARIES}
     Threads::Threads
 )
 
