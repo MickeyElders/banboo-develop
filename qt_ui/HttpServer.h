@@ -17,6 +17,8 @@ private Q_SLOTS:
 
 private:
     void sendResponse(QTcpSocket *sock, const QByteArray &body, const QByteArray &contentType);
+    QByteArray serveFile(const QString &path, QByteArray &contentType);
     QString m_htmlPath;
+    QString m_docRoot;
     QTcpServer m_server;
 };
