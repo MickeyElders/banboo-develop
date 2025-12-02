@@ -295,37 +295,45 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
     if (m_webrtcPipeline) {
         return true;
     }
-    const char *srcUrlEnv = std::getenv("RTSP_SOURCE");
-    const std::string srcUrl = srcUrlEnv ? std::string(srcUrlEnv) : std::string("rtsp://127.0.0.1:8554/deepstream");
-    // Manual build to avoid parse/link issues
+    // Build camera -> encoder -> pay -> webrtcbin (independent of RTSP server to avoid shared-state crashes)
     m_webrtcPipeline = gst_pipeline_new("webrtc-pipeline");
     if (!m_webrtcPipeline) return false;
 
-    GstElement *src = gst_element_factory_make("rtspsrc", "src");
-    GstElement *depay = gst_element_factory_make("rtph264depay", "depay");
+    GstElement *src = gst_element_factory_make("nvarguscamerasrc", "cam");
+    GstElement *capsrc = gst_element_factory_make("capsfilter", "capsrc");
+    GstElement *conv = gst_element_factory_make("nvvidconv", "conv");
     GstElement *q1 = gst_element_factory_make("queue", "q1");
+    GstElement *enc = gst_element_factory_make("x264enc", "enc");
     GstElement *parse = gst_element_factory_make("h264parse", "parse");
-    GstElement *q2 = gst_element_factory_make("queue", "q2");
     GstElement *pay = gst_element_factory_make("rtph264pay", "pay");
     GstElement *capsf = gst_element_factory_make("capsfilter", "capsf");
     m_webrtcBin = gst_element_factory_make("webrtcbin", "webrtcbin");
 
-    if (!src || !depay || !q1 || !parse || !q2 || !pay || !capsf || !m_webrtcBin) {
+    if (!src || !capsrc || !conv || !q1 || !enc || !parse || !pay || !capsf || !m_webrtcBin) {
         std::cout << "[webrtc] element create failed (check gstreamer1.0-nice/webrtcbin plugins)" << std::endl;
         return false;
     }
 
-    g_object_set(src, "location", srcUrl.c_str(), "latency", 200, "protocols", 4 /*tcp*/, nullptr);
+    g_object_set(src, "sensor-id", 0, "do-timestamp", TRUE, nullptr);
+    GstCaps *camcaps = gst_caps_from_string("video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12");
+    g_object_set(capsrc, "caps", camcaps, nullptr);
+    gst_caps_unref(camcaps);
+    g_object_set(enc,
+                 "tune", 4 /*zerolatency*/,
+                 "bitrate", 8000,
+                 "speed-preset", 1 /*ultrafast*/,
+                 "key-int-max", 30,
+                 nullptr);
     g_object_set(pay, "pt", 96, "config-interval", 1, "ssrc", guint32(getpid()), nullptr);
     GstCaps *caps = gst_caps_from_string("application/x-rtp,media=video,encoding-name=H264,payload=96,clock-rate=90000");
     g_object_set(capsf, "caps", caps, nullptr);
     gst_caps_unref(caps);
     g_object_set(m_webrtcBin, "stun-server", "stun://stun.l.google.com:19302", nullptr);
 
-    gst_bin_add_many(GST_BIN(m_webrtcPipeline), src, depay, q1, parse, q2, pay, capsf, m_webrtcBin, nullptr);
+    gst_bin_add_many(GST_BIN(m_webrtcPipeline), src, capsrc, conv, q1, enc, parse, pay, capsf, m_webrtcBin, nullptr);
 
-    if (!gst_element_link_many(depay, q1, parse, q2, pay, capsf, NULL)) {
-        std::cout << "[webrtc] link depay->queues->parse->pay->caps failed" << std::endl;
+    if (!gst_element_link_many(src, capsrc, conv, q1, enc, parse, pay, capsf, NULL)) {
+        std::cout << "[webrtc] link cam->enc->pay chain failed" << std::endl;
         return false;
     }
 
@@ -340,19 +348,6 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
     }
     if (paySrcPad) gst_object_unref(paySrcPad);
     if (webrtcSinkPad) gst_object_unref(webrtcSinkPad);
-
-    // rtspsrc has dynamic pads
-    g_signal_connect(src, "pad-added", G_CALLBACK(+[](GstElement *, GstPad *pad, gpointer user_data) {
-        auto *depay = static_cast<GstElement *>(user_data);
-        GstPad *sink = gst_element_get_static_pad(depay, "sink");
-        if (!sink) return;
-        if (gst_pad_is_linked(sink)) {
-            gst_object_unref(sink);
-            return;
-        }
-        gst_pad_link(pad, sink);
-        gst_object_unref(sink);
-    }), depay);
 
     g_signal_connect(m_webrtcBin, "on-negotiation-needed", G_CALLBACK(DeepStreamRunner::onNegotiationNeeded), this);
     g_signal_connect(m_webrtcBin, "on-ice-candidate", G_CALLBACK(DeepStreamRunner::onIceCandidate), this);
