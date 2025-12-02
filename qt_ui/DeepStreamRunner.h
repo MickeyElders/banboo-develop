@@ -67,6 +67,7 @@ private:
     std::thread m_webrtcThread;
     std::thread m_startThread;
     std::once_flag m_gstOnce;
+    std::atomic_bool m_offerInFlight{false};
 #endif
 #endif
     QString m_sourceUrl{"rtsp://127.0.0.1:8554/deepstream"};

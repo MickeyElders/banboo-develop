@@ -8,6 +8,7 @@
 #include <gst/gstpromise.h>
 #include <gst/webrtc/webrtc.h>
 #include <gst/sdp/sdp.h>
+#include <atomic>
 #include "WebRTCSignaling.h"
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
@@ -432,6 +433,12 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
 void DeepStreamRunner::createAndSendOffer() {
     if (!m_signaling) return;
     if (!ensureWebRTCPipeline()) return;
+    // Avoid concurrent offer creation which can destabilize webrtcbin.
+    bool expected = false;
+    if (!m_offerInFlight.compare_exchange_strong(expected, true)) {
+        std::cout << "[webrtc] skip offer (in-flight)" << std::endl;
+        return;
+    }
     std::cout << "[webrtc] creating offer" << std::endl;
     GstPromise *promise = gst_promise_new_with_change_func(
         [](GstPromise *p, gpointer u) {
@@ -440,6 +447,7 @@ void DeepStreamRunner::createAndSendOffer() {
             GstWebRTCSessionDescription *offer = nullptr;
             gst_structure_get(s, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
             gst_promise_unref(p);
+            runner->m_offerInFlight.store(false);
             if (!offer) return;
             g_signal_emit_by_name(runner->m_webrtcBin, "set-local-description", offer, nullptr);
             runner->sendSdpToPeer(offer, QStringLiteral("offer"));
