@@ -542,7 +542,7 @@ body {
                 </div>
             </div>
             <div class="hls-controls" style="margin-top:8px;">
-                <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="http://127.0.0.1:8080/hls/stream.m3u8">
+                <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="">
                 <div class="btn-row" style="margin-top:6px;">
                     <button class="btn btn-accent" id="hls-play-btn">播放 HLS</button>
                     <span id="webrtc-status" style="align-self:center;font-size:12px;color:var(--error);">未连接</span>
@@ -1148,8 +1148,10 @@ body {
                 }
             };
 
+            const defaultUrl = `http://${location.hostname || '127.0.0.1'}:8088/stream.m3u8`;
+            urlInput.value = defaultUrl;
             playBtn.addEventListener('click', () => play(urlInput.value.trim()));
-            play(urlInput.value.trim());
+            play(defaultUrl);
         })();
 
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
