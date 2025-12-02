@@ -144,7 +144,7 @@ logs:
 deploy: service
 
 # Full redeploy: stop -> clean -> build/install -> restart service
-redeploy: stop clean service
+redeploy: stop clean service hls-services
 
 clean:
 	@rm -rf "$(BUILD_DIR)"
