@@ -1,0 +1,23 @@
+[Unit]
+Description=Repackage Bamboo RTSP to HLS (LAN playback)
+After=bamboo-qt-ui.service network-online.target
+Wants=bamboo-qt-ui.service
+
+[Service]
+Type=simple
+User=root
+# Create output dir for HLS segments/playlist
+ExecStartPre=/bin/mkdir -p /opt/bamboo-qt/www
+# Pull RTSP (local) and generate short HLS segments for low latency
+ExecStart=/usr/bin/env gst-launch-1.0 -v \
+  rtspsrc location=rtsp://127.0.0.1:8554/deepstream latency=200 protocols=tcp ! \
+  rtph264depay ! h264parse ! mpegtsmux ! \
+  hlssink max-files=4 target-duration=2 \
+    playlist-location=/opt/bamboo-qt/www/stream.m3u8 \
+    playlist-root=http://127.0.0.1:8088 \
+    location=/opt/bamboo-qt/www/segment_%05d.ts
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

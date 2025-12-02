@@ -1,0 +1,15 @@
+[Unit]
+Description=Serve HLS output directory over HTTP (LAN)
+After=network.target bamboo-rtsp-hls.service
+Wants=bamboo-rtsp-hls.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/bamboo-qt/www
+ExecStart=/usr/bin/python3 -m http.server 8088
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

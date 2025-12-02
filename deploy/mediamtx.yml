@@ -1,9 +1,21 @@
-# Minimal MediaMTX config for LAN-only WebRTC from local RTSP
+# Minimal MediaMTX config for LAN HLS/FLV playback from local RTSP
 logLevel: info
 
-webrtc:
+# Enable HLS for video.js/hls.js
+hls:
   enabled: yes
-  stunServers: []  # LAN only, no external STUN
+  # fMP4 works better with modern browsers; keep segments short for lower latency
+  variant: fmp4
+  segmentCount: 3
+  segmentDuration: 2s
+  allowOrigin: "*"
+
+# Enable HTTP-FLV for flv.js if需要
+flv:
+  enabled: yes
+
+webrtc:
+  enabled: no  # we are using HLS/FLV instead; set to yes if you later want WebRTC
 
 paths:
   cam:

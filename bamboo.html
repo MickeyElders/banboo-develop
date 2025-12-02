@@ -746,8 +746,12 @@
     </div>
 
     <div id="webrtc-panel">
-        <h4>WebRTC 预览 <span id="webrtc-status">未连接</span></h4>
-        <video id="webrtc-video" autoplay playsinline muted></video>
+        <h4>HLS 预览 <span id="webrtc-status">未连接</span></h4>
+        <video id="hls-video" autoplay playsinline muted controls style="background:#000;"></video>
+        <div style="margin-top:6px;">
+            <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="http://127.0.0.1:8088/stream.m3u8">
+            <button class="btn btn-accent" id="hls-play-btn" style="margin-top:6px;width:100%;">播放 HLS</button>
+        </div>
     </div>
 
     <script>
@@ -1119,7 +1123,51 @@
             };
         })();
 
+        // HLS 播放（默认 http://127.0.0.1:8088/stream.m3u8）
+        (function initHlsPreview() {
+            const statusEl = document.getElementById('webrtc-status');
+            const videoEl = document.getElementById('hls-video');
+            const urlInput = document.getElementById('hls-url');
+            const playBtn = document.getElementById('hls-play-btn');
+            if (!statusEl || !videoEl || !urlInput || !playBtn) return;
+
+            const setStatus = (txt, good = false) => {
+                statusEl.textContent = txt;
+                statusEl.style.color = good ? '#4caf50' : '#f44336';
+            };
+
+            const play = (src) => {
+                if (!src) return;
+                setStatus('加载中...');
+                if (window.Hls && window.Hls.isSupported()) {
+                    const hls = new Hls({ lowLatencyMode: true });
+                    hls.loadSource(src);
+                    hls.attachMedia(videoEl);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        videoEl.play().catch(() => {});
+                        setStatus('HLS 已连接', true);
+                    });
+                    hls.on(Hls.Events.ERROR, (_, data) => {
+                        setStatus('播放错误');
+                        console.error('hls error', data);
+                    });
+                } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                    videoEl.src = src;
+                    videoEl.addEventListener('loadedmetadata', () => {
+                        videoEl.play().catch(() => {});
+                        setStatus('HLS 已连接', true);
+                    }, { once: true });
+                } else {
+                    setStatus('浏览器不支持 HLS');
+                }
+            };
+
+            playBtn.addEventListener('click', () => play(urlInput.value.trim()));
+            play(urlInput.value.trim());
+        })();
+
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </body>
 </html>
