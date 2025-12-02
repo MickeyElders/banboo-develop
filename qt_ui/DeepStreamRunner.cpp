@@ -53,6 +53,13 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 
     std::cout << "[deepstream] Building pipeline for sink=" << (pipeline.isEmpty() ? (std::getenv("DS_SINK") ? std::getenv("DS_SINK") : "fakesink") : "custom") << std::endl;
 
+    // Bind signaling callbacks once (before any early return)
+    if (m_signaling) {
+        QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
+                         this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
+                         Qt::UniqueConnection);
+    }
+
     // If DS_PIPELINE is provided, use it verbatim.
     const char *envPipeline = std::getenv("DS_PIPELINE");
     if (pipeline.isEmpty() && envPipeline && std::strlen(envPipeline) > 0) {
