@@ -294,12 +294,14 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
 
     GstElement *src = gst_element_factory_make("rtspsrc", "src");
     GstElement *depay = gst_element_factory_make("rtph264depay", "depay");
+    GstElement *q1 = gst_element_factory_make("queue", "q1");
     GstElement *parse = gst_element_factory_make("h264parse", "parse");
+    GstElement *q2 = gst_element_factory_make("queue", "q2");
     GstElement *pay = gst_element_factory_make("rtph264pay", "pay");
     GstElement *capsf = gst_element_factory_make("capsfilter", "capsf");
     m_webrtcBin = gst_element_factory_make("webrtcbin", "webrtcbin");
 
-    if (!src || !depay || !parse || !pay || !capsf || !m_webrtcBin) {
+    if (!src || !depay || !q1 || !parse || !q2 || !pay || !capsf || !m_webrtcBin) {
         std::cout << "[webrtc] element create failed (check gstreamer1.0-nice/webrtcbin plugins)" << std::endl;
         return false;
     }
@@ -311,10 +313,10 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
     gst_caps_unref(caps);
     g_object_set(m_webrtcBin, "stun-server", "stun://stun.l.google.com:19302", nullptr);
 
-    gst_bin_add_many(GST_BIN(m_webrtcPipeline), src, depay, parse, pay, capsf, m_webrtcBin, nullptr);
+    gst_bin_add_many(GST_BIN(m_webrtcPipeline), src, depay, q1, parse, q2, pay, capsf, m_webrtcBin, nullptr);
 
-    if (!gst_element_link_many(depay, parse, pay, capsf, NULL)) {
-        std::cout << "[webrtc] link depay->parse->pay->caps failed" << std::endl;
+    if (!gst_element_link_many(depay, q1, parse, q2, pay, capsf, NULL)) {
+        std::cout << "[webrtc] link depay->queues->parse->pay->caps failed" << std::endl;
         return false;
     }
 
@@ -361,6 +363,7 @@ bool DeepStreamRunner::ensureWebRTCPipeline() {
         std::cout << "[webrtc] pipeline creation failed" << std::endl;
         return false;
     }
+    std::cout << "[webrtc] pipeline ready (ensure)" << std::endl;
     return true;
 }
 
@@ -422,6 +425,7 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
 void DeepStreamRunner::createAndSendOffer() {
     if (!m_signaling) return;
     if (!ensureWebRTCPipeline()) return;
+    std::cout << "[webrtc] creating offer" << std::endl;
     GstPromise *promise = gst_promise_new_with_change_func(
         [](GstPromise *p, gpointer u) {
             auto *runner = static_cast<DeepStreamRunner *>(u);
