@@ -145,7 +145,8 @@ status:
 logs:
 	@sudo journalctl -u $(SERVICE_NAME) -n 200 -f
 
-deploy: service
+# Deploy UI + HLS services in one go
+deploy: service hls-services
 
 # Full redeploy: stop -> clean -> build/install -> restart services (UI + HLS)
 redeploy: stop clean service hls-services
