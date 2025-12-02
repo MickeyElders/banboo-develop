@@ -43,6 +43,11 @@ void HttpServer::onReadyRead() {
     if (!lines.isEmpty()) {
         const QList<QByteArray> parts = lines.first().split(' ');
         if (parts.size() >= 2) path = parts.at(1).trimmed();
+        // Handle absolute-form requests (e.g., curl with full URL)
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            QUrl u(QString::fromUtf8(path));
+            if (u.isValid()) path = u.path(QUrl::FullyDecoded).toUtf8();
+        }
     }
     QByteArray body;
     QByteArray ctype = "text/html; charset=utf-8";
