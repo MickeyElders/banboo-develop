@@ -10,6 +10,7 @@ User=root
 ExecStartPre=/bin/mkdir -p /opt/bamboo-qt/www
 # Pull RTSP (local) and generate short HLS segments for low latency
 ExecStart=/opt/bamboo-qt/bin/hls-repack.sh
+Environment=PIPELINE_ID=rtsp-hls
 Restart=always
 RestartSec=3
 

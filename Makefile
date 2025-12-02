@@ -94,8 +94,10 @@ hls-services: install
 	done
 	@sudo install -D -m755 $(HLS_SCRIPT) /opt/bamboo-qt/bin/hls-repack.sh
 	@sudo systemctl daemon-reload
-	@sudo systemctl enable --now bamboo-rtsp-hls.service bamboo-hls-http.service
-	@sudo systemctl restart bamboo-rtsp-hls.service bamboo-hls-http.service
+	@sudo systemctl enable --now bamboo-hls-http.service
+	@sudo systemctl restart bamboo-hls-http.service
+	@sudo systemctl enable --now bamboo-rtsp-hls.service
+	@sudo systemctl restart bamboo-rtsp-hls.service
 
 configure: deps
 	@if [ ! -d "$(BUILD_DIR)" ]; then mkdir -p "$(BUILD_DIR)"; fi
