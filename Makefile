@@ -29,6 +29,7 @@ QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6
 
 # HLS repack services (RTSP->HLS) for browser playback
 HLS_SERVICES ?= deploy/systemd/bamboo-rtsp-hls.service deploy/systemd/bamboo-hls-http.service
+HLS_SCRIPT ?= deploy/scripts/hls-repack.sh
 
 # Media gateway (RTSP->WebRTC) prebuilt binary
 MEDIAMTX_BIN ?= /usr/local/bin/mediamtx
@@ -91,6 +92,7 @@ hls-services: install
 		echo "Installing $$svc to /etc/systemd/system/$${svc##*/}"; \
 		sudo install -D -m644 $$svc /etc/systemd/system/$${svc##*/}; \
 	done
+	@sudo install -D -m755 $(HLS_SCRIPT) /opt/bamboo-qt/bin/hls-repack.sh
 	@sudo systemctl daemon-reload
 	@sudo systemctl enable --now bamboo-rtsp-hls.service bamboo-hls-http.service
 	@sudo systemctl restart bamboo-rtsp-hls.service bamboo-hls-http.service
