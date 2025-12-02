@@ -42,7 +42,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
 #else
     // 先停掉现有管线（stop 内部自带锁），避免与后续锁死
     stop();
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
 
     qInfo() << "[deepstream] start() called, sink env=" << qgetenv("DS_SINK") << "pipeline len=" << pipeline.size();
     if (!ensureGstInited()) {
@@ -71,6 +71,10 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         }
         m_thread = std::thread(&DeepStreamRunner::runLoop, this);
         std::cout << "[deepstream] RTSP server thread started (DS_PIPELINE)" << std::endl;
+        lock.unlock();
+        if (m_signaling) {
+            ensureWebRTCPipeline();
+        }
         return true;
     }
 
@@ -175,11 +179,13 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     m_thread = std::thread(&DeepStreamRunner::runLoop, this);
     std::cout << "[deepstream] RTSP server thread started" << std::endl;
 
+    lock.unlock();
     // Bind signaling to handler (once) and start WebRTC pipeline
     if (m_signaling) {
         QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
                          this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
                          Qt::UniqueConnection);
+        ensureWebRTCPipeline();
     }
     std::cout << "[deepstream] start() finished, pipeline up" << std::endl;
     return true;
