@@ -16,7 +16,7 @@ private Q_SLOTS:
     void onDisconnected();
 
 private:
-    void sendResponse(QTcpSocket *sock, const QByteArray &body, const QByteArray &contentType);
+    void sendResponse(QTcpSocket *sock, const QByteArray &body, const QByteArray &contentType, bool headOnly);
     QByteArray serveFile(const QString &path, QByteArray &contentType);
     QString m_htmlPath;
     QString m_docRoot;

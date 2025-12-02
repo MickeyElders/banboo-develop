@@ -35,20 +35,25 @@ void HttpServer::onReadyRead() {
     if (!sock) return;
     const QByteArray req = sock->readAll();
     qInfo() << "[http] request bytes" << req.size() << "from" << sock->peerAddress().toString();
-    if (!req.startsWith("GET")) {
-        sock->disconnectFromHost();
-        return;
-    }
+    if (req.isEmpty()) { sock->disconnectFromHost(); return; }
+
     const QList<QByteArray> lines = req.split('\n');
+    QByteArray method = "GET";
     QByteArray path = "/";
     if (!lines.isEmpty()) {
         const QList<QByteArray> parts = lines.first().split(' ');
+        if (parts.size() >= 1) method = parts.at(0).trimmed();
         if (parts.size() >= 2) path = parts.at(1).trimmed();
         // Handle absolute-form requests (e.g., curl with full URL)
         if (path.startsWith("http://") || path.startsWith("https://")) {
             QUrl u(QString::fromUtf8(path));
             if (u.isValid()) path = u.path(QUrl::FullyDecoded).toUtf8();
         }
+    }
+    const bool headOnly = (method == "HEAD");
+    if (method != "GET" && method != "HEAD") {
+        sendResponse(sock, QByteArray(), "text/plain; charset=utf-8", headOnly);
+        return;
     }
     QByteArray body;
     QByteArray ctype = "text/html; charset=utf-8";
@@ -62,7 +67,7 @@ void HttpServer::onReadyRead() {
     } else if (path.startsWith("/hls/")) {
         body = serveFile(QString::fromUtf8(path.mid(5)), ctype);  // strip "/hls/"
         if (body.isEmpty()) {
-            sock->disconnectFromHost();
+            sendResponse(sock, QByteArray(), "text/plain; charset=utf-8", headOnly);
             return;
         }
     } else {
@@ -74,7 +79,7 @@ void HttpServer::onReadyRead() {
             body = "<html><body><h3>bamboo.html not found</h3></body></html>";
         }
     }
-    sendResponse(sock, body, ctype);
+    sendResponse(sock, body, ctype, headOnly);
 }
 
 void HttpServer::onDisconnected() {
@@ -82,15 +87,20 @@ void HttpServer::onDisconnected() {
     if (sock) sock->deleteLater();
 }
 
-void HttpServer::sendResponse(QTcpSocket *sock, const QByteArray &body, const QByteArray &contentType) {
+void HttpServer::sendResponse(QTcpSocket *sock, const QByteArray &body, const QByteArray &contentType, bool headOnly) {
     if (!sock) return;
     QByteArray resp;
     resp += "HTTP/1.1 200 OK\r\n";
     resp += "Content-Type: " + contentType + "\r\n";
     resp += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
+    resp += "Access-Control-Allow-Origin: *\r\n";
     resp += "Connection: close\r\n\r\n";
-    resp += body;
-    sock->write(resp);
+    if (headOnly) {
+        sock->write(resp);
+    } else {
+        resp += body;
+        sock->write(resp);
+    }
     sock->flush();
     sock->waitForBytesWritten(100);
     sock->disconnectFromHost();
