@@ -21,6 +21,8 @@ DeepStreamRunner::~DeepStreamRunner() {
     if (m_startThread.joinable()) {
         m_startThread.join();
     }
+    m_offerInFlight.store(false);
+    m_webrtcNegotiated.store(false);
 }
 
 void DeepStreamRunner::setWebRTCSignaling(WebRTCSignaling *sig) {
@@ -44,6 +46,8 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     // 先停掉现有管线（stop 内部自带锁），避免与后续锁死
     stop();
     std::unique_lock<std::mutex> lock(m_mutex);
+    m_offerInFlight.store(false);
+    m_webrtcNegotiated.store(false);
 
     qInfo() << "[deepstream] start() called, sink env=" << qgetenv("DS_SINK") << "pipeline len=" << pipeline.size();
     if (!ensureGstInited()) {
@@ -230,6 +234,8 @@ void DeepStreamRunner::stop() {
         g_main_loop_unref(m_loop);
         m_loop = nullptr;
     }
+    m_offerInFlight.store(false);
+    m_webrtcNegotiated.store(false);
 #endif
 }
 
@@ -395,6 +401,7 @@ void DeepStreamRunner::handleSignalingMessage(const QJsonObject &obj) {
     if (!m_webrtcBin) return;
     const QString type = obj.value("type").toString();
     if (type == "answer") {
+        m_webrtcNegotiated.store(true);
         const QString sdp = obj.value("sdp").toString();
         GstSDPMessage *sdpMsg = nullptr;
         if (gst_sdp_message_new(&sdpMsg) != GST_SDP_OK) return;
@@ -461,6 +468,10 @@ void DeepStreamRunner::createAndSendOffer() {
 void DeepStreamRunner::renegotiateWebRTC() {
     // When a signaling client connects after startup, ensure pipeline exists and send a fresh offer.
     std::cout << "[webrtc] renegotiate: client connected, ensuring pipeline" << std::endl;
+    if (m_webrtcNegotiated.load()) {
+        std::cout << "[webrtc] already negotiated, skip renegotiate" << std::endl;
+        return;
+    }
     if (!ensureWebRTCPipeline()) return;
     createAndSendOffer();
 }
