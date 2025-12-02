@@ -282,6 +282,7 @@ void DeepStreamRunner::runLoop() {
 }
 
 bool DeepStreamRunner::buildWebRTCPipeline() {
+    // Caller should not hold m_mutex to avoid re-entrance deadlocks.
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_webrtcPipeline) {
         return true;
@@ -444,7 +445,7 @@ void DeepStreamRunner::createAndSendOffer() {
 
 void DeepStreamRunner::renegotiateWebRTC() {
     // When a signaling client connects after startup, ensure pipeline exists and send a fresh offer.
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::cout << "[webrtc] renegotiate: client connected, ensuring pipeline" << std::endl;
     if (!ensureWebRTCPipeline()) return;
     createAndSendOffer();
 }
