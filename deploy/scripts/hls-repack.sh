@@ -3,7 +3,7 @@ set -e
 
 OUT_DIR="/opt/bamboo-qt/www"
 SRC_URL="rtsp://127.0.0.1:8554/deepstream"
-PLAYLIST_ROOT="http://127.0.0.1:8088"
+PLAYLIST_ROOT="http://127.0.0.1:8080/hls"
 
 mkdir -p "${OUT_DIR}"
 
