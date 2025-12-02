@@ -27,12 +27,15 @@ QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6
  https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
  https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 
+# HLS repack services (RTSP->HLS) for browser playback
+HLS_SERVICES ?= deploy/systemd/bamboo-rtsp-hls.service deploy/systemd/bamboo-hls-http.service
+
 # Media gateway (RTSP->WebRTC) prebuilt binary
 MEDIAMTX_BIN ?= /usr/local/bin/mediamtx
 MEDIAMTX_VER ?= 1.8.1
 MEDIAMTX_URL ?= https://github.com/bluenviron/mediamtx/releases/download/v$(MEDIAMTX_VER)/mediamtx_linux_arm64.tar.gz
 
-.PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
+.PHONY: all deps configure build run install install-config install-models service hls-services start stop restart status logs deploy redeploy clean distclean
 .PHONY: mediamtx
 
 all: build
@@ -82,6 +85,15 @@ mediamtx:
 			sudo install -m 755 mediamtx "$(MEDIAMTX_BIN)"; \
 		rm -rf $$tmpdir; \
 	fi
+
+hls-services: install
+	@for svc in $(HLS_SERVICES); do \
+		echo "Installing $$svc to /etc/systemd/system/$${svc##*/}"; \
+		sudo install -D -m644 $$svc /etc/systemd/system/$${svc##*/}; \
+	done
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable --now bamboo-rtsp-hls.service bamboo-hls-http.service
+	@sudo systemctl restart bamboo-rtsp-hls.service bamboo-hls-http.service
 
 configure: deps
 	@if [ ! -d "$(BUILD_DIR)" ]; then mkdir -p "$(BUILD_DIR)"; fi
