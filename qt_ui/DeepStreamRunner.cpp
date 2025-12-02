@@ -339,7 +339,7 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
 
     // Link capsfilter to webrtcbin sink pad
     GstPad *paySrcPad = gst_element_get_static_pad(capsf, "src");
-    GstPad *webrtcSinkPad = gst_element_get_request_pad(m_webrtcBin, "sink_%u");
+    GstPad *webrtcSinkPad = gst_element_request_pad_simple(m_webrtcBin, "sink_%u");
     if (!paySrcPad || !webrtcSinkPad || gst_pad_link(paySrcPad, webrtcSinkPad) != GST_PAD_LINK_OK) {
         std::cout << "[webrtc] pad link to webrtcbin failed" << std::endl;
         if (paySrcPad) gst_object_unref(paySrcPad);
@@ -357,7 +357,7 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
     m_webrtcThread = std::thread([this]() {
         if (m_webrtcLoop) g_main_loop_run(m_webrtcLoop);
     });
-    std::cout << "[webrtc] pipeline started, source=" << srcUrl << std::endl;
+    std::cout << "[webrtc] pipeline started (direct camera source)" << std::endl;
     return true;
 }
 
