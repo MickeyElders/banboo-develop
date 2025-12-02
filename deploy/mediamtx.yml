@@ -1,0 +1,12 @@
+# Minimal MediaMTX config for LAN-only WebRTC from local RTSP
+logLevel: info
+
+webrtc:
+  enabled: yes
+  stunServers: []  # LAN only, no external STUN
+
+paths:
+  cam:
+    # Pull from local RTSP served by bamboo-qt-ui
+    source: rtsp://127.0.0.1:8554/deepstream
+    sourceOnDemand: yes
