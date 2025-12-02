@@ -9,7 +9,15 @@
 #include <gst/webrtc/webrtc.h>
 #include <gst/sdp/sdp.h>
 #include <atomic>
+#include <cstring>
 #include "WebRTCSignaling.h"
+
+namespace {
+bool isWebRTCDisabled() {
+    const char *env = std::getenv("DISABLE_WEBRTC");
+    return env && std::strcmp(env, "0") != 0;
+}
+}  // namespace
 
 DeepStreamRunner::DeepStreamRunner(QObject *parent) : QObject(parent) {}
 
@@ -26,6 +34,7 @@ DeepStreamRunner::~DeepStreamRunner() {
 }
 
 void DeepStreamRunner::setWebRTCSignaling(WebRTCSignaling *sig) {
+    if (isWebRTCDisabled()) return;
     m_signaling = sig;
 #if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
     if (m_signaling) {
@@ -59,7 +68,7 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     std::cout << "[deepstream] Building pipeline for sink=" << (pipeline.isEmpty() ? (std::getenv("DS_SINK") ? std::getenv("DS_SINK") : "fakesink") : "custom") << std::endl;
 
     // Bind signaling callbacks once (before any early return)
-    if (m_signaling) {
+    if (!isWebRTCDisabled() && m_signaling) {
         QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
                          this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
                          Qt::UniqueConnection);
@@ -182,6 +191,10 @@ bool DeepStreamRunner::start(const QString &pipeline) {
     std::cout << "[deepstream] RTSP server thread started" << std::endl;
 
     lock.unlock();
+    if (isWebRTCDisabled()) {
+        std::cout << "[webrtc] disabled via DISABLE_WEBRTC" << std::endl;
+        return true;
+    }
     // Bind signaling to handler (once); webrtc pipeline will be started on-demand when clients connect.
     if (m_signaling) {
         QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
@@ -292,6 +305,7 @@ void DeepStreamRunner::runLoop() {
 bool DeepStreamRunner::buildWebRTCPipeline() {
     // Caller should not hold m_mutex to avoid re-entrance deadlocks.
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (isWebRTCDisabled()) return false;
     if (m_webrtcPipeline) {
         return true;
     }
@@ -468,6 +482,10 @@ void DeepStreamRunner::createAndSendOffer() {
 void DeepStreamRunner::renegotiateWebRTC() {
     // When a signaling client connects after startup, ensure pipeline exists and send a fresh offer.
     std::cout << "[webrtc] renegotiate: client connected, ensuring pipeline" << std::endl;
+    if (isWebRTCDisabled()) {
+        std::cout << "[webrtc] disabled, skip renegotiate" << std::endl;
+        return;
+    }
     if (m_webrtcNegotiated.load()) {
         std::cout << "[webrtc] already negotiated, skip renegotiate" << std::endl;
         return;
