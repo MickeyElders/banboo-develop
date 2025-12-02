@@ -2,6 +2,7 @@
 
 #include <QDebug>
 #include <QFile>
+#include <QCoreApplication>
 
 HttpServer::HttpServer(const QString &htmlPath, quint16 port, QObject *parent)
     : QObject(parent), m_htmlPath(htmlPath) {
