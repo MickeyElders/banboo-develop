@@ -37,8 +37,9 @@ Environment=VK_JSON_FILE_PATH=/usr/share/vulkan/icd.d/nvidia_icd.json
 Environment=GST_DEBUG=2
 
 # Feature toggles
-Environment=WEB_PREVIEW=1
-Environment=HTTP_SERVER=0
+Environment=WEB_PREVIEW=0
+Environment=HTTP_SERVER=1
+Environment=HTTP_PORT=8080
 Environment=DS_AUTOSTART=1
 Environment=DS_SINK=rtsp
 # Force minimal RTSP (no nvinfer/OSD) to validate video; remove to restore full pipeline
