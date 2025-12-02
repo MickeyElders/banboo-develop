@@ -27,7 +27,13 @@ QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6
  https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
  https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 
+# Media gateway (RTSP->WebRTC) prebuilt binary
+MEDIAMTX_BIN ?= /usr/local/bin/mediamtx
+MEDIAMTX_VER ?= 1.8.1
+MEDIAMTX_URL ?= https://github.com/bluenviron/mediamtx/releases/download/v$(MEDIAMTX_VER)/mediamtx_linux_arm64.tar.gz
+
 .PHONY: all deps configure build run install install-config install-models service start stop restart status logs deploy redeploy clean distclean
+.PHONY: mediamtx
 
 all: build
 
@@ -62,7 +68,20 @@ deps:
 	else \
 		echo "All optional packages already installed."; \
 	fi
+	@$(MAKE) --no-print-directory mediamtx
 	@$(MAKE) --no-print-directory check_qt6
+
+mediamtx:
+	@if [ -x "$(MEDIAMTX_BIN)" ]; then \
+		echo "mediamtx already installed at $(MEDIAMTX_BIN)"; \
+	else \
+		tmpdir=$$(mktemp -d); \
+		echo "Installing mediamtx $(MEDIAMTX_VER) from $(MEDIAMTX_URL)"; \
+		cd $$tmpdir && wget -q "$(MEDIAMTX_URL)" -O mediamtx.tar.gz && \
+			tar xf mediamtx.tar.gz && \
+			sudo install -m 755 mediamtx "$(MEDIAMTX_BIN)"; \
+		rm -rf $$tmpdir; \
+	fi
 
 configure: deps
 	@if [ ! -d "$(BUILD_DIR)" ]; then mkdir -p "$(BUILD_DIR)"; fi
