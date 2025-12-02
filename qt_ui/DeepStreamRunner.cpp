@@ -384,7 +384,9 @@ void DeepStreamRunner::onIceCandidate(GstElement *webrtc, guint mlineindex, gcha
     obj["sdpMid"] = QString::fromUtf8(mid ? mid : "");
     obj["sdpMLineIndex"] = int(mlineindex);
     obj["candidate"] = QString::fromUtf8(candidate ? candidate : "");
-    self->m_signaling->sendMessage(obj);
+    QMetaObject::invokeMethod(self->m_signaling, [sig=self->m_signaling, obj]() {
+        if (sig) sig->sendMessage(obj);
+    }, Qt::QueuedConnection);
 }
 
 void DeepStreamRunner::handleSignalingMessage(const QJsonObject &obj) {
@@ -419,7 +421,11 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
     QJsonObject obj;
     obj["type"] = type;
     obj["sdp"] = QString::fromUtf8(sdpStr);
-    m_signaling->sendMessage(obj);
+    QMetaObject::invokeMethod(m_signaling, [this, obj]() {
+        if (m_signaling) {
+            m_signaling->sendMessage(obj);
+        }
+    }, Qt::QueuedConnection);
     g_free(sdpStr);
 }
 

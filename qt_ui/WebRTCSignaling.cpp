@@ -49,9 +49,12 @@ void WebRTCSignaling::onDisconnected() {
 
 void WebRTCSignaling::sendMessage(const QJsonObject &obj) {
     const QByteArray payload = QJsonDocument(obj).toJson(QJsonDocument::Compact);
-    for (QWebSocket *c : std::as_const(m_clients)) {
-        if (c && c->isValid()) {
-            c->sendTextMessage(QString::fromUtf8(payload));
+    // Ensure send happens on this object's thread to avoid cross-thread socket notifiers.
+    QMetaObject::invokeMethod(this, [this, payload]() {
+        for (QWebSocket *c : std::as_const(m_clients)) {
+            if (c && c->isValid()) {
+                c->sendTextMessage(QString::fromUtf8(payload));
+            }
         }
-    }
+    }, Qt::QueuedConnection);
 }
