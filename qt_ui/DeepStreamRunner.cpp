@@ -64,16 +64,6 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         }
         m_thread = std::thread(&DeepStreamRunner::runLoop, this);
         std::cout << "[deepstream] RTSP server thread started (DS_PIPELINE)" << std::endl;
-
-        // Start WebRTC pipeline as well (DS_PIPELINE branch previously returned early).
-        if (m_signaling) {
-            QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
-                             this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
-                             Qt::UniqueConnection);
-            if (!buildWebRTCPipeline()) {
-                std::cout << "[deepstream] WebRTC pipeline start failed (DS_PIPELINE)" << std::endl;
-            }
-        }
         return true;
     }
 
@@ -183,9 +173,6 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
                          this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
                          Qt::UniqueConnection);
-        if (!buildWebRTCPipeline()) {
-            std::cout << "[deepstream] WebRTC pipeline start failed" << std::endl;
-        }
     }
     std::cout << "[deepstream] start() finished, pipeline up" << std::endl;
     return true;
@@ -286,6 +273,10 @@ void DeepStreamRunner::runLoop() {
 }
 
 bool DeepStreamRunner::buildWebRTCPipeline() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_webrtcPipeline) {
+        return true;
+    }
     const char *srcUrlEnv = std::getenv("RTSP_SOURCE");
     const std::string srcUrl = srcUrlEnv ? std::string(srcUrlEnv) : std::string("rtsp://127.0.0.1:8554/deepstream");
     // Manual build to avoid parse/link issues
@@ -355,6 +346,15 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
     return true;
 }
 
+bool DeepStreamRunner::ensureWebRTCPipeline() {
+    if (m_webrtcPipeline) return true;
+    if (!buildWebRTCPipeline()) {
+        std::cout << "[webrtc] pipeline creation failed" << std::endl;
+        return false;
+    }
+    return true;
+}
+
 void DeepStreamRunner::onNegotiationNeeded(GstElement *webrtc, gpointer user_data) {
     Q_UNUSED(webrtc);
     auto *self = static_cast<DeepStreamRunner *>(user_data);
@@ -411,7 +411,8 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
 }
 
 void DeepStreamRunner::createAndSendOffer() {
-    if (!m_webrtcBin || !m_signaling) return;
+    if (!m_signaling) return;
+    if (!ensureWebRTCPipeline()) return;
     GstPromise *promise = gst_promise_new_with_change_func(
         [](GstPromise *p, gpointer u) {
             auto *runner = static_cast<DeepStreamRunner *>(u);
@@ -429,8 +430,9 @@ void DeepStreamRunner::createAndSendOffer() {
 }
 
 void DeepStreamRunner::renegotiateWebRTC() {
-    // When a signaling client connects after startup, proactively send a fresh offer.
+    // When a signaling client connects after startup, ensure pipeline exists and send a fresh offer.
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (!ensureWebRTCPipeline()) return;
     createAndSendOffer();
 }
 

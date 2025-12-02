@@ -47,6 +47,7 @@ private:
     bool buildServer(const std::string &launch);
     bool buildWebRTCPipeline();
     void runLoop();
+    bool ensureWebRTCPipeline();
 
     // WebRTC callbacks
     static void onNegotiationNeeded(GstElement *webrtc, gpointer user_data);
