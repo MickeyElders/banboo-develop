@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QFile>
 #include <QCoreApplication>
+#include <QUrl>
 
 HttpServer::HttpServer(const QString &htmlPath, quint16 port, QObject *parent)
     : QObject(parent), m_htmlPath(htmlPath) {
