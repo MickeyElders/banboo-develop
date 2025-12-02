@@ -27,44 +27,16 @@
             --power: #c93dff;
         }
 
-        body {
-            font-family: 'Microsoft YaHei', 'Consolas', Arial, sans-serif;
-            background: radial-gradient(120% 120% at 20% 20%, #1a222f 0%, #0f131a 40%, #0c1016 100%);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow: hidden;
-        }
+body {
+    font-family: 'Microsoft YaHei', 'Consolas', Arial, sans-serif;
+    background: radial-gradient(120% 120% at 20% 20%, #1a222f 0%, #0f131a 40%, #0c1016 100%);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow: hidden;
+}
 
-        #webrtc-panel {
-            position: fixed;
-            right: 16px;
-            bottom: 16px;
-            width: 360px;
-            background: var(--bg-panel);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-            padding: 8px;
-            z-index: 50;
-        }
-        #webrtc-panel h4 {
-            margin: 0 0 6px 0;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        #webrtc-panel video {
-            width: 100%;
-            height: 200px;
-            object-fit: contain;
-            background: #000;
-            border-radius: 8px;
-        }
-        #webrtc-status {
-            font-size: 12px;
-            color: var(--error);
-        }
+#webrtc-panel { display: none; }
+#webrtc-status { font-size: 12px; color: var(--error); }
 
         .main-container {
             display: grid;
@@ -541,7 +513,8 @@
                 <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度</span>
             </div>
             <div class="camera-canvas">
-                <div class="camera-placeholder">
+                <video id="hls-video" autoplay playsinline muted controls style="display:none;"></video>
+                <div class="camera-placeholder" id="camera-placeholder">
                     <div>
                         <div>竹材检测预览 / RTSP 或 GStreamer 流</div>
                         <small>推理时间 <span id="inference-time">15.3ms</span> · FPS <span id="detection-fps">28.5</span></small>
@@ -566,6 +539,13 @@
                         <div class="coord-label">刀片选择</div>
                         <div class="coord-value" id="blade-selection">双刀片</div>
                     </div>
+                </div>
+            </div>
+            <div class="hls-controls" style="margin-top:8px;">
+                <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="http://127.0.0.1:8080/hls/stream.m3u8">
+                <div class="btn-row" style="margin-top:6px;">
+                    <button class="btn btn-accent" id="hls-play-btn">播放 HLS</button>
+                    <span id="webrtc-status" style="align-self:center;font-size:12px;color:var(--error);">未连接</span>
                 </div>
             </div>
         </div>
@@ -1146,6 +1126,9 @@
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
                         videoEl.play().catch(() => {});
                         setStatus('HLS 已连接', true);
+                        const ph = document.getElementById('camera-placeholder');
+                        if (ph) ph.style.display = 'none';
+                        videoEl.style.display = 'block';
                     });
                     hls.on(Hls.Events.ERROR, (_, data) => {
                         setStatus('播放错误');
@@ -1156,6 +1139,9 @@
                     videoEl.addEventListener('loadedmetadata', () => {
                         videoEl.play().catch(() => {});
                         setStatus('HLS 已连接', true);
+                        const ph = document.getElementById('camera-placeholder');
+                        if (ph) ph.style.display = 'none';
+                        videoEl.style.display = 'block';
                     }, { once: true });
                 } else {
                     setStatus('浏览器不支持 HLS');
