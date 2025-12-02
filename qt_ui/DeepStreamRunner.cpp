@@ -22,6 +22,17 @@ DeepStreamRunner::~DeepStreamRunner() {
     }
 }
 
+void DeepStreamRunner::setWebRTCSignaling(WebRTCSignaling *sig) {
+    m_signaling = sig;
+#if defined(ENABLE_GSTREAMER) && defined(ENABLE_RTSP)
+    if (m_signaling) {
+        QObject::connect(m_signaling, &WebRTCSignaling::clientConnected,
+                         this, [this]() { this->renegotiateWebRTC(); },
+                         Qt::UniqueConnection);
+    }
+#endif
+}
+
 bool DeepStreamRunner::start(const QString &pipeline) {
 #if !defined(ENABLE_GSTREAMER) || !defined(ENABLE_RTSP)
     Q_UNUSED(pipeline);
@@ -335,21 +346,10 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
 }
 
 void DeepStreamRunner::onNegotiationNeeded(GstElement *webrtc, gpointer user_data) {
+    Q_UNUSED(webrtc);
     auto *self = static_cast<DeepStreamRunner *>(user_data);
-    GstPromise *promise = gst_promise_new_with_change_func(
-        [](GstPromise *p, gpointer u) {
-            auto *runner = static_cast<DeepStreamRunner *>(u);
-            const GstStructure *s = gst_promise_get_reply(p);
-            GstWebRTCSessionDescription *offer = nullptr;
-            gst_structure_get(s, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
-            gst_promise_unref(p);
-            if (!offer) return;
-            g_signal_emit_by_name(runner->m_webrtcBin, "set-local-description", offer, nullptr);
-            runner->sendSdpToPeer(offer, QStringLiteral("offer"));
-            gst_webrtc_session_description_free(offer);
-        },
-        self, nullptr);
-    g_signal_emit_by_name(webrtc, "create-offer", nullptr, promise);
+    if (!self) return;
+    self->createAndSendOffer();
 }
 
 void DeepStreamRunner::onIceCandidate(GstElement *webrtc, guint mlineindex, gchar *candidate, gchar *mid, gpointer user_data) {
@@ -398,6 +398,30 @@ void DeepStreamRunner::sendSdpToPeer(GstWebRTCSessionDescription *desc, const QS
     obj["sdp"] = QString::fromUtf8(sdpStr);
     m_signaling->sendMessage(obj);
     g_free(sdpStr);
+}
+
+void DeepStreamRunner::createAndSendOffer() {
+    if (!m_webrtcBin || !m_signaling) return;
+    GstPromise *promise = gst_promise_new_with_change_func(
+        [](GstPromise *p, gpointer u) {
+            auto *runner = static_cast<DeepStreamRunner *>(u);
+            const GstStructure *s = gst_promise_get_reply(p);
+            GstWebRTCSessionDescription *offer = nullptr;
+            gst_structure_get(s, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
+            gst_promise_unref(p);
+            if (!offer) return;
+            g_signal_emit_by_name(runner->m_webrtcBin, "set-local-description", offer, nullptr);
+            runner->sendSdpToPeer(offer, QStringLiteral("offer"));
+            gst_webrtc_session_description_free(offer);
+        },
+        this, nullptr);
+    g_signal_emit_by_name(m_webrtcBin, "create-offer", nullptr, promise);
+}
+
+void DeepStreamRunner::renegotiateWebRTC() {
+    // When a signaling client connects after startup, proactively send a fresh offer.
+    std::lock_guard<std::mutex> lock(m_mutex);
+    createAndSendOffer();
 }
 
 void DeepStreamRunner::startPipeline() {

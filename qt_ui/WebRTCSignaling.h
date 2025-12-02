@@ -17,6 +17,7 @@ public:
 
 Q_SIGNALS:
     void messageReceived(const QJsonObject &obj);
+    void clientConnected();
 
 private Q_SLOTS:
     void onNewConnection();

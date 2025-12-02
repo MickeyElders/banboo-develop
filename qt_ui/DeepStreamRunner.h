@@ -26,7 +26,7 @@ public:
     explicit DeepStreamRunner(QObject *parent = nullptr);
     ~DeepStreamRunner();
 
-    void setWebRTCSignaling(class WebRTCSignaling *sig) { m_signaling = sig; }
+    void setWebRTCSignaling(class WebRTCSignaling *sig);
     QString sourceUrl() const { return m_sourceUrl; }
 
     Q_INVOKABLE bool start(const QString &pipeline = QString());
@@ -53,6 +53,8 @@ private:
     static void onIceCandidate(GstElement *webrtc, guint mlineindex, gchar *candidate, gchar *mid, gpointer user_data);
     void handleSignalingMessage(const QJsonObject &obj);
     void sendSdpToPeer(GstWebRTCSessionDescription *desc, const QString &type);
+    void createAndSendOffer();
+    void renegotiateWebRTC();
 
     GstRTSPServer *m_server{nullptr};
     GstRTSPMediaFactory *m_factory{nullptr};

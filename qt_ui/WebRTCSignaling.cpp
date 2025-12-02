@@ -23,6 +23,7 @@ void WebRTCSignaling::onNewConnection() {
         connect(socket, &QWebSocket::disconnected, this, &WebRTCSignaling::onDisconnected);
         m_clients << socket;
         qInfo() << "[webrtc] signaling client connected, total:" << m_clients.size();
+        Q_EMIT clientConnected();
     }
 }
 
