@@ -309,7 +309,7 @@ bool DeepStreamRunner::buildWebRTCPipeline() {
     }
 
     g_object_set(src, "location", srcUrl.c_str(), "latency", 200, "protocols", 4 /*tcp*/, nullptr);
-    g_object_set(pay, "pt", 96, "config-interval", 1, nullptr);
+    g_object_set(pay, "pt", 96, "config-interval", 1, "ssrc", guint32(getpid()), nullptr);
     GstCaps *caps = gst_caps_from_string("application/x-rtp,media=video,encoding-name=H264,payload=96,clock-rate=90000");
     g_object_set(capsf, "caps", caps, nullptr);
     gst_caps_unref(caps);
