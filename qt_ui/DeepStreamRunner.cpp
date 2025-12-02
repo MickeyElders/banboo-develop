@@ -64,6 +64,16 @@ bool DeepStreamRunner::start(const QString &pipeline) {
         }
         m_thread = std::thread(&DeepStreamRunner::runLoop, this);
         std::cout << "[deepstream] RTSP server thread started (DS_PIPELINE)" << std::endl;
+
+        // Start WebRTC pipeline as well (DS_PIPELINE branch previously returned early).
+        if (m_signaling) {
+            QObject::connect(m_signaling, &WebRTCSignaling::messageReceived,
+                             this, [this](const QJsonObject &obj) { handleSignalingMessage(obj); },
+                             Qt::UniqueConnection);
+            if (!buildWebRTCPipeline()) {
+                std::cout << "[deepstream] WebRTC pipeline start failed (DS_PIPELINE)" << std::endl;
+            }
+        }
         return true;
     }
 
