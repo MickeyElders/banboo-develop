@@ -9,7 +9,7 @@ User=root
 # Create output dir for HLS segments/playlist
 ExecStartPre=/bin/mkdir -p /opt/bamboo-qt/www
 # Pull RTSP (local) and generate short HLS segments for low latency (single line to satisfy systemd)
-ExecStart=/bin/sh -c 'gst-launch-1.0 -e -v rtspsrc location=rtsp://127.0.0.1:8554/deepstream latency=200 protocols=tcp ! rtph264depay ! h264parse ! mpegtsmux ! hlssink max-files=4 target-duration=2 playlist-location=/opt/bamboo-qt/www/stream.m3u8 playlist-root=http://127.0.0.1:8080/hls location=/opt/bamboo-qt/www/segment_%05d.ts'
+ExecStart=/bin/sh -c 'gst-launch-1.0 -e -v rtspsrc location=rtsp://127.0.0.1:8554/deepstream latency=200 protocols=tcp ! rtph264depay ! h264parse ! mpegtsmux ! hlssink max-files=4 target-duration=2 playlist-location=/opt/bamboo-qt/www/stream.m3u8 playlist-root=http://127.0.0.1:8080/hls location=/opt/bamboo-qt/www/segment_%%05d.ts'
 Restart=always
 RestartSec=3
 
