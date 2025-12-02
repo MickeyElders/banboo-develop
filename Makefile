@@ -147,7 +147,7 @@ logs:
 
 deploy: service
 
-# Full redeploy: stop -> clean -> build/install -> restart service
+# Full redeploy: stop -> clean -> build/install -> restart services (UI + HLS)
 redeploy: stop clean service hls-services
 
 clean:
