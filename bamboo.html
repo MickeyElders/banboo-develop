@@ -1120,7 +1120,7 @@ body {
                 statusEl.style.color = good ? '#4caf50' : '#f44336';
             };
 
-            const defaultUrl = `ws://${location.hostname || '127.0.0.1'}:8081/stream`;
+            const defaultUrl = `ws://${location.hostname || '127.0.0.1'}:9999/stream`;
             urlInput.value = defaultUrl;
 
             const connect = (src) => {
