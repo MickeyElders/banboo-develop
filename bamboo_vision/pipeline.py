@@ -3,20 +3,32 @@ import subprocess
 import os
 import jetson.inference as ji
 import jetson.utils as ju
+from pathlib import Path
 
 
 def build_net(cfg: dict):
     mcfg = cfg.get("model", {})
-    model_path = mcfg.get("onnx", "models/best.onnx")
+    base_dir = Path(__file__).resolve().parent.parent
+    model_path = Path(mcfg.get("onnx", "models/best.onnx"))
+    if not model_path.is_absolute():
+        model_path = base_dir / model_path
     engine_path = mcfg.get("engine", "")
+    if engine_path:
+        engine_path = Path(engine_path)
+        if not engine_path.is_absolute():
+            engine_path = base_dir / engine_path
     threshold = float(mcfg.get("threshold", 0.5))
     nms = float(mcfg.get("nms", 0.45))
     extra_args = []
+    extra_args += ["--model", str(model_path)]
     if engine_path:
-        extra_args += ["--engine", engine_path]
+        extra_args += ["--engine", str(engine_path)]
     labels = mcfg.get("labels")
     if labels:
-        extra_args += ["--labels", labels]
+        labels_path = Path(labels)
+        if not labels_path.is_absolute():
+            labels_path = base_dir / labels_path
+        extra_args += ["--labels", str(labels_path)]
     input_blob = mcfg.get("input_blob")
     if input_blob:
         extra_args += ["--input-blob", input_blob]
@@ -27,7 +39,7 @@ def build_net(cfg: dict):
     if output_bbox:
         extra_args += ["--output-bbox", output_bbox]
     logging.info("Loading model: %s", model_path)
-    net = ji.detectNet(model=model_path, threshold=threshold, argv=extra_args)
+    net = ji.detectNet(model="", threshold=threshold, argv=extra_args)
     net.SetNMS(nms)
     return net
 
