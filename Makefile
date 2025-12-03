@@ -49,13 +49,21 @@ install-jetson:
 	done; \
 	SRC_DIR="$(JI_SRC)"; \
 	if [ ! -d "$$SRC_DIR" ]; then \
-		echo "ERROR: $(JI_SRC) not found. Please place jetson-inference source at $(JI_SRC)"; \
-		exit 1; \
+		if [ -d "jetson-inference-master" ]; then \
+			SRC_DIR="jetson-inference-master"; \
+		else \
+			echo "ERROR: $(JI_SRC) not found and jetson-inference-master not found. Please place jetson-inference source here."; \
+			exit 1; \
+		fi; \
 	fi; \
 	if [ -d "$$SRC_DIR/.git" ]; then \
 		git -C "$$SRC_DIR" submodule update --init --recursive; \
 	else \
 		echo "WARN: $(JI_SRC) has no .git; assuming submodules already present"; \
+	fi; \
+	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
+		echo "ERROR: $$SRC_DIR does not contain CMakeLists.txt. Please provide the full jetson-inference source tree."; \
+		exit 1; \
 	fi; \
 	cd "$$SRC_DIR"; \
 	mkdir -p build && cd build; \
