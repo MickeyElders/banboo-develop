@@ -28,7 +28,7 @@ check-jetson:
 install-jetson:
 	@set -e; \
 	missing=""; \
-	for pkg in python3-dev python3-numpy; do \
+	for pkg in python3-dev python3-numpy libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev cmake build-essential git pkg-config; do \
 		dpkg -s $$pkg >/dev/null 2>&1 || missing="$$missing $$pkg"; \
 	done; \
 	if [ -n "$$missing" ]; then \
