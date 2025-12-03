@@ -5,6 +5,7 @@ PIP ?= $(PY) -m pip
 PREFIX ?= /opt/bamboo-vision
 SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
+JI_SRC ?= jetson-inference-master
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
@@ -46,17 +47,16 @@ install-jetson:
 	for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
 		if [ ! -f $$dst ]; then sudo ln -sf "$$NPYMATH" $$dst; fi; \
 	done; \
-	tmpdir=$$(mktemp -d); \
-	echo "Cloning jetson-inference into $$tmpdir"; \
-	cd $$tmpdir; \
-	git clone --recursive https://github.com/dusty-nv/jetson-inference.git; \
-	cd jetson-inference; \
+	if [ ! -d "$(JI_SRC)" ]; then \
+		echo "ERROR: $(JI_SRC) not found. Please place jetson-inference source at $(JI_SRC)"; \
+		exit 1; \
+	fi; \
+	cd $(JI_SRC); \
 	mkdir -p build && cd build; \
 	cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	make -j$$(nproc); \
 	sudo make install; \
 	sudo ldconfig; \
-	rm -rf "$$tmpdir"; \
 	echo "jetson-inference install completed"
 
 check-gst:
