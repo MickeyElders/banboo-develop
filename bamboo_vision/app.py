@@ -9,6 +9,7 @@ import os
 # Ensure we load the locally built jetson-utils/jetson-inference (under /usr/local)
 _JETSON_PY = [
     "/usr/local/lib/python3.10/dist-packages",
+    "/usr/local/lib/python3/dist-packages",
     "/usr/local/python",
 ]
 for _p in _JETSON_PY:
