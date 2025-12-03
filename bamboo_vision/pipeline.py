@@ -20,7 +20,7 @@ def build_net(cfg: dict):
     threshold = float(mcfg.get("threshold", 0.5))
     nms = float(mcfg.get("nms", 0.45))
     extra_args = []
-    extra_args += ["--model", str(model_path)]
+    # model path is passed via detectNet(model=...)
     if engine_path:
         extra_args += ["--engine", str(engine_path)]
     labels = mcfg.get("labels")
@@ -81,7 +81,7 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         rtsp_uri = out_cfg.get("rtsp_uri", f"rtsp://{host}:{port}/{path}")
         # normalise rtsp_uri host placeholder like rtsp://@:8554/live
         if rtsp_uri.startswith("rtsp://@:"):
-            rtsp_uri = "rtsp://127.0.0.1:" + rtsp_uri.split(":@", 1)[-1]
+            rtsp_uri = "rtsp://127.0.0.1:" + rtsp_uri.split("@:", 1)[-1]
         width = cam_cfg.get("width", 1280)
         height = cam_cfg.get("height", 720)
         fr = cam_cfg.get("fps", 30)
