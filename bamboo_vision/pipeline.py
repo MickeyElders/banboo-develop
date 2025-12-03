@@ -39,7 +39,8 @@ def build_net(cfg: dict):
     if output_bbox:
         extra_args += ["--output-bbox", output_bbox]
     logging.info("Loading model: %s", model_path)
-    net = ji.detectNet(model="", threshold=threshold, argv=extra_args)
+    # Pass model via dedicated parameter, argv carries auxiliary options only
+    net = ji.detectNet(model=str(model_path), threshold=threshold, argv=extra_args)
     net.SetNMS(nms)
     return net
 
@@ -78,6 +79,9 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         port = out_cfg.get("rtsp_port", 8554)
         path = out_cfg.get("rtsp_path", "live")
         rtsp_uri = out_cfg.get("rtsp_uri", f"rtsp://{host}:{port}/{path}")
+        # normalise rtsp_uri host placeholder like rtsp://@:8554/live
+        if rtsp_uri.startswith("rtsp://@:"):
+            rtsp_uri = "rtsp://127.0.0.1:" + rtsp_uri.split(":@", 1)[-1]
         width = cam_cfg.get("width", 1280)
         height = cam_cfg.get("height", 720)
         fr = cam_cfg.get("fps", 30)
