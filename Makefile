@@ -7,6 +7,9 @@ SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
 JI_SRC ?= jetson-inference
 JI_SRC_ABS := $(abspath $(JI_SRC))
+JI_BUILD ?= $(JI_SRC)/build
+JI_PY ?= $(JI_BUILD)/aarch64/lib/python
+JI_LIB ?= $(JI_BUILD)/aarch64/lib
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
@@ -20,7 +23,7 @@ deps:
 	$(MAKE) build-engine
 
 check-jetson:
-	@if PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) -c "import jetson.inference, jetson.utils" >/dev/null 2>&1; then \
+	@if PYTHONPATH="$(JI_PY):$(JETSON_PY):$$PYTHONPATH" LD_LIBRARY_PATH="$(JI_LIB):$$LD_LIBRARY_PATH" $(PY) -c "import jetson.inference, jetson.utils" >/dev/null 2>&1; then \
 		echo "jetson-inference bindings OK"; \
 	else \
 		echo "jetson-inference Python bindings not found; attempting source install..." ; \
