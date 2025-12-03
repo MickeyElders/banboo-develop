@@ -57,8 +57,6 @@ install-jetson:
 		ls -l "$$SRC_DIR"; \
 		exit 1; \
 	fi; \
-	# Bypass submodule git check in CMakeLists (we vendor source without .git)
-	mkdir -p "$$SRC_DIR/utils" && touch "$$SRC_DIR/utils/.git"; \
 	mkdir -p "$$SRC_DIR/build"; \
 	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	cmake --build "$$SRC_DIR/build" -- -j$$(nproc); \
