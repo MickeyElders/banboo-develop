@@ -58,6 +58,8 @@ install-jetson:
 check-gst:
 	@set -e; \
 	export GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra"; \
+	export GST_PLUGIN_SCANNER="/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner"; \
+	export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$$LD_LIBRARY_PATH"; \
 	if gst-inspect-1.0 nvv4l2h264enc >/dev/null 2>&1; then \
 		echo "GStreamer: nvv4l2h264enc OK"; \
 	else \
@@ -106,6 +108,9 @@ logs:
 
 clean-install:
 	sudo systemctl stop $(SERVICE) 2>/dev/null || true
+	sudo systemctl disable $(SERVICE) 2>/dev/null || true
+	sudo rm -f /etc/systemd/system/$(SERVICE)
+	sudo systemctl daemon-reload
 	sudo rm -rf "$(PREFIX)"
 
 redeploy: clean-install install

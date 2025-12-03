@@ -18,10 +18,13 @@ from .calibration import CalibrationManager
 
 def main():
     # Ensure GStreamer plugin path includes Tegra encoders
-    os.environ.setdefault(
-        "GST_PLUGIN_PATH",
-        "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra",
-    )
+    os.environ.setdefault("GST_PLUGIN_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra")
+    os.environ.setdefault("GST_PLUGIN_SCANNER", "/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner")
+    # Prepend tegra libs for NV encoders
+    ld = os.environ.get("LD_LIBRARY_PATH", "")
+    tegra_path = "/usr/lib/aarch64-linux-gnu/tegra"
+    if tegra_path not in ld:
+        os.environ["LD_LIBRARY_PATH"] = tegra_path + (":" + ld if ld else "")
     parser = argparse.ArgumentParser(description="Bamboo vision with jetson-inference + Modbus + HTTP")
     parser.add_argument("--config", default="config/runtime.yaml", help="Path to runtime config YAML")
     parser.add_argument("--headless", action="store_true", help="Disable HDMI output")

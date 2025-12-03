@@ -35,8 +35,12 @@ def build_outputs(out_cfg: dict):
     # Detect encoder availability
     use_x264 = False
     try:
+        env = os.environ.copy()
+        env.setdefault("GST_PLUGIN_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra")
+        env.setdefault("GST_PLUGIN_SCANNER", "/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner")
+        env.setdefault("LD_LIBRARY_PATH", "/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:" + env.get("LD_LIBRARY_PATH", ""))
         if subprocess.run(["gst-inspect-1.0", "nvv4l2h264enc"],
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode != 0:
             use_x264 = True
     except FileNotFoundError:
         # gst-inspect missing; be conservative and use x264
@@ -57,5 +61,8 @@ def build_outputs(out_cfg: dict):
             else:
                 rtsp_uri = rtsp_uri + "?encoder=x264enc"
             argv = ["--encoder=x264enc"]
-        outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
+        try:
+            outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
+        except Exception as e:
+            logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
     return outputs
