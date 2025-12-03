@@ -145,11 +145,11 @@ status:
 logs:
 	@sudo journalctl -u $(SERVICE_NAME) -n 200 -f
 
-# Deploy UI + HLS services in one go
-deploy: service hls-services
+# Default deploy: only UI service (RTSP output). HLS is optional via `make hls-services`.
+deploy: service
 
-# Full redeploy: stop -> clean -> build/install -> restart services (UI + HLS)
-redeploy: stop clean service hls-services
+# Full redeploy: stop -> clean -> build/install -> restart UI service
+redeploy: stop clean service
 
 clean:
 	@rm -rf "$(BUILD_DIR)"

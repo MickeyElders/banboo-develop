@@ -15,7 +15,8 @@ rm -f "${OUT_DIR}/segment_"*.ts "${OUT_DIR}/stream.m3u8" 2>/dev/null || true
 exec gst-launch-1.0 -e -v \
   rtspsrc location="${SRC_URL}" latency=200 protocols=tcp do-retransmission=false ! \
   rtph264depay ! queue ! h264parse ! mpegtsmux ! \
-  hlssink max-files=6 playlist-length=5 target-duration=2 \
+  hlssink2 is-live=true send-keyframe-requests=true \
+    max-files=6 playlist-length=5 target-duration=2 \
     playlist-root="${PLAYLIST_ROOT}" \
     playlist-location="${OUT_DIR}/stream.m3u8" \
     location="${OUT_DIR}/segment_%05d.ts"

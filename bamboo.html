@@ -726,11 +726,14 @@ body {
     </div>
 
     <div id="webrtc-panel">
-        <h4>HLS 预览 <span id="webrtc-status">未连接</span></h4>
-        <video id="hls-video" autoplay playsinline muted controls style="background:#000;"></video>
+        <h4>JSMpeg 预览 <span id="jsmpeg-status">未连接</span></h4>
+        <canvas id="jsmpeg-canvas" style="width:100%;background:#000;border:1px solid var(--border);border-radius:6px;"></canvas>
         <div style="margin-top:6px;">
-            <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="http://127.0.0.1:8088/stream.m3u8">
-            <button class="btn btn-accent" id="hls-play-btn" style="margin-top:6px;width:100%;">播放 HLS</button>
+            <input id="jsmpeg-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="">
+            <button class="btn btn-accent" id="jsmpeg-open-btn" style="margin-top:6px;width:100%;">播放 / 重连</button>
+            <div style="margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.4;">
+                需要 MPEG-TS over WebSocket 流（JSMpeg），默认地址基于当前主机。若无画面，请确认后端提供 ws://... 的 TS 流。
+            </div>
         </div>
     </div>
 
@@ -1103,59 +1106,50 @@ body {
             };
         })();
 
-        // HLS 播放（默认 http://127.0.0.1:8088/stream.m3u8）
-        (function initHlsPreview() {
-            const statusEl = document.getElementById('webrtc-status');
-            const videoEl = document.getElementById('hls-video');
-            const urlInput = document.getElementById('hls-url');
-            const playBtn = document.getElementById('hls-play-btn');
-            if (!statusEl || !videoEl || !urlInput || !playBtn) return;
+        // JSMpeg 预览：需要后端提供 MPEG-TS WebSocket 流
+        (function initJsmpegPreview() {
+            const statusEl = document.getElementById('jsmpeg-status');
+            const canvas = document.getElementById('jsmpeg-canvas');
+            const urlInput = document.getElementById('jsmpeg-url');
+            const btn = document.getElementById('jsmpeg-open-btn');
+            if (!statusEl || !canvas || !urlInput || !btn) return;
 
+            let player = null;
             const setStatus = (txt, good = false) => {
                 statusEl.textContent = txt;
                 statusEl.style.color = good ? '#4caf50' : '#f44336';
             };
 
-            const play = (src) => {
+            const defaultUrl = `ws://${location.hostname || '127.0.0.1'}:8081/stream`;
+            urlInput.value = defaultUrl;
+
+            const connect = (src) => {
                 if (!src) return;
-                setStatus('加载中...');
-                if (window.Hls && window.Hls.isSupported()) {
-                    const hls = new Hls({ lowLatencyMode: true });
-                    hls.loadSource(src);
-                    hls.attachMedia(videoEl);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        videoEl.play().catch(() => {});
-                        setStatus('HLS 已连接', true);
-                        const ph = document.getElementById('camera-placeholder');
-                        if (ph) ph.style.display = 'none';
-                        videoEl.style.display = 'block';
+                if (player) {
+                    try { player.destroy(); } catch (_) {}
+                    player = null;
+                }
+                setStatus('连接中...');
+                try {
+                    player = new JSMpeg.Player(src, {
+                        canvas,
+                        autoplay: true,
+                        audio: false,
+                        loop: true,
+                        videoBufferSize: 512 * 1024
                     });
-                    hls.on(Hls.Events.ERROR, (_, data) => {
-                        setStatus('播放错误');
-                        console.error('hls error', data);
-                    });
-                } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                    videoEl.src = src;
-                    videoEl.addEventListener('loadedmetadata', () => {
-                        videoEl.play().catch(() => {});
-                        setStatus('HLS 已连接', true);
-                        const ph = document.getElementById('camera-placeholder');
-                        if (ph) ph.style.display = 'none';
-                        videoEl.style.display = 'block';
-                    }, { once: true });
-                } else {
-                    setStatus('浏览器不支持 HLS');
+                    setStatus('已连接（如无画面请检查 WebSocket TS 流）', true);
+                } catch (e) {
+                    console.error('jsmpeg init failed', e);
+                    setStatus('初始化失败');
                 }
             };
 
-            const defaultUrl = `http://${location.hostname || '127.0.0.1'}:8080/hls/stream.m3u8`;
-            urlInput.value = defaultUrl;
-            playBtn.addEventListener('click', () => play(urlInput.value.trim()));
-            play(defaultUrl);
+            btn.addEventListener('click', () => connect(urlInput.value.trim()));
+            connect(defaultUrl);
         })();
 
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </body>
 </html>
