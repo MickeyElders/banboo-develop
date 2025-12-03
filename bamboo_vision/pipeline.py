@@ -4,8 +4,14 @@ import os
 import sys
 from pathlib import Path
 
-# Prefer locally built jetson-utils/jetson-inference under /usr/local
+# Prefer local jetson-inference source tree (repo/jetson-inference/python) before system installs
+_ROOT = Path(__file__).resolve().parent.parent
+_LOCAL_JI_PY = _ROOT / "jetson-inference" / "python"
+_LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
+if _LOCAL_JI_PY.is_dir():
+    sys.path.insert(0, str(_LOCAL_JI_PY))
 _JETSON_PY = [
+    str(_LOCAL_JI_PY),
     "/usr/local/lib/python3.10/dist-packages",
     "/usr/local/lib/python3/dist-packages",
     "/usr/local/python",
@@ -13,6 +19,8 @@ _JETSON_PY = [
 for _p in _JETSON_PY:
     if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)
+if _LOCAL_JI_LIB.is_dir():
+    os.environ["LD_LIBRARY_PATH"] = str(_LOCAL_JI_LIB) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
 import jetson.inference as ji
 import jetson.utils as ju
