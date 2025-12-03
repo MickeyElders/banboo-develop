@@ -52,7 +52,7 @@ def main():
     input_stream = ju.videoSource(cam_uri)
     outputs = build_outputs(out_cfg)
     if not outputs:
-        outputs.append(ju.videoOutput("rtsp://@:8554/live"))
+        logging.warning("No outputs available (RTSP/HDMI). Continuing without rendering.")
 
     net = build_net(cfg)
     font = ju.cudaFont()

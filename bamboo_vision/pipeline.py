@@ -35,6 +35,7 @@ def build_outputs(out_cfg: dict):
     outputs = []
     # Detect encoder availability
     use_x264 = False
+    have_x264 = False
     try:
         env = os.environ.copy()
         env.setdefault("GST_PLUGIN_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra")
@@ -43,9 +44,12 @@ def build_outputs(out_cfg: dict):
         if subprocess.run(["gst-inspect-1.0", "nvv4l2h264enc"],
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode != 0:
             use_x264 = True
+        have_x264 = subprocess.run(["gst-inspect-1.0", "x264enc"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode == 0
     except FileNotFoundError:
         # gst-inspect missing; be conservative and use x264
         use_x264 = True
+        have_x264 = True  # assume available in good plugins
 
     if out_cfg.get("hdmi", True):
         try:
@@ -56,14 +60,23 @@ def build_outputs(out_cfg: dict):
         rtsp_uri = out_cfg.get("rtsp_uri", "rtsp://@:8554/live")
         argv = []
         if use_x264:
-            logging.warning("nvv4l2h264enc not available; falling back to software x264enc for RTSP")
-            if "?" in rtsp_uri:
-                rtsp_uri = rtsp_uri + "&encoder=x264enc"
+            if not have_x264:
+                logging.error("Neither nvv4l2h264enc nor x264enc is available; RTSP output disabled")
             else:
-                rtsp_uri = rtsp_uri + "?encoder=x264enc"
-            argv = ["--encoder=x264enc"]
-        try:
-            outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
-        except Exception as e:
-            logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
+                logging.warning("nvv4l2h264enc not available; falling back to software x264enc for RTSP")
+                os.environ["GST_ENCODER"] = "x264enc"
+                if "?" in rtsp_uri:
+                    rtsp_uri = rtsp_uri + "&encoder=x264enc"
+                else:
+                    rtsp_uri = rtsp_uri + "?encoder=x264enc"
+                argv = ["--encoder=x264enc"]
+                try:
+                    outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
+                except Exception as e:
+                    logging.error("Failed to create RTSP output with x264 (%s): %s", rtsp_uri, e)
+        else:
+            try:
+                outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
+            except Exception as e:
+                logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
     return outputs
