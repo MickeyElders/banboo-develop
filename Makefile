@@ -22,8 +22,16 @@ check-jetson:
 
 install-jetson:
 	@set -e; \
-	sudo apt-get update; \
-	sudo apt-get install -y python3-dev python3-numpy; \
+	missing=""; \
+	for pkg in python3-dev python3-numpy; do \
+		dpkg -s $$pkg >/dev/null 2>&1 || missing="$$missing $$pkg"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "Installing missing build deps:$$missing"; \
+		sudo apt-get update && sudo apt-get install -y $$missing; \
+	else \
+		echo "Build deps OK (python3-dev/python3-numpy)"; \
+	fi; \
 	tmpdir=$$(mktemp -d); \
 	echo "Cloning jetson-inference into $$tmpdir"; \
 	cd $$tmpdir; \
