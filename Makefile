@@ -57,17 +57,22 @@ install-jetson:
 
 check-gst:
 	@set -e; \
+	export GST_PLUGIN_PATH="/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra"; \
 	if gst-inspect-1.0 nvv4l2h264enc >/dev/null 2>&1; then \
 		echo "GStreamer: nvv4l2h264enc OK"; \
 	else \
 		echo "Installing GStreamer encoder deps (nvv4l2h264enc/x264enc)..."; \
 		miss=""; \
-		for pkg in nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools; do \
+		for pkg in nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils nvidia-l4t-jetson-multimedia-api gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools; do \
 			dpkg -s $$pkg >/dev/null 2>&1 || miss="$$miss $$pkg"; \
 		done; \
 		if [ -n "$$miss" ]; then sudo apt-get update && sudo apt-get install -y $$miss; fi; \
+		if [ -f /usr/lib/aarch64-linux-gnu/tegra/libnvv4l2h264enc.so ] && [ ! -f /usr/lib/aarch64-linux-gnu/gstreamer-1.0/libnvv4l2h264enc.so ]; then \
+			echo "Linking libnvv4l2h264enc.so into gstreamer-1.0 path"; \
+			sudo ln -sf /usr/lib/aarch64-linux-gnu/tegra/libnvv4l2h264enc.so /usr/lib/aarch64-linux-gnu/gstreamer-1.0/libnvv4l2h264enc.so; \
+		fi; \
 		if ! gst-inspect-1.0 nvv4l2h264enc >/dev/null 2>&1; then \
-			echo "Warning: nvv4l2h264enc still missing after install"; \
+			echo "Warning: nvv4l2h264enc still missing after install; RTSP will fall back to x264enc"; \
 		fi; \
 	fi; \
 	if ! gst-inspect-1.0 x264enc >/dev/null 2>&1; then \

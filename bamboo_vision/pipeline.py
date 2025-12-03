@@ -52,6 +52,10 @@ def build_outputs(out_cfg: dict):
         argv = []
         if use_x264:
             logging.warning("nvv4l2h264enc not available; falling back to software x264enc for RTSP")
+            if "?" in rtsp_uri:
+                rtsp_uri = rtsp_uri + "&encoder=x264enc"
+            else:
+                rtsp_uri = rtsp_uri + "?encoder=x264enc"
             argv = ["--encoder=x264enc"]
         outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
     return outputs
