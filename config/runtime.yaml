@@ -42,6 +42,9 @@ output:
   hdmi: true
   rtsp: true
   rtsp_uri: "rtsp://@:8554/live"
+  raw_udp: false
+  raw_udp_host: "127.0.0.1"
+  raw_udp_port: 5600
 
 app:
   publish_interval_ms: 100

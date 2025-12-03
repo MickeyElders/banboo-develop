@@ -31,7 +31,7 @@ def build_net(cfg: dict):
     return net
 
 
-def build_outputs(out_cfg: dict):
+def build_outputs(out_cfg: dict, cam_cfg: dict):
     outputs = []
     # Detect encoder availability
     use_x264 = False
@@ -79,4 +79,22 @@ def build_outputs(out_cfg: dict):
                 outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
             except Exception as e:
                 logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
+    if out_cfg.get("raw_udp", False):
+        # Build a lightweight raw UDP pipeline (no encoder), user can transcode externally (x264/RTSP server)
+        width = cam_cfg.get("width", 1280)
+        height = cam_cfg.get("height", 720)
+        fr = cam_cfg.get("fps", 30)
+        host = out_cfg.get("raw_udp_host", "127.0.0.1")
+        port = out_cfg.get("raw_udp_port", 5600)
+        pipeline = (
+            f"gstreamer://appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
+            f"video/x-raw,format=RGBA,width={width},height={height},framerate={fr}/1 ! "
+            "videoconvert ! video/x-raw,format=I420 ! "
+            f"udpsink host={host} port={port} sync=false"
+        )
+        try:
+            outputs.append(ju.videoOutput(pipeline))
+            logging.info("Raw UDP output enabled to udp://%s:%d (RGBA->I420, no encoder)", host, port)
+        except Exception as e:
+            logging.error("Failed to create raw UDP output: %s", e)
     return outputs

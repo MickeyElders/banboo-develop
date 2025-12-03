@@ -50,7 +50,7 @@ def main():
         logging.info("Headless mode detected; disabling HDMI output")
 
     input_stream = ju.videoSource(cam_uri)
-    outputs = build_outputs(out_cfg)
+    outputs = build_outputs(out_cfg, cam_cfg)
     if not outputs:
         logging.warning("No outputs available (RTSP/HDMI). Continuing without rendering.")
 

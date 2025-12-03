@@ -39,6 +39,7 @@ make service
 - HTTP 动态服务：`/`/`/bamboo.html` 提供前端页面；`/api/status` 返回最近检测、PLC 状态、FPS；`/api/control` 为预留控制入口（按键可调用）。
 - 在线标定：`/api/calibration` GET/POST，前端悬浮面板可实时调整 `pixel_to_mm/offset_mm/latency_ms/belt_speed_mm_s`，可选 `persist=true` 写回 `config/runtime.yaml`。
 - 编码器：默认硬件 `nvv4l2h264enc`；若缺失则自动降级为软件 `x264enc`（需 `gstreamer1.0-plugins-good/bad`、`libx264-dev`）。`GST_PLUGIN_PATH` 在程序内默认包含 `/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra`。
+- 备用：`output.raw_udp` 可启用原始帧 UDP 输出（RGBA->I420，无编码）到 `raw_udp_host:raw_udp_port`，便于外部轻量 x264/RTSP 组合（例如：`udpsrc ! videoconvert ! x264enc ! rtph264pay ! rtspclientsink`）。
 - 简单像素→毫米换算（按 `runtime.yaml`），写入 Modbus：  
   - 相机→PLC：0x07D0 通信请求保持 1，0x07D1 状态=1，0x07D2 坐标(float，高低字)，0x07D4 结果码(1 成功/2 失败)。  
   - PLC→相机：0x0834 心跳，0x0835 状态(1=可接收坐标，2=送料中)，0x0836 当前位置(float，高低字)。  
