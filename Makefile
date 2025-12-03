@@ -5,7 +5,7 @@ PIP ?= $(PY) -m pip
 PREFIX ?= /opt/bamboo-vision
 SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
-JI_SRC ?= jetson-inference-master
+JI_SRC ?= jetson-inference
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
@@ -47,17 +47,26 @@ install-jetson:
 	for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
 		if [ ! -f $$dst ]; then sudo ln -sf "$$NPYMATH" $$dst; fi; \
 	done; \
-	if [ ! -d "$(JI_SRC)" ]; then \
+	SRC_DIR="$(JI_SRC)"; \
+	TMP_CLONE=""; \
+	if [ ! -d "$$SRC_DIR" ]; then \
 		echo "ERROR: $(JI_SRC) not found. Please place jetson-inference source at $(JI_SRC)"; \
 		exit 1; \
 	fi; \
-	cd $(JI_SRC); \
-	git submodule update --init --recursive; \
+	if [ ! -d "$$SRC_DIR/.git" ]; then \
+		echo "WARN: $(JI_SRC) is not a git checkout; cloning fresh repo with submodules..."; \
+		TMP_CLONE=$$(mktemp -d); \
+		git clone --recursive https://github.com/dusty-nv/jetson-inference.git "$$TMP_CLONE/jetson-inference"; \
+		SRC_DIR="$$TMP_CLONE/jetson-inference"; \
+	fi; \
+	git -C "$$SRC_DIR" submodule update --init --recursive; \
+	cd "$$SRC_DIR"; \
 	mkdir -p build && cd build; \
 	cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	make -j$$(nproc); \
 	sudo make install; \
 	sudo ldconfig; \
+	if [ -n "$$TMP_CLONE" ]; then rm -rf "$$TMP_CLONE"; fi; \
 	echo "jetson-inference install completed"
 
 check-gst:
