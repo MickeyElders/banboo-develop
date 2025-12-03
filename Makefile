@@ -95,7 +95,8 @@ build-engine:
 	fi
 
 run:
-	$(PY) -m bamboo_vision.app --config config/runtime.yaml
+	@nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
+	echo "bamboo-vision started in background (PID $$(cat /tmp/bamboo-vision.run.pid)), logs: /tmp/bamboo-vision.run.log"
 
 install: deps
 	sudo mkdir -p "$(PREFIX)"
