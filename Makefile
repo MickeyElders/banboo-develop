@@ -61,11 +61,10 @@ install-jetson:
 	else \
 		echo "WARN: $(JI_SRC) has no .git; assuming submodules already present"; \
 	fi; \
-	cd "$$SRC_DIR"; \
-	mkdir -p build && cd build; \
-	cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
-	make -j$$(nproc); \
-	sudo make install; \
+	mkdir -p "$$SRC_DIR/build"; \
+	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
+	cmake --build "$$SRC_DIR/build" -- -j$$(nproc); \
+	sudo cmake --install "$$SRC_DIR/build"; \
 	sudo ldconfig; \
 	echo "jetson-inference install completed"
 
