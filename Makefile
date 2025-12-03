@@ -52,7 +52,7 @@ install-jetson:
 	git clone --recursive https://github.com/dusty-nv/jetson-inference.git; \
 	cd jetson-inference; \
 	mkdir -p build && cd build; \
-	cmake .. -DENABLE_PYTHON=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
+	cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	make -j$$(nproc); \
 	sudo make install; \
 	sudo ldconfig; \
