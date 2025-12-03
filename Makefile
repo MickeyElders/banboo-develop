@@ -32,6 +32,7 @@ install-jetson:
 	else \
 		echo "Build deps OK (python3-dev/python3-numpy)"; \
 	fi; \
+	$(PY) -m pip install --upgrade "numpy<2"; \
 	NUMPY_INC=$$(python3 -c "import numpy, os; print(numpy.get_include())" 2>/dev/null || true); \
 	NPYMATH=$$(find /usr -name libnpymath.a -print -quit 2>/dev/null || true); \
 	if [ -z "$$NUMPY_INC" ]; then echo "numpy not found, please install python3-numpy"; exit 1; fi; \

@@ -1,3 +1,7 @@
 pymodbus
 pyyaml
 flask
+pymodbus
+pyyaml
+flask
+numpy<2
