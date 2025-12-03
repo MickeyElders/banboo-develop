@@ -1,6 +1,3 @@
-.ONESHELL:
-SHELL := /bin/bash
-
 PY ?= python3
 PIP ?= $(PY) -m pip
 PREFIX ?= /opt/bamboo-vision
@@ -14,16 +11,8 @@ deps:
 	$(MAKE) check-jetson
 
 check-jetson:
-	@PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) - <<'PY'
-	import sys
-	try:
-		import jetson.inference  # noqa: F401
-		import jetson.utils      # noqa: F401
-		print("jetson-inference bindings OK")
-	except Exception:
-		sys.stderr.write("Missing jetson-inference Python bindings.\n")
-		sys.exit(1)
-	PY
+	@PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) -c "import sys; import jetson.inference, jetson.utils; print('jetson-inference bindings OK')" >/dev/null 2>&1 || \
+	 (echo 'Missing jetson-inference Python bindings.' 1>&2; exit 1)
 
 run:
 	$(PY) -m bamboo_vision.app --config config/runtime.yaml
