@@ -1,3 +1,0 @@
-# Ignore upstream documentation (not needed for runtime/deploy)
-docs/
-docs/**/*
