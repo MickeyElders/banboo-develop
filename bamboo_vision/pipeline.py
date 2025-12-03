@@ -19,28 +19,26 @@ def build_net(cfg: dict):
             engine_path = base_dir / engine_path
     threshold = float(mcfg.get("threshold", 0.5))
     nms = float(mcfg.get("nms", 0.45))
-    extra_args = []
-    # model path is passed via detectNet(model=...)
+    extra_args = [f"--model={model_path}"]
     if engine_path:
-        extra_args += ["--engine", str(engine_path)]
+        extra_args += [f"--engine={engine_path}"]
     labels = mcfg.get("labels")
     if labels:
         labels_path = Path(labels)
         if not labels_path.is_absolute():
             labels_path = base_dir / labels_path
-        extra_args += ["--labels", str(labels_path)]
+        extra_args += [f"--labels={labels_path}"]
     input_blob = mcfg.get("input_blob")
     if input_blob:
-        extra_args += ["--input-blob", input_blob]
+        extra_args += [f"--input-blob={input_blob}"]
     output_cvg = mcfg.get("output_cvg")
     if output_cvg:
-        extra_args += ["--output-cvg", output_cvg]
+        extra_args += [f"--output-cvg={output_cvg}"]
     output_bbox = mcfg.get("output_bbox")
     if output_bbox:
-        extra_args += ["--output-bbox", output_bbox]
+        extra_args += [f"--output-bbox={output_bbox}"]
     logging.info("Loading model: %s", model_path)
-    # Pass model via dedicated parameter, argv carries auxiliary options only
-    net = ji.detectNet(model=str(model_path), threshold=threshold, argv=extra_args)
+    net = ji.detectNet(argv=extra_args, threshold=threshold)
     net.SetNMS(nms)
     return net
 
@@ -99,7 +97,7 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
                     f"rtspclientsink location={rtsp_uri}"
                 )
                 try:
-                    outputs.append(ju.videoOutput("gstreamer://" + pipeline))
+                    outputs.append(ju.videoOutput("gstreamer:// " + pipeline))
                     logging.info("Software RTSP (x264) enabled: %s", rtsp_uri)
                 except Exception as e:
                     logging.error("Failed to create software RTSP output: %s", e)
