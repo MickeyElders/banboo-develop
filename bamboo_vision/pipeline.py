@@ -39,7 +39,7 @@ def build_net(cfg: dict):
     if output_bbox:
         extra_args += ["--output-bbox", output_bbox]
     logging.info("Loading model: %s", model_path)
-    net = ji.detectNet(model=str(model_path), threshold=threshold, argv=extra_args)
+    net = ji.detectNet(model="", threshold=threshold, argv=extra_args)
     net.SetNMS(nms)
     return net
 
@@ -71,23 +71,40 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
             outputs.append(ju.videoOutput("display://0"))
         except Exception as e:
             logging.warning("Failed to create HDMI output (display://0): %s; continuing without HDMI", e)
-    # RTSP output (force x264 if NVENC missing)
+    # RTSP output (prefer x264 pipeline when HW encoder missing)
     rtsp_enabled = out_cfg.get("rtsp", False) or out_cfg.get("software_rtsp", False)
     if rtsp_enabled:
-        rtsp_uri = out_cfg.get("rtsp_uri", "rtsp://@:8554/live")
-        # choose encoder: prefer NVENC when present, otherwise x264
-        encoder = out_cfg.get("rtsp_encoder")
-        if not encoder:
-            encoder = "x264enc" if use_x264 else "nvv4l2h264enc"
-        if encoder == "x264enc" and not have_x264:
-            logging.error("x264enc not available; RTSP disabled")
+        host = out_cfg.get("rtsp_host", "127.0.0.1")
+        port = out_cfg.get("rtsp_port", 8554)
+        path = out_cfg.get("rtsp_path", "live")
+        rtsp_uri = out_cfg.get("rtsp_uri", f"rtsp://{host}:{port}/{path}")
+        width = cam_cfg.get("width", 1280)
+        height = cam_cfg.get("height", 720)
+        fr = cam_cfg.get("fps", 30)
+        # force software pipeline when HW encoder missing or software_rtsp set
+        if use_x264 or out_cfg.get("software_rtsp", False):
+            if not have_x264:
+                logging.error("x264enc not available; RTSP disabled")
+            else:
+                pipeline = (
+                    f"appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
+                    f"video/x-raw,format=RGBA,width={width},height={height},framerate={fr}/1 ! "
+                    "videoconvert ! video/x-raw,format=I420 ! "
+                    "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast key-int-max=30 ! "
+                    "rtph264pay config-interval=1 pt=96 ! "
+                    f"rtspclientsink location={rtsp_uri}"
+                )
+                try:
+                    outputs.append(ju.videoOutput("gstreamer://" + pipeline))
+                    logging.info("Software RTSP (x264) enabled: %s", rtsp_uri)
+                except Exception as e:
+                    logging.error("Failed to create software RTSP output: %s", e)
         else:
-            uri = rtsp_uri + ("&" if "?" in rtsp_uri else "?") + f"encoder={encoder}"
             try:
-                outputs.append(ju.videoOutput(uri))
-                logging.info("RTSP enabled via %s (encoder=%s)", rtsp_uri, encoder)
+                outputs.append(ju.videoOutput(rtsp_uri))
+                logging.info("RTSP enabled via NVENC: %s", rtsp_uri)
             except Exception as e:
-                logging.error("Failed to create RTSP output (%s): %s", uri, e)
+                logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
 
     # Raw UDP (optional)
     if out_cfg.get("raw_udp", False):
