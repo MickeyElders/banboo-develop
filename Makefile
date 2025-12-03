@@ -61,10 +61,6 @@ install-jetson:
 	else \
 		echo "WARN: $(JI_SRC) has no .git; assuming submodules already present"; \
 	fi; \
-	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
-		echo "ERROR: $$SRC_DIR does not contain CMakeLists.txt. Please provide the full jetson-inference source tree."; \
-		exit 1; \
-	fi; \
 	cd "$$SRC_DIR"; \
 	mkdir -p build && cd build; \
 	cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
