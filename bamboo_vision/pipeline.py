@@ -1,9 +1,20 @@
 import logging
 import subprocess
 import os
+import sys
+from pathlib import Path
+
+# Prefer locally built jetson-utils/jetson-inference under /usr/local
+_JETSON_PY = [
+    "/usr/local/lib/python3.10/dist-packages",
+    "/usr/local/python",
+]
+for _p in _JETSON_PY:
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import jetson.inference as ji
 import jetson.utils as ju
-from pathlib import Path
 
 
 def build_net(cfg: dict):
