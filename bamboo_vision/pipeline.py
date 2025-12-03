@@ -88,17 +88,13 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
             if not have_x264:
                 logging.error("x264enc not available; RTSP disabled")
             else:
-                pipeline = (
-                    f"appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
-                    f"video/x-raw,format=RGBA,width={width},height={height},framerate={fr}/1 ! "
-                    "videoconvert ! video/x-raw,format=I420 ! "
-                    "x264enc tune=zerolatency bitrate=4000 speed-preset=superfast key-int-max=30 ! "
-                    "rtph264pay config-interval=1 pt=96 ! "
-                    f"rtspclientsink location={rtsp_uri}"
-                )
                 try:
-                    outputs.append(ju.videoOutput("gstreamer:// " + pipeline))
-                    logging.info("Software RTSP (x264) enabled: %s", rtsp_uri)
+                    # Ask jetson-utils to use x264 encoder internally
+                    outputs.append(ju.videoOutput(rtsp_uri, argv=[f"--output-encoder=x264enc",
+                                                                  f"--output-width={width}",
+                                                                  f"--output-height={height}",
+                                                                  f"--output-framerate={fr}"]))
+                    logging.info("RTSP (software x264) enabled: %s", rtsp_uri)
                 except Exception as e:
                     logging.error("Failed to create software RTSP output: %s", e)
         else:
