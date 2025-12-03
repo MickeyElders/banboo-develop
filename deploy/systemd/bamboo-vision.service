@@ -1,0 +1,15 @@
+[Unit]
+Description=Bamboo Vision (jetson-inference + Modbus + HTTP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/bamboo-vision
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m bamboo_vision.app --config /opt/bamboo-vision/config/runtime.yaml
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -2,28 +2,41 @@
 
 ## 1. 依赖
 - JetPack 自带的 `jetson-inference` Python 轮子（`python3 -c "import jetson.inference, jetson.utils"` 应返回成功）。
-- `pymodbus`、`pyyaml`：  
+- 其他依赖：`pymodbus`、`pyyaml`、`flask`  
   ```bash
   sudo apt-get install -y python3-pip
   python3 -m pip install --upgrade pip
-  python3 -m pip install pymodbus pyyaml
+  python3 -m pip install -r requirements.txt
   ```
 
 ## 2. 配置
 - 编辑 `config/runtime.yaml`：至少填写 Modbus `host/port/slave_id`，以及校准后的 `pixel_to_mm/offset_mm`。  
 - CSI 相机默认 `csi://0`，如需自定义 GStreamer 管线，替换 `camera.pipeline`。
 - RTSP 默认输出到 `rtsp://@:8554/live`，本地 HDMI 通过 `display://0`。
+- HTTP 服务：默认 `http://0.0.0.0:8080/` 提供 `bamboo.html` 及 `/api/status`。
 
 ## 3. 运行
+### 本地直接运行
 ```bash
-python3 bamboo_vision.py --config config/runtime.yaml
+python3 -m bamboo_vision.app --config config/runtime.yaml      # HDMI+RTSP
+python3 -m bamboo_vision.app --config config/runtime.yaml --headless   # 仅 RTSP
 ```
-常用参数：
-- `--headless`：仅 RTSP，不占用 HDMI。
+或使用 Makefile：
+```bash
+make deps
+make run
+```
+
+### 安装为 systemd 服务（Jetson 上）
+```bash
+make service
+```
+服务名：`bamboo-vision.service`，默认工作目录 `/opt/bamboo-vision`，配置 `/opt/bamboo-vision/config/runtime.yaml`。
 
 ## 4. 功能说明
 - 捕获 CSI/GStreamer 视频，使用 `detectNet`（ONNX/engine）检测竹节。
 - 同时输出到 HDMI 和 RTSP（可被 MediaMTX/ffplay/VLC 拉流）。
+- HTTP 动态服务：`/`/`/bamboo.html` 提供前端页面；`/api/status` 返回最近检测、PLC 状态、FPS；`/api/control` 为预留控制入口（按键可调用）。
 - 简单像素→毫米换算（按 `runtime.yaml`），写入 Modbus：  
   - 相机→PLC：0x07D0 通信请求保持 1，0x07D1 状态=1，0x07D2 坐标(float，高低字)，0x07D4 结果码(1 成功/2 失败)。  
   - PLC→相机：0x0834 心跳，0x0835 状态(1=可接收坐标，2=送料中)，0x0836 当前位置(float，高低字)。  

@@ -1,5 +1,0 @@
-bamboo
-bamboo_node
-bamboo_segment
-bamboo_tip
-bamboo_base
