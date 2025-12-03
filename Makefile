@@ -32,8 +32,8 @@ install-jetson:
 	else \
 		echo "Build deps OK (python3-dev/python3-numpy)"; \
 	fi; \
-	NUMPY_INC=$$(python3 - <<'PY' 2>/dev/null || true\nimport numpy, os\nprint(numpy.get_include())\nPY); \
-	NUMPY_LIBDIR=$$(python3 - <<'PY' 2>/dev/null || true\nimport numpy, os\nprint(os.path.join(os.path.dirname(numpy.__file__), 'core', 'lib'))\nPY); \
+	NUMPY_INC=$$(python3 -c "import numpy, os; print(numpy.get_include())" 2>/dev/null || true); \
+	NUMPY_LIBDIR=$$(python3 -c "import numpy, os; import numpy as np; print(os.path.join(os.path.dirname(np.__file__), 'core', 'lib'))" 2>/dev/null || true); \
 	if [ -z "$$NUMPY_INC" ] || [ -z "$$NUMPY_LIBDIR" ]; then echo "numpy not found, please install python3-numpy"; exit 1; fi; \
 	if [ -f "$$NUMPY_LIBDIR/libnpymath.a" ]; then \
 		for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
