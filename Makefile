@@ -47,10 +47,10 @@ install-jetson:
 	for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
 		if [ ! -f $$dst ]; then sudo ln -sf "$$NPYMATH" $$dst; fi; \
 	done; \
-	SRC_DIR="$(JI_SRC)"; \
+	SRC_DIR=$$(readlink -f "$(JI_SRC)"); \
 	if [ ! -d "$$SRC_DIR" ]; then \
 		if [ -d "jetson-inference-master" ]; then \
-			SRC_DIR="jetson-inference-master"; \
+			SRC_DIR=$$(readlink -f "jetson-inference-master"); \
 		else \
 			echo "ERROR: $(JI_SRC) not found and jetson-inference-master not found. Please place jetson-inference source here."; \
 			exit 1; \
@@ -60,6 +60,11 @@ install-jetson:
 		git -C "$$SRC_DIR" submodule update --init --recursive; \
 	else \
 		echo "WARN: $(JI_SRC) has no .git; assuming submodules already present"; \
+	fi; \
+	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
+		echo "ERROR: $$SRC_DIR does not contain CMakeLists.txt"; \
+		ls -l "$$SRC_DIR"; \
+		exit 1; \
 	fi; \
 	mkdir -p "$$SRC_DIR/build"; \
 	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
