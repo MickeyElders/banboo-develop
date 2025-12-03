@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 PY ?= python3
 PIP ?= $(PY) -m pip
 PREFIX ?= /opt/bamboo-vision
@@ -11,8 +13,27 @@ deps:
 	$(MAKE) check-jetson
 
 check-jetson:
-	@PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) -c "import sys; import jetson.inference, jetson.utils; print('jetson-inference bindings OK')" >/dev/null 2>&1 || \
-	 (echo 'Missing jetson-inference Python bindings.' 1>&2; exit 1)
+	@if PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) -c "import jetson.inference, jetson.utils" >/dev/null 2>&1; then \
+		echo "jetson-inference bindings OK"; \
+	else \
+		echo "jetson-inference Python bindings not found; attempting source install..." ; \
+		$(MAKE) install-jetson; \
+	fi
+
+install-jetson:
+	@set -e; \
+	tmpdir=$$(mktemp -d); \
+	echo "Cloning jetson-inference into $$tmpdir"; \
+	cd $$tmpdir; \
+	git clone --recursive https://github.com/dusty-nv/jetson-inference.git; \
+	cd jetson-inference; \
+	mkdir -p build && cd build; \
+	cmake .. -DENABLE_PYTHON=ON; \
+	make -j$$(nproc); \
+	sudo make install; \
+	sudo ldconfig; \
+	rm -rf "$$tmpdir"; \
+	echo "jetson-inference install completed"
 
 run:
 	$(PY) -m bamboo_vision.app --config config/runtime.yaml
