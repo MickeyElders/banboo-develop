@@ -1,0 +1,45 @@
+# Runtime configuration for bamboo_vision.py
+
+camera:
+  # CSI default; override with a full GStreamer pipeline if needed.
+  pipeline: "csi://0"
+  width: 1280
+  height: 720
+
+model:
+  onnx: "models/best.onnx"
+  engine: "models/best.engine"   # optional; leave blank to build on first run
+  labels: ""                      # optional labels.txt
+  threshold: 0.50
+  nms: 0.45
+  # input_blob: ""                # set if your ONNX blob names differ
+  # output_cvg: ""
+  # output_bbox: ""
+
+calibration:
+  pixel_to_mm: 1.0      # placeholder; replace after calibration
+  offset_mm: 0.0
+
+modbus:
+  host: "192.168.1.100"
+  port: 502
+  slave_id: 1
+  poll_ms: 50
+  write_heartbeat_ms: 20
+  addr_cam_to_plc:
+    comm: 0x07D0    # D2000
+    status: 0x07D1  # D2001
+    coord: 0x07D2   # D2002 (float hi/lo)
+    result: 0x07D4  # D2004
+  addr_plc_to_cam:
+    heartbeat: 0x0834  # D2100
+    state: 0x0835      # D2101 (1=ready for coordinate; 2=feeding)
+    servo_pos: 0x0836  # D2102 (float hi/lo)
+
+output:
+  hdmi: true
+  rtsp: true
+  rtsp_uri: "rtsp://@:8554/live"
+
+app:
+  publish_interval_ms: 100
