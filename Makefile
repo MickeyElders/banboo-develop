@@ -94,8 +94,9 @@ check-gst:
 	fi
 
 build-engine:
-	@if [ -f models/best.engine ]; then \
-		echo "TensorRT engine already exists (models/best.engine)"; \
+	@ENGINE_PATH="models/best.engine"; \
+	if [ -f "$$ENGINE_PATH" ]; then \
+		echo "TensorRT engine already exists ($$ENGINE_PATH); skip build"; \
 	else \
 		echo "Building TensorRT engine from models/best.onnx (FP16)"; \
 		if [ ! -x "$(TRTEXEC)" ]; then \
