@@ -4,14 +4,11 @@ PREFIX ?= /opt/bamboo-vision
 SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
 
-.PHONY: deps check-jetson run install reinstall service service-restart service-stop service-status logs redeploy
+.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy
 
 deps:
 	$(PIP) install -r requirements.txt
 	$(MAKE) check-jetson
-
-run:
-	$(PY) -m bamboo_vision.app --config config/runtime.yaml
 
 check-jetson:
 	@PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) - <<'PY' || exit $$?
@@ -32,16 +29,17 @@ except Exception as e:
     sys.exit(1)
 PY
 
+run:
+	$(PY) -m bamboo_vision.app --config config/runtime.yaml
+
 install: deps
 	sudo mkdir -p "$(PREFIX)"
 	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md "$(PREFIX)"
-
-reinstall: clean-install install service-restart
-
-service: install
 	sudo install -D -m644 deploy/systemd/$(SERVICE) /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now $(SERVICE)
+
+service: install
 
 service-restart:
 	sudo systemctl restart $(SERVICE)
@@ -59,4 +57,4 @@ clean-install:
 	sudo systemctl stop $(SERVICE) 2>/dev/null || true
 	sudo rm -rf "$(PREFIX)"
 
-redeploy: clean-install install service
+redeploy: clean-install install
