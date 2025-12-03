@@ -11,6 +11,7 @@ JETSON_PY ?= /usr/local/python
 deps:
 	$(PIP) install -r requirements.txt
 	$(MAKE) check-jetson
+	$(MAKE) check-gst
 
 check-jetson:
 	@if PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) -c "import jetson.inference, jetson.utils" >/dev/null 2>&1; then \
@@ -53,6 +54,26 @@ install-jetson:
 	sudo ldconfig; \
 	rm -rf "$$tmpdir"; \
 	echo "jetson-inference install completed"
+
+check-gst:
+	@set -e; \
+	if gst-inspect-1.0 nvv4l2h264enc >/dev/null 2>&1; then \
+		echo "GStreamer: nvv4l2h264enc OK"; \
+	else \
+		echo "Installing GStreamer encoder deps (nvv4l2h264enc/x264enc)..."; \
+		miss=""; \
+		for pkg in nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools; do \
+			dpkg -s $$pkg >/dev/null 2>&1 || miss="$$miss $$pkg"; \
+		done; \
+		if [ -n "$$miss" ]; then sudo apt-get update && sudo apt-get install -y $$miss; fi; \
+		if ! gst-inspect-1.0 nvv4l2h264enc >/dev/null 2>&1; then \
+			echo "Warning: nvv4l2h264enc still missing after install"; \
+		fi; \
+	fi; \
+	if ! gst-inspect-1.0 x264enc >/dev/null 2>&1; then \
+		echo "Installing x264 encoder support"; \
+		dpkg -s libx264-dev >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y libx264-dev); \
+	fi
 
 run:
 	$(PY) -m bamboo_vision.app --config config/runtime.yaml
