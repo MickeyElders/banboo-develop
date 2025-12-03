@@ -6,6 +6,7 @@ PREFIX ?= /opt/bamboo-vision
 SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
 JI_SRC ?= jetson-inference
+JI_SRC_ABS := $(abspath $(JI_SRC))
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
@@ -47,19 +48,15 @@ install-jetson:
 	for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
 		if [ ! -f $$dst ]; then sudo ln -sf "$$NPYMATH" $$dst; fi; \
 	done; \
-	SRC_DIR=$$(readlink -f "$(JI_SRC)"); \
+	SRC_DIR="$(JI_SRC_ABS)"; \
 	if [ ! -d "$$SRC_DIR" ]; then \
-		if [ -d "jetson-inference-master" ]; then \
-			SRC_DIR=$$(readlink -f "jetson-inference-master"); \
-		else \
-			echo "ERROR: $(JI_SRC) not found and jetson-inference-master not found. Please place jetson-inference source here."; \
-			exit 1; \
-		fi; \
+		echo "ERROR: $(JI_SRC) not found. Please place jetson-inference source here."; \
+		exit 1; \
 	fi; \
 	if [ -d "$$SRC_DIR/.git" ]; then \
 		git -C "$$SRC_DIR" submodule update --init --recursive; \
 	else \
-		echo "WARN: $(JI_SRC) has no .git; assuming submodules already present"; \
+		echo "WARN: $$SRC_DIR has no .git; assuming submodules already present"; \
 	fi; \
 	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
 		echo "ERROR: $$SRC_DIR does not contain CMakeLists.txt"; \
