@@ -18,7 +18,7 @@ TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
 
 deps:
 	$(PIP) install -r requirements.txt
-	$(MAKE) check-jetson
+	$(MAKE) install-jetson
 	$(MAKE) check-gst
 	$(MAKE) build-engine
 
@@ -122,12 +122,12 @@ build-engine:
 	fi
 
 run:
-	@PYTHONPATH="/usr/local/lib/python3.10/dist-packages:/usr/local/lib/python3/dist-packages:/usr/local/python:$$PYTHONPATH" nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
+	@PYTHONPATH="$(abspath $(JI_PY)):/usr/local/lib/python3.10/dist-packages:/usr/local/lib/python3/dist-packages:/usr/local/python:$$PYTHONPATH" LD_LIBRARY_PATH="$(abspath $(JI_LIB)):/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$$LD_LIBRARY_PATH" nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
 	echo "bamboo-vision started in background (PID $$(cat /tmp/bamboo-vision.run.pid)), logs: /tmp/bamboo-vision.run.log"
 
 install: deps
 	sudo mkdir -p "$(PREFIX)"
-	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md "$(PREFIX)"
+	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md jetson-inference "$(PREFIX)"
 	sudo install -D -m644 deploy/systemd/$(SERVICE) /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now $(SERVICE)
