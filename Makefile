@@ -35,7 +35,6 @@ PY
 install: deps
 	sudo mkdir -p "$(PREFIX)"
 	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md "$(PREFIX)"
-	$(MAKE) service
 
 reinstall: clean-install install service-restart
 
@@ -60,4 +59,4 @@ clean-install:
 	sudo systemctl stop $(SERVICE) 2>/dev/null || true
 	sudo rm -rf "$(PREFIX)"
 
-redeploy: clean-install install service-restart
+redeploy: clean-install install service
