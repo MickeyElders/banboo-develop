@@ -5,6 +5,8 @@ PIP ?= $(PY) -m pip
 PREFIX ?= /opt/bamboo-vision
 SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
+# Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
+TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 
 .PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy
 
@@ -88,10 +90,12 @@ build-engine:
 		echo "TensorRT engine already exists (models/best.engine)"; \
 	else \
 		echo "Building TensorRT engine from models/best.onnx (FP16)"; \
-		trtexec --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --workspace=2048 || true; \
-		if [ ! -f models/best.engine ]; then \
-			echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; \
+		if [ ! -x "$(TRTEXEC)" ]; then \
+			echo "ERROR: trtexec not found at $(TRTEXEC). Set TRTEXEC=/path/to/trtexec"; \
+			exit 1; \
 		fi; \
+		"$(TRTEXEC)" --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --workspace=2048 || true; \
+		if [ ! -f models/best.engine ]; then echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; fi; \
 	fi
 
 run:
