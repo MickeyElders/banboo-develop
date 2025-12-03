@@ -88,18 +88,7 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         fr = cam_cfg.get("fps", 30)
         # force software pipeline when HW encoder missing or software_rtsp set
         if use_x264 or out_cfg.get("software_rtsp", False):
-            if not have_x264:
-                logging.error("x264enc not available; RTSP disabled")
-            else:
-                try:
-                    # Ask jetson-utils to use x264 encoder internally
-                    outputs.append(ju.videoOutput(rtsp_uri, argv=[f"--output-encoder=x264enc",
-                                                                  f"--output-width={width}",
-                                                                  f"--output-height={height}",
-                                                                  f"--output-framerate={fr}"]))
-                    logging.info("RTSP (software x264) enabled: %s", rtsp_uri)
-                except Exception as e:
-                    logging.error("Failed to create software RTSP output: %s", e)
+            logging.error("RTSP disabled: NVENC missing and x264enc push not supported by jetson.utils on this board.")
         else:
             try:
                 outputs.append(ju.videoOutput(rtsp_uri))

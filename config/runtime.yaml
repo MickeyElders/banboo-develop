@@ -39,10 +39,10 @@ modbus:
 
 output:
   hdmi: false
-  rtsp: false            # enable built-in RTSP server (uses HW encoder when available)
+  rtsp: false            # NVENC missing on this board; RTSP disabled in app
   rtsp_uri: "rtsp://@:8554/live"
-  software_rtsp: true    # force software x264 RTSP (ignores HW encoder when true)
-  raw_udp: false
+  software_rtsp: false
+  raw_udp: true          # enable raw UDP frames for external encoder
   raw_udp_host: "127.0.0.1"
   raw_udp_port: 5600
 
