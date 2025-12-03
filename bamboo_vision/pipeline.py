@@ -26,6 +26,7 @@ def build_net(cfg: dict):
     output_bbox = mcfg.get("output_bbox")
     if output_bbox:
         extra_args += ["--output-bbox", output_bbox]
+    logging.info("Loading model: %s", model_path)
     net = ji.detectNet(model=model_path, threshold=threshold, argv=extra_args)
     net.SetNMS(nms)
     return net

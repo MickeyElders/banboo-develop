@@ -40,9 +40,9 @@ modbus:
 
 output:
   hdmi: true
-  rtsp: true
+  rtsp: false            # NVENC 缺失时关闭内置 RTSP，使用 raw_udp + 外部软编
   rtsp_uri: "rtsp://@:8554/live"
-  raw_udp: false
+  raw_udp: true
   raw_udp_host: "127.0.0.1"
   raw_udp_port: 5600
 
