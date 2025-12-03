@@ -7,6 +7,7 @@ SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
+TRT_WORKSPACE ?= 2048  # MiB workspace for TensorRT engine build
 
 .PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy
 
@@ -94,7 +95,7 @@ build-engine:
 			echo "ERROR: trtexec not found at $(TRTEXEC). Set TRTEXEC=/path/to/trtexec"; \
 			exit 1; \
 		fi; \
-		"$(TRTEXEC)" --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --workspace=2048 || true; \
+		"$(TRTEXEC)" --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --workspace=$(TRT_WORKSPACE) || true; \
 		if [ ! -f models/best.engine ]; then echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; fi; \
 	fi
 
