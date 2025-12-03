@@ -1,6 +1,8 @@
 import logging
 import struct
 import time
+import ipaddress
+import socket
 
 from pymodbus.client import ModbusTcpClient
 
@@ -24,11 +26,15 @@ class ModbusBridge:
 
     def __init__(self, cfg: dict, state: SharedState):
         mcfg = cfg.get("modbus", {})
-        self.host = mcfg.get("host", "127.0.0.1")
+        self.host = mcfg.get("host", "") or None
         self.port = int(mcfg.get("port", 502))
         self.slave_id = int(mcfg.get("slave_id", 1))
         self.poll_ms = int(mcfg.get("poll_ms", 50))
         self.hb_ms = int(mcfg.get("write_heartbeat_ms", 20))
+        self.auto_discover = bool(mcfg.get("auto_discover", False))
+        self.scan_subnet = mcfg.get("scan_subnet", "")
+        self.scan_timeout = float(mcfg.get("scan_timeout_ms", 75)) / 1000.0
+        self._discover_attempted = False
         self.addr_cam = mcfg.get("addr_cam_to_plc", {})
         self.addr_plc = mcfg.get("addr_plc_to_cam", {})
         self.client = ModbusTcpClient(host=self.host, port=self.port, unit_id=self.slave_id, timeout=1)
@@ -41,7 +47,45 @@ class ModbusBridge:
         self.hb_local = 0
         self.state = state
 
+    def _discover_host(self):
+        """Scan the configured subnet for an open Modbus/TCP endpoint."""
+        if self._discover_attempted:
+            return
+        self._discover_attempted = True
+        if not self.auto_discover:
+            return
+        if not self.scan_subnet:
+            logging.warning("Modbus auto_discover enabled but scan_subnet not set; skipping discovery")
+            return
+        try:
+            net = ipaddress.ip_network(self.scan_subnet, strict=False)
+        except Exception as e:
+            logging.warning("Invalid scan_subnet '%s': %s", self.scan_subnet, e)
+            return
+        logging.info("Scanning subnet %s for PLC on port %d ...", net, self.port)
+        for idx, ip in enumerate(net.hosts()):
+            ip_str = str(ip)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(self.scan_timeout)
+            try:
+                if sock.connect_ex((ip_str, self.port)) == 0:
+                    logging.info("Found Modbus device at %s:%d", ip_str, self.port)
+                    self.host = ip_str
+                    self.client.host = ip_str
+                    return
+            except Exception:
+                pass
+            finally:
+                sock.close()
+            if idx % 50 == 0:
+                logging.debug("Modbus scan progress: %d hosts checked", idx)
+        logging.warning("Modbus auto-discovery did not find any device on %s:%d", net, self.port)
+
     def ensure_connected(self) -> bool:
+        if not self.host:
+            self._discover_host()
+            if not self.host:
+                return False
         if self.connected and self.client.connected:
             return True
         self.connected = self.client.connect()

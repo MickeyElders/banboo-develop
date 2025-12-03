@@ -596,20 +596,9 @@ body {
                         <div class="coord-value" id="x-coordinate">245.8mm</div>
                     </div>
                     <div class="coord-item">
-                        <div class="coord-label">切割质量</div>
-                        <div class="coord-value" id="cut-quality" style="color: var(--success);">正常</div>
-                    </div>
-                    <div class="coord-item">
                         <div class="coord-label">刀片选择</div>
                         <div class="coord-value" id="blade-selection">双刀片</div>
                     </div>
-                </div>
-            </div>
-            <div class="hls-controls" style="margin-top:8px;">
-                <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="">
-                <div class="btn-row" style="margin-top:6px;">
-                    <button class="btn btn-accent" id="hls-play-btn">播放 HLS</button>
-                    <span id="webrtc-status" style="align-self:center;font-size:12px;color:var(--error);">未连接</span>
                 </div>
             </div>
         </div>
@@ -630,7 +619,6 @@ body {
                         <tr><td class="register-addr">40002</td><td>PLC 命令</td><td class="register-value" id="reg-40002">2</td></tr>
                         <tr><td class="register-addr">40003</td><td>坐标就绪</td><td class="register-value" id="reg-40003">1</td></tr>
                         <tr><td class="register-addr">40004-40005</td><td>X 坐标</td><td class="register-value" id="reg-40004">2458</td></tr>
-                        <tr><td class="register-addr">40006</td><td>切割质量</td><td class="register-value" id="reg-40006">0</td></tr>
                         <tr><td class="register-addr">40007-40008</td><td>心跳计数</td><td class="register-value" id="reg-40007">12345</td></tr>
                         <tr><td class="register-addr">40009</td><td>刀片编号</td><td class="register-value" id="reg-40009">3</td></tr>
                         <tr><td class="register-addr">40010</td><td>健康状态</td><td class="register-value" id="reg-40010">0</td></tr>
@@ -790,15 +778,7 @@ body {
     </div>
 
     <div id="webrtc-panel">
-        <h4>HLS 预览 <span id="hls-status">未连接</span></h4>
-        <video id="hls-video" autoplay playsinline muted controls style="width:100%;background:#000;border:1px solid var(--border);border-radius:6px;"></video>
-        <div style="margin-top:6px;">
-            <input id="hls-url" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-primary);" value="">
-            <button class="btn btn-accent" id="hls-open-btn" style="margin-top:6px;width:100%;">播放 / 重连</button>
-            <div style="margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.4;">
-                默认播放 MediaMTX 提供的 HLS：<code>http://&lt;设备&gt;:8888/deepstream/index.m3u8</code>。如浏览器不支持 HLS，请复制地址用 VLC/PotPlayer。
-            </div>
-        </div>
+        <!-- HLS preview removed per requirement -->
     </div>
 
     <!-- Calibration floating panel -->
@@ -896,38 +876,45 @@ body {
             document.getElementById('reg-40007').textContent = systemState.heartbeat;
         }
 
-        function updateJetsonInfo() {
-            jetsonData.cpu.usage = 35 + Math.random() * 30;
-            jetsonData.gpu.usage = 20 + Math.random() * 35;
-            jetsonData.memory.used = 1.8 + Math.random() * 3.0;
-            jetsonData.cpu.temp = 45 + Math.random() * 12;
-            jetsonData.gpu.temp = 42 + Math.random() * 10;
-            jetsonData.thermal.temp = Math.max(jetsonData.cpu.temp, jetsonData.gpu.temp);
-            jetsonData.fan.speed = 1800 + Math.random() * 600;
-            jetsonData.power.draw = 7 + Math.random() * 5;
+        async function updateJetsonInfo() {
+            try {
+                const res = await fetch('/api/jetson');
+                if (!res.ok) throw new Error(res.statusText);
+                const d = await res.json();
+                jetsonData.cpu.usage = d.cpu || 0;
+                jetsonData.gpu.usage = d.gpu || 0;
+                jetsonData.memory.total = (d.mem_total_mb || 0) / 1024;
+                jetsonData.memory.used = (d.mem_used_mb || 0) / 1024;
+                jetsonData.cpu.temp = d.temp_c || 0;
+                jetsonData.gpu.temp = d.temp_c || 0;
+                jetsonData.thermal.temp = d.temp_c || 0;
+                jetsonData.fan.speed = d.fan_rpm || 0;
+                jetsonData.power.draw = d.power_w || 0;
+                jetsonData.emc.freq = d.emc_mhz || 0;
+                const up = d.uptime_sec || 0;
+                jetsonData.uptime.days = Math.floor(up / 86400);
+                jetsonData.uptime.hours = Math.floor((up % 86400) / 3600);
+                jetsonData.uptime.minutes = Math.floor((up % 3600) / 60);
 
-            document.getElementById('cpu-usage').textContent = jetsonData.cpu.usage.toFixed(1) + '%';
-            document.getElementById('cpu-progress').style.width = jetsonData.cpu.usage + '%';
-            document.getElementById('gpu-usage').textContent = jetsonData.gpu.usage.toFixed(1) + '%';
-            document.getElementById('gpu-progress').style.width = jetsonData.gpu.usage + '%';
+                document.getElementById('cpu-usage').textContent = jetsonData.cpu.usage.toFixed(1) + '%';
+                document.getElementById('cpu-progress').style.width = jetsonData.cpu.usage + '%';
+                document.getElementById('gpu-usage').textContent = jetsonData.gpu.usage.toFixed(1) + '%';
+                document.getElementById('gpu-progress').style.width = jetsonData.gpu.usage + '%';
 
-            const memPercent = (jetsonData.memory.used / jetsonData.memory.total) * 100;
-            document.getElementById('memory-usage').textContent = jetsonData.memory.used.toFixed(1) + 'GB/' + jetsonData.memory.total + 'GB';
-            document.getElementById('memory-progress').style.width = memPercent + '%';
+                const memPercent = (jetsonData.memory.used / Math.max(jetsonData.memory.total, 0.001)) * 100;
+                document.getElementById('memory-usage').textContent = jetsonData.memory.used.toFixed(1) + 'GB/' + jetsonData.memory.total.toFixed(1) + 'GB';
+                document.getElementById('memory-progress').style.width = memPercent + '%';
 
-            document.getElementById('thermal-temp').textContent = jetsonData.thermal.temp.toFixed(0) + '°C';
-            document.getElementById('temp-progress').style.width = jetsonData.thermal.temp + '%';
-            document.getElementById('fan-speed').textContent = jetsonData.fan.speed.toFixed(0) + ' RPM';
-            document.getElementById('power-draw').textContent = jetsonData.power.draw.toFixed(1) + 'W';
-            document.getElementById('emc-freq').textContent = jetsonData.emc.freq + ' MHz';
-            document.getElementById('uptime').textContent = `${jetsonData.uptime.days}d ${jetsonData.uptime.hours}h ${jetsonData.uptime.minutes}m`;
-            document.getElementById('perf-mode').textContent = performanceState.mode;
-
-            aiModelData.inferenceTime = 12 + Math.random() * 8;
-            aiModelData.detectionFps = 24 + Math.random() * 8;
-            document.getElementById('model-inference').textContent = aiModelData.inferenceTime.toFixed(1) + 'ms';
-            document.getElementById('inference-time').textContent = aiModelData.inferenceTime.toFixed(1) + 'ms';
-            document.getElementById('detection-fps').textContent = aiModelData.detectionFps.toFixed(1);
+                document.getElementById('thermal-temp').textContent = jetsonData.thermal.temp.toFixed(0) + '°C';
+                document.getElementById('temp-progress').style.width = jetsonData.thermal.temp + '%';
+                document.getElementById('fan-speed').textContent = jetsonData.fan.speed.toFixed(0) + ' RPM';
+                document.getElementById('power-draw').textContent = jetsonData.power.draw.toFixed(1) + 'W';
+                document.getElementById('emc-freq').textContent = jetsonData.emc.freq + ' MHz';
+                document.getElementById('uptime').textContent = `${jetsonData.uptime.days}d ${jetsonData.uptime.hours}h ${jetsonData.uptime.minutes}m`;
+                document.getElementById('perf-mode').textContent = performanceState.mode;
+            } catch (e) {
+                console.warn('jetson info fetch failed', e);
+            }
         }
 
         function updateWorkflowStatus(step) {
@@ -1018,40 +1005,80 @@ body {
             }
         }
 
-        function applyWifiConfig() {
-            wifiState.ssid = document.getElementById('wifi-ssid').value;
-            wifiState.password = document.getElementById('wifi-password').value;
-            wifiState.security = document.getElementById('wifi-security').value;
-            wifiState.mode = document.getElementById('wifi-mode-select').value;
-            wifiState.ip = document.getElementById('wifi-ip').value;
-            wifiState.mask = document.getElementById('wifi-mask').value;
-            wifiState.gateway = document.getElementById('wifi-gateway').value;
-            wifiState.dns = document.getElementById('wifi-dns').value;
-            wifiState.status = wifiState.mode === 'dhcp' ? '获取地址中' : '静态配置已应用';
-            updateWifiUI();
-            alert(`[预览] Wi-Fi 已应用: ${wifiState.ssid} (${wifiState.mode})`);
-        }
-
-        function checkWifi() {
-            const ok = Math.random() > 0.15;
-            wifiState.status = ok ? '已连接' : '断开 / 待检查';
-            wifiState.rssi = ok ? -50 - Math.floor(Math.random() * 15) : null;
-            updateWifiUI();
-            alert(ok ? '[预览] Wi-Fi 连通正常' : '[预览] Wi-Fi 未连接，请检查天线/密码/信道');
-        }
-
-        function restartWifiService() {
-            alert('[预览] 重启 Wi-Fi 服务，请在实际部署中调用 network manager/connman/自定义脚本');
-        }
-
-        function handlePowerAction(action) {
-            const labelMap = {
-                reboot: '重启 Jetson',
-                shutdown: '安全关机',
-                restartService: '重启推理/Modbus 服务'
+        
+                async function applyWifiConfig() {
+            const payload = {
+                ssid: document.getElementById('wifi-ssid').value,
+                password: document.getElementById('wifi-password').value,
+                security: document.getElementById('wifi-security').value,
+                mode: document.getElementById('wifi-mode-select').value,
+                ip: document.getElementById('wifi-ip').value,
+                mask: document.getElementById('wifi-mask').value,
+                gateway: document.getElementById('wifi-gateway').value,
+                dns: document.getElementById('wifi-dns').value,
             };
-            const message = `[预览] ${labelMap[action]} 已触发。实际部署请调用 systemd/DBus/脚本。`;
-            alert(message);
+            try {
+                const res = await fetch('/api/wifi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'apply failed');
+                wifiState.ssid = payload.ssid;
+                wifiState.password = payload.password;
+                wifiState.security = payload.security;
+                wifiState.mode = payload.mode;
+                wifiState.ip = data.ip || payload.ip;
+                wifiState.mask = payload.mask;
+                wifiState.gateway = data.gateway || payload.gateway;
+                wifiState.dns = data.dns || payload.dns;
+                wifiState.status = '已应用';
+                wifiState.rssi = data.wifi && data.wifi.signal ? -Math.abs(parseInt(data.wifi.signal, 10)) : null;
+                updateWifiUI();
+                alert('Wi-Fi 已应用');
+            } catch (e) {
+                alert('Wi-Fi 应用失败: ' + e.message);
+            }
+        }
+
+        async function checkWifi() {
+            try {
+                const res = await fetch('/api/wifi');
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'wifi status error');
+                wifiState.ssid = data.wifi && data.wifi.ssid ? data.wifi.ssid : '';
+                wifiState.rssi = data.wifi && data.wifi.signal ? -Math.abs(parseInt(data.wifi.signal, 10)) : null;
+                wifiState.status = data.connection ? '已连接' : '未连接';
+                wifiState.ip = data.ip || '';
+                wifiState.gateway = data.gateway || '';
+                wifiState.dns = data.dns || '';
+                updateWifiUI();
+            } catch (e) {
+                alert('Wi-Fi 状态查询失败: ' + e.message);
+            }
+        }
+
+        async function restartWifiService() {
+            try {
+                const res = await fetch('/api/wifi/restart', { method: 'POST' });
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'restart failed');
+                alert('Wi-Fi 已重启');
+            } catch (e) {
+                alert('Wi-Fi 重启失败: ' + e.message);
+            }
+        }
+
+        async function handlePowerAction(action) {
+            try {
+                const res = await fetch('/api/power', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.stderr || data.error || 'command failed');
+                alert('命令已执行: ' + action);
+            } catch (e) {
+                alert('执行失败: ' + e.message);
+            }
         }
 
         function openSettingsModal() {
@@ -1063,44 +1090,50 @@ body {
         }
 
         document.getElementById('start-btn').addEventListener('click', () => {
-            systemState.isRunning = true;
-            systemState.plcCommand = 1;
-            document.getElementById('start-btn').disabled = true;
-            document.getElementById('start-btn').textContent = '运行中';
-            updateWorkflowStatus(1);
-            simulateWorkflow();
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start' }) })
+                .then(() => {
+                    systemState.isRunning = true;
+                    document.getElementById('start-btn').disabled = true;
+                    document.getElementById('start-btn').textContent = '运行中';
+                    updateWorkflowStatus(1);
+                })
+                .catch(() => {});
         });
 
         document.getElementById('pause-btn').addEventListener('click', () => {
-            if (!systemState.isRunning) return;
-            systemState.isRunning = false;
-            systemState.plcCommand = 5;
-            document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').textContent = '恢复运行';
-            updateModbusRegisters();
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pause' }) })
+                .then(() => {
+                    systemState.isRunning = false;
+                    document.getElementById('start-btn').disabled = false;
+                    document.getElementById('start-btn').textContent = '恢复运行';
+                })
+                .catch(() => {});
         });
 
         document.getElementById('stop-btn').addEventListener('click', () => {
-            systemState.isRunning = false;
-            systemState.plcCommand = 0;
-            systemState.coordinateReady = 0;
-            document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').textContent = '启动系统';
-            updateWorkflowStatus(1);
-            updateModbusRegisters();
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) })
+                .then(() => {
+                    systemState.isRunning = false;
+                    document.getElementById('start-btn').disabled = false;
+                    document.getElementById('start-btn').textContent = '启动系统';
+                    updateWorkflowStatus(1);
+                })
+                .catch(() => {});
         });
 
         document.getElementById('emergency-btn').addEventListener('click', () => {
-            systemState.isRunning = false;
-            systemState.plcCommand = 6;
-            ['step-1','step-2','step-3','step-4','step-5'].forEach(id => {
-                const el = document.getElementById(id);
-                el.classList.remove('active', 'completed');
-                el.style.borderColor = 'var(--error)';
-                el.style.color = 'var(--error)';
-            });
-            document.getElementById('current-process').textContent = '🚨 紧急停机';
-            updateModbusRegisters();
+            fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'emergency_stop' }) })
+                .then(() => {
+                    systemState.isRunning = false;
+                    ['step-1','step-2','step-3','step-4','step-5'].forEach(id => {
+                        const el = document.getElementById(id);
+                        el.classList.remove('active', 'completed');
+                        el.style.borderColor = 'var(--error)';
+                        el.style.color = 'var(--error)';
+                    });
+                    document.getElementById('current-process').textContent = '🚨 紧急停机';
+                })
+                .catch(() => {});
         });
 
         document.getElementById('power-btn').addEventListener('click', openSettingsModal);
@@ -1130,16 +1163,48 @@ body {
             updateWifiUI();
         });
 
+        // --- Live data from backend instead of simulation ---
+        const applyStatus = (data) => {
+            if (!data) return;
+            const hb = data.heartbeat ?? 0;
+            document.getElementById('heartbeat-counter').textContent = hb;
+            document.getElementById('plc-response').textContent = data.plc?.ready ? 'ready' : 'busy';
+            if (data.fps !== undefined) {
+                document.getElementById('detection-fps').textContent = data.fps.toFixed(1);
+                const infMs = data.fps > 0 ? (1000.0 / data.fps) : 0;
+                document.getElementById('inference-time').textContent = infMs.toFixed(1) + 'ms';
+            }
+            if (data.last_detection) {
+                const x = data.last_detection.x_mm ?? 0;
+                document.getElementById('x-coordinate').textContent = `${x.toFixed(1)}mm`;
+                const pos = Math.max(0, Math.min(100, (x / 1000) * 100));
+                document.getElementById('cutting-position').style.left = `${pos}%`;
+                const conf = data.last_detection.conf ?? 0;
+                document.getElementById('cut-quality').textContent = conf > 0.5 ? '正常' : '低置信度';
+            }
+            if (data.plc) {
+                document.getElementById('reg-40002').textContent = data.plc.state ?? 0;
+                document.getElementById('reg-40003').textContent = data.plc.ready ? 1 : 0;
+                const pos = data.plc.pos ?? 0;
+                document.getElementById('reg-40004').textContent = Math.round(pos * 10);
+            }
+        };
+
+        const pollStatus = async () => {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw new Error(res.statusText);
+                const data = await res.json();
+                applyStatus(data);
+            } catch (e) {
+                console.warn('status poll failed', e);
+            }
+        };
+
         updateWifiUI();
-        updateModbusRegisters();
         updateWorkflowStatus(1);
-        setInterval(updateHeartbeat, 500);
-        setInterval(updateJetsonInfo, 2000);
-        setInterval(() => {
-            const responseTime = Math.floor(Math.random() * 10) + 8;
-            document.getElementById('response-time').textContent = responseTime + 'ms';
-            document.getElementById('plc-response').textContent = responseTime + 'ms';
-        }, 1000);
+        pollStatus();
+        setInterval(pollStatus, 1000);
 
         // WebRTC over WebSocket (port 8080)
         (function initWebRTC() {
@@ -1196,51 +1261,6 @@ body {
                     setStatus('信令解析失败');
                 }
             };
-        })();
-
-        // HLS 预览（依赖 mediamtx 提供的 HLS）
-        (function initHlsPreview() {
-            const statusEl = document.getElementById('hls-status');
-            const videoEl = document.getElementById('hls-video');
-            const urlInput = document.getElementById('hls-url');
-            const btn = document.getElementById('hls-open-btn');
-            if (!statusEl || !videoEl || !urlInput || !btn) return;
-
-            const setStatus = (txt, good = false) => {
-                statusEl.textContent = txt;
-                statusEl.style.color = good ? '#4caf50' : '#f44336';
-            };
-
-            const play = (src) => {
-                if (!src) return;
-                setStatus('加载中...');
-                if (window.Hls && window.Hls.isSupported()) {
-                    const hls = new Hls({ lowLatencyMode: true });
-                    hls.loadSource(src);
-                    hls.attachMedia(videoEl);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        videoEl.play().catch(() => {});
-                        setStatus('已连接', true);
-                    });
-                    hls.on(Hls.Events.ERROR, (_, data) => {
-                        console.error('hls error', data);
-                        setStatus('播放错误');
-                    });
-                } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                    videoEl.src = src;
-                    videoEl.addEventListener('loadedmetadata', () => {
-                        videoEl.play().catch(() => {});
-                        setStatus('已连接', true);
-                    }, { once: true });
-                } else {
-                    setStatus('浏览器不支持 HLS，请用外部播放器');
-                }
-            };
-
-            const defaultUrl = `http://${location.hostname || '127.0.0.1'}:8888/deepstream/index.m3u8`;
-            urlInput.value = defaultUrl;
-            btn.addEventListener('click', () => play(urlInput.value.trim()));
-            play(defaultUrl);
         })();
 
         // Calibration API integration

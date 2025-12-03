@@ -22,11 +22,15 @@ calibration:
   belt_speed_mm_s: 0.0
 
 modbus:
-  host: "192.168.1.100"
+  # If you know the PLC IP, fill host. If empty and auto_discover=true, the code will scan scan_subnet for port 502.
+  host: ""
   port: 502
   slave_id: 1
   poll_ms: 50
   write_heartbeat_ms: 20
+  auto_discover: true
+  scan_subnet: "192.168.1.0/24"   # adjust to the direct-link subnet
+  scan_timeout_ms: 75             # TCP connect timeout per host during scan
   addr_cam_to_plc:
     comm: 0x07D0    # D2000
     status: 0x07D1  # D2001
