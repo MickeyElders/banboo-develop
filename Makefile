@@ -27,16 +27,18 @@ QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6
  https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz \
  https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
 
-# HLS repack services (RTSP->HLS) for browser playback
+# HLS repack services (RTSP->HLS) for browser playback (optional)
 HLS_SERVICES ?= deploy/systemd/bamboo-rtsp-hls.service deploy/systemd/bamboo-hls-http.service
 HLS_SCRIPT ?= deploy/scripts/hls-repack.sh
+# JSMpeg WebSocket broadcaster (RTSP->JPEG over WS)
+JSMPEG_SERVICE ?= deploy/systemd/bamboo-jsmpeg.service
 
 # Media gateway (RTSP->WebRTC) prebuilt binary
 MEDIAMTX_BIN ?= /usr/local/bin/mediamtx
 MEDIAMTX_VER ?= 1.8.1
 MEDIAMTX_URL ?= https://github.com/bluenviron/mediamtx/releases/download/v$(MEDIAMTX_VER)/mediamtx_linux_arm64.tar.gz
 
-.PHONY: all deps configure build run install install-config install-models service hls-services start stop restart status logs deploy redeploy clean distclean
+.PHONY: all deps configure build run install install-config install-models service hls-services jsmpeg-service start stop restart status logs deploy redeploy clean distclean
 .PHONY: mediamtx
 
 all: build
@@ -99,6 +101,13 @@ hls-services: install
 	@sudo systemctl enable --now bamboo-rtsp-hls.service
 	@sudo systemctl restart bamboo-rtsp-hls.service
 
+jsmpeg-service: install
+	@echo "Installing $(JSMPEG_SERVICE) to /etc/systemd/system/$${JSMPEG_SERVICE##*/}"
+	@sudo install -D -m644 $(JSMPEG_SERVICE) /etc/systemd/system/$${JSMPEG_SERVICE##*/}
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable --now bamboo-jsmpeg.service
+	@sudo systemctl restart bamboo-jsmpeg.service
+
 configure: deps
 	@if [ ! -d "$(BUILD_DIR)" ]; then mkdir -p "$(BUILD_DIR)"; fi
 	cd "$(BUILD_DIR)" && cmake $(CMAKE_FLAGS) ..
@@ -146,10 +155,10 @@ logs:
 	@sudo journalctl -u $(SERVICE_NAME) -n 200 -f
 
 # Default deploy: only UI service (RTSP output). HLS is optional via `make hls-services`.
-deploy: service
+deploy: service jsmpeg-service
 
-# Full redeploy: stop -> clean -> build/install -> restart UI service
-redeploy: stop clean service
+# Full redeploy: stop -> clean -> build/install -> restart UI + JSMpeg service
+redeploy: stop clean service jsmpeg-service
 
 clean:
 	@rm -rf "$(BUILD_DIR)"
