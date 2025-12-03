@@ -7,7 +7,7 @@ SERVICE ?= bamboo-vision.service
 JETSON_PY ?= /usr/local/python
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
-TRT_WORKSPACE ?= 2048  # MiB workspace for TensorRT engine build
+TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
 
 .PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy
 
