@@ -30,15 +30,16 @@ QT6_MIRRORS ?= https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.6/6.6
 # HLS repack services (RTSP->HLS) for browser playback (optional)
 HLS_SERVICES ?= deploy/systemd/bamboo-rtsp-hls.service deploy/systemd/bamboo-hls-http.service
 HLS_SCRIPT ?= deploy/scripts/hls-repack.sh
-# JSMpeg WebSocket broadcaster (RTSP->JPEG over WS)
-JSMPEG_SERVICE ?= deploy/systemd/bamboo-jsmpeg.service
-
-# Media gateway (RTSP->WebRTC) prebuilt binary
+# MediaMTX gateway (RTSP->HLS/WebRTC)
+MEDIAMTX_SERVICE ?= deploy/systemd/mediamtx.service
+MEDIAMTX_CONFIG ?= deploy/mediamtx.yml
+MEDIAMTX_CONFIG_DEST ?= /etc/mediamtx/mediamtx.yml
+# MediaMTX prebuilt binary
 MEDIAMTX_BIN ?= /usr/local/bin/mediamtx
 MEDIAMTX_VER ?= 1.8.1
 MEDIAMTX_URL ?= https://github.com/bluenviron/mediamtx/releases/download/v$(MEDIAMTX_VER)/mediamtx_linux_arm64.tar.gz
 
-.PHONY: all deps configure build run install install-config install-models service hls-services jsmpeg-service start stop restart status logs deploy redeploy clean distclean
+.PHONY: all deps configure build run install install-config install-models service hls-services mediamtx-service start stop restart status logs deploy redeploy clean distclean
 .PHONY: mediamtx
 
 all: build
@@ -101,6 +102,15 @@ hls-services: install
 	@sudo systemctl enable --now bamboo-rtsp-hls.service
 	@sudo systemctl restart bamboo-rtsp-hls.service
 
+mediamtx-service: mediamtx
+	@echo "Installing $(MEDIAMTX_SERVICE) to /etc/systemd/system/$${MEDIAMTX_SERVICE##*/}"
+	@sudo install -D -m644 $(MEDIAMTX_SERVICE) /etc/systemd/system/$${MEDIAMTX_SERVICE##*/}
+	@echo "Installing MediaMTX config to $(MEDIAMTX_CONFIG_DEST)"
+	@sudo install -D -m644 $(MEDIAMTX_CONFIG) $(MEDIAMTX_CONFIG_DEST)
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable --now mediamtx.service
+	@sudo systemctl restart mediamtx.service
+
 jsmpeg-service: install
 	@echo "Installing $(JSMPEG_SERVICE) to /etc/systemd/system/$${JSMPEG_SERVICE##*/}"
 	@sudo install -D -m644 $(JSMPEG_SERVICE) /etc/systemd/system/$${JSMPEG_SERVICE##*/}
@@ -155,10 +165,10 @@ logs:
 	@sudo journalctl -u $(SERVICE_NAME) -n 200 -f
 
 # Default deploy: only UI service (RTSP output). HLS is optional via `make hls-services`.
-deploy: service jsmpeg-service
+deploy: service mediamtx-service
 
-# Full redeploy: stop -> clean -> build/install -> restart UI + JSMpeg service
-redeploy: stop clean service jsmpeg-service
+# Full redeploy: stop -> clean -> build/install -> restart UI + MediaMTX gateway
+redeploy: stop clean service mediamtx-service
 
 clean:
 	@rm -rf "$(BUILD_DIR)"

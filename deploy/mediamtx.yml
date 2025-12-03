@@ -1,24 +1,17 @@
-# Minimal MediaMTX config for LAN HLS/FLV playback from local RTSP
+# MediaMTX config: pull local RTSP and expose HLS for browser playback
 logLevel: info
 
-# Enable HLS for video.js/hls.js
 hls:
   enabled: yes
-  # fMP4 works better with modern browsers; keep segments short for lower latency
   variant: fmp4
   segmentCount: 3
   segmentDuration: 2s
   allowOrigin: "*"
 
-# Enable HTTP-FLV for flv.js if需要
-flv:
-  enabled: yes
-
 webrtc:
-  enabled: no  # we are using HLS/FLV instead; set to yes if you later want WebRTC
+  enabled: no
 
 paths:
-  cam:
-    # Pull from local RTSP served by bamboo-qt-ui
+  deepstream:
     source: rtsp://127.0.0.1:8554/deepstream
     sourceOnDemand: yes
