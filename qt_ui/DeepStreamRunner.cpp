@@ -282,8 +282,8 @@ bool DeepStreamRunner::buildServer(const std::string &launch) {
 
     m_factory = gst_rtsp_media_factory_new();
     gst_rtsp_media_factory_set_launch(m_factory, launch.c_str());
-    // Do not share a single pipeline across clients; avoid clashes with WebRTC loopback client.
-    gst_rtsp_media_factory_set_shared(m_factory, FALSE);
+    // Share a single pipeline across clients to avoid multiple nvarguscamerasrc instances (Argus is exclusive).
+    gst_rtsp_media_factory_set_shared(m_factory, TRUE);
     std::cout << "[deepstream] RTSP launch: " << launch << std::endl;
 
     gst_rtsp_mount_points_add_factory(mounts, "/deepstream", m_factory);
