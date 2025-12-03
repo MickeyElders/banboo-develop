@@ -57,6 +57,8 @@ install-jetson:
 		ls -l "$$SRC_DIR"; \
 		exit 1; \
 	fi; \
+	# Ensure python package dir exists to satisfy install step
+	mkdir -p "$$SRC_DIR/utils/python/jetson"; \
 	mkdir -p "$$SRC_DIR/build"; \
 	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	cmake --build "$$SRC_DIR/build" -- -j$$(nproc); \
