@@ -8,10 +8,11 @@ from pathlib import Path
 import jetson.utils as ju
 
 from .config_loader import load_config
-from .pipeline import build_net, build_outputs, pixel_to_mm
+from .pipeline import build_net, build_outputs
 from .shared_state import SharedState
 from .modbus import ModbusBridge
 from .http_server import start_http_server
+from .calibration import CalibrationManager
 
 
 def main():
@@ -33,6 +34,7 @@ def main():
     cam_uri = cam_cfg.get("pipeline") or "csi://0"
     out_cfg = cfg.get("output", {})
     calib_cfg = cfg.get("calibration", {})
+    calib_manager = CalibrationManager(calib_cfg, cfg_path if cfg_path.exists() else None)
     if args.headless:
         out_cfg = dict(out_cfg)
         out_cfg["hdmi"] = False
@@ -47,7 +49,8 @@ def main():
     state = SharedState()
     mb = ModbusBridge(cfg, state)
     base_dir = Path(__file__).resolve().parent.parent
-    start_http_server(cfg, state, base_dir)
+    start_http_server(cfg, state, base_dir, calib_manager)
+    state.update_calibration(calib_manager.get())
 
     running = True
 
@@ -80,7 +83,7 @@ def main():
         conf = 0.0
         if best_det:
             cx = 0.5 * (best_det.Left + best_det.Right)
-            x_mm = pixel_to_mm(cx, calib_cfg)
+            x_mm = calib_manager.to_mm(cx)
             result_code = 1
             conf = best_det.Confidence
             font.OverlayText(

@@ -28,16 +28,6 @@ def build_net(cfg: dict):
     return net
 
 
-def pixel_to_mm(x_px: float, calib: dict) -> float:
-    """
-    Simple pixel->mm conversion.
-    Replace with real calibration later.
-    """
-    px_to_mm = float(calib.get("pixel_to_mm", 1.0))
-    offset_mm = float(calib.get("offset_mm", 0.0))
-    return x_px * px_to_mm + offset_mm
-
-
 def build_outputs(out_cfg: dict):
     outputs = []
     if out_cfg.get("hdmi", True):

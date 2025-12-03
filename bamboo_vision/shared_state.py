@@ -13,6 +13,7 @@ class SharedState:
             "plc": {"state": 0, "ready": False, "pos": 0.0},
             "fps": 0.0,
             "heartbeat": 0,
+            "calibration": {},
             "ts": time.time(),
         }
 
@@ -38,6 +39,11 @@ class SharedState:
     def update_fps(self, fps):
         with self.lock:
             self.data["fps"] = fps
+            self.data["ts"] = time.time()
+
+    def update_calibration(self, calib: dict):
+        with self.lock:
+            self.data["calibration"] = calib
             self.data["ts"] = time.time()
 
     def snapshot(self):

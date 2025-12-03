@@ -38,6 +38,70 @@ body {
 #webrtc-panel { display: none; }
 #webrtc-status { font-size: 12px; color: var(--error); }
 
+        /* Calibration floating panel */
+        .calib-panel {
+            position: fixed;
+            right: 14px;
+            bottom: 14px;
+            width: 320px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+            padding: 12px;
+            z-index: 999;
+        }
+        .calib-panel h4 {
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--accent);
+        }
+        .calib-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .calib-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .calib-field label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .calib-field input {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-primary);
+        }
+        .calib-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .calib-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+        .calib-btn.primary {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .calib-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+        }
+
         .main-container {
             display: grid;
             grid-template-areas:
@@ -737,6 +801,34 @@ body {
         </div>
     </div>
 
+    <!-- Calibration floating panel -->
+    <div class="calib-panel">
+        <h4>在线标定</h4>
+        <div class="calib-grid">
+            <div class="calib-field">
+                <label for="calib-pxmm">像素→毫米</label>
+                <input id="calib-pxmm" type="number" step="0.0001" placeholder="pixel_to_mm">
+            </div>
+            <div class="calib-field">
+                <label for="calib-offset">坐标偏移(mm)</label>
+                <input id="calib-offset" type="number" step="0.1" placeholder="offset_mm">
+            </div>
+            <div class="calib-field">
+                <label for="calib-latency">延迟(ms)</label>
+                <input id="calib-latency" type="number" step="1" placeholder="latency_ms">
+            </div>
+            <div class="calib-field">
+                <label for="calib-speed">皮带速度(mm/s)</label>
+                <input id="calib-speed" type="number" step="1" placeholder="belt_speed_mm_s">
+            </div>
+        </div>
+        <div class="calib-actions">
+            <button class="calib-btn" id="calib-refresh">刷新</button>
+            <button class="calib-btn primary" id="calib-save">保存</button>
+        </div>
+        <div id="calib-status" style="margin-top:6px;font-size:12px;color:var(--text-secondary);">等待操作</div>
+    </div>
+
     <script>
         // 模拟数据（预览用，Qt 版本请绑定真实接口）
         const systemState = {
@@ -1149,6 +1241,72 @@ body {
             urlInput.value = defaultUrl;
             btn.addEventListener('click', () => play(urlInput.value.trim()));
             play(defaultUrl);
+        })();
+
+        // Calibration API integration
+        (function initCalibration() {
+            const pxmm = document.getElementById('calib-pxmm');
+            const offset = document.getElementById('calib-offset');
+            const latency = document.getElementById('calib-latency');
+            const speed = document.getElementById('calib-speed');
+            const statusEl = document.getElementById('calib-status');
+            const btnRefresh = document.getElementById('calib-refresh');
+            const btnSave = document.getElementById('calib-save');
+            if (!pxmm || !offset || !latency || !speed || !statusEl) return;
+
+            const setStatus = (txt, good = false) => {
+                statusEl.textContent = txt;
+                statusEl.style.color = good ? '#4caf50' : 'var(--text-secondary)';
+            };
+
+            const fill = (calib) => {
+                if (!calib) return;
+                pxmm.value = calib.pixel_to_mm ?? '';
+                offset.value = calib.offset_mm ?? '';
+                latency.value = calib.latency_ms ?? '';
+                speed.value = calib.belt_speed_mm_s ?? '';
+            };
+
+            const refresh = async () => {
+                try {
+                    const res = await fetch('/api/status');
+                    if (!res.ok) throw new Error(res.statusText);
+                    const data = await res.json();
+                    fill(data.calibration || (data.data && data.data.calibration));
+                    setStatus('已刷新', true);
+                } catch (e) {
+                    console.error('calibration refresh failed', e);
+                    setStatus('刷新失败');
+                }
+            };
+
+            const save = async () => {
+                const payload = {
+                    pixel_to_mm: parseFloat(pxmm.value || '0'),
+                    offset_mm: parseFloat(offset.value || '0'),
+                    latency_ms: parseFloat(latency.value || '0'),
+                    belt_speed_mm_s: parseFloat(speed.value || '0'),
+                    persist: true
+                };
+                try {
+                    const res = await fetch('/api/calibration', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) throw new Error(res.statusText);
+                    const data = await res.json();
+                    fill(data.calibration);
+                    setStatus('已保存', true);
+                } catch (e) {
+                    console.error('calibration save failed', e);
+                    setStatus('保存失败');
+                }
+            };
+
+            btnRefresh?.addEventListener('click', refresh);
+            btnSave?.addEventListener('click', save);
+            refresh();
         })();
 
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
