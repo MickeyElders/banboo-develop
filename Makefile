@@ -125,19 +125,13 @@ logs:
 	sudo journalctl -u $(SERVICE) -n 200 -f
 
 clean-install:
-	# Stop service first (if unit still known to systemd)
-	if systemctl list-units --all --type=service | grep -q "$(SERVICE)"; then \
-		sudo systemctl stop $(SERVICE) 2>/dev/null || true; \
-		sudo systemctl kill $(SERVICE) 2>/dev/null || true; \
-		sudo systemctl disable $(SERVICE) 2>/dev/null || true; \
-		sudo systemctl reset-failed $(SERVICE) 2>/dev/null || true; \
-	fi
-	# Fallback: kill any stray python process running bamboo_vision.app
-	pgrep -f "bamboo_vision.app" >/dev/null 2>&1 && sudo pkill -f "bamboo_vision.app" || true
-	# Remove unit file and reload
+	sudo systemctl stop $(SERVICE) 2>/dev/null || true
+	sudo systemctl kill $(SERVICE) 2>/dev/null || true
+	sudo systemctl disable $(SERVICE) 2>/dev/null || true
+	sudo systemctl reset-failed $(SERVICE) 2>/dev/null || true
+	sudo pkill -f "bamboo_vision.app" 2>/dev/null || true
 	sudo rm -f /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
-	# Remove install prefix
 	sudo rm -rf "$(PREFIX)"
 
 redeploy: clean-install install
