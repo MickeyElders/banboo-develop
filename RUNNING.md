@@ -41,13 +41,10 @@ make service
 - 编码器：默认硬件 `nvv4l2h264enc`；若缺失则自动降级为软件 `x264enc`（需 `gstreamer1.0-plugins-good/bad`、`libx264-dev`）。`GST_PLUGIN_PATH` 在程序内默认包含 `/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra`。
 - 备用：`output.raw_udp` 可启用原始帧 UDP 输出（RGBA->I420，无编码）到 `raw_udp_host:raw_udp_port`，便于外部轻量 x264/RTSP 组合（例如：`udpsrc ! videoconvert ! x264enc ! rtph264pay ! rtspclientsink`）。
 
-## 外部软编推流示例（开启 raw_udp 后）
+## 外部软编推流示例（raw_udp 默认开启）
 ```bash
-gst-launch-1.0 -v \
-  udpsrc port=5600 caps="video/x-raw,format=I420,width=1280,height=720,framerate=30/1" ! \
-  queue ! x264enc tune=zerolatency bitrate=4000 speed-preset=superfast key-int-max=30 ! \
-  rtph264pay config-interval=1 pt=96 ! \
-  rtspclientsink location=rtsp://127.0.0.1:8554/live
+UDP_PORT=5600 WIDTH=1280 HEIGHT=720 FPS=30 RTSP_URL=rtsp://127.0.0.1:8554/live \
+  bash deploy/scripts/udp_x264_rtsp.sh
 ```
 - 简单像素→毫米换算（按 `runtime.yaml`），写入 Modbus：  
   - 相机→PLC：0x07D0 通信请求保持 1，0x07D1 状态=1，0x07D2 坐标(float，高低字)，0x07D4 结果码(1 成功/2 失败)。  

@@ -123,10 +123,10 @@ def main():
         state.update_fps(net.GetNetworkFPS())
         mb.step(now)
         if now - last_publish >= publish_interval:
-            mb.publish_detection(x_mm, result_code)
+        mb.publish_detection(x_mm, result_code)
             last_publish = now
 
-        if not outputs[0].IsStreaming():
+        if outputs and not outputs[0].IsStreaming():
             running = False
 
     mb.close()

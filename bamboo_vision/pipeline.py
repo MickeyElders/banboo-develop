@@ -39,7 +39,7 @@ def build_net(cfg: dict):
     if output_bbox:
         extra_args += ["--output-bbox", output_bbox]
     logging.info("Loading model: %s", model_path)
-    net = ji.detectNet(model="", threshold=threshold, argv=extra_args)
+    net = ji.detectNet(model=str(model_path), threshold=threshold, argv=extra_args)
     net.SetNMS(nms)
     return net
 
@@ -64,36 +64,33 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         use_x264 = True
         have_x264 = True  # assume available in good plugins
 
+    if use_x264:
+        logging.warning("nvv4l2h264enc not available; will try software x264enc for RTSP")
     if out_cfg.get("hdmi", True):
         try:
             outputs.append(ju.videoOutput("display://0"))
         except Exception as e:
             logging.warning("Failed to create HDMI output (display://0): %s; continuing without HDMI", e)
-    if out_cfg.get("rtsp", True):
+    # RTSP output (force x264 if NVENC missing)
+    rtsp_enabled = out_cfg.get("rtsp", False) or out_cfg.get("software_rtsp", False)
+    if rtsp_enabled:
         rtsp_uri = out_cfg.get("rtsp_uri", "rtsp://@:8554/live")
-        argv = []
-        if use_x264:
-            if not have_x264:
-                logging.error("Neither nvv4l2h264enc nor x264enc is available; RTSP output disabled")
-            else:
-                logging.warning("nvv4l2h264enc not available; falling back to software x264enc for RTSP")
-                os.environ["GST_ENCODER"] = "x264enc"
-                if "?" in rtsp_uri:
-                    rtsp_uri = rtsp_uri + "&encoder=x264enc"
-                else:
-                    rtsp_uri = rtsp_uri + "?encoder=x264enc"
-                argv = ["--encoder=x264enc"]
-                try:
-                    outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
-                except Exception as e:
-                    logging.error("Failed to create RTSP output with x264 (%s): %s", rtsp_uri, e)
+        # choose encoder: prefer NVENC when present, otherwise x264
+        encoder = out_cfg.get("rtsp_encoder")
+        if not encoder:
+            encoder = "x264enc" if use_x264 else "nvv4l2h264enc"
+        if encoder == "x264enc" and not have_x264:
+            logging.error("x264enc not available; RTSP disabled")
         else:
+            uri = rtsp_uri + ("&" if "?" in rtsp_uri else "?") + f"encoder={encoder}"
             try:
-                outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
+                outputs.append(ju.videoOutput(uri))
+                logging.info("RTSP enabled via %s (encoder=%s)", rtsp_uri, encoder)
             except Exception as e:
-                logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
+                logging.error("Failed to create RTSP output (%s): %s", uri, e)
+
+    # Raw UDP (optional)
     if out_cfg.get("raw_udp", False):
-        # Build a lightweight raw UDP pipeline (no encoder), user can transcode externally (x264/RTSP server)
         width = cam_cfg.get("width", 1280)
         height = cam_cfg.get("height", 720)
         fr = cam_cfg.get("fps", 30)

@@ -38,10 +38,11 @@ modbus:
     servo_pos: 0x0836  # D2102 (float hi/lo)
 
 output:
-  hdmi: true
-  rtsp: false            # NVENC 缺失时关闭内置 RTSP，使用 raw_udp + 外部软编
+  hdmi: false
+  rtsp: false            # enable built-in RTSP server (uses HW encoder when available)
   rtsp_uri: "rtsp://@:8554/live"
-  raw_udp: false         # 若需外部软编推流，改为 true 并用下方端口
+  software_rtsp: true    # force software x264 RTSP (ignores HW encoder when true)
+  raw_udp: false
   raw_udp_host: "127.0.0.1"
   raw_udp_port: 5600
 

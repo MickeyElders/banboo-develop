@@ -12,6 +12,7 @@ deps:
 	$(PIP) install -r requirements.txt
 	$(MAKE) check-jetson
 	$(MAKE) check-gst
+	$(MAKE) build-engine
 
 check-jetson:
 	@if PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) -c "import jetson.inference, jetson.utils" >/dev/null 2>&1; then \
@@ -65,7 +66,7 @@ check-gst:
 	else \
 		echo "Installing GStreamer encoder deps (nvv4l2h264enc/x264enc)..."; \
 		miss=""; \
-		for pkg in nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils nvidia-l4t-jetson-multimedia-api gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-tools; do \
+		for pkg in nvidia-l4t-gstreamer nvidia-l4t-multimedia nvidia-l4t-multimedia-utils nvidia-l4t-jetson-multimedia-api gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-tools; do \
 			dpkg -s $$pkg >/dev/null 2>&1 || miss="$$miss $$pkg"; \
 		done; \
 		if [ -n "$$miss" ]; then sudo apt-get update && sudo apt-get install -y $$miss; fi; \
@@ -80,6 +81,17 @@ check-gst:
 	if ! gst-inspect-1.0 x264enc >/dev/null 2>&1; then \
 		echo "Installing x264 encoder support"; \
 		dpkg -s libx264-dev >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y libx264-dev); \
+	fi
+
+build-engine:
+	@if [ -f models/best.engine ]; then \
+		echo "TensorRT engine already exists (models/best.engine)"; \
+	else \
+		echo "Building TensorRT engine from models/best.onnx (FP16)"; \
+		trtexec --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --workspace=2048 || true; \
+		if [ ! -f models/best.engine ]; then \
+			echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; \
+		fi; \
 	fi
 
 run:
