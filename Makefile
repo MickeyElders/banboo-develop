@@ -32,13 +32,23 @@ install-jetson:
 	else \
 		echo "Build deps OK (python3-dev/python3-numpy)"; \
 	fi; \
+	NUMPY_INC=$$(python3 - <<'PY' 2>/dev/null || true\nimport numpy, os\nprint(numpy.get_include())\nPY); \
+	NUMPY_LIBDIR=$$(python3 - <<'PY' 2>/dev/null || true\nimport numpy, os\nprint(os.path.join(os.path.dirname(numpy.__file__), 'core', 'lib'))\nPY); \
+	if [ -z "$$NUMPY_INC" ] || [ -z "$$NUMPY_LIBDIR" ]; then echo "numpy not found, please install python3-numpy"; exit 1; fi; \
+	if [ -f "$$NUMPY_LIBDIR/libnpymath.a" ]; then \
+		for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
+			if [ ! -f $$dst ]; then sudo ln -sf "$$NUMPY_LIBDIR/libnpymath.a" $$dst; fi; \
+		done; \
+	else \
+		echo "libnpymath.a not found under $$NUMPY_LIBDIR"; exit 1; \
+	fi; \
 	tmpdir=$$(mktemp -d); \
 	echo "Cloning jetson-inference into $$tmpdir"; \
 	cd $$tmpdir; \
 	git clone --recursive https://github.com/dusty-nv/jetson-inference.git; \
 	cd jetson-inference; \
 	mkdir -p build && cd build; \
-	cmake .. -DENABLE_PYTHON=ON; \
+	cmake .. -DENABLE_PYTHON=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NUMPY_LIBDIR/libnpymath.a"; \
 	make -j$$(nproc); \
 	sudo make install; \
 	sudo ldconfig; \
