@@ -43,7 +43,7 @@ Environment=HTTP_PORT=8080
 Environment=DS_AUTOSTART=1
 Environment=DS_SINK=rtsp
 # Force minimal RTSP (no nvinfer/OSD) to validate video; remove to restore full pipeline
-Environment="DS_PIPELINE=( nvarguscamerasrc sensor-id=0 do-timestamp=true ! video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! queue ! nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! queue ! nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! h264parse config-interval=1 ! queue ! rtph264pay name=pay0 pt=96 )"
+Environment="DS_PIPELINE=( nvarguscamerasrc sensor-id=0 do-timestamp=true ! video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1,format=NV12 ! nvvideoconvert ! video/x-raw(memory:NVMM),format=NV12 ! nvv4l2h264enc insert-sps-pps=true bitrate=8000000 maxperf-enable=1 iframeinterval=30 preset-level=1 control-rate=1 ! h264parse config-interval=1 ! rtph264pay name=pay0 pt=96 )"
 Environment=DS_FORCE_SW_ENC=1
 # Expose RTSP for external gateway (mediamtx) and disable in-process WebRTC instability
 Environment=RTSP_SOURCE=rtsp://127.0.0.1:8554/deepstream
