@@ -52,6 +52,7 @@ install-jetson:
 		exit 1; \
 	fi; \
 	cd $(JI_SRC); \
+	git submodule update --init --recursive; \
 	mkdir -p build && cd build; \
 	cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	make -j$$(nproc); \
