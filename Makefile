@@ -52,22 +52,6 @@ install-jetson:
 		if [ ! -f $$dst ]; then sudo ln -sf "$$NPYMATH" $$dst; fi; \
 	done; \
 	SRC_DIR="$(JI_SRC_ABS)"; \
-	TMP_CLONE=""; \
-	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
-		if [ -f "jetson-inference-master/CMakeLists.txt" ]; then \
-			SRC_DIR=$$(abspath jetson-inference-master); \
-		else \
-			echo "WARN: $$SRC_DIR missing CMakeLists.txt; cloning fresh repo (recursive)"; \
-			TMP_CLONE=$$(mktemp -d); \
-			git clone --recursive https://github.com/dusty-nv/jetson-inference.git "$$TMP_CLONE/jetson-inference"; \
-			SRC_DIR="$$TMP_CLONE/jetson-inference"; \
-		fi; \
-	fi; \
-	if [ -d "$$SRC_DIR/.git" ]; then \
-		git -C "$$SRC_DIR" submodule update --init --recursive; \
-	else \
-		echo "WARN: $$SRC_DIR has no .git; assuming submodules already present"; \
-	fi; \
 	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
 		echo "ERROR: $$SRC_DIR does not contain CMakeLists.txt"; \
 		ls -l "$$SRC_DIR"; \
@@ -78,7 +62,6 @@ install-jetson:
 	cmake --build "$$SRC_DIR/build" -- -j$$(nproc); \
 	sudo cmake --install "$$SRC_DIR/build"; \
 	sudo ldconfig; \
-	if [ -n "$$TMP_CLONE" ]; then rm -rf "$$TMP_CLONE"; fi; \
 	echo "jetson-inference install completed"
 
 check-gst:
