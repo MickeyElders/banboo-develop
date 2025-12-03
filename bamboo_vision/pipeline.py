@@ -1,4 +1,5 @@
 import logging
+import subprocess
 import jetson.inference as ji
 import jetson.utils as ju
 
@@ -31,6 +32,16 @@ def build_net(cfg: dict):
 
 def build_outputs(out_cfg: dict):
     outputs = []
+    # Detect encoder availability
+    use_x264 = False
+    try:
+        if subprocess.run(["gst-inspect-1.0", "nvv4l2h264enc"],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+            use_x264 = True
+    except FileNotFoundError:
+        # gst-inspect missing; be conservative and use x264
+        use_x264 = True
+
     if out_cfg.get("hdmi", True):
         try:
             outputs.append(ju.videoOutput("display://0"))
@@ -38,5 +49,9 @@ def build_outputs(out_cfg: dict):
             logging.warning("Failed to create HDMI output (display://0): %s; continuing without HDMI", e)
     if out_cfg.get("rtsp", True):
         rtsp_uri = out_cfg.get("rtsp_uri", "rtsp://@:8554/live")
-        outputs.append(ju.videoOutput(rtsp_uri))
+        argv = []
+        if use_x264:
+            logging.warning("nvv4l2h264enc not available; falling back to software x264enc for RTSP")
+            argv = ["--encoder=x264enc"]
+        outputs.append(ju.videoOutput(rtsp_uri, argv=argv))
     return outputs
