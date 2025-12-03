@@ -4,6 +4,7 @@ import signal
 import sys
 import time
 from pathlib import Path
+import os
 
 import jetson.utils as ju
 
@@ -35,9 +36,10 @@ def main():
     out_cfg = cfg.get("output", {})
     calib_cfg = cfg.get("calibration", {})
     calib_manager = CalibrationManager(calib_cfg, cfg_path if cfg_path.exists() else None)
-    if args.headless:
+    if args.headless or os.environ.get("HEADLESS") == "1" or not os.environ.get("DISPLAY"):
         out_cfg = dict(out_cfg)
         out_cfg["hdmi"] = False
+        logging.info("Headless mode detected; disabling HDMI output")
 
     input_stream = ju.videoSource(cam_uri)
     outputs = build_outputs(out_cfg)

@@ -1,3 +1,4 @@
+import logging
 import jetson.inference as ji
 import jetson.utils as ju
 
@@ -31,7 +32,10 @@ def build_net(cfg: dict):
 def build_outputs(out_cfg: dict):
     outputs = []
     if out_cfg.get("hdmi", True):
-        outputs.append(ju.videoOutput("display://0"))
+        try:
+            outputs.append(ju.videoOutput("display://0"))
+        except Exception as e:
+            logging.warning("Failed to create HDMI output (display://0): %s; continuing without HDMI", e)
     if out_cfg.get("rtsp", True):
         rtsp_uri = out_cfg.get("rtsp_uri", "rtsp://@:8554/live")
         outputs.append(ju.videoOutput(rtsp_uri))
