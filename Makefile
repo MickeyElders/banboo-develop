@@ -11,22 +11,15 @@ deps:
 	$(MAKE) check-jetson
 
 check-jetson:
-	@PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) - <<'PY' || exit $$?
+	PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) - <<'PY'
 import sys
 try:
-    import jetson.inference  # noqa: F401
-    import jetson.utils      # noqa: F401
-    print("jetson-inference bindings OK")
-except Exception as e:
-    sys.stderr.write(
-        "\nMissing jetson-inference Python bindings.\n"
-        "Install from https://github.com/dusty-nv/jetson-inference :\n"
-        "  git clone --recursive https://github.com/dusty-nv/jetson-inference\n"
-        "  cd jetson-inference && mkdir build && cd build\n"
-        "  cmake .. -DENABLE_PYTHON=ON && make -j$$(nproc) && sudo make install && sudo ldconfig\n"
-        "Ensure PYTHONPATH includes /usr/local/python (set JETSON_PY in Makefile if different).\n"
-    )
-    sys.exit(1)
+	import jetson.inference  # noqa: F401
+	import jetson.utils      # noqa: F401
+	print("jetson-inference bindings OK")
+except Exception:
+	sys.stderr.write("Missing jetson-inference Python bindings.\n")
+	sys.exit(1)
 PY
 
 run:
