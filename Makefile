@@ -15,15 +15,15 @@ deps:
 
 check-jetson:
 	@PYTHONPATH="$(JETSON_PY):$$PYTHONPATH" $(PY) - <<'PY'
-import sys
-try:
-    import jetson.inference  # noqa: F401
-    import jetson.utils      # noqa: F401
-    print("jetson-inference bindings OK")
-except Exception:
-    sys.stderr.write("Missing jetson-inference Python bindings.\n")
-    sys.exit(1)
-PY
+	import sys
+	try:
+		import jetson.inference  # noqa: F401
+		import jetson.utils      # noqa: F401
+		print("jetson-inference bindings OK")
+	except Exception:
+		sys.stderr.write("Missing jetson-inference Python bindings.\n")
+		sys.exit(1)
+	PY
 
 run:
 	$(PY) -m bamboo_vision.app --config config/runtime.yaml
