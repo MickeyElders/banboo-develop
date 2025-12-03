@@ -95,7 +95,7 @@ build-engine:
 			echo "ERROR: trtexec not found at $(TRTEXEC). Set TRTEXEC=/path/to/trtexec"; \
 			exit 1; \
 		fi; \
-		"$(TRTEXEC)" --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --workspace=$(TRT_WORKSPACE) || true; \
+		"$(TRTEXEC)" --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --memPoolSize=workspace:$(TRT_WORKSPACE)MiB || true; \
 		if [ ! -f models/best.engine ]; then echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; fi; \
 	fi
 
