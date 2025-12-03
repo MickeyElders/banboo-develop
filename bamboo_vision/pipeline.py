@@ -88,13 +88,13 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         host = out_cfg.get("raw_udp_host", "127.0.0.1")
         port = out_cfg.get("raw_udp_port", 5600)
         pipeline = (
-            f"gstreamer://appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
+            f"appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
             f"video/x-raw,format=RGBA,width={width},height={height},framerate={fr}/1 ! "
             "videoconvert ! video/x-raw,format=I420 ! "
             f"udpsink host={host} port={port} sync=false"
         )
         try:
-            outputs.append(ju.videoOutput(pipeline))
+            outputs.append(ju.videoOutput("gstreamer://" + pipeline))
             logging.info("Raw UDP output enabled to udp://%s:%d (RGBA->I420, no encoder)", host, port)
         except Exception as e:
             logging.error("Failed to create raw UDP output: %s", e)

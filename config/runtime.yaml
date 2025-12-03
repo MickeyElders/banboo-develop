@@ -9,12 +9,11 @@ camera:
 model:
   onnx: "models/best.onnx"
   engine: "models/best.engine"   # optional; leave blank to build on first run
-  labels: ""                      # optional labels.txt
+  labels: "config/labels.txt"     # optional labels.txt
   threshold: 0.50
   nms: 0.45
-  # input_blob: ""                # set if your ONNX blob names differ
-  # output_cvg: ""
-  # output_bbox: ""
+  input_blob: "images"            # YOLOv8 default
+  output_bbox: "output0"          # YOLOv8 default output
 
 calibration:
   pixel_to_mm: 1.0      # placeholder; replace after calibration
@@ -42,7 +41,7 @@ output:
   hdmi: true
   rtsp: false            # NVENC 缺失时关闭内置 RTSP，使用 raw_udp + 外部软编
   rtsp_uri: "rtsp://@:8554/live"
-  raw_udp: true
+  raw_udp: false         # 若需外部软编推流，改为 true 并用下方端口
   raw_udp_host: "127.0.0.1"
   raw_udp_port: 5600
 
