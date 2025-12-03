@@ -37,6 +37,9 @@ def build_net(cfg: dict):
     output_bbox = mcfg.get("output_bbox")
     if output_bbox:
         extra_args += [f"--output-bbox={output_bbox}"]
+    # If no coverage layer provided, reuse bbox to satisfy detectNet expectations for single-output models.
+    if not output_cvg and output_bbox:
+        extra_args += [f"--output-cvg={output_bbox}"]
     logging.info("Loading model: %s", model_path)
     net = ji.detectNet(argv=extra_args, threshold=threshold)
     net.SetNMS(nms)
