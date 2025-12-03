@@ -22,6 +22,8 @@ check-jetson:
 
 install-jetson:
 	@set -e; \
+	sudo apt-get update; \
+	sudo apt-get install -y python3-dev python3-numpy; \
 	tmpdir=$$(mktemp -d); \
 	echo "Cloning jetson-inference into $$tmpdir"; \
 	cd $$tmpdir; \
