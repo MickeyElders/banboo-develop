@@ -7,6 +7,8 @@ SRC_URL="rtsp://127.0.0.1:8554/deepstream"
 PLAYLIST_ROOT=""
 
 mkdir -p "${OUT_DIR}"
+# Clean stale outputs to force fresh playlist + segments
+rm -f "${OUT_DIR}/segment_"*.ts "${OUT_DIR}/stream.m3u8" 2>/dev/null || true
 # Precreate playlist to avoid 404 while pipeline spins up
 : > "${OUT_DIR}/stream.m3u8"
 
