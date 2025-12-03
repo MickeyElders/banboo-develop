@@ -129,9 +129,6 @@ clean-install:
 	sudo systemctl stop $(SERVICE) 2>/dev/null || true
 	sudo systemctl disable $(SERVICE) 2>/dev/null || true
 	sudo systemctl reset-failed $(SERVICE) 2>/dev/null || true
-	# Fallback: kill stray app process if any
-	sudo pkill -f "python3 -m bamboo_vision.app" 2>/dev/null || true
-	sudo pkill -f "bamboo_vision.app" 2>/dev/null || true
 	# Remove unit file and reload
 	sudo rm -f /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
