@@ -18,6 +18,10 @@ TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
 
 .PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy check-ji-source kiosk-deps kiosk-service
 deps: check-ji-source
+	@set -e; if ! $(PY) -m pip --version >/dev/null 2>&1; then \
+		echo "pip not found; installing python3-pip"; \
+		sudo apt-get update && sudo apt-get install -y python3-pip; \
+	fi
 	$(PIP) install -r requirements.txt
 	$(MAKE) install-jetson
 	$(MAKE) check-gst
