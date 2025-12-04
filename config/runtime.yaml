@@ -42,10 +42,11 @@ modbus:
     servo_pos: 0x0836  # D2102 (float hi/lo)
 
 output:
-  hdmi: true              # HDMI 本地预览（官方 videoOutput）
-  rtsp: true              # 官方 jetson.utils RTSP 输出（需要 NVENC 可用）
+  hdmi: false             # HDMI 本地预览（官方 videoOutput）
+  rtsp: true              # 官方 jetson.utils RTSP 输出；缺 NVENC 可用 software_rtsp
   rtsp_uri: "rtsp://@:8554/live"
-  software_rtsp: false    # 保持关闭，避免自建软编管线
+  software_rtsp: true     # 无 NVENC 时启用 x264 软编 RTSP（gstreamer）
+  rtsp_bitrate_kbps: 4000
 
 app:
   publish_interval_ms: 100

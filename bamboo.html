@@ -596,12 +596,13 @@ body {
         <div class="camera-panel">
             <div class="camera-title">
                 📹 实时检测画面
-                <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度 | RTSP 输出</span>
+                <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度 | RTSP/HLS 软编</span>
             </div>
             <div class="camera-canvas">
+                <video id="hls-video" autoplay playsinline muted controls style="display:none;"></video>
                 <div class="camera-placeholder" id="camera-placeholder">
                     <div>
-                        <div>竹材检测预览：使用 RTSP 播放 `rtsp://&lt;jetson_ip&gt;:8554/live`</div>
+                        <div>竹材检测预览：rtsp://&lt;jetson_ip&gt;:8554/live 或本地 HLS</div>
                         <small>推理时间 <span id="inference-time">15.3ms</span> · FPS <span id="detection-fps">28.5</span></small>
                     </div>
                 </div>
@@ -799,7 +800,7 @@ body {
     </div>
 
     <div id="webrtc-panel">
-        <!-- 空占位：官方管线仅输出 RTSP，浏览器请用外部播放器 -->
+        <!-- HLS 软编预览，使用 hls.js -->
     </div>
 
     <!-- Calibration floating panel -->
@@ -1126,6 +1127,55 @@ body {
             }
         }
 
+        function initHlsPlayer() {
+            const video = document.getElementById('hls-video');
+            const placeholder = document.getElementById('camera-placeholder');
+            if (!video) return;
+            const url = '/hls/index.m3u8';
+            let attached = false;
+            const attach = () => {
+                if (attached) return;
+                attached = true;
+                video.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+            };
+            const startPlayback = () => {
+                if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = url;
+                    video.play().catch(() => {});
+                    attach();
+                    showMessage('HLS 预览已连接', 'success');
+                    return true;
+                }
+                if (window.Hls) {
+                    const hls = new Hls({ lowLatencyMode: true });
+                    hls.on(Hls.Events.ERROR, (_, data) => {
+                        if (data && data.details !== 'bufferStalledError') {
+                            showMessage('预览流异常: ' + (data.details || ''), 'warn');
+                        }
+                    });
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+                    attach();
+                    showMessage('HLS 预览已连接', 'success');
+                    return true;
+                }
+                return false;
+            };
+            const probe = async () => {
+                try {
+                    const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
+                    if (!res.ok) throw new Error(res.statusText);
+                    if (!startPlayback()) {
+                        setTimeout(probe, 1000);
+                    }
+                } catch (_) {
+                    setTimeout(probe, 3000);
+                }
+            };
+            probe();
+        }
+
         function openSettingsModal() {
             document.getElementById('settings-modal').style.display = 'flex';
         }
@@ -1267,6 +1317,7 @@ body {
 
         updateWifiUI();
         updateWorkflowStatus(1);
+        initHlsPlayer();
         pollStatus();
         setInterval(pollStatus, 1000);
 
@@ -1400,5 +1451,6 @@ body {
 
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </body>
 </html>

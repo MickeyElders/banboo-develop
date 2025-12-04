@@ -68,7 +68,7 @@ def build_net(cfg: dict):
 
 def build_outputs(out_cfg: dict, cam_cfg: dict):
     outputs = []
-    # Detect encoder availability (for informational logging)
+    # Detect encoder availability (for RTSP/HLS decisions)
     try:
         env = os.environ.copy()
         env.setdefault("GST_PLUGIN_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra")
@@ -76,10 +76,11 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         env.setdefault("LD_LIBRARY_PATH", "/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:" + env.get("LD_LIBRARY_PATH", ""))
         have_nvenc = subprocess.run(["gst-inspect-1.0", "nvv4l2h264enc"],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode == 0
-        if not have_nvenc:
-            logging.warning("nvv4l2h264enc not available; RTSP may fail without hardware encoder.")
+        have_x264 = subprocess.run(["gst-inspect-1.0", "x264enc"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode == 0
     except FileNotFoundError:
-        have_nvenc = True  # assume system image includes it
+        have_nvenc = False
+        have_x264 = True  # assume software stack present
 
     # Prefer RTSP if enabled, otherwise HDMI; keep a single output to avoid multiple pipelines on CSI cameras.
     selected = None
@@ -91,12 +92,49 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         rtsp_uri = out_cfg.get("rtsp_uri", f"rtsp://{host}:{port}/{path}")
         if rtsp_uri.startswith("rtsp://@:"):
             rtsp_uri = "rtsp://127.0.0.1:" + rtsp_uri.split("@:", 1)[-1]
-        try:
-            selected = ju.videoOutput(rtsp_uri)
-            logging.info("RTSP enabled via jetson.utils videoOutput: %s", rtsp_uri)
-        except Exception as e:
-            logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
-            selected = None
+        if not have_nvenc and not out_cfg.get("software_rtsp", False):
+            logging.error("RTSP disabled: nvv4l2h264enc not present; enable software_rtsp or install NVENC packages.")
+        elif have_nvenc and not out_cfg.get("software_rtsp", False):
+            try:
+                selected = ju.videoOutput(rtsp_uri)
+                logging.info("RTSP enabled via jetson.utils videoOutput: %s", rtsp_uri)
+            except Exception as e:
+                logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
+                selected = None
+        elif out_cfg.get("software_rtsp", False):
+            if not have_x264:
+                logging.error("Software RTSP requested but x264enc missing; install gstreamer1.0-plugins-*/libx264.")
+            else:
+                width = cam_cfg.get("width", 1280)
+                height = cam_cfg.get("height", 720)
+                fr = cam_cfg.get("fps", 30)
+                bitrate = int(out_cfg.get("rtsp_bitrate_kbps", 4000))
+                hls_dir = Path(out_cfg.get("hls_dir", "/tmp/bamboo_hls"))
+                playlist_name = out_cfg.get("hls_playlist", "index.m3u8")
+                segment_name = out_cfg.get("hls_segment", "segment%05d.ts")
+                target_duration = int(out_cfg.get("hls_target_duration", 1))
+                max_files = int(out_cfg.get("hls_max_files", 6))
+                hls_dir.mkdir(parents=True, exist_ok=True)
+                playlist_path = (hls_dir / playlist_name).as_posix()
+                segment_path = (hls_dir / segment_name).as_posix()
+                # 同时输出 RTSP (UDP RTP) 与 HLS 文件，方便浏览器播放
+                pipeline = (
+                    f"appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
+                    f"video/x-raw,format=RGBA,width={width},height={height},framerate={fr}/1 ! "
+                    "videoconvert ! video/x-raw,format=I420 ! "
+                    f"x264enc tune=zerolatency speed-preset=ultrafast bitrate={bitrate} key-int-max={fr*2} ! tee name=t "
+                    "t. ! queue ! rtph264pay config-interval=1 pt=96 ! "
+                    f"udpsink host={host} port={port} sync=false "
+                    "t. ! queue ! h264parse ! mpegtsmux ! "
+                    f"hlssink target-duration={target_duration} max-files={max_files} "
+                    f'playlist-location="{playlist_path}" location="{segment_path}"'
+                )
+                try:
+                    selected = ju.videoOutput("gstreamer://" + pipeline)
+                    logging.info("Software RTSP+HLS via x264 (RTSP udp://%s:%d, HLS dir %s)", host, port, hls_dir)
+                except Exception as e:
+                    logging.error("Failed to create software RTSP output: %s", e)
+                    selected = None
 
     if selected is None and out_cfg.get("hdmi", True):
         try:
