@@ -22,7 +22,6 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
     host = http_cfg.get("host", "0.0.0.0")
     port = int(http_cfg.get("port", 8080))
     out_cfg = cfg.get("output", {})
-    hls_dir = Path(out_cfg.get("hls_dir", "/tmp/bamboo_hls")).resolve()
 
     app = Flask(__name__, static_folder=None)
 
@@ -37,14 +36,6 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
     @app.route("/api/status")
     def api_status():
         return jsonify(state.snapshot())
-
-    # Serve HLS segments if soft-encoded preview is enabled
-    if out_cfg.get("software_rtsp") and shutil.which("x264enc"):
-        hls_dir.mkdir(parents=True, exist_ok=True)
-
-        @app.route("/hls/<path:filename>")
-        def hls_static(filename):
-            return send_from_directory(hls_dir, filename)
 
     @app.route("/api/control", methods=["POST"])
     def api_control():

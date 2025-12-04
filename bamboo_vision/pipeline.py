@@ -8,22 +8,15 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY = _ROOT / "jetson-inference" / "python"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
-if _LOCAL_JI_PY.is_dir():
-    sys.path.insert(0, str(_LOCAL_JI_PY))
-_JETSON_PY = [
-    str(_LOCAL_JI_PY),
-    "/usr/local/lib/python3.10/dist-packages",
-    "/usr/local/lib/python3/dist-packages",
-    "/usr/local/python",
-]
-for _p in _JETSON_PY:
-    if os.path.isdir(_p) and _p not in sys.path:
-        sys.path.insert(0, _p)
+if not _LOCAL_JI_PY.is_dir():
+    print(f"Local jetson-inference python path missing: {_LOCAL_JI_PY}", file=sys.stderr)
+    sys.exit(1)
+sys.path.insert(0, str(_LOCAL_JI_PY))
 if _LOCAL_JI_LIB.is_dir():
     os.environ["LD_LIBRARY_PATH"] = str(_LOCAL_JI_LIB) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
-import jetson.inference as ji
-import jetson.utils as ju
+import jetson_inference as ji  # use local bindings; required
+import jetson_utils as ju
 
 
 def build_net(cfg: dict):
@@ -82,10 +75,20 @@ def build_outputs(out_cfg: dict, cam_cfg: dict):
         have_nvenc = False
         have_x264 = True  # assume software stack present
 
-    # Prefer RTSP if enabled, otherwise HDMI; keep a single output to avoid multiple pipelines on CSI cameras.
+    # Prefer WebRTC (built-in jetson.utils server) if enabled, then RTSP/HDMI; keep a single output to avoid multiple pipelines on CSI cameras.
     selected = None
+    webrtc_enabled = out_cfg.get("webrtc", False)
+    if webrtc_enabled:
+        uri = out_cfg.get("webrtc_uri", "webrtc://@:9000/live")
+        try:
+            selected = ju.videoOutput(uri)
+            logging.info("WebRTC enabled via jetson.utils videoOutput: %s", uri)
+        except Exception as e:
+            logging.error("Failed to create WebRTC output (%s): %s", uri, e)
+            selected = None
+
     rtsp_enabled = out_cfg.get("rtsp", False)
-    if rtsp_enabled:
+    if selected is None and rtsp_enabled:
         host = out_cfg.get("rtsp_host", "127.0.0.1")
         port = out_cfg.get("rtsp_port", 8554)
         path = out_cfg.get("rtsp_path", "live")

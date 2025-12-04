@@ -107,6 +107,11 @@ videoOutput* videoOutput::Create( const videoOptions& options )
 	{
 		output = gstEncoder::Create(options);
 	}
+	else if( uri.protocol == "gstreamer" )
+	{
+		// allow custom gstreamer pipelines passed through directly
+		output = gstEncoder::Create(options);
+	}
 	else if( uri.protocol == "display" )
 	{
 		output = glDisplay::Create(options);

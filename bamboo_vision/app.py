@@ -13,20 +13,16 @@ _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
 if _LOCAL_JI_PY.is_dir():
     sys.path.insert(0, str(_LOCAL_JI_PY))
 # Also prepend /usr/local installs as fallback
-_JETSON_PY = [
-    str(_LOCAL_JI_PY),
-    "/usr/local/lib/python3.10/dist-packages",
-    "/usr/local/lib/python3/dist-packages",
-    "/usr/local/python",
-]
-for _p in _JETSON_PY:
-    if os.path.isdir(_p) and _p not in sys.path:
-        sys.path.insert(0, _p)
+# Hard-require local jetson-inference python bindings to avoid mixing system installs
+if not _LOCAL_JI_PY.is_dir():
+    print(f"Local jetson-inference python path missing: {_LOCAL_JI_PY}", file=sys.stderr)
+    sys.exit(1)
+sys.path.insert(0, str(_LOCAL_JI_PY))
 # Ensure local libs are visible (for freshly built jetson-inference in-tree)
 if _LOCAL_JI_LIB.is_dir():
     os.environ["LD_LIBRARY_PATH"] = str(_LOCAL_JI_LIB) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
-import jetson.utils as ju
+import jetson_utils as ju  # use local bindings; required
 
 from .config_loader import load_config
 from .pipeline import build_net, build_outputs

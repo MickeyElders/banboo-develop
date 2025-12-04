@@ -307,10 +307,18 @@ bool gstEncoder::buildCapsStr()
 // buildLaunchStr
 bool gstEncoder::buildLaunchStr()
 {
+	// Support fully-specified custom pipelines by using the resource path when protocol is "gstreamer"
+	const URI& uri = GetResource();
+	if( uri.protocol == "gstreamer" && uri.location.size() > 0 )
+	{
+		mLaunchStr = uri.location;
+		LogVerbose(LOG_GSTREAMER "gstEncoder -- using custom pipeline from URI: %s\n", mLaunchStr.c_str());
+		return true;
+	}
+
 	std::ostringstream ss;
 	ss << "appsrc name=mysource is-live=true do-timestamp=true format=3 ! ";  // setup appsrc input element
 	
-	const URI& uri = GetResource();
 	std::string encoderOptions = "";
 
 	// select the encoder
