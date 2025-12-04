@@ -32,6 +32,8 @@ def build_net(cfg: dict):
             engine_path = base_dir / engine_path
     threshold = float(mcfg.get("threshold", 0.5))
     nms = float(mcfg.get("nms", 0.45))
+    input_shape = mcfg.get("input_shape")  # e.g. "1x3x960x960" to avoid dynamic profiles
+    workspace = mcfg.get("workspace_mb")
     extra_args = [f"--model={model_path}"]
     if engine_path:
         extra_args += [f"--engine={engine_path}"]
@@ -53,6 +55,10 @@ def build_net(cfg: dict):
     # If no coverage layer provided, reuse bbox to satisfy detectNet expectations for single-output models.
     if not output_cvg and output_bbox:
         extra_args += [f"--output-cvg={output_bbox}"]
+    if input_shape:
+        extra_args += [f"--input-shape={input_shape}"]
+    if workspace:
+        extra_args += [f"--workspace={workspace}"]
     logging.info("Loading model: %s", model_path)
     net = ji.detectNet(argv=extra_args, threshold=threshold)
     net.SetNMS(nms)

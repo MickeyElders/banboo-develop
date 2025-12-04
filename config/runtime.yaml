@@ -12,6 +12,8 @@ model:
   labels: "config/labels.txt"     # optional labels.txt
   threshold: 0.50
   nms: 0.45
+  input_shape: "1x3x960x960"      # fixed shape profile to avoid dynamic issues
+  workspace_mb: 2048              # TensorRT workspace (MiB)
   input_blob: "images"            # YOLOv8 default
   output_bbox: "output0"          # YOLOv8 default output
 
