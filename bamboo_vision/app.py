@@ -6,23 +6,25 @@ import time
 from pathlib import Path
 import os
 
-# Prefer local jetson-inference source tree (repo/jetson-inference/python) before system installs
+# Prefer local jetson-inference source/build tree
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY = _ROOT / "jetson-inference" / "python"
+_LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
-if _LOCAL_JI_PY.is_dir():
-    sys.path.insert(0, str(_LOCAL_JI_PY))
-# Also prepend /usr/local installs as fallback
-# Hard-require local jetson-inference python bindings to avoid mixing system installs
-if not _LOCAL_JI_PY.is_dir():
-    print(f"Local jetson-inference python path missing: {_LOCAL_JI_PY}", file=sys.stderr)
-    sys.exit(1)
-sys.path.insert(0, str(_LOCAL_JI_PY))
+
+for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY):
+    if _p.is_dir():
+        sys.path.insert(0, str(_p))
 # Ensure local libs are visible (for freshly built jetson-inference in-tree)
 if _LOCAL_JI_LIB.is_dir():
     os.environ["LD_LIBRARY_PATH"] = str(_LOCAL_JI_LIB) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
-import jetson_utils as ju  # use local bindings; required
+# Require local jetson_utils (no system fallback)
+try:
+    import jetson_utils as ju
+except ImportError:
+    print("jetson_utils not found in local jetson-inference build. Please run `make install-jetson` to build/install bindings.", file=sys.stderr)
+    sys.exit(1)
 
 from .config_loader import load_config
 from .pipeline import build_net, build_outputs

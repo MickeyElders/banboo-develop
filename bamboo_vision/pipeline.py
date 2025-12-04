@@ -8,15 +8,29 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY = _ROOT / "jetson-inference" / "python"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
-if not _LOCAL_JI_PY.is_dir():
-    print(f"Local jetson-inference python path missing: {_LOCAL_JI_PY}", file=sys.stderr)
-    sys.exit(1)
-sys.path.insert(0, str(_LOCAL_JI_PY))
+if _LOCAL_JI_PY.is_dir():
+    sys.path.insert(0, str(_LOCAL_JI_PY))
 if _LOCAL_JI_LIB.is_dir():
     os.environ["LD_LIBRARY_PATH"] = str(_LOCAL_JI_LIB) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
-import jetson_inference as ji  # use local bindings; required
-import jetson_utils as ju
+try:
+    import jetson_inference as ji  # prefer local bindings
+    import jetson_utils as ju
+except ImportError:
+    _fallback = [
+        "/usr/local/lib/python3.10/dist-packages",
+        "/usr/local/lib/python3/dist-packages",
+        "/usr/local/python",
+    ]
+    for _p in _fallback:
+        if os.path.isdir(_p) and _p not in sys.path:
+            sys.path.insert(0, _p)
+    try:
+        import jetson_inference as ji  # type: ignore
+        import jetson_utils as ju  # type: ignore
+    except ImportError:
+        print("jetson_inference/jetson_utils not found. Please build jetson-inference (make install-jetson) or install jetson-utils.", file=sys.stderr)
+        sys.exit(1)
 
 
 def build_net(cfg: dict):

@@ -9,9 +9,9 @@ KIOSK_URL ?= http://localhost:8080/bamboo.html
 JETSON_PY ?= /usr/local/python
 JI_SRC ?= jetson-inference
 JI_SRC_ABS := $(abspath $(JI_SRC))
-JI_BUILD ?= $(JI_SRC)/build
-JI_PY ?= $(JI_BUILD)/aarch64/lib/python
-JI_LIB ?= $(JI_BUILD)/aarch64/lib
+JI_BUILD ?= $(JI_SRC)/build/aarch64
+JI_PY ?= $(JI_BUILD)/python
+JI_LIB ?= $(JI_BUILD)/lib
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
@@ -67,12 +67,10 @@ install-jetson:
 	fi; \
 	# Ensure python package dir exists to satisfy install step
 	mkdir -p "$$SRC_DIR/utils/python/jetson"; \
-	mkdir -p "$$SRC_DIR/build"; \
-	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
-	cmake --build "$$SRC_DIR/build" -- -j$$(nproc); \
-	sudo cmake --install "$$SRC_DIR/build"; \
-	sudo ldconfig; \
-	echo "jetson-inference install completed"
+	mkdir -p "$$SRC_DIR/build/aarch64"; \
+	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
+	cmake --build "$$SRC_DIR/build/aarch64" -- -j$$(nproc); \
+	echo "jetson-inference local build completed (python libs in $$SRC_DIR/build/aarch64/python)"
 
 check-gst:
 	@set -e; \
