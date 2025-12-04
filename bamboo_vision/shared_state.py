@@ -14,7 +14,8 @@ class SharedState:
             "fps": 0.0,
             "heartbeat": 0,
             "calibration": {},
-            "control": {"running": False, "mode": "stop"},
+            "control": {"running": True, "mode": "start"},
+            "control_ts": time.time(),
             "ts": time.time(),
         }
 
@@ -50,7 +51,12 @@ class SharedState:
     def update_control(self, control: dict):
         with self.lock:
             self.data["control"].update(control)
+            self.data["control_ts"] = time.time()
             self.data["ts"] = time.time()
+
+    def get_control(self) -> dict:
+        with self.lock:
+            return dict(self.data["control"])
 
     def snapshot(self):
         with self.lock:

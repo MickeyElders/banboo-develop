@@ -12,24 +12,24 @@
         }
 
         :root {
-            --bg-main: #0f131a;
-            --bg-panel: #161b24;
-            --bg-spot: #1f2632;
-            --text-primary: #e8ecf3;
-            --text-secondary: #9aa4b5;
-            --accent: #ff7a3d;
-            --success: #4caf50;
-            --warning: #f2c14f;
-            --error: #f44336;
-            --border: #2a3342;
-            --jetson: #76b900;
-            --modbus: #2196f3;
-            --power: #c93dff;
+            --bg-main: #0b1220;
+            --bg-panel: #111a2b;
+            --bg-spot: #142035;
+            --text-primary: #e6f0ff;
+            --text-secondary: #9bb3d1;
+            --accent: #5cc8ff;
+            --success: #3ac88f;
+            --warning: #ffd166;
+            --error: #f45b69;
+            --border: #1d2a3d;
+            --jetson: #54d3a8;
+            --modbus: #4da3ff;
+            --power: #6b7cff;
         }
 
 body {
     font-family: 'Microsoft YaHei', 'Consolas', Arial, sans-serif;
-    background: radial-gradient(120% 120% at 20% 20%, #1a222f 0%, #0f131a 40%, #0c1016 100%);
+    background: radial-gradient(140% 140% at 15% 20%, #1a2f4f 0%, #0f1a2d 40%, #0b1220 85%), linear-gradient(120deg, rgba(92,200,255,0.08), rgba(0,0,0,0));
     color: var(--text-primary);
     min-height: 100vh;
     overflow: hidden;
@@ -37,6 +37,27 @@ body {
 
 #webrtc-panel { display: none; }
 #webrtc-status { font-size: 12px; color: var(--error); }
+
+        .message-bar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            min-width: 240px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all 0.2s ease;
+            z-index: 50;
+        }
+        .message-bar.show { opacity: 1; transform: translateY(0); }
+        .message-bar.success { border-color: var(--success); color: var(--success); }
+        .message-bar.error { border-color: var(--error); color: var(--error); }
+        .message-bar.warn { border-color: var(--warning); color: var(--warning); }
 
         /* Calibration floating panel */
         .calib-panel {
@@ -549,6 +570,7 @@ body {
     </style>
 </head>
 <body>
+    <div id="message-bar" class="message-bar"></div>
     <div class="main-container">
         <div class="header-panel">
             <div class="system-title">
@@ -574,13 +596,12 @@ body {
         <div class="camera-panel">
             <div class="camera-title">
                 📹 实时检测画面
-                <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度</span>
+                <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度 | RTSP 输出</span>
             </div>
             <div class="camera-canvas">
-                <video id="hls-video" autoplay playsinline muted controls style="display:none;"></video>
                 <div class="camera-placeholder" id="camera-placeholder">
                     <div>
-                        <div>竹材检测预览 / RTSP 或 GStreamer 流</div>
+                        <div>竹材检测预览：使用 RTSP 播放 `rtsp://&lt;jetson_ip&gt;:8554/live`</div>
                         <small>推理时间 <span id="inference-time">15.3ms</span> · FPS <span id="detection-fps">28.5</span></small>
                     </div>
                 </div>
@@ -654,7 +675,7 @@ body {
                     <div class="status-item"><span>EMC</span><span id="emc-freq">2133 MHz</span></div>
                     <div class="status-item"><span>运行时长</span><span id="uptime">2d 3h 15m</span></div>
                     <div class="status-item"><span>性能模式</span><span id="perf-mode">15W</span></div>
-                    <div class="status-item"><span>X11</span><span class="status-good">已禁用</span></div>
+                    <div class="status-item"><span>NVPModel</span><span id="nvpmodel">未知</span></div>
                 </div>
             </div>
 
@@ -778,7 +799,7 @@ body {
     </div>
 
     <div id="webrtc-panel">
-        <!-- HLS preview removed per requirement -->
+        <!-- 空占位：官方管线仅输出 RTSP，浏览器请用外部播放器 -->
     </div>
 
     <!-- Calibration floating panel -->
@@ -870,6 +891,24 @@ body {
             bladeType: ['未选', '刀片A', '刀片B', '双刀片']
         };
 
+        let messageTimer = null;
+        function showMessage(text, type = 'info') {
+            const bar = document.getElementById('message-bar');
+            if (!bar) {
+                console.log(text);
+                return;
+            }
+            bar.textContent = text;
+            bar.className = 'message-bar show';
+            if (type && type !== 'info') {
+                bar.classList.add(type === 'warning' ? 'warn' : type);
+            }
+            clearTimeout(messageTimer);
+            messageTimer = setTimeout(() => {
+                bar.classList.remove('show', 'success', 'error', 'warn');
+            }, 3200);
+        }
+
         function updateHeartbeat() {
             systemState.heartbeat += 1;
             document.getElementById('heartbeat-counter').textContent = systemState.heartbeat;
@@ -891,6 +930,9 @@ body {
                 jetsonData.fan.speed = d.fan_rpm || 0;
                 jetsonData.power.draw = d.power_w || 0;
                 jetsonData.emc.freq = d.emc_mhz || 0;
+                const nvp = d.nvpmodel || performanceState.mode;
+                const nvpEl = document.getElementById('nvpmodel');
+                performanceState.mode = nvp;
                 const up = d.uptime_sec || 0;
                 jetsonData.uptime.days = Math.floor(up / 86400);
                 jetsonData.uptime.hours = Math.floor((up % 86400) / 3600);
@@ -906,12 +948,15 @@ body {
                 document.getElementById('memory-progress').style.width = memPercent + '%';
 
                 document.getElementById('thermal-temp').textContent = jetsonData.thermal.temp.toFixed(0) + '°C';
-                document.getElementById('temp-progress').style.width = jetsonData.thermal.temp + '%';
-                document.getElementById('fan-speed').textContent = jetsonData.fan.speed.toFixed(0) + ' RPM';
+                const tempPercent = Math.min(100, Math.max(0, jetsonData.thermal.temp));
+                document.getElementById('temp-progress').style.width = tempPercent + '%';
+                const fanVal = jetsonData.fan.speed;
+                document.getElementById('fan-speed').textContent = fanVal > 0 ? `${fanVal.toFixed(0)} RPM` : '-';
                 document.getElementById('power-draw').textContent = jetsonData.power.draw.toFixed(1) + 'W';
                 document.getElementById('emc-freq').textContent = jetsonData.emc.freq + ' MHz';
                 document.getElementById('uptime').textContent = `${jetsonData.uptime.days}d ${jetsonData.uptime.hours}h ${jetsonData.uptime.minutes}m`;
-                document.getElementById('perf-mode').textContent = performanceState.mode;
+                document.getElementById('perf-mode').textContent = nvp;
+                if (nvpEl) nvpEl.textContent = nvp || '未知';
             } catch (e) {
                 console.warn('jetson info fetch failed', e);
             }
@@ -1032,9 +1077,9 @@ body {
                 wifiState.status = '已应用';
                 wifiState.rssi = data.wifi && data.wifi.signal ? -Math.abs(parseInt(data.wifi.signal, 10)) : null;
                 updateWifiUI();
-                alert('Wi-Fi 已应用');
+                showMessage('Wi-Fi 已应用', 'success');
             } catch (e) {
-                alert('Wi-Fi 应用失败: ' + e.message);
+                showMessage('Wi-Fi 应用失败: ' + e.message, 'error');
             }
         }
 
@@ -1051,7 +1096,7 @@ body {
                 wifiState.dns = data.dns || '';
                 updateWifiUI();
             } catch (e) {
-                alert('Wi-Fi 状态查询失败: ' + e.message);
+                showMessage('Wi-Fi 状态查询失败: ' + e.message, 'warn');
             }
         }
 
@@ -1060,9 +1105,9 @@ body {
                 const res = await fetch('/api/wifi/restart', { method: 'POST' });
                 const data = await res.json();
                 if (!data.ok) throw new Error(data.error || 'restart failed');
-                alert('Wi-Fi 已重启');
+                showMessage('Wi-Fi 已重启', 'success');
             } catch (e) {
-                alert('Wi-Fi 重启失败: ' + e.message);
+                showMessage('Wi-Fi 重启失败: ' + e.message, 'error');
             }
         }
 
@@ -1075,9 +1120,9 @@ body {
                 });
                 const data = await res.json();
                 if (!data.ok) throw new Error(data.stderr || data.error || 'command failed');
-                alert('命令已执行: ' + action);
+                showMessage('命令已执行: ' + action, 'success');
             } catch (e) {
-                alert('执行失败: ' + e.message);
+                showMessage('执行失败: ' + e.message, 'error');
             }
         }
 
@@ -1096,6 +1141,7 @@ body {
                     document.getElementById('start-btn').disabled = true;
                     document.getElementById('start-btn').textContent = '运行中';
                     updateWorkflowStatus(1);
+                    showMessage('已发送启动指令', 'success');
                 })
                 .catch(() => {});
         });
@@ -1106,6 +1152,7 @@ body {
                     systemState.isRunning = false;
                     document.getElementById('start-btn').disabled = false;
                     document.getElementById('start-btn').textContent = '恢复运行';
+                    showMessage('已暂停推理/输出', 'warn');
                 })
                 .catch(() => {});
         });
@@ -1117,6 +1164,7 @@ body {
                     document.getElementById('start-btn').disabled = false;
                     document.getElementById('start-btn').textContent = '启动系统';
                     updateWorkflowStatus(1);
+                    showMessage('已停止推理/输出', 'warn');
                 })
                 .catch(() => {});
         });
@@ -1132,6 +1180,7 @@ body {
                         el.style.color = 'var(--error)';
                     });
                     document.getElementById('current-process').textContent = '🚨 紧急停机';
+                    showMessage('已触发紧急停机', 'error');
                 })
                 .catch(() => {});
         });
@@ -1151,7 +1200,7 @@ body {
             btn.addEventListener('click', () => {
                 performanceState.mode = btn.dataset.mode;
                 updateJetsonInfo();
-                alert(`[预览] 性能模式切换到 ${btn.dataset.mode}，实际部署请调用 nvpmodel`);
+                showMessage(`[预览] 性能模式切换到 ${btn.dataset.mode}，实际部署请调用 nvpmodel`, 'warn');
             });
         });
 
@@ -1169,6 +1218,21 @@ body {
             const hb = data.heartbeat ?? 0;
             document.getElementById('heartbeat-counter').textContent = hb;
             document.getElementById('plc-response').textContent = data.plc?.ready ? 'ready' : 'busy';
+            if (data.control) {
+                const running = !!data.control.running;
+                const mode = data.control.mode || 'stop';
+                const startBtn = document.getElementById('start-btn');
+                if (startBtn) {
+                    startBtn.disabled = running;
+                    startBtn.textContent = running ? '运行中' : (mode === 'pause' ? '恢复运行' : '启动系统');
+                }
+                const procEl = document.getElementById('current-process');
+                if (!running && mode === 'emergency' && procEl) {
+                    procEl.textContent = '🚨 紧急停机';
+                }
+                const sysReg = document.getElementById('reg-40001');
+                if (sysReg) sysReg.textContent = running ? 1 : 0;
+            }
             if (data.fps !== undefined) {
                 document.getElementById('detection-fps').textContent = data.fps.toFixed(1);
                 const infMs = data.fps > 0 ? (1000.0 / data.fps) : 0;
@@ -1294,9 +1358,11 @@ body {
                     const data = await res.json();
                     fill(data.calibration || (data.data && data.data.calibration));
                     setStatus('已刷新', true);
+                    showMessage('标定参数已刷新', 'success');
                 } catch (e) {
                     console.error('calibration refresh failed', e);
                     setStatus('刷新失败');
+                    showMessage('标定刷新失败: ' + e.message, 'warn');
                 }
             };
 
@@ -1316,11 +1382,14 @@ body {
                     });
                     if (!res.ok) throw new Error(res.statusText);
                     const data = await res.json();
+                    if (!data.ok) throw new Error('persist failed');
                     fill(data.calibration);
                     setStatus('已保存', true);
+                    showMessage('标定参数已保存', 'success');
                 } catch (e) {
                     console.error('calibration save failed', e);
                     setStatus('保存失败');
+                    showMessage('标定保存失败: ' + e.message, 'error');
                 }
             };
 
@@ -1331,6 +1400,5 @@ body {
 
         console.log('AI竹节识别切割系统 - 无头版预览界面已加载');
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </body>
 </html>

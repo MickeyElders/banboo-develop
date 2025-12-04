@@ -1,0 +1,19 @@
+[Unit]
+Description=Bamboo Vision HDMI Kiosk
+After=network.target bamboo-vision.service
+Requires=bamboo-vision.service
+
+[Service]
+Type=simple
+User=@USER@
+Environment=KIOSK_URL=@URL@
+Environment=SESSION_SCRIPT=@PREFIX@/bin/kiosk-session.sh
+Environment=DISPLAY=:0
+Environment=HOME=/home/@USER@
+Environment=XAUTHORITY=/home/@USER@/.Xauthority
+ExecStart=@PREFIX@/bin/kiosk-startx.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

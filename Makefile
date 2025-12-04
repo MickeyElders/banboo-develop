@@ -4,6 +4,8 @@ PY ?= python3
 PIP ?= $(PY) -m pip
 PREFIX ?= /opt/bamboo-vision
 SERVICE ?= bamboo-vision.service
+KIOSK_USER ?= ubuntu
+KIOSK_URL ?= http://localhost:8080/bamboo.html
 JETSON_PY ?= /usr/local/python
 JI_SRC ?= jetson-inference
 JI_SRC_ABS := $(abspath $(JI_SRC))
@@ -14,13 +16,19 @@ JI_LIB ?= $(JI_BUILD)/aarch64/lib
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
 
-.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy
-
-deps:
+.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy check-ji-source kiosk-deps kiosk-service
+deps: check-ji-source
 	$(PIP) install -r requirements.txt
 	$(MAKE) install-jetson
 	$(MAKE) check-gst
 	$(MAKE) build-engine
+
+check-ji-source:
+	@if [ ! -f "$(JI_SRC_ABS)/CMakeLists.txt" ]; then \
+		echo "ERROR: jetson-inference source missing at $(JI_SRC_ABS)"; \
+		echo "Clone https://github.com/dusty-nv/jetson-inference into $(JI_SRC_ABS) or override JI_SRC=<path>"; \
+		exit 1; \
+	fi
 
 check-jetson:
 	@if PYTHONPATH="$(JI_PY):$(JETSON_PY):$$PYTHONPATH" LD_LIBRARY_PATH="$(JI_LIB):$$LD_LIBRARY_PATH" $(PY) -c "import jetson.inference, jetson.utils" >/dev/null 2>&1; then \
@@ -144,3 +152,23 @@ clean-install:
 	sudo rm -rf "$(PREFIX)"
 
 redeploy: clean-install install
+
+kiosk-deps:
+	@set -e; \
+	missing=""; \
+	for pkg in xserver-xorg xinit openbox chromium-browser x11-xserver-utils; do \
+		dpkg -s $$pkg >/dev/null 2>&1 || missing="$$missing $$pkg"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "Installing kiosk dependencies:$$missing"; \
+		sudo apt-get update && sudo apt-get install -y $$missing; \
+	else \
+		echo "Kiosk dependencies OK"; \
+	fi
+
+kiosk-service: kiosk-deps install
+	sudo install -D -m755 deploy/scripts/kiosk-session.sh "$(PREFIX)/bin/kiosk-session.sh"
+	sudo install -D -m755 deploy/scripts/kiosk-startx.sh "$(PREFIX)/bin/kiosk-startx.sh"
+	sudo sh -c "sed -e 's|@USER@|$(KIOSK_USER)|g' -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@URL@|$(KIOSK_URL)|g' deploy/systemd/bamboo-kiosk.service > /etc/systemd/system/bamboo-kiosk.service"
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now bamboo-kiosk.service

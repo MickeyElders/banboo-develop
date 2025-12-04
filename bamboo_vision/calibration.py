@@ -32,7 +32,7 @@ class CalibrationManager:
 
     def persist(self):
         if not self._persist_path:
-            return
+            return False
         try:
             with self._persist_path.open("r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
@@ -41,5 +41,10 @@ class CalibrationManager:
         if "calibration" not in cfg:
             cfg["calibration"] = {}
         cfg["calibration"].update(self.get())
-        with self._persist_path.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(cfg, f, allow_unicode=True)
+        try:
+            self._persist_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._persist_path.open("w", encoding="utf-8") as f:
+                yaml.safe_dump(cfg, f, allow_unicode=True)
+            return True
+        except Exception:
+            return False

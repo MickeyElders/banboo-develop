@@ -68,70 +68,45 @@ def build_net(cfg: dict):
 
 def build_outputs(out_cfg: dict, cam_cfg: dict):
     outputs = []
-    # Detect encoder availability
-    use_x264 = False
-    have_x264 = False
+    # Detect encoder availability (for informational logging)
     try:
         env = os.environ.copy()
         env.setdefault("GST_PLUGIN_PATH", "/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra")
         env.setdefault("GST_PLUGIN_SCANNER", "/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner")
         env.setdefault("LD_LIBRARY_PATH", "/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:" + env.get("LD_LIBRARY_PATH", ""))
-        if subprocess.run(["gst-inspect-1.0", "nvv4l2h264enc"],
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode != 0:
-            use_x264 = True
-        have_x264 = subprocess.run(["gst-inspect-1.0", "x264enc"],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode == 0
+        have_nvenc = subprocess.run(["gst-inspect-1.0", "nvv4l2h264enc"],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env).returncode == 0
+        if not have_nvenc:
+            logging.warning("nvv4l2h264enc not available; RTSP may fail without hardware encoder.")
     except FileNotFoundError:
-        # gst-inspect missing; be conservative and use x264
-        use_x264 = True
-        have_x264 = True  # assume available in good plugins
+        have_nvenc = True  # assume system image includes it
 
-    if use_x264:
-        logging.warning("nvv4l2h264enc not available; will try software x264enc for RTSP")
-    if out_cfg.get("hdmi", True):
-        try:
-            outputs.append(ju.videoOutput("display://0"))
-        except Exception as e:
-            logging.warning("Failed to create HDMI output (display://0): %s; continuing without HDMI", e)
-    # RTSP output (prefer x264 pipeline when HW encoder missing)
-    rtsp_enabled = out_cfg.get("rtsp", False) or out_cfg.get("software_rtsp", False)
+    # Prefer RTSP if enabled, otherwise HDMI; keep a single output to avoid multiple pipelines on CSI cameras.
+    selected = None
+    rtsp_enabled = out_cfg.get("rtsp", False)
     if rtsp_enabled:
         host = out_cfg.get("rtsp_host", "127.0.0.1")
         port = out_cfg.get("rtsp_port", 8554)
         path = out_cfg.get("rtsp_path", "live")
         rtsp_uri = out_cfg.get("rtsp_uri", f"rtsp://{host}:{port}/{path}")
-        # normalise rtsp_uri host placeholder like rtsp://@:8554/live
         if rtsp_uri.startswith("rtsp://@:"):
             rtsp_uri = "rtsp://127.0.0.1:" + rtsp_uri.split("@:", 1)[-1]
-        width = cam_cfg.get("width", 1280)
-        height = cam_cfg.get("height", 720)
-        fr = cam_cfg.get("fps", 30)
-        # force software pipeline when HW encoder missing or software_rtsp set
-        if use_x264 or out_cfg.get("software_rtsp", False):
-            logging.error("RTSP disabled: NVENC missing and x264enc push not supported by jetson.utils on this board.")
-        else:
-            try:
-                outputs.append(ju.videoOutput(rtsp_uri))
-                logging.info("RTSP enabled via NVENC: %s", rtsp_uri)
-            except Exception as e:
-                logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
-
-    # Raw UDP (optional)
-    if out_cfg.get("raw_udp", False):
-        width = cam_cfg.get("width", 1280)
-        height = cam_cfg.get("height", 720)
-        fr = cam_cfg.get("fps", 30)
-        host = out_cfg.get("raw_udp_host", "127.0.0.1")
-        port = out_cfg.get("raw_udp_port", 5600)
-        pipeline = (
-            f"appsrc name=mysource is-live=true do-timestamp=true format=3 ! "
-            f"video/x-raw,format=RGBA,width={width},height={height},framerate={fr}/1 ! "
-            "videoconvert ! video/x-raw,format=I420 ! "
-            f"udpsink host={host} port={port} sync=false"
-        )
         try:
-            outputs.append(ju.videoOutput("gstreamer://" + pipeline))
-            logging.info("Raw UDP output enabled to udp://%s:%d (RGBA->I420, no encoder)", host, port)
+            selected = ju.videoOutput(rtsp_uri)
+            logging.info("RTSP enabled via jetson.utils videoOutput: %s", rtsp_uri)
         except Exception as e:
-            logging.error("Failed to create raw UDP output: %s", e)
+            logging.error("Failed to create RTSP output (%s): %s", rtsp_uri, e)
+            selected = None
+
+    if selected is None and out_cfg.get("hdmi", True):
+        try:
+            selected = ju.videoOutput("display://0")
+            logging.info("HDMI output enabled (display://0)")
+        except Exception as e:
+            logging.warning("Failed to create HDMI output (display://0): %s; running headless", e)
+
+    if selected:
+        outputs.append(selected)
+    else:
+        logging.warning("No outputs available (RTSP/HDMI).")
     return outputs

@@ -43,12 +43,9 @@ modbus:
 
 output:
   hdmi: false
-  rtsp: false            # NVENC missing on this board; RTSP disabled in app
+  rtsp: false
   rtsp_uri: "rtsp://@:8554/live"
-  software_rtsp: false
-  raw_udp: true          # enable raw UDP frames for external encoder
-  raw_udp_host: "127.0.0.1"
-  raw_udp_port: 5600
+  software_rtsp: false    # jetson.utils RTSP expects NVENC; enable only if hardware encoder present
 
 app:
   publish_interval_ms: 100

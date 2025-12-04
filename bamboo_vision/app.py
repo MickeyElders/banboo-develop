@@ -83,6 +83,8 @@ def main():
     state.update_calibration(calib_manager.get())
 
     running = True
+    control = state.get_control()
+    last_control_mode = control.get("mode")
 
     def handle_sig(signum, frame):
         nonlocal running
@@ -95,11 +97,36 @@ def main():
     publish_interval = float(cfg.get("app", {}).get("publish_interval_ms", 100)) / 1000.0
 
     while running:
+        now = time.time()
+        control = state.get_control()
+        if control.get("mode") != last_control_mode:
+            logging.info("Control change: %s", control)
+            last_control_mode = control.get("mode")
+        mb.sync_control(control)
+        mb.step(now, control)
+
         if not input_stream.IsStreaming():
             logging.warning("Input stream not streaming, breaking loop")
             break
         img = input_stream.Capture()
         if img is None:
+            continue
+
+        if not control.get("running", True):
+            # Skip inference/output but keep heartbeats and status updates alive
+            font.OverlayText(
+                img,
+                text=f"paused ({control.get('mode')})",
+                x=5,
+                y=5,
+                color=ju.makeColor(255, 200, 64, 255),
+                bg_color=ju.makeColor(0, 0, 0, 180),
+            )
+            for out in outputs:
+                out.Render(img)
+                out.SetStatus(f"Paused ({control.get('mode')})")
+            state.update_detection(None, 0.0, 0)
+            state.update_fps(0.0)
             continue
 
         detections = net.Detect(img, overlay="box,labels,conf")
@@ -138,10 +165,8 @@ def main():
             out.Render(img)
             out.SetStatus(f"FPS {net.GetNetworkFPS():.1f}")
 
-        now = time.time()
         state.update_detection(x_mm, conf, result_code)
         state.update_fps(net.GetNetworkFPS())
-        mb.step(now)
         if now - last_publish >= publish_interval:
             mb.publish_detection(x_mm, result_code)
             last_publish = now

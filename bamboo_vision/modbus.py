@@ -39,6 +39,9 @@ class ModbusBridge:
         self.addr_plc = mcfg.get("addr_plc_to_cam", {})
         self.client = ModbusTcpClient(host=self.host, port=self.port, unit_id=self.slave_id, timeout=1)
         self.connected = False
+        # 1=running, 2=fault/emergency, 3=stopped/idle (per PLC.md for D2001)
+        self.status_value = 3
+        self._last_status_sent = None
         self.last_poll = 0.0
         self.last_hb = 0.0
         self.plc_ready = False
@@ -100,16 +103,41 @@ class ModbusBridge:
             pass
         self.connected = False
 
-    def step(self, now: float):
+    def _status_from_control(self, control: dict | None) -> int:
+        mode = (control or {}).get("mode", "") or ""
+        running = bool((control or {}).get("running"))
+        if mode == "emergency":
+            return 2
+        if running:
+            return 1
+        return 3
+
+    def sync_control(self, control: dict | None):
+        """Update local status_value based on control and push to PLC if it changed."""
+        self.status_value = self._status_from_control(control)
+        if self.status_value == self._last_status_sent:
+            return
         if not self.ensure_connected():
             return
+        status_addr = self.addr_cam.get("status", 0x07D1)
+        try:
+            self.client.write_register(address=status_addr, value=self.status_value, slave=self.slave_id)
+            self._last_status_sent = self.status_value
+            logging.info("PLC status updated to %d (mode=%s)", self.status_value, (control or {}).get("mode"))
+        except Exception as e:
+            logging.warning("Failed to push control status to PLC: %s", e)
 
+    def step(self, now: float, control: dict | None = None):
+        if not self.ensure_connected():
+            return
+        self.status_value = self._status_from_control(control)
         # Heartbeat/communication ack
         if now - self.last_hb >= self.hb_ms / 1000.0:
             ack_addr = self.addr_cam.get("comm", 0x07D0)
             status_addr = self.addr_cam.get("status", 0x07D1)
             self.client.write_register(address=ack_addr, value=1, slave=self.slave_id)
-            self.client.write_register(address=status_addr, value=1, slave=self.slave_id)  # 1=normal
+            self.client.write_register(address=status_addr, value=self.status_value, slave=self.slave_id)
+            self._last_status_sent = self.status_value
             self.last_hb = now
             self.hb_local = (self.hb_local + 1) & 0xFFFF
 

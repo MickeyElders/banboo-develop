@@ -5,6 +5,8 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory, request
 import os
 import multiprocessing
+import re
+import subprocess
 
 from .shared_state import SharedState
 from .calibration import CalibrationManager
@@ -38,15 +40,17 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
         body = request.get_json(force=True, silent=True) or {}
         action = body.get("action", "noop")
         # Map actions to shared state flags or future hooks
+        control_state = {"running": False, "mode": action}
         if action == "start":
-            state.update_control({"running": True, "mode": "start"})
+            control_state = {"running": True, "mode": "start"}
         elif action == "pause":
-            state.update_control({"running": False, "mode": "pause"})
+            control_state = {"running": False, "mode": "pause"}
         elif action == "stop":
-            state.update_control({"running": False, "mode": "stop"})
+            control_state = {"running": False, "mode": "stop"}
         elif action == "emergency_stop":
-            state.update_control({"running": False, "mode": "emergency"})
-        return jsonify({"ok": True, "action": action})
+            control_state = {"running": False, "mode": "emergency"}
+        state.update_control(control_state)
+        return jsonify({"ok": True, "action": action, "control": control_state})
 
     @app.route("/api/calibration", methods=["GET", "POST"])
     def api_calibration():
@@ -54,10 +58,11 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
             return jsonify({"ok": True, "calibration": calib.get()})
         body = request.get_json(force=True, silent=True) or {}
         calib.update(body)
+        state.update_calibration(calib.get())
+        ok = True
         if body.get("persist"):
-            calib.persist()
-            state.update_calibration(calib.get())
-        return jsonify({"ok": True, "calibration": calib.get()})
+            ok = calib.persist()
+        return jsonify({"ok": ok, "calibration": calib.get()})
 
     @app.route("/api/jetson")
     def api_jetson():
@@ -69,7 +74,13 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
         except Exception:
             cpu_pct = 0.0
 
+        gpu_pct = 0.0
         mem_total_mb = mem_free_mb = mem_avail_mb = 0.0
+        power_w = 0.0
+        emc_mhz = 0
+        fan_rpm = 0
+        nvpmodel_mode = ""
+
         try:
             with open("/proc/meminfo", "r") as f:
                 info = f.read().splitlines()
@@ -108,18 +119,55 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
         except Exception:
             pass
 
+        # Parse tegrastats if available for GPU/util/power
+        try:
+            p = subprocess.run(["tegrastats", "--interval", "1000", "--count", "1"], capture_output=True, text=True, timeout=2)
+            if p.returncode == 0 and p.stdout:
+                line = p.stdout.strip().splitlines()[-1]
+                m = re.search(r"GR3D_FREQ\s+(\d+)%", line)
+                if m:
+                    gpu_pct = float(m.group(1))
+                m = re.search(r"POM_5V_IN\s+(\d+)mW", line) or re.search(r"VDD_IN\s+(\d+)mW", line)
+                if m:
+                    power_w = float(m.group(1)) / 1000.0
+                m = re.search(r"EMC_FREQ\s+\d+%@(\d+)", line)
+                if m:
+                    emc_mhz = int(m.group(1))
+        except Exception:
+            pass
+
+        # Fan PWM as rough RPM proxy
+        for path in ("/sys/devices/pwm-fan/cur_pwm", "/sys/devices/pwm-fan/target_pwm"):
+            try:
+                with open(path, "r") as f:
+                    pwm = int(f.read().strip())
+                    fan_rpm = max(fan_rpm, int(pwm * 30))
+            except Exception:
+                continue
+
+        try:
+            p = subprocess.run(["nvpmodel", "-q", "--verbose"], capture_output=True, text=True, timeout=2)
+            if p.returncode == 0 and p.stdout:
+                for line in p.stdout.splitlines():
+                    if "NVPMODEL" in line or "Power Mode" in line:
+                        nvpmodel_mode = line.strip()
+                        break
+        except Exception:
+            pass
+
         return jsonify(
             {
                 "cpu": cpu_pct,
-                "gpu": 0.0,  # GPU util not parsed here
+                "gpu": gpu_pct,
                 "mem_total_mb": mem_total_mb,
                 "mem_used_mb": mem_used_mb,
                 "mem_free_mb": mem_free_mb,
                 "temp_c": temp_c,
                 "uptime_sec": uptime_sec,
-                "power_w": 0.0,
-                "emc_mhz": 0,
-                "fan_rpm": 0,
+                "power_w": power_w,
+                "emc_mhz": emc_mhz,
+                "fan_rpm": fan_rpm,
+                "nvpmodel": nvpmodel_mode,
             }
         )
 
