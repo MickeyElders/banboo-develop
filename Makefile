@@ -90,10 +90,7 @@ install-jetson:
 
 install-jetson-if-missing:
 	@set -e; \
-	if python3 - <<'PY' >/dev/null 2>&1; then \
-import jetson_inference, jetson_utils
-PY
-	then \
+	if python3 -c "import jetson_inference, jetson_utils" >/dev/null 2>&1; then \
 		echo "jetson-inference already available in system python, skipping build/install"; \
 	else \
 		$(MAKE) install-jetson; \
