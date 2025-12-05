@@ -10,15 +10,12 @@ import glob
 # Prefer local jetson-inference source/build tree
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY_SRC = _ROOT / "jetson-inference" / "python"
-_LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
-_LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
+_LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build"
+_LOCAL_JI_LIB = _LOCAL_JI_PY_BUILD / "aarch64" / "lib"
 
-_extra_py_paths = [
-    _LOCAL_JI_PY_BUILD,
-    _LOCAL_JI_PY_SRC,
-]
-# Add any versioned python lib dirs (python/3.8, python/3.10, etc.)
-_extra_py_paths += [Path(p) for p in glob.glob(str(_ROOT / "jetson-inference" / "build" / "aarch64" / "lib" / "python*"))]
+_extra_py_paths = [_LOCAL_JI_PY_SRC]
+# collect any python* dirs under build/**
+_extra_py_paths += [p for p in (Path(_ROOT) / "jetson-inference" / "build").rglob("python*") if p.is_dir()]
 
 for _p in _extra_py_paths:
     if _p.is_dir():

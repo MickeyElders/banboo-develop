@@ -8,14 +8,11 @@ import glob
 # Require local jetson-inference build (no system fallback)
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY_SRC = _ROOT / "jetson-inference" / "python"
-_LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
-_LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
+_LOCAL_JI_PY_BUILD_ROOT = _ROOT / "jetson-inference" / "build"
+_LOCAL_JI_LIB = _LOCAL_JI_PY_BUILD_ROOT / "aarch64" / "lib"
 
-_extra_py_paths = [
-    _LOCAL_JI_PY_BUILD,
-    _LOCAL_JI_PY_SRC,
-]
-_extra_py_paths += [Path(p) for p in glob.glob(str(_ROOT / "jetson-inference" / "build" / "aarch64" / "lib" / "python*"))]
+_extra_py_paths = [_LOCAL_JI_PY_SRC]
+_extra_py_paths += [p for p in _LOCAL_JI_PY_BUILD_ROOT.rglob("python*") if p.is_dir()]
 
 for _p in _extra_py_paths:
     if _p.is_dir():

@@ -120,7 +120,7 @@ build-engine:
 	fi
 
 run:
-	@PYTHONPATH="$(abspath $(JI_SRC)/python):$(abspath $(JI_BUILD))/python:$(abspath $(JI_BUILD))/lib/python:$(abspath $(JI_BUILD))/lib/python/3.10:/usr/local/lib/python3.10/dist-packages:/usr/local/lib/python3/dist-packages:/usr/local/python:$$PYTHONPATH" LD_LIBRARY_PATH="$(abspath $(JI_BUILD))/lib:/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$$LD_LIBRARY_PATH" nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
+	@PYTHONPATH="$(abspath $(JI_SRC)/python):$(abspath $(JI_SRC))/build:$(abspath $(JI_BUILD)):/usr/local/lib/python3.10/dist-packages:/usr/local/lib/python3/dist-packages:/usr/local/python:$$PYTHONPATH" LD_LIBRARY_PATH="$(abspath $(JI_BUILD))/lib:$(abspath $(JI_BUILD))/aarch64/lib:/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$$LD_LIBRARY_PATH" nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
 	echo "bamboo-vision started in background (PID $$(cat /tmp/bamboo-vision.run.pid)), logs: /tmp/bamboo-vision.run.log"
 
 install: deps
