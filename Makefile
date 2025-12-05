@@ -63,18 +63,17 @@ install-jetson:
 	for dst in /usr/lib/libnpymath.a /usr/lib/aarch64-linux-gnu/libnpymath.a; do \
 		if [ ! -f $$dst ]; then sudo ln -sf "$$NPYMATH" $$dst; fi; \
 	done; \
-	SRC_DIR="$(JI_SRC_ABS)"; \
-	if [ ! -f "$$SRC_DIR/CMakeLists.txt" ]; then \
-		echo "ERROR: $$SRC_DIR does not contain CMakeLists.txt"; \
-		ls -l "$$SRC_DIR"; \
+	if [ ! -f "$(JI_SRC_ABS)/CMakeLists.txt" ]; then \
+		echo "ERROR: $(JI_SRC_ABS) does not contain CMakeLists.txt"; \
+		ls -l "$(JI_SRC_ABS)"; \
 		exit 1; \
 	fi; \
 	# Ensure python package dir exists to satisfy install step
-	mkdir -p "$$SRC_DIR/utils/python/jetson"; \
-	mkdir -p "$$SRC_DIR/build/aarch64"; \
-	cmake -S "$$SRC_DIR" -B "$$SRC_DIR/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
-	cmake --build "$$SRC_DIR/build/aarch64" -- -j$$(nproc); \
-	echo "jetson-inference local build completed (python libs in $$SRC_DIR/build/aarch64/python)"
+	mkdir -p "$(JI_SRC_ABS)/utils/python/jetson"; \
+	mkdir -p "$(JI_SRC_ABS)/build/aarch64"; \
+	cmake -S "$(JI_SRC_ABS)" -B "$(JI_SRC_ABS)/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
+	cmake --build "$(JI_SRC_ABS)/build/aarch64" -- -j$$(nproc); \
+	echo "jetson-inference local build completed (python libs in $(JI_SRC_ABS)/build/aarch64/python)"
 
 check-gst:
 	@set -e; \
