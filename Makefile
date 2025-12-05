@@ -33,8 +33,8 @@ deps: check-ji-source
 
 check-ji-source:
 	@if [ ! -f "$(JI_SRC_ABS)/CMakeLists.txt" ]; then \
-		echo "ERROR: jetson-inference source missing at $(JI_SRC_ABS)"; \
-		exit 1; \
+		echo "jetson-inference source missing at $(JI_SRC_ABS), cloning..."; \
+		$(MAKE) update-ji-source; \
 	fi
 
 check-jetson:
