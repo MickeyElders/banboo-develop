@@ -253,38 +253,7 @@ def main():
             ju.cudaMemcpy2D(dest=combo, destX=l_proc.width, src=r_proc)
             frame_out = combo
 
-            # 可选立体深度（需标定文件），缺失时跳过；使用 OpenCV SGBM，避免 headless CUDA/OpenGL 冲突
-            if sgbm is None and not disparity_error_logged:
-                try:
-                    num_disp = int(cam_cfg.get("stereo_num_disp", 96))
-                    block = int(cam_cfg.get("stereo_block_size", 5))
-                    num_disp = max(16, (num_disp // 16) * 16)
-                    block = max(3, block | 1)
-                    sgbm = cv2.StereoSGBM_create(
-                        minDisparity=0,
-                        numDisparities=num_disp,
-                        blockSize=block,
-                        P1=8 * 3 * block * block,
-                        P2=32 * 3 * block * block,
-                        mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY,
-                    )
-                except Exception as e:
-                    disparity_error_logged = True
-                    logging.warning("Init SGBM failed: %s", e)
-                    sgbm = None
-            if sgbm is not None:
-                try:
-                    l_np = ju.cudaToNumpy(l_proc)
-                    r_np = ju.cudaToNumpy(r_proc)
-                    if l_np.dtype != np.uint8:
-                        l_np = np.clip(l_np, 0, 255).astype(np.uint8)
-                        r_np = np.clip(r_np, 0, 255).astype(np.uint8)
-                    l_gray = cv2.cvtColor(l_np, cv2.COLOR_RGB2GRAY) if l_np.shape[2] >= 3 else l_np
-                    r_gray = cv2.cvtColor(r_np, cv2.COLOR_RGB2GRAY) if r_np.shape[2] >= 3 else r_np
-                    _disp = sgbm.compute(l_gray, r_gray)
-                    # 可选：将 _disp 转可视化叠加，但目前仅计算以确保管线可用
-                except Exception as e:
-                    logging.debug("SGBM compute failed/skipped: %s", e)
+            # 深度暂不启用（仅使用 ref_px 像素标尺距离）
 
         try:
             jpeg_bytes = ju.cudaEncodeImage(frame_out, "jpg")

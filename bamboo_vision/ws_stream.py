@@ -17,6 +17,7 @@ class WebSocketStreamer:
         self._thread: threading.Thread | None = None
         self._server = None
         self._stopping = threading.Event()
+        self._ready = threading.Event()
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -39,6 +40,7 @@ class WebSocketStreamer:
         server_coro = websockets.serve(self._handler, self.host, self.port, max_queue=1)
         try:
             self._server = self.loop.run_until_complete(server_coro)
+            self._ready.set()
             self.loop.run_forever()
         except Exception as e:
             logging.error("WebSocket streamer loop error: %s", e)
@@ -68,7 +70,7 @@ class WebSocketStreamer:
             self.clients.discard(ws)
 
     def push(self, data: bytes):
-        if not self.clients or not self.loop or not self.loop.is_running():
+        if not self.clients or not self.loop or not self.loop.is_running() or not self._ready.is_set():
             return
         try:
             asyncio.run_coroutine_threadsafe(self._broadcast(data), self.loop)
