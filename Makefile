@@ -45,7 +45,7 @@ check-jetson:
 install-jetson:
 	@set -e; \
 	missing=""; \
-	for pkg in python3-dev python3-numpy libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev cmake build-essential git pkg-config; do \
+	for pkg in python3-dev python3-numpy libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libsoup2.4-dev libjson-glib-dev cmake build-essential git pkg-config; do \
 		dpkg -s $$pkg >/dev/null 2>&1 || missing="$$missing $$pkg"; \
 	done; \
 	if [ -n "$$missing" ]; then \
@@ -103,17 +103,17 @@ check-gst:
 	fi
 
 build-engine:
-	@ENGINE_PATH="models/best.engine"; \
+	@ENGINE_PATH="models/best_static.engine"; \
 	if [ -f "$$ENGINE_PATH" ]; then \
 		echo "TensorRT engine already exists ($$ENGINE_PATH); skip build"; \
 	else \
-		echo "Building TensorRT engine from models/best.onnx (FP16)"; \
+		echo "Building TensorRT engine from models/best_static.onnx (FP16)"; \
 		if [ ! -x "$(TRTEXEC)" ]; then \
 			echo "ERROR: trtexec not found at $(TRTEXEC). Set TRTEXEC=/path/to/trtexec"; \
 			exit 1; \
 		fi; \
-		"$(TRTEXEC)" --onnx=models/best.onnx --saveEngine=models/best.engine --fp16 --best --noBuilderCache --tacticSources=+CUBLAS,+CUDNN,-JIT_CONVOLUTIONS --maxAuxStreams=1 --builderOptimizationLevel=5 --verbose --memPoolSize=workspace:$(TRT_WORKSPACE) || true; \
-		if [ ! -f models/best.engine ]; then echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; fi; \
+		"$(TRTEXEC)" --onnx=models/best_static.onnx --saveEngine=models/best_static.engine --explicitBatch --shapes=images:1x3x960x960 --fp16 --best --noBuilderCache --tacticSources=+CUBLAS,+CUDNN,-JIT_CONVOLUTIONS --maxAuxStreams=1 --builderOptimizationLevel=5 --verbose --memPoolSize=workspace:$(TRT_WORKSPACE) || true; \
+		if [ ! -f models/best_static.engine ]; then echo "WARNING: trtexec failed to generate engine; runtime will fall back to ONNX"; fi; \
 	fi
 
 run:
