@@ -274,8 +274,8 @@ def main():
                     sgbm = None
             if sgbm is not None:
                 try:
-            l_np = ju.cudaToNumpy(l_proc)
-            r_np = ju.cudaToNumpy(r_proc)
+                    l_np = ju.cudaToNumpy(l_proc)
+                    r_np = ju.cudaToNumpy(r_proc)
                     if l_np.dtype != np.uint8:
                         l_np = np.clip(l_np, 0, 255).astype(np.uint8)
                         r_np = np.clip(r_np, 0, 255).astype(np.uint8)
