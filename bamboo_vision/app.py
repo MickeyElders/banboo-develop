@@ -76,7 +76,12 @@ def main():
     right_uri = "csi://1"
     out_cfg = cfg.get("output", {})
     calib_cfg = cfg.get("calibration", {})
-    calib_manager = CalibrationManager(calib_cfg, cfg_path if cfg_path.exists() else None)
+    calib_file = calib_cfg.get("file")
+    if calib_file:
+        calib_file = Path(calib_file)
+        if not calib_file.is_absolute():
+            calib_file = Path("/opt/bamboo-vision") / calib_file
+    calib_manager = CalibrationManager(calib_cfg, calib_file)
     if args.headless or os.environ.get("HEADLESS") == "1" or not os.environ.get("DISPLAY"):
         out_cfg = dict(out_cfg)
         out_cfg["hdmi"] = False
@@ -109,6 +114,8 @@ def main():
     base_dir = Path(__file__).resolve().parent.parent
     start_http_server(cfg, state, base_dir, calib_manager)
     state.update_calibration(calib_manager.get())
+    if calib_file and not calib_manager.status()["loaded"]:
+        logging.warning("Calibration file missing: %s, please run calibration tool via UI to generate it.", calib_file)
 
     running = True
     control = state.get_control()
@@ -144,6 +151,8 @@ def main():
         r_img = right.Capture()
         if l_img is None or r_img is None:
             continue
+
+        calib_missing = not calib_manager.status().get("loaded", False)
 
         if not control.get("running", True):
             font.OverlayText(
@@ -192,6 +201,16 @@ def main():
             if now - last_publish >= publish_interval:
                 mb.publish_detection(x_mm, result_code)
                 last_publish = now
+
+        if calib_missing:
+            font.OverlayText(
+                l_img,
+                text="未标定：请在前端点击标定生成文件",
+                x=5,
+                y=30,
+                color=ju.makeColor(255, 200, 64, 255),
+                bg_color=ju.makeColor(0, 0, 0, 180),
+            )
 
         # 合成到并排画面
         if combo is None or combo.width != (l_img.width + r_img.width) or combo.height != l_img.height:

@@ -37,7 +37,9 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
 
     @app.route("/api/status")
     def api_status():
-        return jsonify(state.snapshot())
+        snap = state.snapshot()
+        snap["calibration_status"] = calib.status()
+        return jsonify(snap)
 
     @app.route("/api/control", methods=["POST"])
     def api_control():
@@ -59,14 +61,14 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
     @app.route("/api/calibration", methods=["GET", "POST"])
     def api_calibration():
         if request.method == "GET":
-            return jsonify({"ok": True, "calibration": calib.get()})
+            return jsonify({"ok": True, "calibration": calib.get(), "status": calib.status()})
         body = request.get_json(force=True, silent=True) or {}
         calib.update(body)
         state.update_calibration(calib.get())
         ok = True
         if body.get("persist"):
             ok = calib.persist()
-        return jsonify({"ok": ok, "calibration": calib.get()})
+        return jsonify({"ok": ok, "calibration": calib.get(), "status": calib.status()})
 
     @app.route("/api/calibration/run", methods=["POST"])
     def api_calibration_run():
