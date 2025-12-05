@@ -4,12 +4,14 @@ import os
 import sys
 from pathlib import Path
 
-# Prefer local jetson-inference source tree (repo/jetson-inference/python) before system installs
+# Require local jetson-inference build (no system fallback)
 _ROOT = Path(__file__).resolve().parent.parent
-_LOCAL_JI_PY = _ROOT / "jetson-inference" / "python"
+_LOCAL_JI_PY_SRC = _ROOT / "jetson-inference" / "python"
+_LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
-if _LOCAL_JI_PY.is_dir():
-    sys.path.insert(0, str(_LOCAL_JI_PY))
+for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY_SRC):
+    if _p.is_dir():
+        sys.path.insert(0, str(_p))
 if _LOCAL_JI_LIB.is_dir():
     os.environ["LD_LIBRARY_PATH"] = str(_LOCAL_JI_LIB) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
@@ -17,20 +19,8 @@ try:
     import jetson_inference as ji  # prefer local bindings
     import jetson_utils as ju
 except ImportError:
-    _fallback = [
-        "/usr/local/lib/python3.10/dist-packages",
-        "/usr/local/lib/python3/dist-packages",
-        "/usr/local/python",
-    ]
-    for _p in _fallback:
-        if os.path.isdir(_p) and _p not in sys.path:
-            sys.path.insert(0, _p)
-    try:
-        import jetson_inference as ji  # type: ignore
-        import jetson_utils as ju  # type: ignore
-    except ImportError:
-        print("jetson_inference/jetson_utils not found. Please build jetson-inference (make install-jetson) or install jetson-utils.", file=sys.stderr)
-        sys.exit(1)
+    print("jetson_inference/jetson_utils not found in local build. Please run `make install-jetson`.", file=sys.stderr)
+    sys.exit(1)
 
 
 def build_net(cfg: dict):

@@ -8,11 +8,11 @@ import os
 
 # Prefer local jetson-inference source/build tree
 _ROOT = Path(__file__).resolve().parent.parent
-_LOCAL_JI_PY = _ROOT / "jetson-inference" / "python"
+_LOCAL_JI_PY_SRC = _ROOT / "jetson-inference" / "python"
 _LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
 
-for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY):
+for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY_SRC):
     if _p.is_dir():
         sys.path.insert(0, str(_p))
 # Ensure local libs are visible (for freshly built jetson-inference in-tree)
@@ -32,6 +32,7 @@ from .shared_state import SharedState
 from .modbus import ModbusBridge
 from .http_server import start_http_server
 from .calibration import CalibrationManager
+from .preflight import preflight_checks
 
 
 def main():
@@ -66,6 +67,8 @@ def main():
         out_cfg = dict(out_cfg)
         out_cfg["hdmi"] = False
         logging.info("Headless mode detected; disabling HDMI output")
+
+    preflight_checks(cfg, _LOCAL_JI_PY_BUILD, _LOCAL_JI_LIB)
 
     input_stream = ju.videoSource(cam_uri)
     outputs = build_outputs(out_cfg, cam_cfg)
