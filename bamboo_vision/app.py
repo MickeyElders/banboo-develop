@@ -41,7 +41,7 @@ from .pipeline import build_net, build_outputs
 from .shared_state import SharedState
 from .modbus import ModbusBridge
 from .http_server import start_http_server
-from .ws_stream import FrameBroadcaster
+from .ws_stream import WebSocketStreamer
 from .calibration import CalibrationManager
 from .preflight import preflight_checks
 
@@ -101,7 +101,7 @@ def main():
         logging.error("Failed to init dual cameras: %s", e)
         sys.exit(1)
 
-    broadcaster = FrameBroadcaster(host="0.0.0.0", port=base_ws)
+    broadcaster = WebSocketStreamer(host="0.0.0.0", port=base_ws)
     broadcaster.start()
     logging.info("WebSocket output on ws://0.0.0.0:%d", base_ws)
 
