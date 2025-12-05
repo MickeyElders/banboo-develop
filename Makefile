@@ -131,10 +131,7 @@ install: deps
 	-$(MAKE) service-stop
 	sudo mkdir -p "$(PREFIX)"
 	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md jetson-inference "$(PREFIX)"
-	@if ! find "$(PREFIX)/jetson-inference/build" -name 'jetson_utils*.so' | grep -q .; then \
-		echo "ERROR: jetson_utils binding missing in install prefix $(PREFIX)/jetson-inference/build. Did install-jetson succeed?"; \
-		exit 1; \
-	fi
+	$(MAKE) check-ji-binaries
 	sudo install -D -m644 deploy/systemd/$(SERVICE) /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now $(SERVICE)
@@ -166,6 +163,21 @@ clean-install:
 	sudo rm -rf "$(PREFIX)"
 
 redeploy: service-stop clean-install install
+
+# verify bindings exist both in source build and install prefix
+check-ji-binaries:
+	@if ! find "$(JI_SRC_ABS)/build" -name 'jetson_utils*.so' | grep -q .; then \
+		echo "ERROR: jetson_utils binding missing in source build $(JI_SRC_ABS)/build"; \
+		exit 1; \
+	fi; \
+	if [ -d "$(PREFIX)/jetson-inference" ]; then \
+		if ! find "$(PREFIX)/jetson-inference/build" -name 'jetson_utils*.so' | grep -q .; then \
+			echo "ERROR: jetson_utils binding missing in install prefix $(PREFIX)/jetson-inference/build"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "WARN: install prefix $(PREFIX)/jetson-inference not found; deploy may be incomplete"; \
+	fi
 
 kiosk-deps:
 	@set -e; \
