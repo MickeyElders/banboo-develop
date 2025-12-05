@@ -131,6 +131,8 @@ def main():
     publish_interval = float(cfg.get("app", {}).get("publish_interval_ms", 100)) / 1000.0
 
     combo = None  # 合成的左右并排图
+    disparity = None
+    disparity_error_logged = False
 
     while running:
         now = time.time()
@@ -150,6 +152,11 @@ def main():
         r_img = right.Capture()
         if l_img is None or r_img is None:
             continue
+
+        # 动态监测标定文件变化
+        if calib_manager.reload_if_changed():
+            state.update_calibration(calib_manager.get())
+            logging.info("Calibration file reloaded.")
 
         calib_missing = not calib_manager.status().get("loaded", False)
 
@@ -211,14 +218,31 @@ def main():
                 bg_color=ju.makeColor(0, 0, 0, 180),
             )
 
-        # 合成到并排画面
-        if combo is None or combo.width != (l_img.width + r_img.width) or combo.height != l_img.height:
-            combo = ju.cudaAllocMapped(l_img.width + r_img.width, l_img.height, l_img.format)
-        ju.cudaMemcpy2D(dest=combo, destX=0, src=l_img)
-        ju.cudaMemcpy2D(dest=combo, destX=l_img.width, src=r_img)
+        # 合成输出：未标定时仅推左目，标定后并排左/右
+        frame_out = l_img
+        if not calib_missing:
+            if combo is None or combo.width != (l_img.width + r_img.width) or combo.height != l_img.height:
+                combo = ju.cudaAllocMapped(l_img.width + r_img.width, l_img.height, l_img.format)
+            ju.cudaMemcpy2D(dest=combo, destX=0, src=l_img)
+            ju.cudaMemcpy2D(dest=combo, destX=l_img.width, src=r_img)
+            frame_out = combo
+
+            # 可选立体深度（需标定文件），缺失时跳过
+            if disparity is None and not disparity_error_logged:
+                try:
+                    disparity = ju.cudaStereoDisparity()
+                except Exception as e:
+                    disparity_error_logged = True
+                    logging.warning("Init stereo disparity failed: %s", e)
+                    disparity = None
+            if disparity:
+                try:
+                    disparity.Compute(l_img, r_img)
+                except Exception as e:
+                    logging.debug("Disparity compute skipped/failed: %s", e)
 
         try:
-            jpeg_bytes = ju.cudaEncodeImage(combo, "jpg")
+            jpeg_bytes = ju.cudaEncodeImage(frame_out, "jpg")
             broadcaster.push(bytes(jpeg_bytes))
         except Exception as e:
             logging.debug("WebSocket frame encode/broadcast failed: %s", e)

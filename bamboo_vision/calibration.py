@@ -9,6 +9,7 @@ class CalibrationManager:
     def __init__(self, calib_cfg: dict, persist_file: Path | None = None):
         self._lock = threading.Lock()
         self._persist_file = persist_file
+        self._last_mtime: float | None = None
         self._calib = {
             "pixel_to_mm": float(calib_cfg.get("pixel_to_mm", 1.0)),
             "offset_mm": float(calib_cfg.get("offset_mm", 0.0)),
@@ -55,9 +56,28 @@ class CalibrationManager:
             with self._persist_file.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(self._calib, f, allow_unicode=True)
             self._loaded_from_file = True
+            try:
+                self._last_mtime = self._persist_file.stat().st_mtime
+            except Exception:
+                pass
             return True
         except Exception:
             return False
+
+    def reload_if_changed(self) -> bool:
+        """Reload from disk if file exists and mtime changed."""
+        if not self._persist_file:
+            return False
+        try:
+            mtime = self._persist_file.stat().st_mtime
+        except FileNotFoundError:
+            return False
+        if self._last_mtime is not None and mtime <= self._last_mtime:
+            return False
+        if self._load_from_file():
+            self._last_mtime = mtime
+            return True
+        return False
 
     def _load_from_file(self) -> bool:
         try:
