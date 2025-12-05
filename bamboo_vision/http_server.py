@@ -11,6 +11,7 @@ import shutil
 
 from .shared_state import SharedState
 from .calibration import CalibrationManager
+from .calibration_runner import CalibrationRunner
 from . import system_control
 
 
@@ -22,6 +23,7 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
     host = http_cfg.get("host", "0.0.0.0")
     port = int(http_cfg.get("port", 8080))
     out_cfg = cfg.get("output", {})
+    calib_runner = CalibrationRunner(cfg)
 
     app = Flask(__name__, static_folder=None)
 
@@ -65,6 +67,21 @@ def start_http_server(cfg: dict, state: SharedState, base_dir: Path, calib: Cali
         if body.get("persist"):
             ok = calib.persist()
         return jsonify({"ok": ok, "calibration": calib.get()})
+
+    @app.route("/api/calibration/run", methods=["POST"])
+    def api_calibration_run():
+        body = request.get_json(force=True, silent=True) or {}
+        camera = body.get("camera", "csi://0")
+        res = calib_runner.start(camera)
+        return jsonify(res)
+
+    @app.route("/api/calibration/stop", methods=["POST"])
+    def api_calibration_stop():
+        return jsonify(calib_runner.stop())
+
+    @app.route("/api/calibration/status")
+    def api_calibration_status():
+        return jsonify(calib_runner.status())
 
     @app.route("/api/jetson")
     def api_jetson():

@@ -837,6 +837,15 @@ body {
             <button class="calib-btn primary" id="calib-save">保存</button>
         </div>
         <div id="calib-status" style="margin-top:6px;font-size:12px;color:var(--text-secondary);">等待操作</div>
+        <div style="margin-top:8px;">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">相机标定 (calibrate-camera)</div>
+            <div class="calib-actions">
+                <button class="calib-btn" id="calib-run-cam0">标定 Cam0</button>
+                <button class="calib-btn" id="calib-run-cam1">标定 Cam1</button>
+                <button class="calib-btn" id="calib-stop">停止</button>
+            </div>
+            <div id="calib-run-status" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">未运行</div>
+        </div>
     </div>
 
     <script>
@@ -1360,11 +1369,20 @@ body {
             const statusEl = document.getElementById('calib-status');
             const btnRefresh = document.getElementById('calib-refresh');
             const btnSave = document.getElementById('calib-save');
+            const btnRunCam0 = document.getElementById('calib-run-cam0');
+            const btnRunCam1 = document.getElementById('calib-run-cam1');
+            const btnRunStop = document.getElementById('calib-stop');
+            const runStatus = document.getElementById('calib-run-status');
             if (!pxmm || !offset || !latency || !speed || !statusEl) return;
 
             const setStatus = (txt, good = false) => {
                 statusEl.textContent = txt;
                 statusEl.style.color = good ? '#4caf50' : 'var(--text-secondary)';
+            };
+            const setRunStatus = (txt, good = false) => {
+                if (!runStatus) return;
+                runStatus.textContent = txt;
+                runStatus.style.color = good ? '#4caf50' : 'var(--text-secondary)';
             };
 
             const fill = (calib) => {
@@ -1417,8 +1435,41 @@ body {
                 }
             };
 
+            const runCalibration = async (camera) => {
+                try {
+                    const res = await fetch('/api/calibration/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ camera })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) throw new Error(data.error || 'start failed');
+                    setRunStatus(`运行中 (pid=${data.pid || ''})`, true);
+                    showMessage(`标定启动: ${camera}`, 'success');
+                } catch (e) {
+                    setRunStatus('启动失败');
+                    showMessage('标定启动失败: ' + e.message, 'error');
+                }
+            };
+
+            const stopCalibration = async () => {
+                try {
+                    const res = await fetch('/api/calibration/stop', { method: 'POST' });
+                    const data = await res.json();
+                    if (!data.ok) throw new Error(data.error || 'stop failed');
+                    setRunStatus('已停止', true);
+                    showMessage('标定已停止', 'success');
+                } catch (e) {
+                    setRunStatus('停止失败');
+                    showMessage('标定停止失败: ' + e.message, 'error');
+                }
+            };
+
             btnRefresh?.addEventListener('click', refresh);
             btnSave?.addEventListener('click', save);
+            btnRunCam0?.addEventListener('click', () => runCalibration('csi://0'));
+            btnRunCam1?.addEventListener('click', () => runCalibration('csi://1'));
+            btnRunStop?.addEventListener('click', stopCalibration);
             refresh();
         })();
 

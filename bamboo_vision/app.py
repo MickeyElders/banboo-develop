@@ -68,7 +68,12 @@ def main():
     logging.info("Starting bamboo vision service with %s", cfg_path)
 
     cam_cfg = cfg.get("camera", {})
-    cam_uri = cam_cfg.get("pipeline") or "csi://0"
+    # 固定双摄 csi://0 与 csi://1，分辨率 1280x960（若配置里有则优先配置）
+    width = cam_cfg.get("width", 1280)
+    height = cam_cfg.get("height", 960)
+    fps = cam_cfg.get("fps", 30)
+    left_uri = "csi://0"
+    right_uri = "csi://1"
     out_cfg = cfg.get("output", {})
     calib_cfg = cfg.get("calibration", {})
     calib_manager = CalibrationManager(calib_cfg, cfg_path if cfg_path.exists() else None)
@@ -79,7 +84,20 @@ def main():
 
     preflight_checks(cfg, _LOCAL_JI_PY_BUILD, _LOCAL_JI_LIB)
 
-    input_stream = ju.videoSource(cam_uri)
+    # 初始化双摄
+    base_ws = int(cfg.get("http", {}).get("ws_port", 8765))
+    try:
+        left = ju.videoSource(left_uri, argv=[f"--input-width={width}", f"--input-height={height}", f"--framerate={fps}"])
+        right = ju.videoSource(right_uri, argv=[f"--input-width={width}", f"--input-height={height}", f"--framerate={fps}"])
+        logging.info("Cameras initialized: %s & %s", left_uri, right_uri)
+    except Exception as e:
+        logging.error("Failed to init dual cameras: %s", e)
+        sys.exit(1)
+
+    broadcaster = FrameBroadcaster(host="0.0.0.0", port=base_ws)
+    broadcaster.start()
+    logging.info("WebSocket output on ws://0.0.0.0:%d", base_ws)
+
     outputs = build_outputs(out_cfg, cam_cfg)
     if not outputs:
         logging.warning("No outputs available (RTSP/HDMI). Continuing without rendering.")
@@ -90,15 +108,6 @@ def main():
     mb = ModbusBridge(cfg, state)
     base_dir = Path(__file__).resolve().parent.parent
     start_http_server(cfg, state, base_dir, calib_manager)
-
-    ws_broadcaster = None
-    http_cfg = cfg.get("http", {})
-    ws_port = int(http_cfg.get("ws_port", 8765))
-    try:
-        ws_broadcaster = FrameBroadcaster(host=http_cfg.get("host", "0.0.0.0"), port=ws_port)
-        ws_broadcaster.start()
-    except Exception as e:
-        logging.error("Failed to start WebSocket broadcaster: %s", e)
     state.update_calibration(calib_manager.get())
 
     running = True
@@ -115,6 +124,8 @@ def main():
     last_publish = 0.0
     publish_interval = float(cfg.get("app", {}).get("publish_interval_ms", 100)) / 1000.0
 
+    combo = None  # 合成的左右并排图
+
     while running:
         now = time.time()
         control = state.get_control()
@@ -124,78 +135,79 @@ def main():
         mb.sync_control(control)
         mb.step(now, control)
 
-        if not input_stream.IsStreaming():
-            logging.warning("Input stream not streaming, breaking loop")
-            break
-        img = input_stream.Capture()
-        if img is None:
+        if not left.IsStreaming() or not right.IsStreaming():
+            logging.warning("Input stream not streaming, skipping frame")
+            time.sleep(0.01)
+            continue
+
+        l_img = left.Capture()
+        r_img = right.Capture()
+        if l_img is None or r_img is None:
             continue
 
         if not control.get("running", True):
-            # Skip inference/output but keep heartbeats and status updates alive
             font.OverlayText(
-                img,
+                l_img,
                 text=f"paused ({control.get('mode')})",
                 x=5,
                 y=5,
                 color=ju.makeColor(255, 200, 64, 255),
                 bg_color=ju.makeColor(0, 0, 0, 180),
             )
-            for out in outputs:
-                out.Render(img)
-                out.SetStatus(f"Paused ({control.get('mode')})")
-            state.update_detection(None, 0.0, 0)
-            state.update_fps(0.0)
-            continue
-
-        detections = net.Detect(img, overlay="box,labels,conf")
-        best_det = None
-        for det in detections:
-            if best_det is None or det.Confidence > best_det.Confidence:
-                best_det = det
-
-        x_mm = None
-        result_code = 2  # default: no target
-        conf = 0.0
-        if best_det:
-            cx = 0.5 * (best_det.Left + best_det.Right)
-            x_mm = calib_manager.to_mm(cx)
-            result_code = 1
-            conf = best_det.Confidence
-            font.OverlayText(
-                img,
-                text=f"x={x_mm:.1f}mm conf={best_det.Confidence:.2f}",
-                x=5,
-                y=5,
-                color=ju.makeColor(0, 255, 0, 255),
-                bg_color=ju.makeColor(0, 0, 0, 160),
-            )
         else:
-            font.OverlayText(
-                img,
-                text="no target",
-                x=5,
-                y=5,
-                color=ju.makeColor(255, 64, 64, 255),
-                bg_color=ju.makeColor(0, 0, 0, 160),
-            )
+            detections = net.Detect(l_img, overlay="box,labels,conf")
+            best_det = None
+            for det in detections:
+                if best_det is None or det.Confidence > best_det.Confidence:
+                    best_det = det
+
+            x_mm = None
+            result_code = 2  # default: no target
+            conf = 0.0
+            if best_det:
+                cx = 0.5 * (best_det.Left + best_det.Right)
+                x_mm = calib_manager.to_mm(cx)
+                result_code = 1
+                conf = best_det.Confidence
+                font.OverlayText(
+                    l_img,
+                    text=f"x={x_mm:.1f}mm conf={best_det.Confidence:.2f}",
+                    x=5,
+                    y=5,
+                    color=ju.makeColor(0, 255, 0, 255),
+                    bg_color=ju.makeColor(0, 0, 0, 160),
+                )
+            else:
+                font.OverlayText(
+                    l_img,
+                    text="no target",
+                    x=5,
+                    y=5,
+                    color=ju.makeColor(255, 64, 64, 255),
+                    bg_color=ju.makeColor(0, 0, 0, 160),
+                )
+
+            state.update_detection(x_mm, conf, result_code)
+            state.update_fps(net.GetNetworkFPS())
+            if now - last_publish >= publish_interval:
+                mb.publish_detection(x_mm, result_code)
+                last_publish = now
+
+        # 合成到并排画面
+        if combo is None or combo.width != (l_img.width + r_img.width) or combo.height != l_img.height:
+            combo = ju.cudaAllocMapped(l_img.width + r_img.width, l_img.height, l_img.format)
+        ju.cudaMemcpy2D(dest=combo, destX=0, src=l_img)
+        ju.cudaMemcpy2D(dest=combo, destX=l_img.width, src=r_img)
+
+        try:
+            jpeg_bytes = ju.cudaEncodeImage(combo, "jpg")
+            broadcaster.push(bytes(jpeg_bytes))
+        except Exception as e:
+            logging.debug("WebSocket frame encode/broadcast failed: %s", e)
 
         for out in outputs:
-            out.Render(img)
+            out.Render(combo)
             out.SetStatus(f"FPS {net.GetNetworkFPS():.1f}")
-
-        if ws_broadcaster:
-            try:
-                jpeg_bytes = ju.cudaEncodeImage(img, "jpg")
-                ws_broadcaster.push(bytes(jpeg_bytes))
-            except Exception as e:
-                logging.debug("WebSocket frame encode/broadcast failed: %s", e)
-
-        state.update_detection(x_mm, conf, result_code)
-        state.update_fps(net.GetNetworkFPS())
-        if now - last_publish >= publish_interval:
-            mb.publish_detection(x_mm, result_code)
-            last_publish = now
 
         if outputs and not outputs[0].IsStreaming():
             running = False
