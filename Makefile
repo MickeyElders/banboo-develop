@@ -76,7 +76,11 @@ install-jetson:
 	mkdir -p "$(JI_SRC_ABS)/build/aarch64"; \
 	cmake -S "$(JI_SRC_ABS)" -B "$(JI_SRC_ABS)/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
 	cmake --build "$(JI_SRC_ABS)/build/aarch64" -- -j$$(nproc); \
-	echo "jetson-inference local build completed (python libs in $(JI_SRC_ABS)/build/aarch64/python)"
+	if ! find "$(JI_SRC_ABS)/build" -name 'jetson_utils*.so' | grep -q .; then \
+		echo "ERROR: jetson_utils python binding not found under $(JI_SRC_ABS)/build after build"; \
+		exit 1; \
+	fi; \
+	echo "jetson-inference local build completed; python libs present under $(JI_SRC_ABS)/build"
 
 check-gst:
 	@set -e; \
@@ -127,6 +131,10 @@ install: deps
 	-$(MAKE) service-stop
 	sudo mkdir -p "$(PREFIX)"
 	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md jetson-inference "$(PREFIX)"
+	@if ! find "$(PREFIX)/jetson-inference/build" -name 'jetson_utils*.so' | grep -q .; then \
+		echo "ERROR: jetson_utils binding missing in install prefix $(PREFIX)/jetson-inference/build. Did install-jetson succeed?"; \
+		exit 1; \
+	fi
 	sudo install -D -m644 deploy/systemd/$(SERVICE) /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now $(SERVICE)
