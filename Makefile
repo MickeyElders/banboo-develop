@@ -16,7 +16,7 @@ JI_LIB ?= $(JI_BUILD)/lib
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
 
-.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy check-ji-source kiosk-deps kiosk-service stop restart update-ji-source
+.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy check-ji-source kiosk-deps kiosk-service stop restart update-ji-source install-jetson-if-missing
 
 stop: service-stop
 restart: service-restart
@@ -27,7 +27,7 @@ deps: check-ji-source
 	fi
 	$(PIP) install -r requirements.txt
 	$(MAKE) update-ji-source
-	$(MAKE) install-jetson
+	$(MAKE) install-jetson-if-missing
 	$(MAKE) check-gst
 	$(MAKE) build-engine
 
@@ -87,6 +87,17 @@ install-jetson:
 		exit 1; \
 	fi; \
 	echo "jetson-inference build completed under $(JI_BUILD)"
+
+install-jetson-if-missing:
+	@set -e; \
+	if python3 - <<'PY' >/dev/null 2>&1; then \
+	    import jetson_inference, jetson_utils; \
+	PY \
+	; then \
+		echo "jetson-inference already available in system python, skipping build/install"; \
+	else \
+		$(MAKE) install-jetson; \
+	fi
 
 update-ji-source:
 	@set -e; \
