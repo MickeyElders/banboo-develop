@@ -23,8 +23,8 @@ class FrameBroadcaster:
 
     def _run_loop(self):
         asyncio.set_event_loop(self.loop)
-        self._server = websockets.serve(self._handler, self.host, self.port, max_queue=1)
-        self.loop.run_until_complete(self._server)
+        server_coro = websockets.serve(self._handler, self.host, self.port, max_queue=1)
+        self._server = self.loop.run_until_complete(server_coro)
         self.loop.run_forever()
 
     async def _handler(self, websocket, path):
