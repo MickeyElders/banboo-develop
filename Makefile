@@ -121,6 +121,7 @@ run:
 	echo "bamboo-vision started in background (PID $$(cat /tmp/bamboo-vision.run.pid)), logs: /tmp/bamboo-vision.run.log"
 
 install: deps
+	-$(MAKE) service-stop
 	sudo mkdir -p "$(PREFIX)"
 	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md jetson-inference "$(PREFIX)"
 	sudo install -D -m644 deploy/systemd/$(SERVICE) /etc/systemd/system/$(SERVICE)
