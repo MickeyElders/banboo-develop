@@ -7,8 +7,8 @@ SERVICE ?= bamboo-vision.service
 KIOSK_USER ?= ubuntu
 KIOSK_URL ?= http://localhost:8080/bamboo.html
 JETSON_PY ?= /usr/local/python
-JI_SRC ?= jetson-inference
-JI_SRC_ABS := $(abspath $(JI_SRC))
+JI_SRC ?= $(PREFIX)/jetson-inference
+JI_SRC_ABS := $(JI_SRC)
 JI_BUILD ?= $(JI_SRC)/build/aarch64
 JI_PY ?= $(JI_BUILD)/python
 JI_LIB ?= $(JI_BUILD)/lib
@@ -26,6 +26,7 @@ deps: check-ji-source
 		sudo apt-get update && sudo apt-get install -y python3-pip; \
 	fi
 	$(PIP) install -r requirements.txt
+	$(MAKE) update-ji-source
 	$(MAKE) install-jetson
 	$(MAKE) check-gst
 	$(MAKE) build-engine
@@ -33,7 +34,6 @@ deps: check-ji-source
 check-ji-source:
 	@if [ ! -f "$(JI_SRC_ABS)/CMakeLists.txt" ]; then \
 		echo "ERROR: jetson-inference source missing at $(JI_SRC_ABS)"; \
-		echo "Clone https://github.com/dusty-nv/jetson-inference into $(JI_SRC_ABS) or override JI_SRC=<path>"; \
 		exit 1; \
 	fi
 
@@ -72,15 +72,19 @@ install-jetson:
 		exit 1; \
 	fi; \
 	# Ensure python package dir exists to satisfy install step
-	mkdir -p "$(JI_SRC_ABS)/utils/python/jetson"; \
-	mkdir -p "$(JI_SRC_ABS)/build/aarch64"; \
-	cmake -S "$(JI_SRC_ABS)" -B "$(JI_SRC_ABS)/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
-	cmake --build "$(JI_SRC_ABS)/build/aarch64" -- -j$$(nproc); \
+	sudo mkdir -p "$(JI_SRC_ABS)/utils/python/jetson"; \
+	sudo mkdir -p "$(JI_SRC_ABS)/build/aarch64"; \
+	sudo cmake -S "$(JI_SRC_ABS)" -B "$(JI_SRC_ABS)/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
+	sudo cmake --build "$(JI_SRC_ABS)/build/aarch64" -- -j$$(nproc); \
 	if ! find "$(JI_SRC_ABS)/build" -name 'jetson_utils*.so' | grep -q .; then \
 		echo "ERROR: jetson_utils python binding not found under $(JI_SRC_ABS)/build after build"; \
 		exit 1; \
 	fi; \
-	echo "jetson-inference local build completed; python libs present under $(JI_SRC_ABS)/build"
+	if ! find "$(JI_SRC_ABS)/build" -name 'jetson_inference*so' | grep -q .; then \
+		echo "ERROR: jetson_inference python binding not found under $(JI_SRC_ABS)/build after build"; \
+		exit 1; \
+	fi; \
+	echo "jetson-inference build completed under $(JI_SRC_ABS)/build"
 
 check-gst:
 	@set -e; \
@@ -130,7 +134,7 @@ run:
 install: deps
 	-$(MAKE) service-stop
 	sudo mkdir -p "$(PREFIX)"
-	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md jetson-inference "$(PREFIX)"
+	sudo cp -r bamboo_vision.py bamboo_vision config models bamboo.html requirements.txt RUNNING.md "$(PREFIX)"
 	$(MAKE) check-ji-binaries
 	sudo install -D -m644 deploy/systemd/$(SERVICE) /etc/systemd/system/$(SERVICE)
 	sudo systemctl daemon-reload
@@ -173,6 +177,10 @@ check-ji-binaries:
 	if [ -d "$(PREFIX)/jetson-inference" ]; then \
 		if ! find "$(PREFIX)/jetson-inference/build" -name 'jetson_utils*.so' | grep -q .; then \
 			echo "ERROR: jetson_utils binding missing in install prefix $(PREFIX)/jetson-inference/build"; \
+			exit 1; \
+		fi; \
+		if ! find "$(PREFIX)/jetson-inference/build" -name 'jetson_inference*.so' | grep -q .; then \
+			echo "ERROR: jetson_inference binding missing in install prefix $(PREFIX)/jetson-inference/build"; \
 			exit 1; \
 		fi; \
 	else \
