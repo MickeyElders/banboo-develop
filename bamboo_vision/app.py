@@ -103,9 +103,8 @@ def main():
     broadcaster.start()
     logging.info("WebSocket output on ws://0.0.0.0:%d", base_ws)
 
-    outputs = build_outputs(out_cfg, cam_cfg)
-    if not outputs:
-        logging.warning("No outputs available (RTSP/HDMI). Continuing without rendering.")
+    outputs = []  # videoOutput 全部禁用，只保留推理与 WebSocket JPEG 推送
+    logging.info("Outputs disabled: inference + websocket JPEG only.")
 
     net = build_net(cfg)
     font = ju.cudaFont()
@@ -224,12 +223,7 @@ def main():
         except Exception as e:
             logging.debug("WebSocket frame encode/broadcast failed: %s", e)
 
-        for out in outputs:
-            out.Render(combo)
-            out.SetStatus(f"FPS {net.GetNetworkFPS():.1f}")
-
-        if outputs and not outputs[0].IsStreaming():
-            running = False
+        # 无本地渲染，纯推理推流
 
     mb.close()
     logging.info("Shutting down")
