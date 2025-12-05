@@ -7,9 +7,9 @@ SERVICE ?= bamboo-vision.service
 KIOSK_USER ?= ubuntu
 KIOSK_URL ?= http://localhost:8080/bamboo.html
 JETSON_PY ?= /usr/local/python
-JI_SRC ?= $(PREFIX)/jetson-inference
-JI_SRC_ABS := $(JI_SRC)
-JI_BUILD ?= $(JI_SRC)/build/aarch64
+JI_SRC ?= ../jetson-inference
+JI_SRC_ABS := $(abspath $(JI_SRC))
+JI_BUILD ?= $(JI_SRC_ABS)/build
 JI_PY ?= $(JI_BUILD)/python
 JI_LIB ?= $(JI_BUILD)/lib
 # Default TensorRT CLI path (JetPack install). Override with TRTEXEC=/path/to/trtexec if different.
@@ -71,20 +71,22 @@ install-jetson:
 		ls -l "$(JI_SRC_ABS)"; \
 		exit 1; \
 	fi; \
-	# Ensure python package dir exists to satisfy install step
-	sudo mkdir -p "$(JI_SRC_ABS)/utils/python/jetson"; \
-	sudo mkdir -p "$(JI_SRC_ABS)/build/aarch64"; \
-	sudo cmake -S "$(JI_SRC_ABS)" -B "$(JI_SRC_ABS)/build/aarch64" -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
-	sudo cmake --build "$(JI_SRC_ABS)/build/aarch64" -- -j$$(nproc); \
-	if ! find "$(JI_SRC_ABS)/build" -name 'jetson_utils*.so' | grep -q .; then \
-		echo "ERROR: jetson_utils python binding not found under $(JI_SRC_ABS)/build after build"; \
+	# Clean old build and rebuild in $(JI_BUILD) (matches manual working steps)
+	sudo rm -rf "$(JI_BUILD)"; \
+	sudo mkdir -p "$(JI_BUILD)"; \
+	cd "$(JI_BUILD)" && sudo cmake .. -DENABLE_PYTHON=ON -DENABLE_GSTREAMER=ON -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DNUMPY_INCLUDE_DIRS="$$NUMPY_INC" -DNUMPY_LIBRARIES="$$NPYMATH"; \
+	cd "$(JI_BUILD)" && sudo make -j$$(nproc); \
+	cd "$(JI_BUILD)" && sudo make install; \
+	sudo ldconfig; \
+	if ! find "$(JI_BUILD)" -name 'jetson_utils*.so' | grep -q .; then \
+		echo "ERROR: jetson_utils python binding not found under $(JI_BUILD) after build"; \
 		exit 1; \
 	fi; \
-	if ! find "$(JI_SRC_ABS)/build" -name 'jetson_inference*so' | grep -q .; then \
-		echo "ERROR: jetson_inference python binding not found under $(JI_SRC_ABS)/build after build"; \
+	if ! find "$(JI_BUILD)" -name 'jetson_inference*so' | grep -q .; then \
+		echo "ERROR: jetson_inference python binding not found under $(JI_BUILD) after build"; \
 		exit 1; \
 	fi; \
-	echo "jetson-inference build completed under $(JI_SRC_ABS)/build"
+	echo "jetson-inference build completed under $(JI_BUILD)"
 
 update-ji-source:
 	@set -e; \
@@ -141,7 +143,7 @@ build-engine:
 	fi
 
 run:
-	@PYTHONPATH="$(abspath $(JI_SRC)/python):$(abspath $(JI_SRC))/utils/python/python:$(abspath $(JI_SRC))/build:$(abspath $(JI_BUILD)):$(abspath $(JI_SRC))/build/aarch64/aarch64/lib/python:$(abspath $(JI_SRC))/build/aarch64/aarch64/lib/python/3.10:/usr/local/lib/python3.10/dist-packages:/usr/local/lib/python3/dist-packages:/usr/local/python:$$PYTHONPATH" LD_LIBRARY_PATH="$(abspath $(JI_BUILD))/lib:$(abspath $(JI_BUILD))/aarch64/lib:/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$$LD_LIBRARY_PATH" nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
+	@PYTHONPATH="/usr/local/lib/python3.10/dist-packages:/usr/local/lib/python3/dist-packages:/usr/local/python:$$PYTHONPATH" LD_LIBRARY_PATH="/usr/local/lib:/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$$LD_LIBRARY_PATH" nohup $(PY) -m bamboo_vision.app --config config/runtime.yaml > /tmp/bamboo-vision.run.log 2>&1 & echo $$! > /tmp/bamboo-vision.run.pid; \
 	echo "bamboo-vision started in background (PID $$(cat /tmp/bamboo-vision.run.pid)), logs: /tmp/bamboo-vision.run.log"
 
 install: deps
