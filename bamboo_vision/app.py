@@ -10,9 +10,10 @@ import os
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY_SRC = _ROOT / "jetson-inference" / "python"
 _LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
+_LOCAL_JI_PY_BUILD_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib" / "python"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
 
-for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY_SRC):
+for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY_BUILD_LIB, _LOCAL_JI_PY_SRC):
     if _p.is_dir():
         sys.path.insert(0, str(_p))
 # Ensure local libs are visible (for freshly built jetson-inference in-tree)
