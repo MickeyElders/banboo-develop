@@ -278,6 +278,14 @@ body {
             background: #000;
             display: none;
         }
+        .camera-canvas img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
 
         .camera-placeholder {
             position: absolute;
@@ -599,6 +607,7 @@ body {
                 <span style="color: var(--text-secondary); font-size: 12px;">1280x720 | YOLOv8 | 0.1mm 精度 | WebRTC</span>
             </div>
             <div class="camera-canvas">
+                <img id="streamImage" alt="MJPEG Stream">
                 <div class="camera-placeholder" id="camera-placeholder">
                     <div>
                         <div>竹材检测预览：WebRTC（自动连接）</div>
@@ -1269,6 +1278,21 @@ body {
         updateWorkflowStatus(1);
         pollStatus();
         setInterval(pollStatus, 1000);
+
+        // MJPEG stream (HTTP) fallback
+        (function initMJPEG() {
+            const img = document.getElementById('streamImage');
+            if (!img) return;
+            const baseUrl = `http://${location.hostname || '127.0.0.1'}:8554`;
+            const reload = () => {
+                img.src = `${baseUrl}?t=${Date.now()}`;
+            };
+            img.onerror = () => {
+                console.error('MJPEG stream lost, retrying...');
+                setTimeout(reload, 2000);
+            };
+            reload();
+        })();
 
         // WebRTC over WebSocket (port 8080)
         (function initWebRTC() {

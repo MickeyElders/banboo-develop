@@ -45,11 +45,11 @@ modbus:
 
 output:
   hdmi: false             # HDMI 本地预览（官方 videoOutput）
-  webrtc: true            # WebRTC 输出（jetson.utils 内置 server）
+  webrtc: false           # 暂停 WebRTC，改用软件 RTSP
   webrtc_uri: "webrtc://@:9000/live"
-  rtsp: false             # 如需 RTSP 可开启
+  rtsp: true              # 启用 RTSP
   rtsp_uri: "rtsp://@:8554/live"
-  software_rtsp: false
+  software_rtsp: true     # 使用 x264 软件编码（兼容无 NVENC）
 
 app:
   publish_interval_ms: 100
