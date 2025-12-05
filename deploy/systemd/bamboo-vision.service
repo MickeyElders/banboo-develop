@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/bamboo-vision
 Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONPATH=/opt/bamboo-vision/jetson-inference/python:/opt/bamboo-vision/jetson-inference/build/aarch64/python:/opt/bamboo-vision/jetson-inference/build/aarch64/lib/python:$PYTHONPATH
+Environment=PYTHONPATH=/opt/bamboo-vision/jetson-inference/python:/opt/bamboo-vision/jetson-inference/build/aarch64/python:/opt/bamboo-vision/jetson-inference/build/aarch64/lib/python:/opt/bamboo-vision/jetson-inference/build/aarch64/lib/python/3.10:$PYTHONPATH
 Environment=LD_LIBRARY_PATH=/opt/bamboo-vision/jetson-inference/build/aarch64/lib:/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
 ExecStart=/usr/bin/python3 -m bamboo_vision.app --config /opt/bamboo-vision/config/runtime.yaml
 Restart=on-failure
