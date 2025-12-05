@@ -5,3 +5,4 @@ pymodbus
 pyyaml
 flask
 numpy<2
+websockets

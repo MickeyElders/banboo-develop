@@ -39,6 +39,7 @@ from .pipeline import build_net, build_outputs
 from .shared_state import SharedState
 from .modbus import ModbusBridge
 from .http_server import start_http_server
+from .ws_stream import FrameBroadcaster
 from .calibration import CalibrationManager
 from .preflight import preflight_checks
 
@@ -89,6 +90,15 @@ def main():
     mb = ModbusBridge(cfg, state)
     base_dir = Path(__file__).resolve().parent.parent
     start_http_server(cfg, state, base_dir, calib_manager)
+
+    ws_broadcaster = None
+    http_cfg = cfg.get("http", {})
+    ws_port = int(http_cfg.get("ws_port", 8765))
+    try:
+        ws_broadcaster = FrameBroadcaster(host=http_cfg.get("host", "0.0.0.0"), port=ws_port)
+        ws_broadcaster.start()
+    except Exception as e:
+        logging.error("Failed to start WebSocket broadcaster: %s", e)
     state.update_calibration(calib_manager.get())
 
     running = True
@@ -173,6 +183,13 @@ def main():
         for out in outputs:
             out.Render(img)
             out.SetStatus(f"FPS {net.GetNetworkFPS():.1f}")
+
+        if ws_broadcaster:
+            try:
+                jpeg_bytes = ju.cudaEncodeImage(img, "jpg")
+                ws_broadcaster.push(bytes(jpeg_bytes))
+            except Exception as e:
+                logging.debug("WebSocket frame encode/broadcast failed: %s", e)
 
         state.update_detection(x_mm, conf, result_code)
         state.update_fps(net.GetNetworkFPS())
