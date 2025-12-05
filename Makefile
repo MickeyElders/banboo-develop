@@ -137,7 +137,8 @@ service-restart:
 	sudo systemctl restart $(SERVICE)
 
 service-stop:
-	sudo systemctl stop $(SERVICE)
+	sudo systemctl stop $(SERVICE) 2>/dev/null || true
+	sudo systemctl reset-failed $(SERVICE) 2>/dev/null || true
 
 service-status:
 	sudo systemctl status $(SERVICE) --no-pager
@@ -156,7 +157,7 @@ clean-install:
 	# Remove install prefix
 	sudo rm -rf "$(PREFIX)"
 
-redeploy: clean-install install
+redeploy: service-stop clean-install install
 
 kiosk-deps:
 	@set -e; \
