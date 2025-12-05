@@ -16,7 +16,7 @@ JI_LIB ?= $(JI_BUILD)/lib
 TRTEXEC ?= /usr/src/tensorrt/bin/trtexec
 TRT_WORKSPACE := 2048  # MiB workspace for TensorRT engine build
 
-.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy check-ji-source kiosk-deps kiosk-service stop restart
+.PHONY: deps check-jetson run install service service-restart service-stop service-status logs clean-install redeploy check-ji-source kiosk-deps kiosk-service stop restart update-ji-source
 
 stop: service-stop
 restart: service-restart
@@ -85,6 +85,19 @@ install-jetson:
 		exit 1; \
 	fi; \
 	echo "jetson-inference build completed under $(JI_SRC_ABS)/build"
+
+update-ji-source:
+	@set -e; \
+	if [ -d "$(JI_SRC_ABS)/.git" ]; then \
+		echo "Updating jetson-inference at $(JI_SRC_ABS)"; \
+		sudo git -C "$(JI_SRC_ABS)" fetch origin master --depth=1; \
+		sudo git -C "$(JI_SRC_ABS)" reset --hard origin/master; \
+		sudo git -C "$(JI_SRC_ABS)" submodule update --init --recursive --depth=1; \
+	else \
+		echo "Cloning jetson-inference into $(JI_SRC_ABS)"; \
+		sudo rm -rf "$(JI_SRC_ABS)"; \
+		sudo git clone --recursive --depth=1 https://github.com/dusty-nv/jetson-inference "$(JI_SRC_ABS)"; \
+	fi
 
 check-gst:
 	@set -e; \
