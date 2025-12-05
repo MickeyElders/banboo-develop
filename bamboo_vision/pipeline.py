@@ -3,15 +3,21 @@ import subprocess
 import os
 import sys
 from pathlib import Path
+import glob
 
 # Require local jetson-inference build (no system fallback)
 _ROOT = Path(__file__).resolve().parent.parent
 _LOCAL_JI_PY_SRC = _ROOT / "jetson-inference" / "python"
 _LOCAL_JI_PY_BUILD = _ROOT / "jetson-inference" / "build" / "aarch64" / "python"
-_LOCAL_JI_PY_BUILD_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib" / "python"
-_LOCAL_JI_PY_BUILD_LIB310 = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib" / "python" / "3.10"
 _LOCAL_JI_LIB = _ROOT / "jetson-inference" / "build" / "aarch64" / "lib"
-for _p in (_LOCAL_JI_PY_BUILD, _LOCAL_JI_PY_BUILD_LIB, _LOCAL_JI_PY_BUILD_LIB310, _LOCAL_JI_PY_SRC):
+
+_extra_py_paths = [
+    _LOCAL_JI_PY_BUILD,
+    _LOCAL_JI_PY_SRC,
+]
+_extra_py_paths += [Path(p) for p in glob.glob(str(_ROOT / "jetson-inference" / "build" / "aarch64" / "lib" / "python*"))]
+
+for _p in _extra_py_paths:
     if _p.is_dir():
         sys.path.insert(0, str(_p))
 if _LOCAL_JI_LIB.is_dir():
