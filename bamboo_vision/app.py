@@ -135,6 +135,10 @@ def main():
     combo = None  # 合成的左右并排图
     sgbm = None
     disparity_error_logged = False
+    l_buf = None
+    r_buf = None
+    target_w = getattr(net, "GetInputWidth", lambda: None)() or 960
+    target_h = getattr(net, "GetInputHeight", lambda: None)() or 960
 
     while running:
         now = time.time()
@@ -155,6 +159,22 @@ def main():
         if l_img is None or r_img is None:
             continue
 
+        # 统一到模型输入尺寸
+        if l_img.width != target_w or l_img.height != target_h:
+            if l_buf is None or l_buf.width != target_w or l_buf.height != target_h:
+                l_buf = ju.cudaAllocMapped(target_w, target_h, l_img.format)
+            ju.cudaResize(l_img, l_buf)
+            l_proc = l_buf
+        else:
+            l_proc = l_img
+        if r_img.width != target_w or r_img.height != target_h:
+            if r_buf is None or r_buf.width != target_w or r_buf.height != target_h:
+                r_buf = ju.cudaAllocMapped(target_w, target_h, r_img.format)
+            ju.cudaResize(r_img, r_buf)
+            r_proc = r_buf
+        else:
+            r_proc = r_img
+
         # 动态监测标定文件变化
         if calib_manager.reload_if_changed():
             state.update_calibration(calib_manager.get())
@@ -172,7 +192,7 @@ def main():
                 bg_color=ju.makeColor(0, 0, 0, 180),
             )
         else:
-            detections = net.Detect(l_img, overlay="box,labels,conf")
+            detections = net.Detect(l_proc, overlay="box,labels,conf")
             best_det = None
             for det in detections:
                 if best_det is None or det.Confidence > best_det.Confidence:
@@ -181,14 +201,18 @@ def main():
             x_mm = None
             result_code = 2  # default: no target
             conf = 0.0
+            dist_mm = None
             if best_det:
                 cx = 0.5 * (best_det.Left + best_det.Right)
                 x_mm = calib_manager.to_mm(cx)
+                ref_px = calib_manager.get().get("ref_px", 0.0)
+                if ref_px:
+                    dist_mm = (cx - ref_px) * calib_manager.get().get("pixel_to_mm", 1.0) + calib_manager.get().get("offset_mm", 0.0)
                 result_code = 1
                 conf = best_det.Confidence
                 font.OverlayText(
-                    l_img,
-                    text=f"x={x_mm:.1f}mm conf={best_det.Confidence:.2f}",
+                    l_proc,
+                    text=f"x={x_mm:.1f}mm dist={dist_mm:.1f}mm conf={best_det.Confidence:.2f}" if dist_mm is not None else f"x={x_mm:.1f}mm conf={best_det.Confidence:.2f}",
                     x=5,
                     y=5,
                     color=ju.makeColor(0, 255, 0, 255),
@@ -196,7 +220,7 @@ def main():
                 )
             else:
                 font.OverlayText(
-                    l_img,
+                    l_proc,
                     text="no target",
                     x=5,
                     y=5,
@@ -212,7 +236,7 @@ def main():
 
         if calib_missing:
             font.OverlayText(
-                l_img,
+                l_proc,
                 text="未标定：请在前端点击标定生成文件",
                 x=5,
                 y=30,
@@ -221,12 +245,12 @@ def main():
             )
 
         # 合成输出：未标定时仅推左目，标定后并排左/右
-        frame_out = l_img
+        frame_out = l_proc
         if not calib_missing:
-            if combo is None or combo.width != (l_img.width + r_img.width) or combo.height != l_img.height:
-                combo = ju.cudaAllocMapped(l_img.width + r_img.width, l_img.height, l_img.format)
-            ju.cudaMemcpy2D(dest=combo, destX=0, src=l_img)
-            ju.cudaMemcpy2D(dest=combo, destX=l_img.width, src=r_img)
+            if combo is None or combo.width != (l_proc.width + r_proc.width) or combo.height != l_proc.height:
+                combo = ju.cudaAllocMapped(l_proc.width + r_proc.width, l_proc.height, l_proc.format)
+            ju.cudaMemcpy2D(dest=combo, destX=0, src=l_proc)
+            ju.cudaMemcpy2D(dest=combo, destX=l_proc.width, src=r_proc)
             frame_out = combo
 
             # 可选立体深度（需标定文件），缺失时跳过；使用 OpenCV SGBM，避免 headless CUDA/OpenGL 冲突
@@ -250,8 +274,8 @@ def main():
                     sgbm = None
             if sgbm is not None:
                 try:
-                    l_np = ju.cudaToNumpy(l_img)
-                    r_np = ju.cudaToNumpy(r_img)
+            l_np = ju.cudaToNumpy(l_proc)
+            r_np = ju.cudaToNumpy(r_proc)
                     if l_np.dtype != np.uint8:
                         l_np = np.clip(l_np, 0, 255).astype(np.uint8)
                         r_np = np.clip(r_np, 0, 255).astype(np.uint8)

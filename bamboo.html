@@ -1288,6 +1288,30 @@ body {
         pollStatus();
         setInterval(pollStatus, 1000);
 
+        // 点击画面设置标尺零点 ref_px
+        (function bindRefPixelSetter() {
+            const img = document.getElementById('streamImage');
+            if (!img) return;
+            img.addEventListener('click', async (ev) => {
+                const rect = img.getBoundingClientRect();
+                const ratioX = (ev.clientX - rect.left) / rect.width;
+                const natW = img.naturalWidth || 960;
+                const refPx = Math.round(ratioX * natW);
+                try {
+                    const res = await fetch('/api/calibration', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ref_px: refPx, persist: true })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) throw new Error(data.error || 'calibration update failed');
+                    showMessage(`标尺零点设置为像素 ${refPx}`, 'success');
+                } catch (e) {
+                    showMessage('标尺零点设置失败: ' + e.message, 'error');
+                }
+            });
+        })();
+
         // WebSocket JPEG stream (binary)
         (function initWebSocketStream() {
             const img = document.getElementById('streamImage');

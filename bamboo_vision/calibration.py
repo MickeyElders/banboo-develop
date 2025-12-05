@@ -15,6 +15,7 @@ class CalibrationManager:
             "offset_mm": float(calib_cfg.get("offset_mm", 0.0)),
             "latency_ms": float(calib_cfg.get("latency_ms", 0.0)),
             "belt_speed_mm_s": float(calib_cfg.get("belt_speed_mm_s", 0.0)),
+            "ref_px": float(calib_cfg.get("ref_px", 0.0)),  # 标尺零点像素
         }
         self._loaded_from_file = False
         # Attempt to load from persisted file (json/yaml). If missing, keep defaults.
@@ -42,7 +43,7 @@ class CalibrationManager:
 
     def update(self, data: dict):
         with self._lock:
-            for key in ("pixel_to_mm", "offset_mm", "latency_ms", "belt_speed_mm_s"):
+            for key in ("pixel_to_mm", "offset_mm", "latency_ms", "belt_speed_mm_s", "ref_px"):
                 if key in data:
                     self._calib[key] = float(data[key])
             # manual update counts as loaded
@@ -97,7 +98,7 @@ class CalibrationManager:
             if not isinstance(data, dict):
                 return False
             with self._lock:
-                for key in ("pixel_to_mm", "offset_mm", "latency_ms", "belt_speed_mm_s"):
+                for key in ("pixel_to_mm", "offset_mm", "latency_ms", "belt_speed_mm_s", "ref_px"):
                     if key in data:
                         self._calib[key] = float(data[key])
             return True
