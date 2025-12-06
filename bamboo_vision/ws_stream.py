@@ -18,6 +18,7 @@ class WebSocketStreamer:
         self._server = None
         self._stopping = threading.Event()
         self._ready = threading.Event()
+        self._stop_event: asyncio.Event | None = None
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -29,6 +30,8 @@ class WebSocketStreamer:
     def stop(self):
         self._stopping.set()
         if self.loop and self.loop.is_running():
+            if self._stop_event:
+                self.loop.call_soon_threadsafe(self._stop_event.set)
             self.loop.call_soon_threadsafe(self.loop.stop)
         if self._thread:
             self._thread.join(timeout=1.0)
@@ -37,20 +40,25 @@ class WebSocketStreamer:
         asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        server_coro = websockets.serve(self._handler, self.host, self.port, max_queue=1)
+        self._stop_event = asyncio.Event()
+
+        async def runner():
+            async with websockets.serve(self._handler, self.host, self.port, max_queue=1) as server:
+                self._server = server
+                self._ready.set()
+                await self._stop_event.wait()
+
         try:
-            self._server = self.loop.run_until_complete(server_coro)
-            self._ready.set()
-            self.loop.run_forever()
+            self.loop.run_until_complete(runner())
         except Exception as e:
             logging.error("WebSocket streamer loop error: %s", e)
         finally:
-            try:
-                if self._server:
-                    self._server.close()
-                    self.loop.run_until_complete(self._server.wait_closed())
-            finally:
-                self.loop.close()
+            if self.loop and not self.loop.is_closed():
+                try:
+                    self.loop.stop()
+                    self.loop.close()
+                except Exception:
+                    pass
 
     async def _handler(self, websocket, path):
         self.clients.add(websocket)
@@ -70,9 +78,11 @@ class WebSocketStreamer:
             self.clients.discard(ws)
 
     def push(self, data: bytes):
-        if not self.clients or not self.loop or not self.loop.is_running() or not self._ready.is_set():
+        if not self.clients or not self.loop or not self._ready.is_set():
+            return
+        if self.loop.is_closed():
             return
         try:
-            asyncio.run_coroutine_threadsafe(self._broadcast(data), self.loop)
+            self.loop.call_soon_threadsafe(asyncio.create_task, self._broadcast(data))
         except Exception as e:
             logging.debug("WebSocket push failed: %s", e)

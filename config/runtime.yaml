@@ -7,8 +7,8 @@ camera:
   height: 720
 
 model:
-  onnx: "models/best_static.onnx"
-  engine: "models/best_static.engine"   # optional; leave blank to build on first run
+  onnx: "models/best.onnx"
+  engine: "models/best.engine"   # optional; leave blank to build on first run
   labels: "config/labels.txt"           # optional labels.txt
   threshold: 0.50
   nms: 0.45
