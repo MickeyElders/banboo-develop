@@ -67,6 +67,28 @@ def build_net(cfg: dict):
         extra_args += [f"--input-shape={input_shape}"]
     if workspace:
         extra_args += [f"--workspace={workspace}"]
+    # Minimal safety check: ensure output shape is [1, 18900, 6]; if it's [1, 6, 18900] warn and exit to avoid SEGV.
+    try:
+        import onnx  # type: ignore
+
+        model_onnx = onnx.load(str(model_path))
+        if model_onnx.graph.output:
+            dims = model_onnx.graph.output[0].type.tensor_type.shape.dim
+            if len(dims) == 3:
+                d0 = dims[0].dim_value
+                d1 = dims[1].dim_value
+                d2 = dims[2].dim_value
+                if d0 == 1 and d1 == 6 and d2 == 18900:
+                    msg = (
+                        "Model output shape is [1,6,18900]; expected [1,18900,6]. "
+                        "Please transpose the output (perm=[0,2,1]) and rebuild engine to avoid TensorRT SEGV."
+                    )
+                    logging.error(msg)
+                    raise SystemExit(msg)
+    except ImportError:
+        logging.warning("onnx package not available; skipping output shape sanity check.")
+    except Exception as e:
+        logging.warning("Output shape sanity check failed/skipped: %s", e)
     logging.info("Loading model: %s", model_path)
     net = ji.detectNet(argv=extra_args, threshold=threshold)
     net.SetNMS(nms)
